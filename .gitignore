@@ -1,0 +1,23 @@
+.DS_Store
+.AppleDouble
+.LSOverride
+
+.idea/
+*.iml
+
+# Excel temporary/lock files
+~$*
+*.tmp
+
+# C/C++ build outputs
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dylib
+*.dll
+*.exe
+*.out
+build/
+cmake-build-*/

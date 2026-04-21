@@ -1,0 +1,2003 @@
+﻿#ifndef __SEG_COMP_H_
+#define __SEG_COMP_H_
+#pragma warning ( disable : 4819 )
+
+// enum and map for independent model point processing
+enum seriatim_type {
+	prod_sfas133,
+	prod_sfas97rd,
+    prod_sfas97lp,
+	prod_sfas91,
+	prod_sfas60,
+	prod_sfas120,
+	prod_va_pba,
+	prod_life_pba,
+	prod_ann_pba,
+	prod 
+};
+typedef map <pair<xstring,seriatim_type>, SmartArray< SmartArray< SmartArray<double> > > > seriatim_map;  //[var. name][cohort][gross/ceded][t]
+
+#include <math.h>
+#include "xstring.h"
+#include "Locator.h"
+#include "circtabl.h"
+#include "message.h"
+#include "MULTIDIST.H"
+#include "mystring.H"
+#include "parmfile.h"
+#include "xstring.h"
+#include "svector.h"
+#include "hvector.h"
+#include "collectn.h"
+#include "newcashflow.h"
+#include "monivalu.h"
+#include "monitabl.h"
+#include "ratetbl.h"
+#include "rafmsqlite.h"
+#include "fmlstack.h"
+#include "useful.h"
+#include "RafmSchedule.h"
+#include "DBTable.h"
+#include "VariantTable.h"
+#include "hashobject.h"
+#include "mvisitor.h"
+#include "infdbf.h"
+#include "generatedCppHeader.h"
+#include "OutputFileReader.h"
+#include <map>
+#include <set>
+#include <unordered_map>
+#include <unordered_set>
+#undef WRITE_PUT_METHODS
+            extern MY_DLL int profile_wanted;
+extern MY_DLL int model_capacity;
+extern MY_DLL int &t_high;
+extern MY_DLL2 int restore_variables_ind;
+extern MY_DLL2 FormulaStack *FS;
+extern MY_DLL ModelClass *CP;
+extern MY_DLL xstring modelClass;
+extern MY_DLL xstring group;
+extern MY_DLL xstring cashflow_req;
+extern MY_DLL long layer;
+extern MY_DLL long scenario_number;
+extern MY_DLL int num_of_main_layers;
+extern MY_DLL int layer_offset;
+extern MY_DLL int t_low;
+extern MY_DLL int pv_period;
+
+#include "prodcomp.h"
+#include "include.h"
+#include "column2.h"
+#include "VariableInterface.h"
+extern MY_DLL ofstream log_strm;
+#define ifkey(x)  if (strcmp(key.c_str(), (x))==0)
+
+#include "StringProxy.h"			// ... contains String Proxies
+#include "StringEnumProxy.h"		// ... contains StringEnum Proxies
+#include "NumProxyNonMembers.h"		// ... min, max
+#include "StringedProxyNonMembers.h"		// ... concatenation for StringEnum
+#include "ArrayProxy.h"			// ... contains Array Proxies
+#include "ScalarProxy.h"			// ... contains Scalar Proxies
+#include "ModelGroupProxy.h"
+#include "NonAssocTableProxy.h"	// ... contains Rate_table and Table_from
+#include "AssocTableProxies.h"		// ... contains AssocArray tables
+#include "EnumValue.h"				// ... contains Enum Values
+
+
+using namespace StrEnum;
+
+#ifdef __CREATE_ADCO_ASSET_CLASS_
+class ADCO_ASSET;
+class ADCO_ASSET_persistent_object;
+#endif
+
+#ifdef __CREATE_ANN_PBA_PBA_CLASS_
+class ANN_PBA_PBA;
+class ANN_PBA_PBA_persistent_object;
+typedef TComp<ANN_PBA_PBA, ANN_PBA_PBA_persistent_object> _1D_ANN_PBA_PBA;
+#endif
+
+#ifdef __CREATE_ASSET_ASSET_CLASS_
+class ASSET_ASSET;
+class ASSET_ASSET_persistent_object;
+#endif
+
+#ifdef __CREATE_AUTOMATION_CLASS_
+class AUTOMATION;
+class AUTOMATION_persistent_object;
+#endif
+
+#ifdef __CREATE_A_SUBPORT_ASSET_CLASS_
+class A_SUBPORT_ASSET;
+class A_SUBPORT_ASSET_persistent_object;
+typedef TComp<A_SUBPORT_ASSET, A_SUBPORT_ASSET_persistent_object> _1D_A_SUBPORT_ASSET;
+typedef TMultiDComp<_1D_A_SUBPORT_ASSET, A_SUBPORT_ASSET_persistent_object> _2D_A_SUBPORT_ASSET;
+typedef TMultiDComp<_2D_A_SUBPORT_ASSET, A_SUBPORT_ASSET_persistent_object> _3D_A_SUBPORT_ASSET;
+#endif
+
+#ifdef __CREATE_BOND_AIG_CLASS_
+class BOND_AIG;
+class BOND_AIG_persistent_object;
+typedef TComp<BOND_AIG, BOND_AIG_persistent_object> _1D_BOND_AIG;
+#endif
+
+#ifdef __CREATE_BOND_ASSET_CLASS_
+class BOND_ASSET;
+class BOND_ASSET_persistent_object;
+typedef TComp<BOND_ASSET, BOND_ASSET_persistent_object> _1D_BOND_ASSET;
+#endif
+
+#ifdef __CREATE_BOND_CF_ASSET_CLASS_
+class BOND_CF_ASSET;
+class BOND_CF_ASSET_persistent_object;
+#endif
+
+#ifdef __CREATE_BOND_PORTFOLIO_AIG_CLASS_
+class BOND_PORTFOLIO_AIG;
+class BOND_PORTFOLIO_AIG_persistent_object;
+#endif
+
+#ifdef __CREATE_COMP_COMP_CLASS_
+class COMP_COMP;
+class COMP_COMP_persistent_object;
+#endif
+
+#ifdef __CREATE_EIO_ASSET_CLASS_
+class EIO_ASSET;
+class EIO_ASSET_persistent_object;
+typedef TComp<EIO_ASSET, EIO_ASSET_persistent_object> _1D_EIO_ASSET;
+#endif
+
+#ifdef __CREATE_EPA_ASSET_CLASS_
+class EPA_ASSET;
+class EPA_ASSET_persistent_object;
+typedef TComp<EPA_ASSET, EPA_ASSET_persistent_object> _1D_EPA_ASSET;
+#endif
+
+#ifdef __CREATE_EPL_LIAB_CLASS_
+class EPL_LIAB;
+class EPL_LIAB_persistent_object;
+typedef TComp<EPL_LIAB, EPL_LIAB_persistent_object> _1D_EPL_LIAB;
+#endif
+
+#ifdef __CREATE_FIAAFUND_LIAB_CLASS_
+class FIAAFUND_LIAB;
+class FIAAFUND_LIAB_persistent_object;
+typedef TComp<FIAAFUND_LIAB, FIAAFUND_LIAB_persistent_object> _1D_FIAAFUND_LIAB;
+#endif
+
+#ifdef __CREATE_FIACARVM_LIAB_CLASS_
+class FIACARVM_LIAB;
+class FIACARVM_LIAB_persistent_object;
+typedef TComp<FIACARVM_LIAB, FIACARVM_LIAB_persistent_object> _1D_FIACARVM_LIAB;
+#endif
+
+#ifdef __CREATE_FIA_LIAB_CLASS_
+class FIA_LIAB;
+class FIA_LIAB_persistent_object;
+typedef TComp<FIA_LIAB, FIA_LIAB_persistent_object> _1D_FIA_LIAB;
+#endif
+
+#ifdef __CREATE_HDG_GRP_COMP_CLASS_
+class HDG_GRP_COMP;
+class HDG_GRP_COMP_persistent_object;
+typedef TComp<HDG_GRP_COMP, HDG_GRP_COMP_persistent_object> _1D_HDG_GRP_COMP;
+typedef TMultiDComp<_1D_HDG_GRP_COMP, HDG_GRP_COMP_persistent_object> _2D_HDG_GRP_COMP;
+#endif
+
+#ifdef __CREATE_INTEX_ASSET_CLASS_
+class INTEX_ASSET;
+class INTEX_ASSET_persistent_object;
+#endif
+
+#ifdef __CREATE_INVSTRAT_ASSET_CLASS_
+class INVSTRAT_ASSET;
+class INVSTRAT_ASSET_persistent_object;
+typedef TComp<INVSTRAT_ASSET, INVSTRAT_ASSET_persistent_object> _1D_INVSTRAT_ASSET;
+#endif
+
+#ifdef __CREATE_LIAB_LIAB_CLASS_
+class LIAB_LIAB;
+class LIAB_LIAB_persistent_object;
+#endif
+
+#ifdef __CREATE_MTG_ASSET_CLASS_
+class MTG_ASSET;
+class MTG_ASSET_persistent_object;
+typedef TComp<MTG_ASSET, MTG_ASSET_persistent_object> _1D_MTG_ASSET;
+#endif
+
+#ifdef __CREATE_MTG_CF_ASSET_CLASS_
+class MTG_CF_ASSET;
+class MTG_CF_ASSET_persistent_object;
+#endif
+
+#ifdef __CREATE_RATES_ECONOMY_CLASS_
+class RATES_ECONOMY;
+class RATES_ECONOMY_persistent_object;
+#endif
+
+#ifdef __CREATE_SEG_COMP_CLASS_
+class SEG_COMP;
+class SEG_COMP_persistent_object;
+typedef TComp<SEG_COMP, SEG_COMP_persistent_object> _1D_SEG_COMP;
+#endif
+
+#ifdef __CREATE_SFAS133_GAAP_CLASS_
+class SFAS133_GAAP;
+class SFAS133_GAAP_persistent_object;
+typedef TComp<SFAS133_GAAP, SFAS133_GAAP_persistent_object> _1D_SFAS133_GAAP;
+#endif
+
+#ifdef __CREATE_SFAS97RD_GAAP_CLASS_
+class SFAS97RD_GAAP;
+class SFAS97RD_GAAP_persistent_object;
+typedef TComp<SFAS97RD_GAAP, SFAS97RD_GAAP_persistent_object> _1D_SFAS97RD_GAAP;
+typedef TMultiDComp<_1D_SFAS97RD_GAAP, SFAS97RD_GAAP_persistent_object> _2D_SFAS97RD_GAAP;
+#endif
+
+#ifdef __CREATE_UTIL_RAFM_CLASS_
+class UTIL_RAFM;
+class UTIL_RAFM_persistent_object;
+#endif
+
+
+#include "ModelClass\ann_pba_pba.h"
+#include "ModelClass\hdg_grp_comp.h"
+#include "ModelClass\sfas97rd_gaap.h"
+
+namespace SEG_COMP_NS {
+	struct GroupSharedAttributes;
+	struct SharedByAllAttributes;
+}
+
+class SEG_COMP_persistent_object;
+class SEG_COMP : public ModelClass {
+
+friend void clearSharedTempTables();
+	
+
+protected:
+	static TempTableHolderCollection TTHC;
+	void removeSMPointers(ModelClass* modelToRemove);
+static const CashFlowCommonData* mCFStaticData[];
+  static const CashFlowCommonData mCFStaticData_0[]; 
+  static const CashFlowCommonData mCFStaticData_256[]; 
+  static const CashFlowCommonData mCFStaticData_512[]; 
+  static Table::TableMgr<VariantTable> mgr_;
+
+public :
+	TempTableHolderCollection *getTTHC() const { return &TTHC;}
+	VariableAccess Variable;
+	Table::TableMgr<VariantTable>& getVarTableMgr() {
+		return mgr_;
+	}
+
+	static const bool sModelGroupByParent_ = false;
+	virtual bool isModelGroupByParent() const {
+		return sModelGroupByParent_;
+	}
+
+	size_t sizeofThis() const { return sizeof(SEG_COMP); }
+
+	virtual void createAllShare();
+
+	static HVector<ModelClass::ddfStruct> ddfVector; 
+	static BitArray dataVariables; 
+	static bool hasBeenWritten;
+	static void Terminator();
+	static FunctionPtr RegisterTerminatorOnce;
+	
+// model point map definition
+typedef map <int, long, less <int> > mpmap;
+// Liability model point maps
+mpmap ul_mp_map;
+mpmap vul_mp_map;
+mpmap iul_mp_map;
+mpmap term_mp_map;
+mpmap trad_mp_map;
+mpmap va_mp_map;
+mpmap fa_mp_map;
+mpmap fia_mp_map;
+mpmap pa_mp_map;
+mpmap ltc_mp_map;
+mpmap di_mp_map;
+mpmap epl_mp_map;
+// Asset detail data
+ofstream SALFile;
+const char *zAssetFund[2];
+xstring asset_detail_rpt_inv_strat_id;
+// Asset model point maps
+mpmap bond_mp_map_active;
+mpmap bond_mp_map_active_init;
+mpmap bond_mp_map_inactive;
+mpmap mtg_mp_map_active;
+mpmap mtg_mp_map_active_init;
+mpmap mtg_mp_map_inactive;
+mpmap sec_mp_map_active;
+mpmap sec_mp_map_active_init;
+mpmap sec_mp_map_inactive;
+mpmap ird_mp_map_active;
+mpmap ird_mp_map_active_init;
+mpmap ird_mp_map_inactive;
+mpmap re_mp_map_active;
+mpmap re_mp_map_active_init;
+mpmap re_mp_map_inactive;
+mpmap eqt_mp_map_active;
+mpmap eqt_mp_map_active_init;
+mpmap eqt_mp_map_inactive;
+mpmap eio_mp_map_active;
+mpmap eio_mp_map_active_init;
+mpmap eio_mp_map_inactive;
+mpmap epa_mp_map_active;
+mpmap epa_mp_map_active_init;
+mpmap epa_mp_map_inactive;
+//mpmap::iterator mp_map_iter;
+mpmap::reverse_iterator mp_map_reverse_iter;
+//Hedge model point map
+typedef map <xstring, double> hedge_vals;
+typedef map <xstring, double> hedge_final_vals;
+hedge_vals va_hedge_vals;
+hedge_final_vals va_hedge_final_vals;
+// Existing asset sequence number map
+typedef map <xstring, int, less<xstring> > seqmap;
+seqmap existing_asset_sequence_num_map;
+seqmap::iterator seqmap_iter;
+int asset_mp_sequence_num;
+int sequence_id;
+// GAAP cohort maps
+typedef map <int, long, less <int> > cohortmap;
+cohortmap sfas60_cohort_map;
+cohortmap sfas91_cohort_map;
+cohortmap sfas97lp_cohort_map;
+cohortmap sfas97rd_cohort_map;
+cohortmap sfas120_cohort_map;
+// Independent model point map and arrays
+seriatim_map seriatim_totals;
+SmartArray<bool> sfas60_seriatim_cohort_used;
+SmartArray<bool> sfas120_seriatim_cohort_used;
+SmartArray<bool> sfas97rd_seriatim_cohort_used;
+SmartArray<bool> sfas97lp_seriatim_cohort_used;
+SmartArray<bool> sfas91_seriatim_cohort_used;
+bool seriatim_reins_used;
+// Hedge variables and map
+int mp_unassigned_hedgegrp_count;
+int hedge_grp_liab_counter;
+int hedge_grp_asset_counter;
+int hedge_grp_loop_counter;
+typedef map <int, long, less <int> > hedge_grploop;
+hedge_grploop hedge_grp_loop;
+// GAAP variables
+SmartArray <int> sfas60_cohortnum;
+SmartArray <int> sfas91_cohortnum;
+SmartArray <int> sfas97lp_cohortnum;
+SmartArray <int> sfas120_cohortnum;
+SmartArray <int> sfas97rd_cohortnum;
+// IMR variables
+SmartArray < SmartArray <double> > imr_amortzn_rates_bond;
+SmartArray < SmartArray <double> > imr_amortzn_rates_mtg;
+SmartArray < SmartArray <double> > imr_amortzn_rates_other;
+SmartArray <double> temp_imr_realzd_cap_gains_tbl;
+// AVR variables
+#define REALZD_CAP_GAIN_bonds 0
+#define REALZD_CAP_GAIN_mortgages 1
+#define REALZD_CAP_GAIN_stock 2
+#define REALZD_CAP_GAIN_other 3
+#define MAX_RES_bonds 4
+#define MAX_RES_mortgages 5
+#define MAX_RES_stock 6
+#define MAX_RES_other 7
+#define BASIC_CONTRIB_bonds 8
+#define BASIC_CONTRIB_mortgages 9
+#define BASIC_CONTRIB_stock 10
+#define BASIC_CONTRIB_other 11
+#define RES_OBJ_bonds 12
+#define RES_OBJ_mortgages 13
+#define RES_OBJ_stock 14
+#define RES_OBJ_other 15
+#define UNREALZD_CAP_GAIN_stock 16
+#define UNREALZD_CAP_GAIN_other 17
+#define NUM_AVR_COMPONENTS 18
+double temporary_avr_component[NUM_AVR_COMPONENTS];
+vector <string> gaap_cohorts_sfas60;
+vector <string> gaap_cohorts_sfas91;
+vector <string> gaap_cohorts_sfas97lp;
+vector <string> gaap_cohorts_sfas120;
+vector <string> gaap_cohorts_sfas97rd;
+vector <string> loc_cohorts;
+vector <string> hedge_grps;
+SmartArray <SmartArray <double> > hedge_gross_array;
+SmartArray <SmartArray <double> > hedge_net_array;
+// State of world financial variables
+double init_cash;
+double init_cash_addn;
+double init_interim_cash;
+double init_existing_asset_pct_to_use;
+double init_stat_res_ag38_8d;
+double init_stat_res_net_ag38_8d;
+double init_stat_res_stoch_res_unhedged;
+double init_stat_res_stoch_res;
+double init_stat_res_cte_adj;
+double init_stat_res_cte_adj_unfloored;
+double init_stat_res_cte_adj_unfloored_unhedged;
+double init_stat_res_cte_be;
+double init_stat_res_cte_buffer;
+double init_stat_res_cte_buffer_unhedged;
+double init_stat_res_net_cte_adj;
+double init_stat_res_net_cte_adj_unfloored;
+double init_stat_res_net_cte_adj_unfloored_unhedged;
+double init_stat_res_net_cte_be;
+double init_stat_res_net_cte_buffer;
+double init_stat_res_net_cte_buffer_unhedged;
+double init_stat_res_net_stoch_res_unhedged;
+double init_stat_res_net_stoch_res;
+double init_stat_res_det_res;
+double init_stat_res_det_res_unhedged;
+double init_stat_res_net_det_res;
+double init_stat_res_net_det_res_unhedged;
+double init_stat_res_std_scen_res;
+double init_imr;
+double init_avr_bond;
+double init_avr_mtg;
+double init_avr_eqt;
+double init_avr_other;
+double init_rbc_c1;
+double init_rbc_c3_stoch_amt_unhedged;
+double init_rbc_c3_stoch_amt;
+double init_rbc_c3_std_scen_amt_unhedged;
+double init_rbc_c3_hedge_offset;
+double init_rbc_cash;
+double init_undistrib_earnings;
+double init_free_surp;
+double init_pv_claims_determinstic;
+//SmartArray <double> init_tax_capzd_prem_amortzn_sched;
+vector <double> init_tax_capzd_prem_amortzn_sched;//WTW - Gen2
+//SmartArray <double> init_imr_fy_amortzn;
+vector <double> init_imr_fy_amortzn;//WTW - Gen2
+//SmartArray <double> init_imr_amortzn_amt;
+vector <double> init_imr_amortzn_amt;//WTW - Gen2
+double init_realzd_cap_gain_res_ytd;
+double init_reins_realzd_cap_gain_res_ytd;
+double init_realzd_cap_gain_undistrib_earnings_ytd;
+double init_realzd_cap_gain_tgt_cap_ytd;
+double init_realzd_cap_gain_free_surp_ytd;
+double init_tax_bk_prof_ytd;
+double init_tax_tgt_cap_ytd;
+double init_tax_free_surp_ytd;
+double init_taxable_inc_bk_prof_ytd;
+double init_taxable_inc_tgt_cap_ytd;
+double init_taxable_inc_free_surp_ytd;
+double init_taxable_inc_carryfwd_avail;
+double init_bk_prof_bef_tax_qtd;
+double init_bk_prof_bef_tax_ytd;
+double init_bk_prof_aft_tax_qtd;
+double init_bk_prof_aft_tax_ytd;
+double init_bk_prof_aft_tax_irr;
+double init_distrib_earnings_irr;
+double init_earnings_accum;
+double init_tax_earnings_accum_ytd;
+double init_taxable_inc_earnings_accum_ytd;
+double init_gaap_inc_bef_tax_qtd;
+double init_gaap_inc_bef_tax_ytd;
+double init_gaap_inc_aft_tax_qtd;
+double init_gaap_inc_aft_tax_ytd;
+double init_asset_yld;
+double init_asset_yld_less_dflt;
+double init_asset_yld_less_dflt_inv;
+double init_asset_yld_adj_aig;
+int avr_calc_prior_t;
+xstring avr_calc_prior_sales_timing;
+double avr_bond_saved;
+double avr_mtg_saved;
+double avr_stock_saved;
+double avr_other_saved;
+
+	void init_(){
+		
+
+zAssetFund[0] = "Iv";
+zAssetFund[1] = "Lh";
+asset_detail_rpt_inv_strat_id = "";
+sequence_id = 0;
+seriatim_reins_used = false;
+init_cash = 0.0;
+init_cash_addn = 0.0;
+init_interim_cash = 0.0;
+init_existing_asset_pct_to_use = 0.0;
+init_stat_res_ag38_8d = 0.0;
+init_stat_res_net_ag38_8d = 0.0;
+init_stat_res_stoch_res_unhedged = 0.0;
+init_stat_res_stoch_res = 0.0;
+init_stat_res_cte_adj = 0.0;
+init_stat_res_cte_adj_unfloored = 0.0;
+init_stat_res_cte_adj_unfloored_unhedged = 0.0;
+init_stat_res_cte_be = 0.0;
+init_stat_res_cte_buffer = 0.0;
+init_stat_res_cte_buffer_unhedged = 0.0;
+init_stat_res_net_cte_adj = 0.0;
+init_stat_res_net_cte_adj_unfloored = 0.0;
+init_stat_res_net_cte_adj_unfloored_unhedged = 0.0;
+init_stat_res_net_cte_be = 0.0;
+init_stat_res_net_cte_buffer = 0.0; 
+init_stat_res_net_cte_buffer_unhedged = 0.0;
+init_stat_res_net_stoch_res_unhedged = 0.0;
+init_stat_res_net_stoch_res = 0.0;
+init_stat_res_det_res = 0.0;
+init_stat_res_det_res_unhedged = 0.0;
+init_stat_res_net_det_res = 0.0;
+init_stat_res_net_det_res_unhedged = 0.0;
+init_pv_claims_determinstic = 0.0;
+init_imr = 0.0;
+init_avr_bond = 0.0;
+init_avr_mtg = 0.0;
+init_avr_eqt = 0.0;
+init_avr_other = 0.0;
+init_rbc_c3_stoch_amt_unhedged = 0.0;
+init_rbc_c3_stoch_amt = 0.0;
+init_rbc_c3_std_scen_amt_unhedged = 0.0;
+init_rbc_c3_hedge_offset = 0.0;
+init_rbc_cash = 0.0;
+init_undistrib_earnings = 0.0;
+init_realzd_cap_gain_res_ytd = 0.0;
+init_reins_realzd_cap_gain_res_ytd = 0.0;
+init_realzd_cap_gain_undistrib_earnings_ytd = 0.0;
+init_realzd_cap_gain_tgt_cap_ytd = 0.0;
+init_realzd_cap_gain_free_surp_ytd = 0.0;
+init_tax_bk_prof_ytd = 0.0;
+init_tax_tgt_cap_ytd = 0.0;
+init_tax_free_surp_ytd = 0.0;
+init_taxable_inc_bk_prof_ytd = 0.0;
+init_taxable_inc_tgt_cap_ytd = 0.0;
+init_taxable_inc_free_surp_ytd = 0.0;
+init_taxable_inc_carryfwd_avail = 0.0;
+init_bk_prof_bef_tax_qtd = 0.0;
+init_bk_prof_bef_tax_ytd = 0.0;
+init_bk_prof_aft_tax_qtd = 0.0;
+init_bk_prof_aft_tax_ytd = 0.0;
+init_bk_prof_aft_tax_irr = 0.0;
+init_distrib_earnings_irr = 0.0;
+init_earnings_accum = 0.0;
+init_tax_earnings_accum_ytd = 0.0;
+init_taxable_inc_earnings_accum_ytd = 0.0;
+init_gaap_inc_bef_tax_qtd = 0.0;
+init_gaap_inc_bef_tax_ytd = 0.0;
+init_gaap_inc_aft_tax_qtd = 0.0;
+init_gaap_inc_aft_tax_ytd = 0.0;
+init_asset_yld = 0.0;
+init_asset_yld_less_dflt = 0.0;
+init_asset_yld_adj_aig = 0.0;
+avr_calc_prior_t = -999;
+avr_calc_prior_sales_timing = "None";
+avr_bond_saved = 0.0;
+avr_mtg_saved = 0.0;
+avr_stock_saved = 0.0;
+avr_other_saved = 0.0;
+
+		bIsInit = true;
+	}
+	void deInit_(){
+
+	}
+
+#ifdef __CREATE_ASSET_ASSET_CLASS_
+	ASSET_ASSET	*company_asset;
+	ASSET_ASSET	*&asset;
+#endif
+#ifdef __CREATE_COMP_COMP_CLASS_
+	COMP_COMP	*company;
+#endif
+#ifdef __CREATE_AUTOMATION_CLASS_
+	AUTOMATION	*company_liab_fia_fia_automation;
+	AUTOMATION	*&fia_automation;
+#endif
+#ifdef __CREATE_LIAB_LIAB_CLASS_
+	LIAB_LIAB	*company_liab;
+	LIAB_LIAB	*&liab;
+#endif
+#ifdef __CREATE_RATES_ECONOMY_CLASS_
+	RATES_ECONOMY	*company_rates;
+	RATES_ECONOMY	*&rates;
+#endif
+#ifdef __CREATE_SEG_COMP_CLASS_
+	SEG_COMP	*company_seg;
+	SEG_COMP	*&seg;
+#endif
+ // Column Definition Begins
+ 	ColumnAccessor < mCFStaticData_0 > accr_inc;
+ 	ColumnAccessor < mCFStaticData_0 > accr_inc_inv;
+ 	ColumnAccessor < mCFStaticData_0 > accr_int;
+ 	ColumnAccessor < mCFStaticData_0 > accr_int_aft_dflt;
+ 	ColumnAccessor < mCFStaticData_0 > accr_int_dflt;
+ 	ColumnAccessor < mCFStaticData_0 > acq_exp;
+ 	ColumnAccessor < mCFStaticData_0 > ag48_npr_net;
+ 	ColumnAccessor < mCFStaticData_0 > ag48_res_excess_net;
+ 	ColumnAccessor < mCFStaticData_0 > ag48_res_net;
+ 	ColumnAccessor < mCFStaticData_0 > ag48_unearn_prem_res_npr_net;
+ 	ColumnAccessor < mCFStaticData_0 > ann_benefits_bom;
+ 	ColumnAccessor < mCFStaticData_0 > ann_benefits_eom;
+ 	ColumnAccessor < mCFStaticData_0 > annuitzn_consideration;
+ 	ColumnAccessor < mCFStaticData_0 > annuitzn_count_aig;
+ 	ColumnAccessor < mCFStaticData_0 > annuitzn_inc;
+ 	ColumnAccessor < mCFStaticData_0 > annuitzn_val_released;
+ 	ColumnAccessor < mCFStaticData_0 > asset_cash_flow;
+ 	ColumnAccessor < mCFStaticData_0 > asset_cash_flow_bef_inv;
+ 	ColumnAccessor < mCFStaticData_0 > asset_cash_flow_bef_sale;
+ 	ColumnAccessor < mCFStaticData_0 > asset_less_liab_and_surp;
+ 	ColumnAccessor < mCFStaticData_0 > asset_mp_count;
+ 	ColumnAccessor < mCFStaticData_0 > asset_sa;
+ 	ColumnAccessor < mCFStaticData_0 > asset_yld;
+ 	ColumnAccessor < mCFStaticData_0 > asset_yld_denom;
+ 	ColumnAccessor < mCFStaticData_0 > asset_yld_denom_inv;
+ 	ColumnAccessor < mCFStaticData_0 > asset_yld_inv;
+ 	ColumnAccessor < mCFStaticData_0 > asset_yld_inv_adj_aig;
+ 	ColumnAccessor < mCFStaticData_0 > asset_yld_less_dflt;
+ 	ColumnAccessor < mCFStaticData_0 > asset_yld_less_dflt_inv;
+ 	ColumnAccessor < mCFStaticData_0 > asset_yld_less_dflt_numer;
+ 	ColumnAccessor < mCFStaticData_0 > asset_yld_less_dflt_numer_inv;
+ 	ColumnAccessor < mCFStaticData_0 > asset_yld_numer;
+ 	ColumnAccessor < mCFStaticData_0 > asset_yld_numer_inv;
+ 	ColumnAccessor < mCFStaticData_0 > asset_yld_numer_inv_adj_aig;
+ 	ColumnAccessor < mCFStaticData_0 > avr;
+ 	ColumnAccessor < mCFStaticData_0 > avr_bef_sale;
+ 	ColumnAccessor < mCFStaticData_0 > avr_bond;
+ 	ColumnAccessor < mCFStaticData_0 > avr_bond_bef_sale;
+ 	ColumnAccessor < mCFStaticData_0 > avr_bond_bocy;
+ 	ColumnAccessor < mCFStaticData_0 > avr_detail_log_flag;
+ 	ColumnAccessor < mCFStaticData_0 > avr_dflt;
+ 	ColumnAccessor < mCFStaticData_0 > avr_dflt_bef_sale;
+ 	ColumnAccessor < mCFStaticData_0 > avr_eqt;
+ 	ColumnAccessor < mCFStaticData_0 > avr_eqt_bef_sale;
+ 	ColumnAccessor < mCFStaticData_0 > avr_incr;
+ 	ColumnAccessor < mCFStaticData_0 > avr_mtg;
+ 	ColumnAccessor < mCFStaticData_0 > avr_mtg_bef_sale;
+ 	ColumnAccessor < mCFStaticData_0 > avr_mtg_bocy;
+ 	ColumnAccessor < mCFStaticData_0 > avr_other;
+ 	ColumnAccessor < mCFStaticData_0 > avr_other_bef_sale;
+ 	ColumnAccessor < mCFStaticData_0 > avr_other_bocy;
+ 	ColumnAccessor < mCFStaticData_0 > avr_stock;
+ 	ColumnAccessor < mCFStaticData_0 > avr_stock_bef_sale;
+ 	ColumnAccessor < mCFStaticData_0 > avr_stock_bocy;
+ 	ColumnAccessor < mCFStaticData_0 > avr_unrealzd_cap_gain_eqt_bocy;
+ 	ColumnAccessor < mCFStaticData_0 > avr_unrealzd_cap_gain_non_eqt_bocy;
+ 	ColumnAccessor < mCFStaticData_0 > bef_tax_yld;
+ 	ColumnAccessor < mCFStaticData_0 > bk_prof_aft_tax;
+ 	ColumnAccessor < mCFStaticData_0 > bk_prof_aft_tax_bef_sale;
+ 	ColumnAccessor < mCFStaticData_0 > bk_prof_aft_tax_qtd;
+ 	ColumnAccessor < mCFStaticData_0 > bk_prof_aft_tax_ytd;
+ 	ColumnAccessor < mCFStaticData_0 > bk_prof_bef_tax;
+ 	ColumnAccessor < mCFStaticData_0 > bk_prof_bef_tax_bef_sale;
+ 	ColumnAccessor < mCFStaticData_0 > bk_prof_bef_tax_qtd;
+ 	ColumnAccessor < mCFStaticData_0 > bk_prof_bef_tax_ytd;
+ 	ColumnAccessor < mCFStaticData_0 > bk_prof_by_source_bef_tax;
+ 	ColumnAccessor < mCFStaticData_0 > bk_val;
+ 	ColumnAccessor < mCFStaticData_0 > bk_val_inv;
+ 	ColumnAccessor < mCFStaticData_0 > borrowing;
+ 	ColumnAccessor < mCFStaticData_0 > borrowing_int;
+ 	ColumnAccessor < mCFStaticData_0 > borrowing_rate;
+ 	ColumnAccessor < mCFStaticData_0 > cal_mth;
+ 	ColumnAccessor < mCFStaticData_0 > cal_yr;
+ 	ColumnAccessor < mCFStaticData_0 > cal_yr_relative;
+ 	ColumnAccessor < mCFStaticData_0 > cap_gain;
+ 	ColumnAccessor < mCFStaticData_0 > cap_gain_bef_sale;
+ 	ColumnAccessor < mCFStaticData_0 > cap_gain_free_surp;
+ 	ColumnAccessor < mCFStaticData_0 > cap_gain_free_surp_bef_sale;
+ 	ColumnAccessor < mCFStaticData_0 > cap_gain_from_sale;
+ 	ColumnAccessor < mCFStaticData_0 > cap_gain_res;
+ 	ColumnAccessor < mCFStaticData_0 > cap_gain_res_bef_sale;
+ 	ColumnAccessor < mCFStaticData_0 > cap_gain_tgt_cap;
+ 	ColumnAccessor < mCFStaticData_0 > cap_gain_tgt_cap_bef_sale;
+ 	ColumnAccessor < mCFStaticData_0 > cap_gain_undistrib_earnings;
+ 	ColumnAccessor < mCFStaticData_0 > cap_gain_undistrib_earnings_bef_sale;
+ 	ColumnAccessor < mCFStaticData_0 > cash;
+ 	ColumnAccessor < mCFStaticData_0 > cash_flow_for_inv;
+ 	ColumnAccessor < mCFStaticData_0 > cash_flow_int;
+ 	ColumnAccessor < mCFStaticData_0 > cash_flow_invested;
+ 	ColumnAccessor < mCFStaticData_0 > cash_flow_rate_mthly;
+ 	ColumnAccessor < mCFStaticData_0 > cash_from_sale;
+ 	ColumnAccessor < mCFStaticData_0 > cash_int;
+ 	ColumnAccessor < mCFStaticData_0 > cash_int_inv;
+ 	ColumnAccessor < mCFStaticData_0 > cash_rate;
+ 	ColumnAccessor < mCFStaticData_0 > cash_val;
+ 	ColumnAccessor < mCFStaticData_0 > claim_paid;
+ 	ColumnAccessor < mCFStaticData_0 > comm_bom;
+ 	ColumnAccessor < mCFStaticData_0 > comm_chargeback;
+ 	ColumnAccessor < mCFStaticData_0 > comm_eom;
+ 	ColumnAccessor < mCFStaticData_0 > contribn_from_business_seg;
+ 	ColumnAccessor < mCFStaticData_0 > contribn_from_business_seg_bef_sale;
+ 	ColumnAccessor < mCFStaticData_0 > conversion_cost;
+ 	ColumnAccessor < mCFStaticData_0 > cost_basis_accrual;
+ 	ColumnAccessor < mCFStaticData_0 > cost_basis_incr_appreciation;
+ 	ColumnAccessor < mCFStaticData_0 > cost_basis_purch;
+ 	ColumnAccessor < mCFStaticData_0 > cost_basis_sale;
+ 	ColumnAccessor < mCFStaticData_0 > credited_int;
+ 	ColumnAccessor < mCFStaticData_0 > date;
+ 	ColumnAccessor < mCFStaticData_0 > deferred_gross_prem;
+ 	ColumnAccessor < mCFStaticData_0 > deferred_gross_prem_incr;
+ 	ColumnAccessor < mCFStaticData_0 > deferred_net_prem;
+ 	ColumnAccessor < mCFStaticData_0 > deferred_net_prem_net;
+ 	ColumnAccessor < mCFStaticData_0 > deferred_net_prem_npr;
+ 	ColumnAccessor < mCFStaticData_0 > deferred_net_prem_npr_net;
+ 	ColumnAccessor < mCFStaticData_0 > delta_hedge_inv_amt;
+ 	ColumnAccessor < mCFStaticData_0 > delta_hedge_mkt_val;
+ 	ColumnAccessor < mCFStaticData_0 > delta_hedge_mkt_val_incr;
+ 	ColumnAccessor < mCFStaticData_0 > delta_hedge_pmt;
+ 	ColumnAccessor < mCFStaticData_0 > delta_hedge_prof;
+ 	ColumnAccessor < mCFStaticData_0 > delta_hedge_sale_amt;
+ 	ColumnAccessor < mCFStaticData_0 > delta_hedge_transaction_cost;
+ 	ColumnAccessor < mCFStaticData_0 > dflt_amt;
+ 	ColumnAccessor < mCFStaticData_0 > direct_cash_flow_bom;
+ 	ColumnAccessor < mCFStaticData_0 > direct_cash_flow_eom;
+ 	ColumnAccessor < mCFStaticData_0 > direct_cash_flow_int;
+ 	ColumnAccessor < mCFStaticData_0 > distrib_earnings;
+ 	ColumnAccessor < mCFStaticData_0 > distrib_earnings_bef_sale;
+ 	ColumnAccessor < mCFStaticData_0 > distribn;
+ 	ColumnAccessor < mCFStaticData_0 > distribn_bef_sale;
+ 	ColumnAccessor < mCFStaticData_0 > div_applied;
+ 	ColumnAccessor < mCFStaticData_0 > div_liab;
+ 	ColumnAccessor < mCFStaticData_0 > div_liab_incr;
+ 	ColumnAccessor < mCFStaticData_0 > div_paid;
+ 	ColumnAccessor < mCFStaticData_0 > dth_ben_inf;
+ 	ColumnAccessor < mCFStaticData_0 > dth_benefits;
+ 	ColumnAccessor < mCFStaticData_0 > dth_count_aig;
+ 	ColumnAccessor < mCFStaticData_0 > earnings_accum;
+ 	ColumnAccessor < mCFStaticData_0 > econ_cash;
+ 	ColumnAccessor < mCFStaticData_0 > econ_cash_int;
+ 	ColumnAccessor < mCFStaticData_0 > econ_prof;
+ 	ColumnAccessor < mCFStaticData_0 > econ_prof_unhedged;
+ 	ColumnAccessor < mCFStaticData_0 > econ_res;
+ 	ColumnAccessor < mCFStaticData_0 > econ_res_incr;
+ 	ColumnAccessor < mCFStaticData_0 > econ_res_int;
+ 	ColumnAccessor < mCFStaticData_0 > eff_cap_gains_rate;
+ 	ColumnAccessor < mCFStaticData_0 > endow_benefits;
+ 	ColumnAccessor < mCFStaticData_0 > finalize;
+ 	ColumnAccessor < mCFStaticData_0 > free_surp;
+ 	ColumnAccessor < mCFStaticData_0 > free_surp_at_mkt;
+ 	ColumnAccessor < mCFStaticData_0 > free_surp_at_mkt_ending;
+ 	ColumnAccessor < mCFStaticData_0 > free_surp_bef_distribn;
+ 	ColumnAccessor < mCFStaticData_0 > free_surp_incr;
+ 	ColumnAccessor < mCFStaticData_0 > fund_released_ann;
+ 	ColumnAccessor < mCFStaticData_0 > fund_released_dth;
+ 	ColumnAccessor < mCFStaticData_0 > fund_released_maturity;
+ 	ColumnAccessor < mCFStaticData_0 > fund_released_surr;
+ 	ColumnAccessor < mCFStaticData_0 > fund_released_withdrl;
+ 	ColumnAccessor < mCFStaticData_0 > fund_val_b;
+ 	ColumnAccessor < mCFStaticData_0 > fund_val_fixed;
+ 	ColumnAccessor < mCFStaticData_0 > fund_val_sa;
+ 	ColumnAccessor < mCFStaticData_0 > fund_weighted_cap_spread_fix_rt_aig;
+ 	ColumnAccessor < mCFStaticData_0 > fund_weighted_par_rate_aig;
+ 	ColumnAccessor < mCFStaticData_0 > fund_weighted_pri_spread_aig;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_accum_ben_claim_cost;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_acq_exp;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_ann_claim_cost;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_ben_res;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_ben_res_incr;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_cap_gain_cap;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_cap_gain_res;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_capzd_acq_exp;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_capzd_comm_bom;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_capzd_comm_eom;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_capzd_prem_bonus;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_capzd_reins_yrt_cost;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_cash_flow_int;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_chg_inc;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_claim_res;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_claim_res_incr;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_comm_excess_bom;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_comm_excess_eom;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_comm_trail_bom;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_comm_trail_eom;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_conversion_cost;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_credited_int;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_dac;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_dac_incr;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_deferred_maint_exp;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_deferred_prof_liab;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_deferred_prof_liab_incr;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_deferred_tax_liab;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_deferred_tax_liab_incr;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_div_applied;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_div_liab;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_div_liab_incr;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_div_paid;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_dth_claim_cost;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_endow_claim_cost;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_free_surp;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_gross_prem;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_hedge_cost;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_hedge_mkt_val;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_hedge_mkt_val_incr;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_hlth_claim_cost;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_inc_aft_tax;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_inc_aft_tax_qtd;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_inc_aft_tax_ytd;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_inc_bef_tax;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_inc_bef_tax_qtd;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_inc_bef_tax_ytd;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_inc_ben_claim_cost;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_inc_deferred_tax_liab;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_inc_inv_asset;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_inc_unrealzd_cap_gain;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_inc_unrealzd_cap_gain_incr;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_inv_asset;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_inv_asset_available;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_inv_asset_held;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_inv_asset_not_assigned;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_inv_asset_trading;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_inv_inc_cap;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_inv_inc_res;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_liab_net;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_liab_net_net;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_loads_deducted;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_loads_deferred;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_loc_cost;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_maint_exp_bom;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_maint_exp_eom;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_maint_exp_res;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_maint_exp_res_incr;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_maturity_claim_cost;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_prem_bonus;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_prem_tax;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_prem_waiver_res;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_prem_waiver_res_incr;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_prof_aft_tax_for_pv;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_prof_bef_tax_for_pv;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_reins_yrt_cost;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_req_cap;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_sfas133_liab;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_sfas133_liab_incr;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_sop031_addl_liab;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_sop031_addl_liab_incr;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_surp_incr;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_surp_unrealzd_cap_gain;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_surp_unrealzd_cap_gain_incr;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_surr_claim_cost;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_surr_inc;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_terminal_div;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_unearn_rev_liab;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_unearn_rev_released;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_unrealzd_cap_gain_incr;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_withdrl_ben_claim_cost;
+ 	ColumnAccessor < mCFStaticData_0 > gamma_hedge_inv_amt;
+ 	ColumnAccessor < mCFStaticData_256 > gamma_hedge_mkt_val;
+ 	ColumnAccessor < mCFStaticData_256 > gamma_hedge_mkt_val_incr;
+ 	ColumnAccessor < mCFStaticData_256 > gamma_hedge_pmt;
+ 	ColumnAccessor < mCFStaticData_256 > gamma_hedge_prof;
+ 	ColumnAccessor < mCFStaticData_256 > gamma_hedge_sale_amt;
+ 	ColumnAccessor < mCFStaticData_256 > gamma_hedge_transaction_cost;
+ 	ColumnAccessor < mCFStaticData_256 > gmwb_chg;
+ 	ColumnAccessor < mCFStaticData_256 > gmwb_inf;
+ 	ColumnAccessor < mCFStaticData_256 > gross_prem_annualzd;
+ 	ColumnAccessor < mCFStaticData_256 > hedge_cash_flow;
+ 	ColumnAccessor < mCFStaticData_256 > hedge_cost;
+ 	ColumnAccessor < mCFStaticData_256 > hedge_cost_bef_sale;
+ 	ColumnAccessor < mCFStaticData_256 > hedge_cost_charge;
+ 	ColumnAccessor < mCFStaticData_256 > hedge_exp;
+ 	ColumnAccessor < mCFStaticData_256 > hedge_int_pmt;
+ 	ColumnAccessor < mCFStaticData_256 > hedge_inv_amt_bom;
+ 	ColumnAccessor < mCFStaticData_256 > hedge_inv_amt_eom;
+ 	ColumnAccessor < mCFStaticData_256 > hedge_liab_claims;
+ 	ColumnAccessor < mCFStaticData_256 > hedge_mkt_val;
+ 	ColumnAccessor < mCFStaticData_256 > hedge_mkt_val_growth;
+ 	ColumnAccessor < mCFStaticData_256 > hedge_mkt_val_incr;
+ 	ColumnAccessor < mCFStaticData_256 > hedge_opt_pmt;
+ 	ColumnAccessor < mCFStaticData_256 > hedge_rila_trading_cost_aig;
+ 	ColumnAccessor < mCFStaticData_256 > hedge_sale_amt;
+ 	ColumnAccessor < mCFStaticData_256 > imr;
+ 	ColumnAccessor < mCFStaticData_256 > imr_amortzn_adj;
+ 	ColumnAccessor < mCFStaticData_256 > imr_amortzn_for_mth;
+ 	ColumnAccessor < mCFStaticData_256 > imr_amortzn_for_mth_bef_sale;
+ 	ColumnAccessor < mCFStaticData_256 > imr_bef_sale;
+ 	ColumnAccessor < mCFStaticData_256 > imr_cap_gain;
+ 	ColumnAccessor < mCFStaticData_256 > imr_cap_gain_bef_sale;
+ 	ColumnAccessor < mCFStaticData_256 > imr_cap_gain_net;
+ 	ColumnAccessor < mCFStaticData_256 > imr_cap_gain_net_bef_sale;
+ 	ColumnAccessor < mCFStaticData_256 > imr_cap_gain_tax;
+ 	ColumnAccessor < mCFStaticData_256 > imr_cap_gain_tax_bef_sale;
+ 	ColumnAccessor < mCFStaticData_256 > imr_impact_free_surp;
+ 	ColumnAccessor < mCFStaticData_256 > imr_impact_free_surp_bef_sale;
+ 	ColumnAccessor < mCFStaticData_256 > imr_impact_res;
+ 	ColumnAccessor < mCFStaticData_256 > imr_impact_res_bef_sale;
+ 	ColumnAccessor < mCFStaticData_256 > imr_impact_tgt_cap;
+ 	ColumnAccessor < mCFStaticData_256 > imr_impact_tgt_cap_bef_sale;
+ 	ColumnAccessor < mCFStaticData_256 > imr_incr;
+ 	ColumnAccessor < mCFStaticData_256 > imr_incr_bef_sale;
+ 	ColumnAccessor < mCFStaticData_256 > infl_cumul;
+ 	ColumnAccessor < mCFStaticData_256 > initialize;
+ 	ColumnAccessor < mCFStaticData_256 > int_pmt;
+ 	ColumnAccessor < mCFStaticData_256 > interim_cash;
+ 	ColumnAccessor < mCFStaticData_256 > interim_cash_int;
+ 	ColumnAccessor < mCFStaticData_256 > interim_cash_rate;
+ 	ColumnAccessor < mCFStaticData_256 > inv_asset;
+ 	ColumnAccessor < mCFStaticData_256 > inv_cash_flow_int_div_and_rent;
+ 	ColumnAccessor < mCFStaticData_256 > inv_cash_flow_prin_pmt;
+ 	ColumnAccessor < mCFStaticData_256 > inv_exp;
+ 	ColumnAccessor < mCFStaticData_256 > inv_fee_ref;
+ 	ColumnAccessor < mCFStaticData_256 > inv_inc;
+ 	ColumnAccessor < mCFStaticData_256 > inv_inc_bk_prof;
+ 	ColumnAccessor < mCFStaticData_256 > inv_inc_bk_prof_bef_sale;
+ 	ColumnAccessor < mCFStaticData_256 > inv_inc_earnings_accum;
+ 	ColumnAccessor < mCFStaticData_256 > inv_inc_free_surp;
+ 	ColumnAccessor < mCFStaticData_256 > inv_inc_fund;
+ 	ColumnAccessor < mCFStaticData_256 > inv_inc_on_invested_assets;
+ 	ColumnAccessor < mCFStaticData_256 > inv_inc_res;
+ 	ColumnAccessor < mCFStaticData_256 > inv_inc_tgt_cap;
+ 	ColumnAccessor < mCFStaticData_256 > inv_inc_undistrib_earnings;
+ 	ColumnAccessor < mCFStaticData_256 > invested_asset_sale;
+ 	ColumnAccessor < mCFStaticData_256 > lapse_count_aig;
+ 	ColumnAccessor < mCFStaticData_256 > last_period_indicator;
+ 	ColumnAccessor < mCFStaticData_256 > liab_and_surp;
+ 	ColumnAccessor < mCFStaticData_256 > liab_cash_flow;
+ 	ColumnAccessor < mCFStaticData_256 > liab_cash_flow_bom;
+ 	ColumnAccessor < mCFStaticData_256 > liab_cash_flow_eom;
+ 	ColumnAccessor < mCFStaticData_256 > loc_asset;
+ 	ColumnAccessor < mCFStaticData_256 > loc_asset_incr;
+ 	ColumnAccessor < mCFStaticData_256 > loc_cost;
+ 	ColumnAccessor < mCFStaticData_256 > maint_exp_bom;
+ 	ColumnAccessor < mCFStaticData_256 > maint_exp_eom;
+ 	ColumnAccessor < mCFStaticData_256 > maint_exp_fixed;
+ 	ColumnAccessor < mCFStaticData_256 > maturity_benefits;
+ 	ColumnAccessor < mCFStaticData_256 > mkt_val;
+ 	ColumnAccessor < mCFStaticData_256 > mkt_val_sale;
+ 	ColumnAccessor < mCFStaticData_256 > mths_to_next_mkt_val_calc;
+ 	ColumnAccessor < mCFStaticData_256 > notional_amt;
+ 	ColumnAccessor < mCFStaticData_256 > opt_budget_amt;
+ 	ColumnAccessor < mCFStaticData_256 > opt_inc;
+ 	ColumnAccessor < mCFStaticData_256 > opt_payoff_aig;
+ 	ColumnAccessor < mCFStaticData_256 > opt_pmt;
+ 	ColumnAccessor < mCFStaticData_256 > pba_rollforward_base;
+ 	ColumnAccessor < mCFStaticData_256 > pba_rollforward_factor;
+ 	ColumnAccessor < mCFStaticData_256 > pol_loan;
+ 	ColumnAccessor < mCFStaticData_256 > pol_loan_exp;
+ 	ColumnAccessor < mCFStaticData_256 > pol_loan_inc;
+ 	ColumnAccessor < mCFStaticData_256 > pol_loan_int;
+ 	ColumnAccessor < mCFStaticData_256 > pol_loan_proceeds;
+ 	ColumnAccessor < mCFStaticData_256 > policies_inf;
+ 	ColumnAccessor < mCFStaticData_256 > policies_issued;
+ 	ColumnAccessor < mCFStaticData_256 > port_yld;
+ 	ColumnAccessor < mCFStaticData_256 > port_yld_aft_tax;
+ 	ColumnAccessor < mCFStaticData_256 > port_yld_denom;
+ 	ColumnAccessor < mCFStaticData_256 > port_yld_less_dflt;
+ 	ColumnAccessor < mCFStaticData_256 > prem_bonus;
+ 	ColumnAccessor < mCFStaticData_256 > prem_issued;
+ 	ColumnAccessor < mCFStaticData_256 > prem_paid;
+ 	ColumnAccessor < mCFStaticData_256 > prem_tax;
+ 	ColumnAccessor < mCFStaticData_256 > prem_waiver_benefits;
+ 	ColumnAccessor < mCFStaticData_256 > proj_tgt_hedge_stmt;
+ 	ColumnAccessor < mCFStaticData_256 > rbc;
+ 	ColumnAccessor < mCFStaticData_256 > rbc_bef_sale;
+ 	ColumnAccessor < mCFStaticData_256 > rbc_c1;
+ 	ColumnAccessor < mCFStaticData_256 > rbc_c1_bef_sale;
+ 	ColumnAccessor < mCFStaticData_256 > rbc_c1_eqt;
+ 	ColumnAccessor < mCFStaticData_256 > rbc_c1_eqt_bef_sale;
+ 	ColumnAccessor < mCFStaticData_256 > rbc_c1_non_eqt;
+ 	ColumnAccessor < mCFStaticData_256 > rbc_c1_non_eqt_bef_sale;
+ 	ColumnAccessor < mCFStaticData_256 > rbc_c1_unearn_prem_res_def;
+ 	ColumnAccessor < mCFStaticData_256 > rbc_c2;
+ 	ColumnAccessor < mCFStaticData_256 > rbc_c2_claim;
+ 	ColumnAccessor < mCFStaticData_256 > rbc_c2_claim_prev_yr;
+ 	ColumnAccessor < mCFStaticData_256 > rbc_c2_loss_ratio;
+ 	ColumnAccessor < mCFStaticData_256 > rbc_c2_nar;
+ 	ColumnAccessor < mCFStaticData_256 > rbc_c2_prem;
+ 	ColumnAccessor < mCFStaticData_256 > rbc_c2_prem_prev_yr;
+ 	ColumnAccessor < mCFStaticData_256 > rbc_c3;
+ 	ColumnAccessor < mCFStaticData_256 > rbc_c3_hedge_offset;
+ 	ColumnAccessor < mCFStaticData_256 > rbc_c3_mp;
+ 	ColumnAccessor < mCFStaticData_256 > rbc_c3_std_scen_amt;
+ 	ColumnAccessor < mCFStaticData_256 > rbc_c3_std_scen_amt_unhedged;
+ 	ColumnAccessor < mCFStaticData_256 > rbc_c3_stoch_amt;
+ 	ColumnAccessor < mCFStaticData_256 > rbc_c3_stoch_amt_unhedged;
+ 	ColumnAccessor < mCFStaticData_256 > rbc_c3_unhedged;
+ 	ColumnAccessor < mCFStaticData_256 > rbc_c4;
+ 	ColumnAccessor < mCFStaticData_256 > rbc_cash;
+ 	ColumnAccessor < mCFStaticData_256 > rbc_cash_bef_sale;
+ 	ColumnAccessor < mCFStaticData_256 > realzd_cap_gain;
+ 	ColumnAccessor < mCFStaticData_256 > realzd_cap_gain_bef_sale;
+ 	ColumnAccessor < mCFStaticData_256 > realzd_cap_gain_free_surp;
+ 	ColumnAccessor < mCFStaticData_256 > realzd_cap_gain_free_surp_bef_sale;
+ 	ColumnAccessor < mCFStaticData_256 > realzd_cap_gain_free_surp_ytd;
+ 	ColumnAccessor < mCFStaticData_256 > realzd_cap_gain_free_surp_ytd_bef_sale;
+ 	ColumnAccessor < mCFStaticData_256 > realzd_cap_gain_fund;
+ 	ColumnAccessor < mCFStaticData_256 > realzd_cap_gain_res;
+ 	ColumnAccessor < mCFStaticData_256 > realzd_cap_gain_res_bef_sale;
+ 	ColumnAccessor < mCFStaticData_256 > realzd_cap_gain_res_ytd;
+ 	ColumnAccessor < mCFStaticData_256 > realzd_cap_gain_res_ytd_bef_sale;
+ 	ColumnAccessor < mCFStaticData_256 > realzd_cap_gain_sale;
+ 	ColumnAccessor < mCFStaticData_256 > realzd_cap_gain_tgt_cap;
+ 	ColumnAccessor < mCFStaticData_256 > realzd_cap_gain_tgt_cap_bef_sale;
+ 	ColumnAccessor < mCFStaticData_256 > realzd_cap_gain_tgt_cap_ytd;
+ 	ColumnAccessor < mCFStaticData_256 > realzd_cap_gain_tgt_cap_ytd_bef_sale;
+ 	ColumnAccessor < mCFStaticData_256 > realzd_cap_gain_undistrib_earnings;
+ 	ColumnAccessor < mCFStaticData_256 > realzd_cap_gain_undistrib_earnings_bef_sale;
+ 	ColumnAccessor < mCFStaticData_256 > realzd_cap_gain_undistrib_earnings_ytd;
+ 	ColumnAccessor < mCFStaticData_256 > realzd_cap_gain_undistrib_earnings_ytd_bef_sale;
+ 	ColumnAccessor < mCFStaticData_256 > reins_ann_benefits_bom;
+ 	ColumnAccessor < mCFStaticData_256 > reins_ann_benefits_eom;
+ 	ColumnAccessor < mCFStaticData_256 > reins_cap_gain_res;
+ 	ColumnAccessor < mCFStaticData_256 > reins_cap_gain_res_bef_sale;
+ 	ColumnAccessor < mCFStaticData_256 > reins_cash_flow_bom;
+ 	ColumnAccessor < mCFStaticData_256 > reins_cash_flow_eom;
+ 	ColumnAccessor < mCFStaticData_256 > reins_cash_flow_int;
+ 	ColumnAccessor < mCFStaticData_256 > reins_cash_val;
+ 	ColumnAccessor < mCFStaticData_256 > reins_claim_paid;
+ 	ColumnAccessor < mCFStaticData_256 > reins_comm_chargeback_reimb;
+ 	ColumnAccessor < mCFStaticData_256 > reins_comm_reimb;
+ 	ColumnAccessor < mCFStaticData_256 > reins_comm_reimb_bom;
+ 	ColumnAccessor < mCFStaticData_256 > reins_comm_reimb_eom;
+ 	ColumnAccessor < mCFStaticData_256 > reins_deferred_gross_prem;
+ 	ColumnAccessor < mCFStaticData_256 > reins_deferred_gross_prem_incr;
+ 	ColumnAccessor < mCFStaticData_256 > reins_deferred_net_prem;
+ 	ColumnAccessor < mCFStaticData_256 > reins_div_applied;
+ 	ColumnAccessor < mCFStaticData_256 > reins_div_liab;
+ 	ColumnAccessor < mCFStaticData_256 > reins_div_liab_incr;
+ 	ColumnAccessor < mCFStaticData_256 > reins_div_paid;
+ 	ColumnAccessor < mCFStaticData_256 > reins_dth_ben_inf;
+ 	ColumnAccessor < mCFStaticData_256 > reins_dth_benefits;
+ 	ColumnAccessor < mCFStaticData_256 > reins_ea;
+ 	ColumnAccessor < mCFStaticData_256 > reins_ea_chargeback;
+ 	ColumnAccessor < mCFStaticData_256 > reins_endow_benefits;
+ 	ColumnAccessor < mCFStaticData_256 > reins_exp;
+ 	ColumnAccessor < mCFStaticData_256 > reins_exp_reimb;
+ 	ColumnAccessor < mCFStaticData_256 > reins_exp_reimb_bom;
+ 	ColumnAccessor < mCFStaticData_256 > reins_exp_reimb_eom;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_ben_res;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_ben_res_incr;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_cap_gain_res;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_capzd_comm_bom;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_capzd_comm_eom;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_capzd_prem_bonus;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_cash_flow_int;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_chg_inc;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_claim_res;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_claim_res_incr;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_comm_excess_bom;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_comm_excess_eom;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_comm_trail_bom;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_comm_trail_eom;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_cost;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_credited_int;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_dac;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_dac_incr;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_deferred_maint_exp;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_deferred_prof_liab;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_deferred_prof_liab_incr;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_div_applied;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_div_liab;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_div_liab_incr;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_div_paid;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_dth_claim_cost;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_inv_inc_res;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_liab_net;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_loads_deducted;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_loads_deferred;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_maint_exp_bom;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_maint_exp_eom;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_maint_exp_res;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_maint_exp_res_incr;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_modco_liab;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_modco_liab_incr;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_modco_res_adj;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_prem;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_prem_bonus;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_prem_tax;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_prem_waiver_res;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_prem_waiver_res_incr;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_recoveries;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_refund;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_sfas133_liab;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_sfas133_liab_incr;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_sop031_addl_liab;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_sop031_addl_liab_incr;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_surr_inc;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_terminal_div;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_unearn_rev_liab;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_unearn_rev_released;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_unrealzd_cap_gain_incr;
+ 	ColumnAccessor < mCFStaticData_256 > reins_imr_impact_res;
+ 	ColumnAccessor < mCFStaticData_256 > reins_imr_impact_res_bef_sale;
+ 	ColumnAccessor < mCFStaticData_256 > reins_inv_fee_ref;
+ 	ColumnAccessor < mCFStaticData_256 > reins_inv_inc_res;
+ 	ColumnAccessor < mCFStaticData_256 > reins_maturity_benefits;
+ 	ColumnAccessor < mCFStaticData_256 > reins_modco_res_adj;
+ 	ColumnAccessor < mCFStaticData_256 > reins_prem;
+ 	ColumnAccessor < mCFStaticData_256 > reins_prem_tax;
+ 	ColumnAccessor < mCFStaticData_256 > reins_prem_waiver_benefits;
+ 	ColumnAccessor < mCFStaticData_256 > reins_realzd_cap_gain_res;
+ 	ColumnAccessor < mCFStaticData_256 > reins_realzd_cap_gain_res_bef_sale;
+ 	ColumnAccessor < mCFStaticData_256 > reins_realzd_cap_gain_res_ytd;
+ 	ColumnAccessor < mCFStaticData_256 > reins_realzd_cap_gain_res_ytd_bef_sale;
+ 	ColumnAccessor < mCFStaticData_256 > reins_ref;
+ 	ColumnAccessor < mCFStaticData_256 > reins_stat_claim_res;
+ 	ColumnAccessor < mCFStaticData_256 > reins_stat_claim_res_incr;
+ 	ColumnAccessor < mCFStaticData_256 > reins_stat_cost;
+ 	ColumnAccessor < mCFStaticData_256 > reins_stat_cost_bef_sale;
+ 	ColumnAccessor < mCFStaticData_256 > reins_stat_loading;
+ 	ColumnAccessor < mCFStaticData_256 > reins_stat_loading_incr;
+ 	ColumnAccessor < mCFStaticData_256 > reins_stat_prem_waiver_res;
+ 	ColumnAccessor < mCFStaticData_256 > reins_stat_prem_waiver_res_incr;
+ 	ColumnAccessor < mCFStaticData_512 > reins_stat_res;
+ 	ColumnAccessor < mCFStaticData_512 > reins_stat_res_incr;
+ 	ColumnAccessor < mCFStaticData_512 > reins_stat_res_mp;
+ 	ColumnAccessor < mCFStaticData_512 > reins_stat_res_npr;
+ 	ColumnAccessor < mCFStaticData_512 > reins_stat_res_unhedged;
+ 	ColumnAccessor < mCFStaticData_512 > reins_stat_unearn_prem_res;
+ 	ColumnAccessor < mCFStaticData_512 > reins_stat_unearn_prem_res_incr;
+ 	ColumnAccessor < mCFStaticData_512 > reins_surr_benefits;
+ 	ColumnAccessor < mCFStaticData_512 > reins_tax_claim_res;
+ 	ColumnAccessor < mCFStaticData_512 > reins_tax_claim_res_incr;
+ 	ColumnAccessor < mCFStaticData_512 > reins_tax_deferred_net_prem;
+ 	ColumnAccessor < mCFStaticData_512 > reins_tax_div_liab;
+ 	ColumnAccessor < mCFStaticData_512 > reins_tax_div_liab_incr;
+ 	ColumnAccessor < mCFStaticData_512 > reins_tax_loading;
+ 	ColumnAccessor < mCFStaticData_512 > reins_tax_loading_incr;
+ 	ColumnAccessor < mCFStaticData_512 > reins_tax_prem_waiver_res;
+ 	ColumnAccessor < mCFStaticData_512 > reins_tax_prem_waiver_res_incr;
+ 	ColumnAccessor < mCFStaticData_512 > reins_tax_res;
+ 	ColumnAccessor < mCFStaticData_512 > reins_tax_res_incr;
+ 	ColumnAccessor < mCFStaticData_512 > reins_tax_res_mp;
+ 	ColumnAccessor < mCFStaticData_512 > reins_tax_unearn_prem_res;
+ 	ColumnAccessor < mCFStaticData_512 > reins_tax_unearn_prem_res_incr;
+ 	ColumnAccessor < mCFStaticData_512 > reins_terminal_div;
+ 	ColumnAccessor < mCFStaticData_512 > reins_withdrl_benefits;
+ 	ColumnAccessor < mCFStaticData_512 > rho_convex_hedge_inv_amt;
+ 	ColumnAccessor < mCFStaticData_512 > rho_convex_hedge_mkt_val;
+ 	ColumnAccessor < mCFStaticData_512 > rho_convex_hedge_mkt_val_incr;
+ 	ColumnAccessor < mCFStaticData_512 > rho_convex_hedge_pmt;
+ 	ColumnAccessor < mCFStaticData_512 > rho_convex_hedge_prof;
+ 	ColumnAccessor < mCFStaticData_512 > rho_convex_hedge_sale_amt;
+ 	ColumnAccessor < mCFStaticData_512 > rho_convex_hedge_transaction_cost;
+ 	ColumnAccessor < mCFStaticData_512 > rho_hedge_inv_amt;
+ 	ColumnAccessor < mCFStaticData_512 > rho_hedge_mkt_val;
+ 	ColumnAccessor < mCFStaticData_512 > rho_hedge_mkt_val_incr;
+ 	ColumnAccessor < mCFStaticData_512 > rho_hedge_pmt;
+ 	ColumnAccessor < mCFStaticData_512 > rho_hedge_prof;
+ 	ColumnAccessor < mCFStaticData_512 > rho_hedge_sale_amt;
+ 	ColumnAccessor < mCFStaticData_512 > rho_hedge_transaction_cost;
+ 	ColumnAccessor < mCFStaticData_512 > rila_interim_value_dapv_e_aig;
+ 	ColumnAccessor < mCFStaticData_512 > rila_interim_value_fiapv_e_aig;
+ 	ColumnAccessor < mCFStaticData_512 > rila_interim_value_tc_e_aig;
+ 	ColumnAccessor < mCFStaticData_512 > sale_imr_avr_flag;
+ 	ColumnAccessor < mCFStaticData_512 > sale_inc;
+ 	ColumnAccessor < mCFStaticData_512 > sale_possible_imr_avr_flag;
+ 	ColumnAccessor < mCFStaticData_512 > sched_prin_pmt;
+ 	ColumnAccessor < mCFStaticData_512 > startup;
+ 	ColumnAccessor < mCFStaticData_512 > stat_claim_exp_res;
+ 	ColumnAccessor < mCFStaticData_512 > stat_claim_exp_res_incr;
+ 	ColumnAccessor < mCFStaticData_512 > stat_claim_incurred;
+ 	ColumnAccessor < mCFStaticData_512 > stat_claim_res;
+ 	ColumnAccessor < mCFStaticData_512 > stat_claim_res_incr;
+ 	ColumnAccessor < mCFStaticData_512 > stat_loading;
+ 	ColumnAccessor < mCFStaticData_512 > stat_loading_incr;
+ 	ColumnAccessor < mCFStaticData_512 > stat_prem_waiver_exp_res;
+ 	ColumnAccessor < mCFStaticData_512 > stat_prem_waiver_exp_res_incr;
+ 	ColumnAccessor < mCFStaticData_512 > stat_prem_waiver_res;
+ 	ColumnAccessor < mCFStaticData_512 > stat_prem_waiver_res_incr;
+ 	ColumnAccessor < mCFStaticData_512 > stat_res;
+ 	ColumnAccessor < mCFStaticData_512 > stat_res_ag38_8d;
+ 	ColumnAccessor < mCFStaticData_512 > stat_res_carvm_base_aig;
+ 	ColumnAccessor < mCFStaticData_512 > stat_res_carvm_wb_aig;
+ 	ColumnAccessor < mCFStaticData_512 > stat_res_cte_adj;
+ 	ColumnAccessor < mCFStaticData_512 > stat_res_cte_adj_unfloored;
+ 	ColumnAccessor < mCFStaticData_512 > stat_res_cte_adj_unfloored_unhedged;
+ 	ColumnAccessor < mCFStaticData_512 > stat_res_cte_be;
+ 	ColumnAccessor < mCFStaticData_512 > stat_res_cte_buffer;
+ 	ColumnAccessor < mCFStaticData_512 > stat_res_cte_buffer_unhedged;
+ 	ColumnAccessor < mCFStaticData_512 > stat_res_det_res;
+ 	ColumnAccessor < mCFStaticData_512 > stat_res_det_res_unhedged;
+ 	ColumnAccessor < mCFStaticData_512 > stat_res_excess;
+ 	ColumnAccessor < mCFStaticData_512 > stat_res_excess_unhedged;
+ 	ColumnAccessor < mCFStaticData_512 > stat_res_incr;
+ 	ColumnAccessor < mCFStaticData_512 > stat_res_mp;
+ 	ColumnAccessor < mCFStaticData_512 > stat_res_mp_unhedged;
+ 	ColumnAccessor < mCFStaticData_512 > stat_res_net;
+ 	ColumnAccessor < mCFStaticData_512 > stat_res_net_ag38_8d;
+ 	ColumnAccessor < mCFStaticData_512 > stat_res_net_cte_adj;
+ 	ColumnAccessor < mCFStaticData_512 > stat_res_net_cte_adj_unfloored;
+ 	ColumnAccessor < mCFStaticData_512 > stat_res_net_cte_adj_unfloored_unhedged;
+ 	ColumnAccessor < mCFStaticData_512 > stat_res_net_cte_be;
+ 	ColumnAccessor < mCFStaticData_512 > stat_res_net_cte_buffer;
+ 	ColumnAccessor < mCFStaticData_512 > stat_res_net_cte_buffer_unhedged;
+ 	ColumnAccessor < mCFStaticData_512 > stat_res_net_det_res;
+ 	ColumnAccessor < mCFStaticData_512 > stat_res_net_det_res_unhedged;
+ 	ColumnAccessor < mCFStaticData_512 > stat_res_net_excess;
+ 	ColumnAccessor < mCFStaticData_512 > stat_res_net_excess_unhedged;
+ 	ColumnAccessor < mCFStaticData_512 > stat_res_net_mp;
+ 	ColumnAccessor < mCFStaticData_512 > stat_res_net_mp_unhedged;
+ 	ColumnAccessor < mCFStaticData_512 > stat_res_net_npr;
+ 	ColumnAccessor < mCFStaticData_512 > stat_res_net_npr_unhedged;
+ 	ColumnAccessor < mCFStaticData_512 > stat_res_net_sa;
+ 	ColumnAccessor < mCFStaticData_512 > stat_res_net_stoch_res;
+ 	ColumnAccessor < mCFStaticData_512 > stat_res_net_stoch_res_unhedged;
+ 	ColumnAccessor < mCFStaticData_512 > stat_res_net_unhedged;
+ 	ColumnAccessor < mCFStaticData_512 > stat_res_npr;
+ 	ColumnAccessor < mCFStaticData_512 > stat_res_npr_unhedged;
+ 	ColumnAccessor < mCFStaticData_512 > stat_res_sa;
+ 	ColumnAccessor < mCFStaticData_512 > stat_res_sa_exp_allow;
+ 	ColumnAccessor < mCFStaticData_512 > stat_res_stoch_res;
+ 	ColumnAccessor < mCFStaticData_512 > stat_res_stoch_res_unhedged;
+ 	ColumnAccessor < mCFStaticData_512 > stat_res_unhedged;
+ 	ColumnAccessor < mCFStaticData_512 > stat_res_xol_carvm_aig;
+ 	ColumnAccessor < mCFStaticData_512 > stat_res_xol_excess_res_aig;
+ 	ColumnAccessor < mCFStaticData_512 > stat_res_xol_nb_eco_res_aig;
+ 	ColumnAccessor < mCFStaticData_512 > stat_res_xol_pv_nb_ending_amount_aig;
+ 	ColumnAccessor < mCFStaticData_512 > stat_unearn_prem_res;
+ 	ColumnAccessor < mCFStaticData_512 > stat_unearn_prem_res_incr;
+ 	ColumnAccessor < mCFStaticData_512 > stat_unearn_prem_res_net;
+ 	ColumnAccessor < mCFStaticData_512 > stat_unearn_prem_res_npr;
+ 	ColumnAccessor < mCFStaticData_512 > stat_unearn_prem_res_npr_net;
+ 	ColumnAccessor < mCFStaticData_512 > surr_benefits;
+ 	ColumnAccessor < mCFStaticData_512 > tax;
+ 	ColumnAccessor < mCFStaticData_512 > tax_bef_sale;
+ 	ColumnAccessor < mCFStaticData_512 > tax_bk_prof;
+ 	ColumnAccessor < mCFStaticData_512 > tax_bk_prof_bef_sale;
+ 	ColumnAccessor < mCFStaticData_512 > tax_bk_prof_ytd;
+ 	ColumnAccessor < mCFStaticData_512 > tax_bk_prof_ytd_bef_sale;
+ 	ColumnAccessor < mCFStaticData_512 > tax_capzd_prem;
+ 	ColumnAccessor < mCFStaticData_512 > tax_capzd_prem_amortzn;
+ 	ColumnAccessor < mCFStaticData_512 > tax_capzd_prem_unamortzd;
+ 	ColumnAccessor < mCFStaticData_512 > tax_claim_exp_res;
+ 	ColumnAccessor < mCFStaticData_512 > tax_claim_res;
+ 	ColumnAccessor < mCFStaticData_512 > tax_claim_res_incr;
+ 	ColumnAccessor < mCFStaticData_512 > tax_deferred_net_prem;
+ 	ColumnAccessor < mCFStaticData_512 > tax_div_liab;
+ 	ColumnAccessor < mCFStaticData_512 > tax_div_liab_incr;
+ 	ColumnAccessor < mCFStaticData_512 > tax_earnings_accum;
+ 	ColumnAccessor < mCFStaticData_512 > tax_earnings_accum_ytd;
+ 	ColumnAccessor < mCFStaticData_512 > tax_exempt_inc;
+ 	ColumnAccessor < mCFStaticData_512 > tax_exempt_inc_bk_prof;
+ 	ColumnAccessor < mCFStaticData_512 > tax_exempt_inc_free_surp;
+ 	ColumnAccessor < mCFStaticData_512 > tax_exempt_inc_tgt_cap;
+ 	ColumnAccessor < mCFStaticData_512 > tax_free_surp;
+ 	ColumnAccessor < mCFStaticData_512 > tax_free_surp_bef_sale;
+ 	ColumnAccessor < mCFStaticData_512 > tax_free_surp_ytd;
+ 	ColumnAccessor < mCFStaticData_512 > tax_free_surp_ytd_bef_sale;
+ 	ColumnAccessor < mCFStaticData_512 > tax_loading;
+ 	ColumnAccessor < mCFStaticData_512 > tax_loading_incr;
+ 	ColumnAccessor < mCFStaticData_512 > tax_prem_waiver_exp_res;
+ 	ColumnAccessor < mCFStaticData_512 > tax_prem_waiver_res;
+ 	ColumnAccessor < mCFStaticData_512 > tax_prem_waiver_res_incr;
+ 	ColumnAccessor < mCFStaticData_512 > tax_res;
+ 	ColumnAccessor < mCFStaticData_512 > tax_res_incr;
+ 	ColumnAccessor < mCFStaticData_512 > tax_res_mp;
+ 	ColumnAccessor < mCFStaticData_512 > tax_tgt_cap;
+ 	ColumnAccessor < mCFStaticData_512 > tax_tgt_cap_bef_sale;
+ 	ColumnAccessor < mCFStaticData_512 > tax_tgt_cap_ytd;
+ 	ColumnAccessor < mCFStaticData_512 > tax_tgt_cap_ytd_bef_sale;
+ 	ColumnAccessor < mCFStaticData_512 > tax_transfer_to_sa_net;
+ 	ColumnAccessor < mCFStaticData_512 > tax_unearn_prem_res;
+ 	ColumnAccessor < mCFStaticData_512 > tax_unearn_prem_res_incr;
+ 	ColumnAccessor < mCFStaticData_512 > taxable_inc_addn;
+ 	ColumnAccessor < mCFStaticData_512 > taxable_inc_bk_prof;
+ 	ColumnAccessor < mCFStaticData_512 > taxable_inc_bk_prof_bef_sale;
+ 	ColumnAccessor < mCFStaticData_512 > taxable_inc_bk_prof_ytd;
+ 	ColumnAccessor < mCFStaticData_512 > taxable_inc_bk_prof_ytd_bef_sale;
+ 	ColumnAccessor < mCFStaticData_512 > taxable_inc_carryfwd_addn_ytd;
+ 	ColumnAccessor < mCFStaticData_512 > taxable_inc_carryfwd_applied_ytd;
+ 	ColumnAccessor < mCFStaticData_512 > taxable_inc_carryfwd_avail;
+ 	ColumnAccessor < mCFStaticData_512 > taxable_inc_earnings_accum;
+ 	ColumnAccessor < mCFStaticData_512 > taxable_inc_earnings_accum_ytd;
+ 	ColumnAccessor < mCFStaticData_512 > taxable_inc_free_surp;
+ 	ColumnAccessor < mCFStaticData_512 > taxable_inc_free_surp_bef_sale;
+ 	ColumnAccessor < mCFStaticData_512 > taxable_inc_free_surp_ytd;
+ 	ColumnAccessor < mCFStaticData_512 > taxable_inc_free_surp_ytd_bef_sale;
+ 	ColumnAccessor < mCFStaticData_512 > taxable_inc_tgt_cap;
+ 	ColumnAccessor < mCFStaticData_512 > taxable_inc_tgt_cap_bef_sale;
+ 	ColumnAccessor < mCFStaticData_512 > taxable_inc_tgt_cap_ytd;
+ 	ColumnAccessor < mCFStaticData_512 > taxable_inc_tgt_cap_ytd_bef_sale;
+ 	ColumnAccessor < mCFStaticData_512 > terminal_div;
+ 	ColumnAccessor < mCFStaticData_512 > tgt_cap;
+ 	ColumnAccessor < mCFStaticData_512 > tgt_cap_bef_sale;
+ 	ColumnAccessor < mCFStaticData_512 > tgt_cap_effect;
+ 	ColumnAccessor < mCFStaticData_512 > tgt_cap_effect_bef_sale;
+ 	ColumnAccessor < mCFStaticData_512 > tgt_cap_incr;
+ 	ColumnAccessor < mCFStaticData_512 > tgt_cap_incr_bef_sale;
+ 	ColumnAccessor < mCFStaticData_512 > transfer_cash_flow_sa_bom;
+ 	ColumnAccessor < mCFStaticData_512 > transfer_cash_flow_sa_eom;
+ 	ColumnAccessor < mCFStaticData_512 > transfer_to_sa_net;
+ 	ColumnAccessor < mCFStaticData_512 > undistrib_earnings;
+ 	ColumnAccessor < mCFStaticData_512 > unrealzd_cap_gain_incr;
+ 	ColumnAccessor < mCFStaticData_512 > unrealzd_cap_gain_incr_bef_sale;
+ 	ColumnAccessor < mCFStaticData_512 > unrealzd_cap_gain_released_on_sale;
+ 	ColumnAccessor < mCFStaticData_512 > valn_tgt_ag38_8d;
+ 	ColumnAccessor < mCFStaticData_512 > valn_tgt_gaap_sfas120;
+ 	ColumnAccessor < mCFStaticData_512 > valn_tgt_gaap_sfas91;
+ 	ColumnAccessor < mCFStaticData_512 > valn_tgt_gaap_sfas97rd;
+ 	ColumnAccessor < mCFStaticData_512 > valn_tgt_gaap_sop031;
+ 	ColumnAccessor < mCFStaticData_512 > valn_tgt_hedge_final;
+ 	ColumnAccessor < mCFStaticData_512 > valn_tgt_hedge_shock;
+ 	ColumnAccessor < mCFStaticData_512 > valn_tgt_pba_pol_res;
+ 	ColumnAccessor < mCFStaticData_512 > valn_tgt_pba_rbc_std_scen_step2;
+ 	ColumnAccessor < mCFStaticData_512 > valn_tgt_pba_scen_amt;
+ 	ColumnAccessor < mCFStaticData_512 > vega_hedge_inv_amt;
+ 	ColumnAccessor < mCFStaticData_512 > vega_hedge_mkt_val;
+ 	ColumnAccessor < mCFStaticData_512 > vega_hedge_mkt_val_incr;
+ 	ColumnAccessor < mCFStaticData_512 > vega_hedge_pmt;
+ 	ColumnAccessor < mCFStaticData_512 > vega_hedge_prof;
+ 	ColumnAccessor < mCFStaticData_512 > vega_hedge_sale_amt;
+ 	ColumnAccessor < mCFStaticData_512 > vega_hedge_transaction_cost;
+ 	ColumnAccessor < mCFStaticData_512 > vm21_pv_claims_deterministic_crbg;
+ 	ColumnAccessor < mCFStaticData_512 > withdrl_benefits;
+ 	ColumnAccessor < mCFStaticData_512 > xol_amount_aig;
+ 	ColumnAccessor < mCFStaticData_512 > xol_prem_aig;
+//Column Definition END@2
+
+ // Temporary Table...
+	MonTable* ptr_tt_avr_components;
+	TempTableAccessor avr_components;
+
+	MonTable* ptr_tt_avr_components_bef_sale;
+	TempTableAccessor avr_components_bef_sale;
+
+	MonTable* ptr_tt_imr_aft_tax_realzd_cap_gains_bonds;
+	TempTableAccessor imr_aft_tax_realzd_cap_gains_bonds;
+
+	MonTable* ptr_tt_imr_aft_tax_realzd_cap_gains_bonds_bef_sale;
+	TempTableAccessor imr_aft_tax_realzd_cap_gains_bonds_bef_sale;
+
+	MonTable* ptr_tt_imr_aft_tax_realzd_cap_gains_mortgages;
+	TempTableAccessor imr_aft_tax_realzd_cap_gains_mortgages;
+
+	MonTable* ptr_tt_imr_aft_tax_realzd_cap_gains_mortgages_bef_sale;
+	TempTableAccessor imr_aft_tax_realzd_cap_gains_mortgages_bef_sale;
+
+	MonTable* ptr_tt_imr_aft_tax_realzd_cap_gains_other;
+	TempTableAccessor imr_aft_tax_realzd_cap_gains_other;
+
+	MonTable* ptr_tt_imr_aft_tax_realzd_cap_gains_other_bef_sale;
+	TempTableAccessor imr_aft_tax_realzd_cap_gains_other_bef_sale;
+
+	MonTable* ptr_tt_imr_aft_tax_realzd_cap_gains_rml;
+	TempTableAccessor imr_aft_tax_realzd_cap_gains_rml;
+
+	MonTable* ptr_tt_imr_aft_tax_realzd_cap_gains_rml_bef_sale;
+	TempTableAccessor imr_aft_tax_realzd_cap_gains_rml_bef_sale;
+
+	MonTable* ptr_tt_imr_amortzn_amt_tbl;
+	TempTableAccessor imr_amortzn_amt_tbl;
+
+	MonTable* ptr_tt_imr_amortzn_amt_tbl_bef_sale;
+	TempTableAccessor imr_amortzn_amt_tbl_bef_sale;
+
+	MonTable* ptr_tt_imr_fy_amortzn_for_mth;
+	TempTableAccessor imr_fy_amortzn_for_mth;
+
+	MonTable* ptr_tt_imr_fy_amortzn_for_mth_bef_sale;
+	TempTableAccessor imr_fy_amortzn_for_mth_bef_sale;
+
+	MonTable* ptr_tt_tax_capzd_prem_amortzn_sched;
+	TempTableAccessor tax_capzd_prem_amortzn_sched;
+
+_1D_ANN_PBA_PBA sm_ann_pba;
+_2D_HDG_GRP_COMP sm_hedge_grp;
+_2D_SFAS97RD_GAAP sm_sfas97rd;
+SEG_COMP *sm_bond_is;
+SEG_COMP *sm_bond_pv;
+SEG_COMP *sm_bond_ym;
+SEG_COMP *sm_mtg_is;
+SEG_COMP *sm_mtg_pv;
+SEG_COMP *sm_mtg_ym;
+int main_rebase_model; //1
+
+public :
+	static Attribute::Descriptor* descriptorTable[];
+	static const size_t sDescriptorCount;
+	size_t variableCount() const {
+		return sDescriptorCount;
+	}
+	static Attribute::Descriptor descriptor_0[];
+#ifdef MICROSOFT
+#pragma warning(push)
+#pragma warning(disable : 4005)
+// Disable the warning C4005: 'DESCRIPTOR_TABLE' : macro redefinition
+#endif	MICROSOFT
+	#define DESCRIPTOR_TABLE SEG_COMP::descriptor_0
+#ifdef MICROSOFT
+#pragma warning(pop)
+#endif	MICROSOFT
+	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > asset_yld_comp_rate_id;
+  inline xstring	Get_asset_yld_comp_rate_id() {
+		return asset_yld_comp_rate_id; }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > asset_yld_defn;
+  inline xstring	Get_asset_yld_defn() {
+		return asset_yld_defn; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > asset_yld_deterministic;
+  inline double	Get_asset_yld_deterministic() {
+		return asset_yld_deterministic; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > borrowing_rate_addn;
+  inline double	Get_borrowing_rate_addn() {
+		return borrowing_rate_addn; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > borrowing_rate_mult;
+  inline double	Get_borrowing_rate_mult() {
+		return borrowing_rate_mult; }
+	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > borrowing_rate_qual;
+  inline xstring	Get_borrowing_rate_qual() {
+		return borrowing_rate_qual; }
+	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > borrowing_rate_term;
+  inline int	Get_borrowing_rate_term() {
+		return borrowing_rate_term; }
+	Attribute::Proxy <double, DESCRIPTOR_TABLE > call_sp_d12_k100_vol;
+  inline double	Get_call_sp_d12_k100_vol() {
+		return call_sp_d12_k100_vol; }
+  inline void Set_call_sp_d12_k100_vol(const double &v) {
+		call_sp_d12_k100_vol.setValue(v); }
+	Attribute::Proxy <double, DESCRIPTOR_TABLE > call_sp_d12_k101_vol;
+  inline double	Get_call_sp_d12_k101_vol() {
+		return call_sp_d12_k101_vol; }
+  inline void Set_call_sp_d12_k101_vol(const double &v) {
+		call_sp_d12_k101_vol.setValue(v); }
+	Attribute::Proxy <double, DESCRIPTOR_TABLE > call_sp_d12_k102_vol;
+  inline double	Get_call_sp_d12_k102_vol() {
+		return call_sp_d12_k102_vol; }
+  inline void Set_call_sp_d12_k102_vol(const double &v) {
+		call_sp_d12_k102_vol.setValue(v); }
+	Attribute::Proxy <double, DESCRIPTOR_TABLE > call_sp_d12_k104_vol;
+  inline double	Get_call_sp_d12_k104_vol() {
+		return call_sp_d12_k104_vol; }
+  inline void Set_call_sp_d12_k104_vol(const double &v) {
+		call_sp_d12_k104_vol.setValue(v); }
+	Attribute::Proxy <double, DESCRIPTOR_TABLE > call_sp_d12_k108_vol;
+  inline double	Get_call_sp_d12_k108_vol() {
+		return call_sp_d12_k108_vol; }
+  inline void Set_call_sp_d12_k108_vol(const double &v) {
+		call_sp_d12_k108_vol.setValue(v); }
+	Attribute::Proxy <double, DESCRIPTOR_TABLE > call_sp_d12_k112_vol;
+  inline double	Get_call_sp_d12_k112_vol() {
+		return call_sp_d12_k112_vol; }
+  inline void Set_call_sp_d12_k112_vol(const double &v) {
+		call_sp_d12_k112_vol.setValue(v); }
+	Attribute::Proxy <double, DESCRIPTOR_TABLE > call_sp_d72_k100_vol;
+  inline double	Get_call_sp_d72_k100_vol() {
+		return call_sp_d72_k100_vol; }
+  inline void Set_call_sp_d72_k100_vol(const double &v) {
+		call_sp_d72_k100_vol.setValue(v); }
+	Attribute::Proxy <double, DESCRIPTOR_TABLE > call_sp_d72_k110_vol;
+  inline double	Get_call_sp_d72_k110_vol() {
+		return call_sp_d72_k110_vol; }
+  inline void Set_call_sp_d72_k110_vol(const double &v) {
+		call_sp_d72_k110_vol.setValue(v); }
+	Attribute::Proxy <double, DESCRIPTOR_TABLE > call_sp_d72_k125_vol;
+  inline double	Get_call_sp_d72_k125_vol() {
+		return call_sp_d72_k125_vol; }
+  inline void Set_call_sp_d72_k125_vol(const double &v) {
+		call_sp_d72_k125_vol.setValue(v); }
+	Attribute::Proxy <double, DESCRIPTOR_TABLE > call_sp_d72_k150_vol;
+  inline double	Get_call_sp_d72_k150_vol() {
+		return call_sp_d72_k150_vol; }
+  inline void Set_call_sp_d72_k150_vol(const double &v) {
+		call_sp_d72_k150_vol.setValue(v); }
+	Attribute::Proxy <double, DESCRIPTOR_TABLE > call_sp_d72_k175_vol;
+  inline double	Get_call_sp_d72_k175_vol() {
+		return call_sp_d72_k175_vol; }
+  inline void Set_call_sp_d72_k175_vol(const double &v) {
+		call_sp_d72_k175_vol.setValue(v); }
+	Attribute::Proxy <double, DESCRIPTOR_TABLE > call_sp_d72_k200_vol;
+  inline double	Get_call_sp_d72_k200_vol() {
+		return call_sp_d72_k200_vol; }
+  inline void Set_call_sp_d72_k200_vol(const double &v) {
+		call_sp_d72_k200_vol.setValue(v); }
+	Attribute::Proxy <double, DESCRIPTOR_TABLE > call_sp_d72_k225_vol;
+  inline double	Get_call_sp_d72_k225_vol() {
+		return call_sp_d72_k225_vol; }
+  inline void Set_call_sp_d72_k225_vol(const double &v) {
+		call_sp_d72_k225_vol.setValue(v); }
+	Attribute::Proxy <double, DESCRIPTOR_TABLE > call_sp_d72_k250_vol;
+  inline double	Get_call_sp_d72_k250_vol() {
+		return call_sp_d72_k250_vol; }
+  inline void Set_call_sp_d72_k250_vol(const double &v) {
+		call_sp_d72_k250_vol.setValue(v); }
+	Attribute::Proxy <double, DESCRIPTOR_TABLE > call_sp_d72_k300_vol;
+  inline double	Get_call_sp_d72_k300_vol() {
+		return call_sp_d72_k300_vol; }
+  inline void Set_call_sp_d72_k300_vol(const double &v) {
+		call_sp_d72_k300_vol.setValue(v); }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > cash_rate_addn;
+  inline double	Get_cash_rate_addn() {
+		return cash_rate_addn; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > cash_rate_mult;
+  inline double	Get_cash_rate_mult() {
+		return cash_rate_mult; }
+	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > cash_rate_qual;
+  inline xstring	Get_cash_rate_qual() {
+		return cash_rate_qual; }
+	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > cash_rate_term;
+  inline int	Get_cash_rate_term() {
+		return cash_rate_term; }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > data_validation_defn;
+  inline xstring	Get_data_validation_defn() {
+		return data_validation_defn; }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > existing_asset_pct_to_use_defn;
+  inline xstring	Get_existing_asset_pct_to_use_defn() {
+		return existing_asset_pct_to_use_defn; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > existing_asset_pct_to_use_input;
+  inline double	Get_existing_asset_pct_to_use_input() {
+		return existing_asset_pct_to_use_input; }
+	Attribute::Proxy <StringEnum, DESCRIPTOR_TABLE > gaap_cohort_reins_defn;
+  inline xstring	Get_gaap_cohort_reins_defn() {
+		return gaap_cohort_reins_defn; }
+  inline void Set_gaap_cohort_reins_defn(const xstring &v) {
+		gaap_cohort_reins_defn.setValue(v); }
+	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > gaap_cohorts_selected_sfas120;
+  inline xstring	Get_gaap_cohorts_selected_sfas120() {
+		return gaap_cohorts_selected_sfas120; }
+	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > gaap_cohorts_selected_sfas60;
+  inline xstring	Get_gaap_cohorts_selected_sfas60() {
+		return gaap_cohorts_selected_sfas60; }
+	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > gaap_cohorts_selected_sfas91;
+  inline xstring	Get_gaap_cohorts_selected_sfas91() {
+		return gaap_cohorts_selected_sfas91; }
+	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > gaap_cohorts_selected_sfas97lp;
+  inline xstring	Get_gaap_cohorts_selected_sfas97lp() {
+		return gaap_cohorts_selected_sfas97lp; }
+	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > gaap_cohorts_selected_sfas97rd;
+  inline xstring	Get_gaap_cohorts_selected_sfas97rd() {
+		return gaap_cohorts_selected_sfas97rd; }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gaap_defn;
+  inline xstring	Get_gaap_defn() {
+		return gaap_defn; }
+	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > hedge_assump_set_id;
+  inline xstring	Get_hedge_assump_set_id() {
+		return hedge_assump_set_id; }
+	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > hedge_grps_selected;
+  inline xstring	Get_hedge_grps_selected() {
+		return hedge_grps_selected; }
+	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > hedge_pregen_gross_results;
+  inline xstring	Get_hedge_pregen_gross_results() {
+		return hedge_pregen_gross_results; }
+	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > hedge_pregen_net_results;
+  inline xstring	Get_hedge_pregen_net_results() {
+		return hedge_pregen_net_results; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > imr_amortzn_from_prior_asset_sale;
+  inline double	Get_imr_amortzn_from_prior_asset_sale() {
+		return imr_amortzn_from_prior_asset_sale; }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > imr_options_aig;
+  inline xstring	Get_imr_options_aig() {
+		return imr_options_aig; }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > independent_mp_defn;
+  inline xstring	Get_independent_mp_defn() {
+		return independent_mp_defn; }
+	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > infl_start_date;
+  inline xstring	Get_infl_start_date() {
+		return infl_start_date; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_avr_bond_input;
+  inline double	Get_init_avr_bond_input() {
+		return init_avr_bond_input; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_avr_eqt_input;
+  inline double	Get_init_avr_eqt_input() {
+		return init_avr_eqt_input; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_avr_mtg_input;
+  inline double	Get_init_avr_mtg_input() {
+		return init_avr_mtg_input; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_avr_other_input;
+  inline double	Get_init_avr_other_input() {
+		return init_avr_other_input; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_cash_input;
+  inline double	Get_init_cash_input() {
+		return init_cash_input; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_imr_input;
+  inline double	Get_init_imr_input() {
+		return init_imr_input; }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > interim_cash_rate_defn;
+  inline xstring	Get_interim_cash_rate_defn() {
+		return interim_cash_rate_defn; }
+	Attribute::Proxy <int, DESCRIPTOR_TABLE > inverse_gamma_param_t_aig;
+  inline int	Get_inverse_gamma_param_t_aig() {
+		return inverse_gamma_param_t_aig; }
+  inline void Set_inverse_gamma_param_t_aig(const int &v) {
+		inverse_gamma_param_t_aig.setValue(v); }
+	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > loc_cohorts_selected;
+  inline xstring	Get_loc_cohorts_selected() {
+		return loc_cohorts_selected; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > maint_exp_fixed_input;
+  inline double	Get_maint_exp_fixed_input() {
+		return maint_exp_fixed_input; }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > option_strike_annualization_aig;
+  inline xstring	Get_option_strike_annualization_aig() {
+		return option_strike_annualization_aig; }
+	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > proj_date;
+  inline xstring	Get_proj_date() {
+		return proj_date; }
+	Attribute::Proxy <double, DESCRIPTOR_TABLE > put_sp_d12_k100_vol;
+  inline double	Get_put_sp_d12_k100_vol() {
+		return put_sp_d12_k100_vol; }
+  inline void Set_put_sp_d12_k100_vol(const double &v) {
+		put_sp_d12_k100_vol.setValue(v); }
+	Attribute::Proxy <double, DESCRIPTOR_TABLE > put_sp_d12_k80_vol;
+  inline double	Get_put_sp_d12_k80_vol() {
+		return put_sp_d12_k80_vol; }
+  inline void Set_put_sp_d12_k80_vol(const double &v) {
+		put_sp_d12_k80_vol.setValue(v); }
+	Attribute::Proxy <double, DESCRIPTOR_TABLE > put_sp_d12_k85_vol;
+  inline double	Get_put_sp_d12_k85_vol() {
+		return put_sp_d12_k85_vol; }
+  inline void Set_put_sp_d12_k85_vol(const double &v) {
+		put_sp_d12_k85_vol.setValue(v); }
+	Attribute::Proxy <double, DESCRIPTOR_TABLE > put_sp_d12_k90_vol;
+  inline double	Get_put_sp_d12_k90_vol() {
+		return put_sp_d12_k90_vol; }
+  inline void Set_put_sp_d12_k90_vol(const double &v) {
+		put_sp_d12_k90_vol.setValue(v); }
+	Attribute::Proxy <double, DESCRIPTOR_TABLE > put_sp_d12_k95_vol;
+  inline double	Get_put_sp_d12_k95_vol() {
+		return put_sp_d12_k95_vol; }
+  inline void Set_put_sp_d12_k95_vol(const double &v) {
+		put_sp_d12_k95_vol.setValue(v); }
+	Attribute::Proxy <double, DESCRIPTOR_TABLE > put_sp_d72_k100_vol;
+  inline double	Get_put_sp_d72_k100_vol() {
+		return put_sp_d72_k100_vol; }
+  inline void Set_put_sp_d72_k100_vol(const double &v) {
+		put_sp_d72_k100_vol.setValue(v); }
+	Attribute::Proxy <double, DESCRIPTOR_TABLE > put_sp_d72_k80_vol;
+  inline double	Get_put_sp_d72_k80_vol() {
+		return put_sp_d72_k80_vol; }
+  inline void Set_put_sp_d72_k80_vol(const double &v) {
+		put_sp_d72_k80_vol.setValue(v); }
+	Attribute::Proxy <double, DESCRIPTOR_TABLE > put_sp_d72_k85_vol;
+  inline double	Get_put_sp_d72_k85_vol() {
+		return put_sp_d72_k85_vol; }
+  inline void Set_put_sp_d72_k85_vol(const double &v) {
+		put_sp_d72_k85_vol.setValue(v); }
+	Attribute::Proxy <double, DESCRIPTOR_TABLE > put_sp_d72_k90_vol;
+  inline double	Get_put_sp_d72_k90_vol() {
+		return put_sp_d72_k90_vol; }
+  inline void Set_put_sp_d72_k90_vol(const double &v) {
+		put_sp_d72_k90_vol.setValue(v); }
+	Attribute::Proxy <double, DESCRIPTOR_TABLE > put_sp_d72_k95_vol;
+  inline double	Get_put_sp_d72_k95_vol() {
+		return put_sp_d72_k95_vol; }
+  inline void Set_put_sp_d72_k95_vol(const double &v) {
+		put_sp_d72_k95_vol.setValue(v); }
+	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > rate_setting_cycle_aig;
+  inline xstring	Get_rate_setting_cycle_aig() {
+		return rate_setting_cycle_aig; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > rbc_c3_cte98_factor;
+  inline double	Get_rbc_c3_cte98_factor() {
+		return rbc_c3_cte98_factor; }
+	Attribute::Proxy <xstring, DESCRIPTOR_TABLE > seg_id;
+  inline xstring	Get_seg_id() {
+		return seg_id; }
+  inline void Set_seg_id(const xstring &v) {
+		seg_id.setValue(v); }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > stat_res_det_floor_defn_crbg;
+  inline xstring	Get_stat_res_det_floor_defn_crbg() {
+		return stat_res_det_floor_defn_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > tax_capzd_prem_unamortzd_input;
+  inline double	Get_tax_capzd_prem_unamortzd_input() {
+		return tax_capzd_prem_unamortzd_input; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > tgt_cap_pct_inv_in_seg;
+  inline double	Get_tgt_cap_pct_inv_in_seg() {
+		return tgt_cap_pct_inv_in_seg; }
+	Attribute::Proxy <int, DESCRIPTOR_TABLE > msnumelement;
+  inline int	Get_msnumelement() {
+		return msnumelement; }
+  inline void Set_msnumelement(const int &v) {
+		msnumelement.setValue(v); }
+	Attribute::Proxy<Scalar<double>, DESCRIPTOR_TABLE > asset_yld_ag38_8d;
+	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > business_seg_flag;
+	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > corp_seg_flag;
+	Attribute::Proxy<Scalar<double>, DESCRIPTOR_TABLE > existing_asset_pct_to_use;
+	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > final_period;
+	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > gaap_amortzn_period;
+	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > imr_max_amortzn_yrs;
+	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > imr_max_yrs_to_maturity;
+	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > infl_start_mth;
+	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > infl_start_period;
+	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > infl_start_yr;
+	Attribute::Proxy<Scalar<double>, DESCRIPTOR_TABLE > init_cash_ag38_8d;
+	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > loc_ag48_flag;
+	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > loc_flag;
+	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > loc_gpr_flag;
+	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > pba_tax_flag;
+	Attribute::Proxy<Scalar<xstring>, DESCRIPTOR_TABLE > proj_date_adj;
+	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > proj_start_date;
+	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > proj_start_mth;
+	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > proj_start_yr;
+	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > reins_flag;
+	Attribute::Proxy<Scalar<double>, DESCRIPTOR_TABLE > reins_pct_ag38_8d;
+	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > seg_num;
+	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > start_period;
+	Attribute::Proxy<Scalar<xstring>, DESCRIPTOR_TABLE > state_of_world_financial_file_path;
+	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > tax_capzd_prem_amortzn_yrs;
+	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > vm21_reinv_rate_seg_flag;
+
+void setPtr_col(int cf_no, CashFlowBase* cf);
+void start_of_projection();
+void findTargetColumns();
+void start_of_layer();
+void end_of_projection();
+void end_of_layer(int layer_skipped=0);
+void after_startup(int decrement = 0);
+ void copy_names();
+ void passDataVariables(SEG_COMP* target) { passDataVars(target); }
+
+ void mapVariables();
+
+ // External function prototypes
+
+// Asset Detail Report Summary
+#line 1 "asset_detail_rpt_summary.seg_comp.for"
+void asset_detail_rpt_summary(int t, const xstring &detail_timing, double local_cash, double local_interim_cash, double local_inv_assets_excl_pol_loan);
+
+// Asset Model Point Maps
+#line 1 "asset_mp_maps.seg_comp.for"
+int asset_mp_maps(int command, int asset_defn = -1, int model_point = -1);
+
+// Asset Model Point Summary
+#line 1 "asset_mp_summary.seg_comp.for"
+void asset_mp_summary();
+
+// AVR Calculation
+#line 1 "avr_calc.seg_comp.for"
+double avr_calc(int t, const xstring & sales_timing, const xstring & calc_type);
+
+// Cast Xstring To String Aig
+#line 1 "cast_xstring_to_string_aig.seg_comp.for"
+std::string cast_xstring_to_string_aig(const xstring& input_xstring);
+
+// Finalize Asset Model Points
+#line 1 "finalize_asset_model_points.seg_comp.for"
+void finalize_asset_model_points(void);
+
+// Finalize Liability Model Points
+#line 1 "finalize_liability_model_points.seg_comp.for"
+void finalize_liability_model_points(void);
+
+// Finalize SFAS120 Cohorts
+#line 1 "finalize_sfas120_cohorts.seg_comp.for"
+void finalize_sfas120_cohorts(void);
+
+// Finalize SFAS60 Cohorts
+#line 1 "finalize_sfas60_cohorts.seg_comp.for"
+void finalize_sfas60_cohorts(void);
+
+// Finalize SFAS91 Cohorts
+#line 1 "finalize_sfas91_cohorts.seg_comp.for"
+void finalize_sfas91_cohorts(void);
+
+// Finalize SFAS97LP Cohorts
+#line 1 "finalize_sfas97lp_cohorts.seg_comp.for"
+void finalize_sfas97lp_cohorts(void);
+
+// Finalize SFAS97RD Cohorts
+#line 1 "finalize_sfas97rd_cohorts.seg_comp.for"
+void finalize_sfas97rd_cohorts(void);
+
+// Get Hedge Items
+#line 1 "get_hedge_items.seg_comp.for"
+void get_hedge_items(void);
+
+// Inverse Gamma Put Price
+#line 1 "inverse_gamma_call_price.seg_comp.for"
+double inverse_gamma_call_price(double S0, double K, double r, double T, double q, double k, double theta, double lamb, double rho, double v_0, double xi);
+
+// Inverse Gamma Put Price
+#line 1 "inverse_gamma_put_price.seg_comp.for"
+double inverse_gamma_put_price(double S0, double K, double r, double T, double q, double k, double theta, double lamb, double rho, double v_0, double xi);
+
+// Read State of World Financial
+#line 1 "read_state_of_world_financial.seg_comp.for"
+void read_state_of_world_financial(void);
+
+// Resize Seriatim Array
+#line 1 "resize_seriatim_array.seg_comp.for"
+void resize_seriatim_array(xstring col_name, int num_cohorts, int num_periods, enum seriatim_type type);
+
+// Setup Annuity PBA Elements
+#line 1 "setup_ann_pba_elements.seg_comp.for"
+void setup_ann_pba_elements(void);
+
+// Setup Asset Model Points
+#line 1 "setup_asset_model_points.seg_comp.for"
+void setup_asset_model_points(void);
+
+// Setup Asset Sub Portfolios
+#line 1 "setup_asset_sub_ports.seg_comp.for"
+void setup_asset_sub_ports(void);
+
+// Setup Hedge Groups
+#line 1 "setup_hedge_groups.seg_comp.for"
+void setup_hedge_groups(void);
+
+// Setup Independent Model Point Maps
+#line 1 "setup_imp_maps.seg_comp.for"
+void setup_imp_maps(void);
+
+// Setup Investment Strategy
+#line 1 "setup_inv_strategy.seg_comp.for"
+void setup_inv_strategy(void);
+
+// Setup Liability Model Points
+#line 1 "setup_liab_model_points.seg_comp.for"
+void setup_liab_model_points(void);
+
+// Setup Life PBA Elements
+#line 1 "setup_life_pba_elements.seg_comp.for"
+void setup_life_pba_elements(void);
+
+// Setup SFAS 120 Cohorts
+#line 1 "setup_sfas120_cohorts.seg_comp.for"
+void setup_sfas120_cohorts(void);
+
+// Setup SFAS 60 Cohorts
+#line 1 "setup_sfas60_cohorts.seg_comp.for"
+void setup_sfas60_cohorts(void);
+
+// Setup SFAS 91 Cohorts
+#line 1 "setup_sfas91_cohorts.seg_comp.for"
+void setup_sfas91_cohorts(void);
+
+// Setup SFAS 97 Limited Pay Cohorts
+#line 1 "setup_sfas97lp_cohorts.seg_comp.for"
+void setup_sfas97lp_cohorts(void);
+
+// Setup SFAS 97 Retrospective Deposit Cohorts
+#line 1 "setup_sfas97rd_cohorts.seg_comp.for"
+void setup_sfas97rd_cohorts(void);
+
+// Setup VA PBA Elements
+#line 1 "setup_va_pba_elements.seg_comp.for"
+void setup_va_pba_elements(void);
+
+// Sum Over Asset Sub Portfolios
+#line 1 "sum_over_asset_sub_ports.seg_comp.for"
+double sum_over_asset_sub_ports(const xstring &column_name, int t, int sum_over_timing);
+
+// Sum Over Assets
+#line 1 "sum_over_assets.seg_comp.for"
+double sum_over_assets(const xstring &colname, int t, int sub_port_id, int sale_class_id, int asset_fund_index, int sum_over_timing);
+
+// Sum Over Hedge Groups
+#line 1 "sum_over_hedge_grps.seg_comp.for"
+double sum_over_hedge_grps(const xstring &column_name, int t);
+
+// Sum Over Liabilities
+#line 1 "sum_over_liabilities.seg_comp.for"
+double sum_over_liabilities(const xstring &colname, int t);
+
+// Sum Over Letter of Credit Reserve Elements
+#line 1 "sum_over_loc.seg_comp.for"
+double sum_over_loc(const xstring &column_name, int t);
+
+// Sum Over SFAS120 Cohorts
+#line 1 "sum_over_sfas120.seg_comp.for"
+double sum_over_sfas120(const xstring &colname, int t, int cohort_reins_defn);
+
+// Sum Over SFAS60 Cohorts
+#line 1 "sum_over_sfas60.seg_comp.for"
+double sum_over_sfas60(const xstring &colname, int t, int cohort_reins_defn);
+
+// Sum Over SFAS91 Cohorts
+#line 1 "sum_over_sfas91.seg_comp.for"
+double sum_over_sfas91(const xstring &colname, int t, int cohort_reins_defn);
+
+// Sum Over SFAS97 Limited Pay Cohorts
+#line 1 "sum_over_sfas97lp.seg_comp.for"
+double sum_over_sfas97lp(const xstring &colname, int t, int cohort_reins_defn);
+
+// Sum Over SFAS97 Retrospective Deposit Cohorts
+#line 1 "sum_over_sfas97rd.seg_comp.for"
+double sum_over_sfas97rd(const xstring &colname, int t, int cohort_reins_defn);
+
+// Write State of World Financial
+#line 1 "write_state_of_world_financial.seg_comp.for"
+void write_state_of_world_financial(void);
+
+
+//factory
+static SEG_COMP* makeThis(int isSubmodel, ModelClass *owner, SEG_COMP* peer, 
+					int mainRebase, const xstring &name, SEG_COMP_persistent_object* arrayTemplate);
+
+//constructor
+SEG_COMP(const xstring &modelClassName, int isSubmodel, ModelClass *owner, ModelClass *peer, 
+					int mainRebase, const char *name, ModelClass* arrayPersistentObj);
+
+// constructor if this model class is the base class of another model class
+SEG_COMP(int columnCount, Descriptor* mocd[], Product* persObj);
+
+//destructor
+~SEG_COMP();
+
+
+void ms_BeforeStartup();
+virtual void resetValues(int decrement = 1);
+virtual void temporary_tables();
+virtual void checkFileTables();
+
+#ifdef COLUMNOUTPUT245
+static bool writeClassInfo;
+virtual void writeClassInfoIfRequired() const;
+#endif
+
+};
+
+
+// write persistent object class - same as above but starting with a "_"
+// to avoid error C2243 in Microsoft
+class SEG_COMP_persistent_object : public SEG_COMP {
+
+
+public :
+
+	// this is a first time switch to read the array elements for iteration loop runs
+	// on the second and subsequent iterations, the array won't be read, just reset
+	bool mReadArray;
+  bool isPersistentObject() const { return true; }
+
+	int newTotalsNeeded() const {
+		return sm_calling_model->newTotalsNeeded();
+	}
+
+	ModelType getModelType(){return mModelType;}
+	void subTotalKey(HVector<xstring> &keys) const {
+   sm_calling_model->subTotalKey(keys);
+	}
+
+	void findTargetColumns() {SEG_COMP::findTargetColumns();}
+	void createAllShare() {
+		SEG_COMP::createAllShare();
+}
+
+	void save_variables() {ModelClass::save_variables();}
+
+	void addToMap(const xstring& key, const pointerData& d) {ModelClass::addToMap(key, d);}
+
+	bool adopt(Node* newChild) { return ModelClass::adopt(newChild); }
+
+	// In the next five functions, columnNumber is zero based
+	int columnCount() const;
+	const xstring& ms_columnName(const int columnNumber) const;
+	double ms_columnValue(const int columnNumber, const int t);
+	int ms_columnNumber(const xstring& columnName) const;
+	double ms_columnValue(const xstring& columnName, const int t);
+	double ms_valueAsDouble(const Attribute::Descriptor& descriptor);
+	void reset();
+	void write(long include_submodels = write_submodels);
+	void rebaseModel(long period);
+	void rebaseModelOnly(long period);
+	void write(const xstring& key, long include_submodels = write_submodels);
+
+	ModelClass *Save_main;
+	_1D_ANN_PBA_PBA &sm_ann_pba; //
+	_2D_HDG_GRP_COMP &sm_hedge_grp; //
+	_2D_SFAS97RD_GAAP &sm_sfas97rd; //
+	SEG_COMP *&sm_bond_is; //
+	SEG_COMP *&sm_bond_pv; //
+	SEG_COMP *&sm_bond_ym; //
+	SEG_COMP *&sm_mtg_is; //
+	SEG_COMP *&sm_mtg_pv; //
+	SEG_COMP *&sm_mtg_ym; //
+
+	ProductFeatureList* pfl;
+
+	// objects that do not support magic arrow (i.e. tables)
+private:
+
+public :
+
+
+	~SEG_COMP_persistent_object();
+
+	bool findProductFeatureList(xstring varValue);
+
+	void makeProductFeatureList(xstring varValue);
+
+	void addProductFeatureValue(int result, int count);
+	void addProductFeatureValue(double result, int count);
+	void addProductFeatureValue(xstring result, int count);
+	void addProductFeatureValue(char result, int count);
+
+	int* getProductFeatureIntPointer(int count);
+	double* getProductFeatureDoublePointer(int count);
+	xstring* getProductFeatureXstringPointer(int count);
+	char getProductFeatureIgnore(int count);
+
+	void resizeProductFeatureList(int intCount, int doubleCount, int xstringCount, int ignoreCount);
+
+//factory
+static SEG_COMP_persistent_object* makeThis(int isSubmodel, ModelClass *owner, SEG_COMP* peer, 
+					int mainRebase, const xstring &name, SEG_COMP_persistent_object* arrayTemplate, bool fixedArray);
+
+//constructor
+SEG_COMP_persistent_object(const xstring &modelClassName,
+		int isSm, ModelClass *owner, ModelClass *peer, int mainRebase, const char *name, ModelClass* arrayPersistentObj);
+};
+
+#endif

@@ -1,0 +1,7 @@
+cohort_id,cohort_reins_defn,date,date_char,sfas97rd_cohort_history_agp,sfas97rd_cohort_history_capzd_prem_bonus,sfas97rd_cohort_history_capzd_acq_exp,sfas97rd_cohort_history_capzd_comm_bom,sfas97rd_cohort_history_capzd_comm_eom,sfas97rd_cohort_history_deferred_load,sfas97rd_cohort_history_unearn_rev_liab,sfas97rd_cohort_history_reins_yrt_cost,sfas97rd_cohort_history_sop031_assess,sfas97rd_cohort_history_sop031_gmdb_benefits,sfas97rd_cohort_history_sop031_gmib_benefits,sfas97rd_cohort_history_sop031_gmwb_benefits,sfas97rd_cohort_history_sop031_sg_benefits,sfas97rd_cohort_history_sop031_pbr_benefits,sfas97rd_cohort_history_sop031_pbr_fund_val,sfas97rd_cohort_history_dac_prem_bonus_loss,sfas97rd_cohort_history_dac_acq_exp_loss,sfas97rd_cohort_history_dac_comm_loss
+Cohort 1,Gross,1,1/1/1900,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00
+Cohort 1,Gross,2958101,1/1/9999,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00
+Cohort 1,Ceded,1,1/1/1900,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00
+Cohort 1,Ceded,2958101,1/1/9999,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00
+Cohort 2,Gross,1,1/1/1900,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00
+Cohort 2,Gross,2958101,1/1/9999,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00
