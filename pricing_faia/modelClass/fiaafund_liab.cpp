@@ -338,6 +338,269 @@ extern MY_DLL Message_handler *eh;
 extern SmartArray <SmartArray <double> > fia_caps_array(0);
 
 extern MY_DLL long scenario_number;
+
+namespace {
+bool is_digit_char_crbg(char c)
+{
+	return c >= '0' && c <= '9';
+}
+
+bool extract_tagged_integer_crbg(const string &source, const string &tag, int &value)
+{
+	size_t tag_pos = source.find(tag);
+	if (tag_pos == string::npos)
+	{
+		return false;
+	}
+
+	size_t value_start = tag_pos + tag.length();
+	while (value_start < source.length() && !is_digit_char_crbg(source[value_start]) && source[value_start] != '-')
+	{
+		value_start++;
+	}
+
+	if (value_start >= source.length())
+	{
+		return false;
+	}
+
+	size_t value_end = value_start;
+	if (source[value_end] == '-')
+	{
+		value_end++;
+	}
+
+	while (value_end < source.length() && is_digit_char_crbg(source[value_end]))
+	{
+		value_end++;
+	}
+
+	if (value_end <= value_start || (value_end == value_start + 1 && source[value_start] == '-'))
+	{
+		return false;
+	}
+
+	value = atoi(source.substr(value_start, value_end - value_start).c_str());
+	return true;
+}
+
+void uppercase_string_crbg(string &value)
+{
+	for (size_t i = 0; i < value.length(); ++i)
+	{
+		if (value[i] >= 'a' && value[i] <= 'z')
+		{
+			value[i] = char(value[i] - ('a' - 'A'));
+		}
+	}
+}
+
+const vector<xstring>& get_misc_list_crbg(FIAAFUND_LIAB_UDF &account)
+{
+	if (account.fia->gen2_defn == YES)
+	{
+		return account.fia_rates->misc_list;
+	}
+
+	return account.rates->misc_list;
+}
+
+double get_misc_rate_crbg(FIAAFUND_LIAB_UDF &account, int projection_month, const xstring &lookup_id)
+{
+	if (account.fia->gen2_defn == YES)
+	{
+		return account.fia_rates->get_misc_rate(projection_month, lookup_id, EFFECTIVE_ANNUAL);
+	}
+
+	return account.rates->get_misc_rate(projection_month, lookup_id, EFFECTIVE_ANNUAL);
+}
+
+double gmab_annual_rate_input_crbg(FIAAFUND_LIAB_UDF &account)
+{
+	// Temporary MVP wiring until a generated annual GMAB rate input is added.
+	if (account.fia->gmab_ind_aig == 0)
+	{
+		return 0.0;
+	}
+
+	return max(0.0, account.fia->gmab_credit_rt_mult_aig);
+}
+
+double gmab_term_rate_input_crbg(FIAAFUND_LIAB_UDF &account)
+{
+	return gmab_annual_rate_input_crbg(account) * max(0, account.fia->surr_chg_period_aig);
+}
+
+bool is_secure_cap_strategy_crbg(FIAAFUND_LIAB_UDF &account, int t)
+{
+	account.crediting_type_dyn_trigger_aig(t);
+	account.fia->pol_yr_lookup_gen2 = account.fia->pol_yr(t);
+	account.fia->temp_key_cred_type_dyn_aig = account.fia->crediting_type_dyn_aig;
+
+	StrEnum::EnumValue crediting_rate_defn_local = account.crediting_rate_defn;
+	xstring crediting_dyn_lever_local = account.crediting_dyn_lever;
+	if (crediting_rate_defn_local != POINT_TO_POINT || crediting_dyn_lever_local != DYNAMIC_CAP)
+	{
+		return false;
+	}
+
+	return account.fia->crediting_type_dyn_interm_aig != "NA"
+		&& account.strategy_term_mths_aig(t) > 12
+		&& account.crediting_rate_guar_mths >= account.strategy_term_mths_aig(t);
+}
+
+double non_secure_gmab_min_cap_rate_crbg(FIAAFUND_LIAB_UDF &account)
+{
+	// Temporary MVP wiring until a dedicated non-secure GMAB min-cap input is generated.
+	return max(0.0, account.index_term_cap_rate_min_aig);
+}
+
+double gmab_option_grid_cost_crbg(
+	FIAAFUND_LIAB_UDF &account,
+	int t,
+	double cap_rate,
+	bool secure_strategy,
+	bool throw_if_missing,
+	bool &found)
+{
+	found = false;
+
+	if (!secure_strategy && account.fia->gmab_ind_aig == 0)
+	{
+		return NO_AVG;
+	}
+
+	string strategy_token = secure_strategy ? "SECURERATECLIQUET" : "CS_GMAB";
+	string index_token = account.cast_xstring_to_string_aig(account.crediting_eqt_index);
+	uppercase_string_crbg(index_token);
+
+	int strategy_term_mths = int(account.strategy_term_mths_aig(t));
+	string duration_token = "D" + to_string(strategy_term_mths);
+	string term_token = to_string(strategy_term_mths / 12) + "Y";
+	int spread_bp = int(gmab_annual_rate_input_crbg(account) * 10000.0 + 0.5);
+	int target_cap_bp = int(cap_rate * 10000.0 + 0.5);
+
+	vector<pair<int, xstring> > cap_rows;
+	const vector<xstring> &misc_ids = get_misc_list_crbg(account);
+	for (size_t i = 0; i < misc_ids.size(); ++i)
+	{
+		xstring misc_id = misc_ids[i];
+		misc_id.to_upper();
+		string misc_id_string = account.cast_xstring_to_string_aig(misc_id);
+
+		if (misc_id_string.find(strategy_token) == string::npos
+			|| misc_id_string.find(index_token) == string::npos
+			|| (misc_id_string.find(duration_token) == string::npos
+				&& misc_id_string.find(term_token) == string::npos))
+		{
+			continue;
+		}
+
+		int row_spread_bp = 0;
+		if (!extract_tagged_integer_crbg(misc_id_string, "SPREAD", row_spread_bp))
+		{
+			continue;
+		}
+
+		if (row_spread_bp != spread_bp)
+		{
+			continue;
+		}
+
+		int row_cap_bp = 0;
+		if (!extract_tagged_integer_crbg(misc_id_string, "CAP", row_cap_bp))
+		{
+			continue;
+		}
+
+		cap_rows.push_back(make_pair(row_cap_bp, misc_ids[i]));
+	}
+
+	if (cap_rows.empty())
+	{
+		if (throw_if_missing)
+		{
+			xstring error_msg = "Secure Cap + GMAB option-grid row missing for strategy='" + strategy_token
+				+ "', index='" + index_token + "', duration='" + duration_token
+				+ "', spread_bp=" + to_string(spread_bp) + ", cap_bp=" + to_string(target_cap_bp) + ".";
+			throw FatalError(error_msg);
+		}
+
+		return NO_AVG;
+	}
+
+	sort(cap_rows.begin(), cap_rows.end());
+
+	for (size_t i = 1; i < cap_rows.size(); ++i)
+	{
+		if (cap_rows[i].first == cap_rows[i - 1].first)
+		{
+			throw FatalError("Secure Cap + GMAB option-grid lookup found duplicate CAP rows.");
+		}
+	}
+
+	for (size_t i = 0; i < cap_rows.size(); ++i)
+	{
+		if (cap_rows[i].first == target_cap_bp)
+		{
+			found = true;
+			return get_misc_rate_crbg(account, 0, cap_rows[i].second);
+		}
+	}
+
+	// Explicit boundary rule: clamp to nearest available CAP row, matching get_option_price_aig's edge behavior.
+	if (target_cap_bp <= cap_rows.front().first)
+	{
+		found = true;
+		return get_misc_rate_crbg(account, 0, cap_rows.front().second);
+	}
+
+	if (target_cap_bp >= cap_rows.back().first)
+	{
+		found = true;
+		return get_misc_rate_crbg(account, 0, cap_rows.back().second);
+	}
+
+	for (size_t i = 1; i < cap_rows.size(); ++i)
+	{
+		if (target_cap_bp < cap_rows[i].first)
+		{
+			double lower_cap = double(cap_rows[i - 1].first);
+			double upper_cap = double(cap_rows[i].first);
+			double lower_cost = get_misc_rate_crbg(account, 0, cap_rows[i - 1].second);
+			double upper_cost = get_misc_rate_crbg(account, 0, cap_rows[i].second);
+			double interpolation_weight = (target_cap_bp - lower_cap) / (upper_cap - lower_cap);
+
+			found = true;
+			return lower_cost + interpolation_weight * (upper_cost - lower_cost);
+		}
+	}
+
+	return NO_AVG;
+}
+
+double apply_option_grid_cost_crbg(FIAAFUND_LIAB_UDF &account, int t, double fallback_option_cost)
+{
+	bool secure_strategy = is_secure_cap_strategy_crbg(account, t);
+	if (!secure_strategy && account.fia->gmab_ind_aig == 0)
+	{
+		return fallback_option_cost;
+	}
+
+	double grid_cap_rate = secure_strategy
+		? account.index_term_init_cap_rate_aig(t)
+		: non_secure_gmab_min_cap_rate_crbg(account);
+
+	bool found_grid_cost = false;
+	double grid_cost = gmab_option_grid_cost_crbg(account, t, grid_cap_rate, secure_strategy, true, found_grid_cost);
+	if (!found_grid_cost)
+	{
+		return fallback_option_cost;
+	}
+
+	return secure_strategy ? grid_cost : fallback_option_cost + grid_cost;
+}
+}
 extern MY_DLL long layer;
 extern MY_DLL2 int write_submodels;
 extern MY_DLL int check_rebasing;
@@ -2369,13 +2632,9 @@ if (t <= commencement_period || t > final_period/*maturity_period*/)
 double fund_val = max(0., fund_val_b(t) + credited_int(t) - gmab_chg_aig(t));
 
 //20260218 MQ GMAB logic
-if (fia->gmab_ind_aig == 1 && t + elapsed_mths == fia->surr_chg_period_aig * 12) 
+if (fia->gmab_ind_aig == 1 && t + elapsed_mths == fia->surr_chg_period_aig * 12)
 {
-	double prem_less_withdrl = fia->prem_cumul_proportional_wdl_bef_aig(t) * fund_val_split_prop;
-	double gmab_cap = prem_less_withdrl * fia->gmab_av_cap_rt_aig;
-
-	fund_val = max(fund_val, min(gmab_av_e_bef_aig(t), gmab_cap));
-	fund_val = max(prem_less_withdrl, fund_val);
+	fund_val = max(fund_val, gmab_av_e_bef_aig(t));
 }
 
 return fund_val;  
@@ -2566,21 +2825,9 @@ if (elapsed_mths > 0 && t == commencement_period)
 	return fia->init_gmab_av;
 }
 
-double gmab_amt = gmab_av_e_bef_aig(t) * fia->surv_period(t);  
+double gmab_amt = gmab_av_e_bef_aig(t) * fia->surv_period(t) - fund_released_withdrl(t);
 
-double av_bef_withdrl = fund_val_e_bef(t) * fia->surv_period(t);
-double av_aft_withdrl = av_bef_withdrl - fund_released_withdrl(t);
-
-double reduction_fct = 0.;
-
-if (av_bef_withdrl > SMALL_DOUBLE)
-{
-	reduction_fct = av_aft_withdrl / av_bef_withdrl;
-}
-
-gmab_amt = gmab_amt * reduction_fct;
-
-return gmab_amt;  
+return max(0.0, gmab_amt);
 
 }
 
@@ -2611,9 +2858,14 @@ if (t + elapsed_mths > fia->surr_chg_period_aig * 12)
 	return 0.0;
 }
 
-double gmab_av = gmab_av_b_aig(t) * ( 1 + crediting_rate(t) * fia->gmab_credit_rt_mult_aig);  
+double gmab_av = gmab_av_b_aig(t);
 
-return gmab_av;  
+if (t + elapsed_mths == fia->surr_chg_period_aig * 12)
+{
+	gmab_av *= (1.0 + gmab_term_rate_input_crbg(*this));
+}
+
+return gmab_av;
 
 }
 
@@ -2750,10 +3002,8 @@ if (t <= commencement_period || t > final_period || fia->gmab_ind_aig == 0)
 if (t + elapsed_mths == fia->surr_chg_period_aig * 12) 
 {
 	double fund_val_e_bef = max(0., fund_val_b(t) + credited_int(t) - gmab_chg_aig(t));
-	double prem_less_withdrl = fia->prem_cumul_proportional_wdl_bef_aig(t) * fund_val_split_prop;
-	double gmab_cap = prem_less_withdrl * fia->gmab_av_cap_rt_aig;
 
-	double global_payoff = max(0., min(gmab_cap, gmab_av_e_bef_aig(t)) - fund_val_e_bef);
+	double global_payoff = max(0., gmab_av_e_bef_aig(t) - fund_val_e_bef);
 
 	return global_payoff;
 }
@@ -5230,9 +5480,11 @@ if (t == commencement_period + 1)
 				option_budget -= short_option_cost;
 				option_budget += floor_cost_cv;
 			}
+			}
 		}
+
+		option_budget = apply_option_grid_cost_crbg(*this, t, option_budget);
 	}
-}
 
 else
 {
@@ -5334,10 +5586,21 @@ else if ( strategy_term_elapsed_mths_eom_aig(t) == 1 )
 	//20250527 ZL change gim PV payoff% will impact the hedge assets purchased and sold in stat pricing run.
 	if (fia->gmab_ind_aig == 1 && t + elapsed_mths <= fia->surr_chg_period_aig * 12)
 	{
+		bool secure_strategy = is_secure_cap_strategy_crbg(*this, t);
+		double grid_cap_rate = secure_strategy
+			? index_term_init_cap_rate_aig(t)
+			: non_secure_gmab_min_cap_rate_crbg(*this);
+		bool found_option_grid = false;
+		gmab_option_grid_cost_crbg(*this, t, grid_cap_rate, secure_strategy, false, found_option_grid);
+		if (found_option_grid)
+		{
+			return hedge_mkt_val_per_unit_notional_aig(t);
+		}
+
 		fia->temp_key_cred_type_dyn_aig = fia->crediting_type_dyn_aig;
 		double payoff_hedge_cost_pct_local = fia->payoff_hedge_cost_pct_crbg;
 		return hedge_mkt_val_per_unit_notional_aig(t) + payoff_hedge_cost_pct_local;
-	} 
+	}
 
 	return hedge_mkt_val_per_unit_notional_aig(t);
 }

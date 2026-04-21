@@ -3184,12 +3184,9 @@ else
 	fund_val_cv = max(0, fund_val_prev + credited_int_cv - gmab_chg_cv);
 
 	//20241205 MQ GMAB logic
-	if (fia->gmab_ind_aig == 1 && pol_yr(t) == fia->surr_chg_period_aig) 
+	if (fia->gmab_ind_aig == 1 && pol_yr(t) == fia->surr_chg_period_aig)
 	{
-		double gmab_cap = prem_cumul_prop_wdl_aig(t) * fia->gmab_av_cap_rt_aig;	
-
-		fund_val_cv = max(fund_val_cv, min(gmab_av_e_aig(t), gmab_cap));
-		fund_val_cv = max(fund_val_cv, prem_cumul_prop_wdl_aig(t));
+		fund_val_cv = max(fund_val_cv, gmab_av_e_aig(t));
 	}
 }
 
@@ -3266,11 +3263,16 @@ double gmab_av_cv;
 
 if (t == 0)
 {
-	gmab_av_cv = fia->sm_fia_account[0]->gmab_av_e_aig(fia->res_period); //Need to get GMAB from next time step after fee deduction 
+	gmab_av_cv = fia->sm_fia_account[0]->gmab_av_e_aig(fia->res_period); //Need to get GMAB from next time step after fee deduction
 }
 else
 {
-	gmab_av_cv = gmab_av_b_aig(t) * ( 1 + crediting_rate(t) * fia->gmab_credit_rt_mult_aig);
+	gmab_av_cv = gmab_av_b_aig(t);
+	if (pol_yr(t) == fia->surr_chg_period_aig)
+	{
+		// Temporary MVP wiring: use gmab_credit_rt_mult_aig as annual GMAB rate until a generated input exists.
+		gmab_av_cv *= (1.0 + max(0.0, fia->gmab_credit_rt_mult_aig) * max(0, fia->surr_chg_period_aig));
+	}
 }
 
 return gmab_av_cv;
