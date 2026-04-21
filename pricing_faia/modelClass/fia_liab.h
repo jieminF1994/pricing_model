@@ -1278,6 +1278,9 @@ public :
 	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > ann_rate_table_aig;
   inline xstring	Get_ann_rate_table_aig() {
 		return ann_rate_table_aig; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > annualize_divisor_crbg;
+  inline double	Get_annualize_divisor_crbg() {
+		return annualize_divisor_crbg; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > annuitzn_base;
   inline double	Get_annuitzn_base() {
 		return annuitzn_base; }
@@ -1810,6 +1813,12 @@ public :
 	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > gmab_ind_aig;
   inline int	Get_gmab_ind_aig() {
 		return gmab_ind_aig; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmab_rate_crbg;
+  inline double	Get_gmab_rate_crbg() {
+		return gmab_rate_crbg; }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmab_type_crbg;
+  inline xstring	Get_gmab_type_crbg() {
+		return gmab_type_crbg; }
 	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmwb_base_mav_aig;
   inline xstring	Get_gmwb_base_mav_aig() {
 		return gmwb_base_mav_aig; }
@@ -2056,6 +2065,16 @@ public :
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmwb_wdl_utilization_primary_transition_prob_aig;
   inline double	Get_gmwb_wdl_utilization_primary_transition_prob_aig() {
 		return gmwb_wdl_utilization_primary_transition_prob_aig; }
+	static Attribute::Descriptor descriptor_256[];
+#ifdef MICROSOFT
+#pragma warning(push)
+#pragma warning(disable : 4005)
+// Disable the warning C4005: 'DESCRIPTOR_TABLE' : macro redefinition
+#endif	MICROSOFT
+	#define DESCRIPTOR_TABLE FIA_LIAB::descriptor_256
+#ifdef MICROSOFT
+#pragma warning(pop)
+#endif	MICROSOFT
 	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmwb_wdl_utilization_random_number_src_aig;
   inline xstring	Get_gmwb_wdl_utilization_random_number_src_aig() {
 		return gmwb_wdl_utilization_random_number_src_aig; }
@@ -2067,16 +2086,6 @@ public :
 		return gmwb_wdl_utilization_tgt_level_aig; }
   inline void Set_gmwb_wdl_utilization_tgt_level_aig(const xstring &v) {
 		gmwb_wdl_utilization_tgt_level_aig.setValue(v); }
-	static Attribute::Descriptor descriptor_256[];
-#ifdef MICROSOFT
-#pragma warning(push)
-#pragma warning(disable : 4005)
-// Disable the warning C4005: 'DESCRIPTOR_TABLE' : macro redefinition
-#endif	MICROSOFT
-	#define DESCRIPTOR_TABLE FIA_LIAB::descriptor_256
-#ifdef MICROSOFT
-#pragma warning(pop)
-#endif	MICROSOFT
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmwb_wdl_utilization_transition_matrix_threshold_aig;
   inline double	Get_gmwb_wdl_utilization_transition_matrix_threshold_aig() {
 		return gmwb_wdl_utilization_transition_matrix_threshold_aig; }
@@ -2870,15 +2879,6 @@ public :
 	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > rate_setting_cycle_aig;
   inline xstring	Get_rate_setting_cycle_aig() {
 		return rate_setting_cycle_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > rbc_c1_liab_only_stat_res_pct;
-  inline double	Get_rbc_c1_liab_only_stat_res_pct() {
-		return rbc_c1_liab_only_stat_res_pct; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > rbc_c2_mort_pct;
-  inline double	Get_rbc_c2_mort_pct() {
-		return rbc_c2_mort_pct; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > rbc_c3_ann_high_risk_pct;
-  inline double	Get_rbc_c3_ann_high_risk_pct() {
-		return rbc_c3_ann_high_risk_pct; }
 	static Attribute::Descriptor descriptor_512[];
 #ifdef MICROSOFT
 #pragma warning(push)
@@ -2889,6 +2889,15 @@ public :
 #ifdef MICROSOFT
 #pragma warning(pop)
 #endif	MICROSOFT
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > rbc_c1_liab_only_stat_res_pct;
+  inline double	Get_rbc_c1_liab_only_stat_res_pct() {
+		return rbc_c1_liab_only_stat_res_pct; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > rbc_c2_mort_pct;
+  inline double	Get_rbc_c2_mort_pct() {
+		return rbc_c2_mort_pct; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > rbc_c3_ann_high_risk_pct;
+  inline double	Get_rbc_c3_ann_high_risk_pct() {
+		return rbc_c3_ann_high_risk_pct; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > rbc_c3_ann_low_risk_pct;
   inline double	Get_rbc_c3_ann_low_risk_pct() {
 		return rbc_c3_ann_low_risk_pct; }
@@ -2960,6 +2969,12 @@ public :
 	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > rng_engine_aig;
   inline xstring	Get_rng_engine_aig() {
 		return rng_engine_aig; }
+	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > secure_cap_ind_crbg;
+  inline int	Get_secure_cap_ind_crbg() {
+		return secure_cap_ind_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > secure_cap_rate_crbg;
+  inline double	Get_secure_cap_rate_crbg() {
+		return secure_cap_rate_crbg; }
 	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > seg_id;
   inline xstring	Get_seg_id() {
 		return seg_id; }

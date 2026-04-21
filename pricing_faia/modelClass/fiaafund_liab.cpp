@@ -994,48 +994,50 @@ if (t <= commencement_period || t > final_period/*maturity_period*/)
 	return NO_AVG;
 }
 
+double ner_cv = fia->crediting_ner_aig / (1.0 + fia->crediting_ner_aig);
+double pri_sprd = 0.;
+double gmab_cost = 0.;
+
+//20260325 MQ: Secure cap / gmab
+if (fia->secure_cap_ind_crbg == 1 && fia->pol_yr(t) <= fia->surr_chg_period_aig)
+{
+	pri_sprd = ner_cv - opt_budget_cost_aig(t) / fia->annualize_divisor_crbg;
+	return pri_sprd;
+}
+else if (fia->gmab_ind_aig == 1 && fia->gmab_type_crbg == STANDARD && fia->pol_yr(t) <= fia->surr_chg_period_aig)
+{
+	fia->temp_key_cred_type_dyn_aig = fia->crediting_type_dyn_aig;
+	gmab_cost = init_opt_cost_gmab;
+		
+	gmab_cost = gmab_cost / fia->annualize_divisor_crbg;
+}
+
 if (abs(strategy_term_elapsed_mths_eom_aig(t) - 1) < SMALL_DOUBLE)
 {
+	if (t + elapsed_mths > 1)
+	{
+		if(!isMainModel && alm_flag)
+			ner_cv = fia->asset_yld_inv_adj_aig(t - 1) / (1 + fia->asset_yld_inv_adj_aig(t - 1));
+		else
+			ner_cv = fia->asset_yld_inv(t - 1) / (1 + fia->asset_yld_inv(t - 1));	
+	}
+	
 	double option_cost_cv;
 	
 	fia->temp_key_cred_type_dyn_aig = fia->crediting_type_dyn_aig;//WTW - Gen2 - Mutating Lookup Term 
 	if ( crediting_rate_defn == FIXED_RATE )
-	{
 		option_cost_cv = crediting_rate_fix(t);
-	}
-	else if (t == 1)
-	{
-		option_cost_cv = opt_budget(t) + opt_budget_eprs_aig(t); // 240912 ZL: update EPS pricing spread to include option cost for eprs tier
-	}
 	else
-	{
-		option_cost_cv = opt_budget_cost_aig(t); // 240912 ZL: opt_budget_cost_aig already reflects the additional par for EPS
-	}
+		option_cost_cv = opt_budget_cost_aig(t); 		
 	
-	double ner_cv;
-	if (t == commencement_period + 1)
-	{
-		ner_cv = fia->crediting_ner_aig / (1.0 + fia->crediting_ner_aig);
-	}
-	//20220519 STW：use asset yld including duration weighted adj for rate setting
-	else if(!isMainModel && alm_flag)
-	{
-		ner_cv = fia->asset_yld_inv_adj_aig(t - 1) / (1 + fia->asset_yld_inv_adj_aig(t - 1));
-	}
-	else
-	{
-		ner_cv = fia->asset_yld_inv(t - 1) / (1 + fia->asset_yld_inv(t - 1));
-	}			
-	
+	double annualized_option_cost_cv = option_cost_cv / strategy_term_aig(t) + gmab_cost;
 
-	double annualized_option_cost_cv	= option_cost_cv / strategy_term_aig(t);
-	double pri_sprd						= ner_cv - annualized_option_cost_cv + eprs_cost_rate_aig(t);
+	pri_sprd = ner_cv - annualized_option_cost_cv + eprs_cost_rate_aig(t);
 
 	return pri_sprd;
 }
 
-double pri_sprd = crediting_pri_sprd_aig(t - 1);
-return pri_sprd;
+return crediting_pri_sprd_aig(t - 1);
  
 
 
@@ -1721,6 +1723,61 @@ else
 
 //@@ END
 
+//@@ START - cumul_return_sc_period_crbg
+// Cumul Return Sc Period Crbg                                                                                             
+// Column:CUMUL_RETURN_SC_PERIOD_CRBG
+//========================================================
+double FIAAFUND_LIAB_UDF::fiaafund_liab_cumul_return_sc_period_crbg(int t) {
+//^^^
+
+
+
+//^^^
+
+#line 1 "cumul_return_sc_period_crbg.FIAAFUND_LIAB.for"
+//20260324 New column for Secure cap / GMAB
+if (t <= commencement_period || t > final_period)
+	return NO_AVG;
+
+fia->temp_key_cred_type_dyn_aig = fia->crediting_type_dyn_aig;
+if (crediting_rate_defn == "Fixed Rate" )
+{
+	return 0.0;
+}
+
+if (fia->pol_yr(t) <= fia->surr_chg_period_aig)
+{
+	double cumul_return;
+
+	if(fia->secure_cap_ind_crbg == 1)
+	{
+		cumul_return = (1 + cumul_return_sc_period_crbg(t - 1)) * (1 + crediting_rate(t)) - 1.;
+		
+		return cumul_return;
+	}
+	else if (fia->gmab_ind_aig == 1 && fia->gmab_type_crbg == STANDARD) //use min cap
+	{
+		double crediting_rate_min_cap = 0.;
+		if (mod(t + elapsed_mths, strategy_term_mths_aig(t)) == 0)
+		{
+			crediting_rate_min_cap = min(index_term_index_return_aig(t), index_term_cap_rate_min_col_aig(t));
+		}
+
+		cumul_return = (1 + cumul_return_sc_period_crbg(t - 1)) * (1 + crediting_rate_min_cap) - 1.;
+		
+		return cumul_return;
+	}
+
+	return 0.;
+}
+
+return 0.;
+
+}
+
+
+//@@ END
+
 //@@ START - eprs_cost_rate_aig
 // cost percentage of EPRS features                                                                                             
 // Column:EPRS_COST_RATE_AIG
@@ -1995,7 +2052,7 @@ return ref_rate;
 double FIAAFUND_LIAB_UDF::fiaafund_liab_fund_released_ann(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(20,"fund_released_ann",t);
+	return rebase_value(21,"fund_released_ann",t);
 }
 
 
@@ -2022,7 +2079,7 @@ return fund_val_e_bef(t)
 double FIAAFUND_LIAB_UDF::fiaafund_liab_fund_released_dth(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(21,"fund_released_dth",t);
+	return rebase_value(22,"fund_released_dth",t);
 }
 
 
@@ -2054,7 +2111,7 @@ return fund_val_e_bef(t) * fia->dth_claim_rate_mthly(t);
 double FIAAFUND_LIAB_UDF::fiaafund_liab_fund_released_maturity(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(22,"fund_released_maturity",t);
+	return rebase_value(23,"fund_released_maturity",t);
 }
 
 
@@ -2096,7 +2153,7 @@ return fund_released_maturity_cv;
 double FIAAFUND_LIAB_UDF::fiaafund_liab_fund_released_surr(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(23,"fund_released_surr",t);
+	return rebase_value(24,"fund_released_surr",t);
 }
 
 
@@ -2130,7 +2187,7 @@ return fund_val_e_bef(t)
 double FIAAFUND_LIAB_UDF::fiaafund_liab_fund_released_withdrl(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(24,"fund_released_withdrl",t);
+	return rebase_value(25,"fund_released_withdrl",t);
 }
 
 
@@ -2190,7 +2247,7 @@ return fund_released_withdrls_cv;
 double FIAAFUND_LIAB_UDF::fiaafund_liab_fund_val_b(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(25,"fund_val_b",t);
+	return rebase_value(26,"fund_val_b",t);
 }
 
 
@@ -2220,7 +2277,7 @@ return fund_val_b_bef(t)
 double FIAAFUND_LIAB_UDF::fiaafund_liab_fund_val_b_bef(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(26,"fund_val_b_bef",t);
+	return rebase_value(27,"fund_val_b_bef",t);
 }
 
 
@@ -2355,7 +2412,7 @@ return fund_val_aft_claims;
 double FIAAFUND_LIAB_UDF::fiaafund_liab_fund_val_e_bef(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(29,"fund_val_e_bef",t);
+	return rebase_value(30,"fund_val_e_bef",t);
 }
 
 
@@ -2370,12 +2427,18 @@ double fund_val = max(0., fund_val_b(t) + credited_int(t) - gmab_chg_aig(t));
 
 //20260218 MQ GMAB logic
 if (fia->gmab_ind_aig == 1 && t + elapsed_mths == fia->surr_chg_period_aig * 12) 
-{
-	double prem_less_withdrl = fia->prem_cumul_proportional_wdl_bef_aig(t) * fund_val_split_prop;
-	double gmab_cap = prem_less_withdrl * fia->gmab_av_cap_rt_aig;
-
-	fund_val = max(fund_val, min(gmab_av_e_bef_aig(t), gmab_cap));
-	fund_val = max(prem_less_withdrl, fund_val);
+{		
+	if (fia->gmab_type_crbg == AICO)
+	{
+		double prem_less_withdrl = fia->prem_cumul_proportional_wdl_bef_aig(t) * fund_val_split_prop;
+		double gmab_cap = prem_less_withdrl * fia->gmab_av_cap_rt_aig;
+		fund_val = max(fund_val, min(gmab_av_e_bef_aig(t), gmab_cap));
+		fund_val = max(prem_less_withdrl, fund_val);
+	}
+	else // 20260324 standard GMAB
+	{
+		fund_val = max(fund_val, gmab_av_e_bef_aig(t));
+	}
 }
 
 return fund_val;  
@@ -2438,7 +2501,7 @@ return fund_val_e_bef(t) - claims_av_bef_maturity;
 double FIAAFUND_LIAB_UDF::fiaafund_liab_fund_val_rebal(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(31,"fund_val_rebal",t);
+	return rebase_value(32,"fund_val_rebal",t);
 }
 
 
@@ -2509,7 +2572,7 @@ return weighted_sprd;
 double FIAAFUND_LIAB_UDF::fiaafund_liab_gmab_av_b_aig(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(33,"gmab_av_b_aig",t);
+	return rebase_value(34,"gmab_av_b_aig",t);
 }
 
 
@@ -2543,7 +2606,7 @@ return gmab_av_e_aig(t - 1);
 double FIAAFUND_LIAB_UDF::fiaafund_liab_gmab_av_e_aig(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(34,"gmab_av_e_aig",t);
+	return rebase_value(35,"gmab_av_e_aig",t);
 }
 
 
@@ -2566,8 +2629,16 @@ if (elapsed_mths > 0 && t == commencement_period)
 	return fia->init_gmab_av;
 }
 
-double gmab_amt = gmab_av_e_bef_aig(t) * fia->surv_period(t);  
+double gmab_av = gmab_av_e_bef_aig(t) * fia->surv_period(t);  
 
+//20260320 MQ STANDARD GMAB
+if (fia->gmab_type_crbg == STANDARD)
+{
+	gmab_av -= fund_released_withdrl(t);
+	return gmab_av;  
+}
+
+//AICO logic
 double av_bef_withdrl = fund_val_e_bef(t) * fia->surv_period(t);
 double av_aft_withdrl = av_bef_withdrl - fund_released_withdrl(t);
 
@@ -2578,9 +2649,9 @@ if (av_bef_withdrl > SMALL_DOUBLE)
 	reduction_fct = av_aft_withdrl / av_bef_withdrl;
 }
 
-gmab_amt = gmab_amt * reduction_fct;
+gmab_av = gmab_av * reduction_fct;
 
-return gmab_amt;  
+return gmab_av;  
 
 }
 
@@ -2594,7 +2665,7 @@ return gmab_amt;
 double FIAAFUND_LIAB_UDF::fiaafund_liab_gmab_av_e_bef_aig(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(35,"gmab_av_e_bef_aig",t);
+	return rebase_value(36,"gmab_av_e_bef_aig",t);
 }
 
 
@@ -2611,7 +2682,29 @@ if (t + elapsed_mths > fia->surr_chg_period_aig * 12)
 	return 0.0;
 }
 
-double gmab_av = gmab_av_b_aig(t) * ( 1 + crediting_rate(t) * fia->gmab_credit_rt_mult_aig);  
+double gmab_av;
+
+//20260320 MQ STANDARD GMAB
+if (fia->gmab_type_crbg == STANDARD)
+{
+	if (t + elapsed_mths == fia->surr_chg_period_aig * 12)
+	{
+		fia->temp_key_cred_type_dyn_aig = fia->crediting_type_dyn_aig;
+		double gmab_rate = fia->gmab_rate_crbg;
+
+		gmab_av = gmab_av_b_aig(t) * ( 1 + gmab_rate * fia->surr_chg_period_aig); 
+	}
+	else
+	{
+		gmab_av = gmab_av_b_aig(t);
+	}
+
+	return gmab_av;
+}
+else//AICO
+{
+	gmab_av = gmab_av_b_aig(t) * ( 1 + crediting_rate(t) * fia->gmab_credit_rt_mult_aig); 
+}
 
 return gmab_av;  
 
@@ -2627,7 +2720,7 @@ return gmab_av;
 double FIAAFUND_LIAB_UDF::fiaafund_liab_gmab_chg_aig(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(36,"gmab_chg_aig",t);
+	return rebase_value(37,"gmab_chg_aig",t);
 }
 
 
@@ -2662,7 +2755,7 @@ return gmab_chg;
 double FIAAFUND_LIAB_UDF::fiaafund_liab_gmab_chg_partial_e_aig(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(37,"gmab_chg_partial_e_aig",t);
+	return rebase_value(38,"gmab_chg_partial_e_aig",t);
 }
 
 
@@ -2700,7 +2793,7 @@ return gmab_chg_partial;
 double FIAAFUND_LIAB_UDF::fiaafund_liab_gmab_chg_partial_e_bef_aig(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(38,"gmab_chg_partial_e_bef_aig",t);
+	return rebase_value(39,"gmab_chg_partial_e_bef_aig",t);
 }
 
 
@@ -2804,7 +2897,7 @@ return 0.0;
 double FIAAFUND_LIAB_UDF::fiaafund_liab_gmwb_chg(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(41,"gmwb_chg",t);
+	return rebase_value(42,"gmwb_chg",t);
 }
 
 
@@ -2914,7 +3007,7 @@ return gmwb_chg_amt;
 double FIAAFUND_LIAB_UDF::fiaafund_liab_gmwb_chg_at_surr_aig(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(42,"gmwb_chg_at_surr_aig",t);
+	return rebase_value(43,"gmwb_chg_at_surr_aig",t);
 }
 
 
@@ -2967,7 +3060,7 @@ return min(
 double FIAAFUND_LIAB_UDF::fiaafund_liab_gmwb_chg_at_surr_bef_aig(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(43,"gmwb_chg_at_surr_bef_aig",t);
+	return rebase_value(44,"gmwb_chg_at_surr_bef_aig",t);
 }
 
 
@@ -3207,7 +3300,7 @@ double FIAAFUND_LIAB_UDF::fiaafund_liab_hedge_inv_amt_bom(int t) {
 //^^^
 
 #line 1 "hedge_inv_amt_bom.FIAAFUND_LIAB.for"
-if (/*hedge_defn_local == NO ||*/ t <= commencement_period || t > final_period/*maturity_period*/)
+if (t <= commencement_period || t > final_period/*maturity_period*/)
 	return NO_AVG;
 
 crediting_type_dyn_trigger_aig(t);  // 20191029 MTC - Force call trigger eval to switch crediting_type_dyn_aig
@@ -3217,82 +3310,28 @@ StrEnum::EnumValue hedge_defn_local = hedge_defn;//WTW - Gen2 - Mutating Lookup 
 if (hedge_defn_local == NO)
 	return NO_AVG;
 
-if (mod(t + elapsed_mths, strategy_term_mths_aig(t) /*crediting_mths*/) != 1)// 20190613 DTL: replaced `crediting_mths`
+//20260323 MQ secure cap
+if (fia->secure_cap_ind_crbg == 1 && t + elapsed_mths > 1 && fia->pol_yr(t) <= fia->surr_chg_period_aig)
+	return NO_AVG;
+
+else if (mod(t + elapsed_mths, strategy_term_mths_aig(t)) != 1)
 	return NO_AVG;
 
 // force calls to opt_budget and opt_budget_amt
 opt_budget(t);
 opt_budget_amt(t);
 
-double yrs_to_expiry = strategy_term_aig(t); /*crediting_mths / 12.0;*/  // 20190613 DTL: replaced `crediting_mths`
-double underlying_bom = index_val_bom(t);
-double notional_to_purch = notional_to_hedge_net(t);
-double index_units_owned = 1.0;
-double long_strike = opt_strike_price(t);
-double short_strike = index_val_bom(t) * (1.0 + crediting_cap_rate(t));
-	
-fia->pol_yr_lookup_gen2 = fia->pol_yr(t); //WTW - Gen2 - add working variable for lookups that vary by time for character input
-fia->temp_key_cred_type_dyn_aig = fia->crediting_type_dyn_aig;//WTW - Gen2 - Mutating Lookup Term 
-if (crediting_dyn_lever != DYNAMIC_CAP)//WTW - Gen2 - character input that varies by time	
-	short_strike = payout_index_max;
+// 20200622 STW: use option cost for hedge investment calculation
+double mkt_val_per_unit = opt_budget_cost_aig(t);
 
-double mkt_val_per_unit;
-if (use_option_cost_tables_defn_aig == NO)
+// 20260320 MQ Include initial opt cost for GMAB only
+if (fia->secure_cap_ind_crbg == 0 && fia->gmab_ind_aig == 1 && fia->gmab_type_crbg == STANDARD && t + elapsed_mths == 1)
 {
-	if ( crediting_rate_defn == POINT_TO_POINT	||
-		 crediting_rate_defn == MOVING_AVERAGE     )
-	{
-		index_units_owned = 1.0 / index_val_bom(t);
-	}
-		
-	mkt_val_per_unit 
-		= mkt_val_calc(t - 1,
-			xint(fia->cal_yr_relative(t - 1)),
-			xint(fia->cal_mth(t - 1)),
-			lookback_defn,
-			lookback_mths,
-			lookback_sampling_mths,
-			index_units_owned, 
-			underlying_bom,
-			index_scen_mult,
-			index_scen_sprd_addn,
-			yrs_to_expiry,
-			div_yld_scen_mult,
-			div_yld_sprd,
-			long_strike,
-			short_strike,
-			crediting_cap_rate(t),
-			CALL, //opt_defn
-			0.0, // spot_sprd_adj,
-			0.0, // volatility_sprd_adj,
-			NO_SHIFT); // shift_defn 
-}
-else
-{
-	// 20200622 STW: use option cost for hedge investment calculation
-	mkt_val_per_unit = opt_budget_cost_aig(t);
-	/*
-	const double TABLE_ATM_STRIKE = 1.0;
-	double long_strike = TABLE_ATM_STRIKE;
-
-	if ( opt_strike_price(t) - index_val(t-1) > SMALL_DOUBLE &&
-	     index_val(t-1) > SMALL_DOUBLE                          )
-	{
-		// we guarantee some non-zero index credit
-		long_strike = opt_strike_price(t) / index_val(t-1);
-	}
-
-	short_strike = 1.0 + crediting_cap_rate(t);
-
-	mkt_val_per_unit = 
-		get_option_price_v2_aig(t, long_strike, CALL, strategy_term_mths_aig(t), index_term_mths_aig(t)) - get_option_price_v2_aig(t, short_strike, CALL, strategy_term_mths_aig(t), index_term_mths_aig(t));// DTL 20200109 // 20190613 DTL: replaced `crediting_mths`
-	*/
+	fia->temp_key_cred_type_dyn_aig = fia->crediting_type_dyn_aig;
+	mkt_val_per_unit += init_opt_cost_gmab;
 }
 
-
-double inv_amt 
-= notional_to_purch
-  * mkt_val_per_unit;
+double inv_amt = notional_to_hedge_net(t) * mkt_val_per_unit;
 
 return inv_amt;
 
@@ -3323,11 +3362,27 @@ StrEnum::EnumValue hedge_defn_local = hedge_defn;//WTW - Gen2 - Mutating Lookup 
 if (hedge_defn_local == NO)
 	return NO_AVG;
 
-if (mod(t + elapsed_mths, strategy_term_mths_aig(t) /*crediting_mths*/) == 0)// 20190613 DTL: replaced `crediting_mths`
-	return 0.0;
+//20260325 MQ secure cap / GMAB
+if (fia->secure_cap_ind_crbg == 1 && t + elapsed_mths < fia->surr_chg_period_aig * 12)
+{
+	return notional_amt_seccap_gmab_crbg(t) * hedge_mkt_val_per_unit_notional(t);
+}
 
-return notional_amt_required(t)
-       * hedge_mkt_val_per_unit_notional(t);
+double hedge_mkt_val_cv = notional_amt_required(t) * hedge_mkt_val_per_unit_notional(t);
+
+if (fia->gmab_ind_aig == 1 && fia->gmab_type_crbg == STANDARD && t + elapsed_mths < fia->surr_chg_period_aig * 12)
+{
+	double hedge_mkt_val_gmab = notional_amt_seccap_gmab_crbg(t) * hedge_mkt_val_estimate_gmab_crbg(t);
+
+	return hedge_mkt_val_cv + hedge_mkt_val_gmab;
+}
+
+if (mod(t + elapsed_mths, strategy_term_mths_aig(t)) == 0) 
+{
+	return 0.0;
+}
+
+return hedge_mkt_val_cv;
 
 }
 
@@ -3369,6 +3424,54 @@ else
 }
 
 
+
+}
+
+
+//@@ END
+
+//@@ START - hedge_mkt_val_estimate_gmab_crbg
+// Option Mkt Val Estimate Gmab                                                                                             
+// Column:HEDGE_MKT_VAL_ESTIMATE_GMAB_CRBG
+//========================================================
+double FIAAFUND_LIAB_UDF::fiaafund_liab_hedge_mkt_val_estimate_gmab_crbg(int t) {
+//^^^
+
+
+
+//^^^
+
+#line 1 "hedge_mkt_val_estimate_gmab_crbg.FIAAFUND_LIAB.for"
+//20260324 New column for GMAB
+if (t <= commencement_period || t > final_period)
+	return NO_AVG;
+
+fia->temp_key_cred_type_dyn_aig = fia->crediting_type_dyn_aig;
+if (crediting_rate_defn == "Fixed Rate" )
+{
+	return 0.0;
+}
+
+if (fia->secure_cap_ind_crbg == 1)
+	return 0.;
+
+if (fia->gmab_ind_aig == 1 && fia->gmab_type_crbg == STANDARD && fia->pol_yr(t) <= fia->surr_chg_period_aig)
+{
+	double intrinsic_value = 0.;
+
+	fia->temp_key_cred_type_dyn_aig = fia->crediting_type_dyn_aig;
+	double option_cost = init_opt_cost_gmab;
+
+	double option_term = fia->surr_chg_period_aig * 12.;
+	double remaining_mths_in_term = fia->surr_chg_period_aig * 12. - t - elapsed_mths;
+	double alpha = hedge_option_val_alpha_col_aig(t); 
+	
+	double option_mkt_val_estimate_gmab = intrinsic_value + option_cost * pow(remaining_mths_in_term / option_term, alpha);
+
+	return option_mkt_val_estimate_gmab;
+}
+
+return 0.;
 
 }
 
@@ -3440,111 +3543,40 @@ if (hedge_defn_local == NO)//WTW - Gen2 - Mutating Lookup Term used in expressio
 	return NO_AVG;
 }
 
-if (mod(t + elapsed_mths, strategy_term_mths_aig(t) /*crediting_mths*/) == 0) // 20190613 DTL: replaced `crediting_mths`
+//20260323 MQ Refactoring the column and add logics for secure cap / GMAB
+if (fia->secure_cap_ind_crbg == 0 || (fia->secure_cap_ind_crbg == 1 && t + elapsed_mths >= fia->surr_chg_period_aig * 12))
+{
+	if (mod(t + elapsed_mths, strategy_term_mths_aig(t)) == 0) 
+	{
+		return 0.;
+	}
+}
+
+fia->temp_key_cred_type_dyn_aig = fia->crediting_type_dyn_aig;//WTW - Gen2 - Mutating Lookup Term 
+if ( crediting_rate_defn == "Fixed Rate" )
 {
 	return 0.0;
 }
 
-double mkt_val_per_unit_notional = 0.0;
+double intrinsic_value = max(strategy_return_aig(t), 0.0);
+double option_cost = opt_budget_cost_aig(t);
+double option_term = strategy_term_mths_aig(t);
+double remaining_mths_in_term = strategy_term_mths_aig(t) - strategy_term_elapsed_mths_eom_aig(t);
+double alpha = hedge_option_val_alpha_col_aig(t); 
 
-int mths_since_crediting_start = xint(mod(t + elapsed_mths, strategy_term_mths_aig(t) /*crediting_mths*/));// 20190613 DTL: replaced `crediting_mths`
-double yrs_to_expiry = (strategy_term_mths_aig(t) /*crediting_mths*/ - mths_since_crediting_start) / 12.0;// 20190613 DTL: replaced `crediting_mths`
-double underlying = index_val(t);
-double index_units_owned = 1.0;
-double index_val_at_crediting_start = 0.0;
-double long_strike = 0.0;
-double short_strike = 0.0;
+double option_mkt_val_estimate = intrinsic_value + option_cost * pow(remaining_mths_in_term / option_term, alpha);
 
-if (elapsed_mths > 0 && t <  mths_since_crediting_start)
+if (fia->secure_cap_ind_crbg == 1 && fia->pol_yr(t) <= fia->surr_chg_period_aig)
 {
-	index_val_at_crediting_start = index_val_calc(t - mths_since_crediting_start);
-	long_strike = index_val_at_crediting_start * pow(1.0 + strategy_term_floor_col_aig(t), strategy_term_aig(t) /*crediting_mths / 12.0*/); // DTL 20180919 : Replaced `crediting_floor` with `strategy_term_floor_aig` and replaced `crediting_mths`
+	intrinsic_value = max((1 + cumul_return_sc_period_crbg(t - 1)) * (1 + strategy_return_aig(t)) - 1., 0.);	
+	option_term = fia->surr_chg_period_aig * 12.;
+	remaining_mths_in_term = fia->surr_chg_period_aig * 12. - t - elapsed_mths;
+	alpha = 0.6; // for cliquet option, alpha is 0.6
+
+	option_mkt_val_estimate = intrinsic_value + option_cost * pow(remaining_mths_in_term / option_term, alpha);
 }
-else
-{
-	index_val_at_crediting_start = index_val_bom(t + 1 - mths_since_crediting_start);
-	long_strike = opt_strike_price(t + 1 - mths_since_crediting_start);
-}
-
-fia->temp_key_cred_type_dyn_aig = fia->crediting_type_dyn_aig;//WTW - Gen2 - Mutating Lookup Term 
-if ( crediting_rate_defn == POINT_TO_POINT	||
-	 crediting_rate_defn == MOVING_AVERAGE    )
-{
-	index_units_owned /= index_val_at_crediting_start;
-	short_strike = index_val_at_crediting_start * (1.0 + crediting_cap_rate(t));
-
-	fia->pol_yr_lookup_gen2 = fia->pol_yr(t); //WTW - Gen2 - add working variable for lookups that vary by time for character input
-	fia->temp_key_cred_type_dyn_aig = fia->crediting_type_dyn_aig;//WTW - Gen2 - Mutating Lookup Term 
-
-	if (crediting_dyn_lever != DYNAMIC_CAP)//WTW - Gen2 - character input that varies by time	
-	{
-		short_strike = payout_index_max;
-	}
-}
-
-if (use_option_cost_tables_defn_aig == NO)
-{
-	mkt_val_per_unit_notional 
-		= mkt_val_calc(t,
-			xint(fia->cal_yr_relative(t)),
-			xint(fia->cal_mth(t)),
-			lookback_defn,
-			lookback_mths,
-			lookback_sampling_mths,
-			index_units_owned, 
-			underlying,
-			index_scen_mult,
-			index_scen_sprd_addn,
-			yrs_to_expiry,
-			div_yld_scen_mult,
-			div_yld_sprd,
-			long_strike,
-			short_strike,
-			crediting_cap_rate(t),
-			CALL, //opt_defn
-			0.0, // spot_sprd_adj,
-			0.0, // volatility_sprd_adj,
-			NO_SHIFT); // shift_defn 
-
-			/*log_screen<<"t= "<<t
-			<<" index_units_owned= "<<index_units_owned
-			<<" underlying= "<<underlying
-			<<" yrs_to_expiry= "<<yrs_to_expiry
-			<<" long_strike= "<<long_strike
-			<<" short_strike= "<<short_strike
-			<<" crediting_cap_rate(t)= "<<crediting_cap_rate(t)
-			<<" mkt_val_per_unit_notional= "<<mkt_val_per_unit_notional
-			<<MSG_USER;*/
-}
-else
-{
-	// 20200622 STW: change option market value calculation
-	// Refactored MRM market value estimate.  MCHING 9-2-2021
-
-	fia->temp_key_cred_type_dyn_aig = fia->crediting_type_dyn_aig;//WTW - Gen2 - Mutating Lookup Term 
-	if ( crediting_rate_defn == "Fixed Rate" )
-	{
-		return 0.0;
-	}
-
-	double strategy_term_elapsed_mths		= strategy_term_elapsed_mths_eom_aig(t);
-	double strategy_term_start_mth			= t - strategy_term_elapsed_mths + 1.0;
-
-	double strategy_term_length_mths		= strategy_term_mths_aig(t);
-	double strategy_term_end_mth			= strategy_term_start_mth + strategy_term_length_mths - 1.0;
-
-	mkt_val_per_unit_notional = opt_mkt_val_estimate_aig(
-		t,
-		max(strategy_return_aig(t), 0.0),
-		opt_budget_cost_aig(t),
-		strategy_term_start_mth,
-		strategy_term_end_mth
-	);
-
-	// END MCHING 9-2-2021
-}
-
-return mkt_val_per_unit_notional;
+																		
+return option_mkt_val_estimate;
 
 
 
@@ -3588,6 +3620,10 @@ if (
 {
 	return NO_AVG;
 }
+
+//20260323 MQ secure cap
+if (fia->secure_cap_ind_crbg == 1 && fia->pol_yr(t) <= fia->surr_chg_period_aig)
+	return NO_AVG;
 
 crediting_type_dyn_trigger_aig(t);
 
@@ -3793,20 +3829,32 @@ StrEnum::EnumValue hedge_defn_local = hedge_defn;//WTW - Gen2 - Mutating Lookup 
 if (hedge_defn_local == NO)
 	return NO_AVG;
 
-if (mod(t + elapsed_mths, strategy_term_mths_aig(t) /*crediting_mths*/) == 0)// 20190613 DTL: replaced `crediting_mths`
+//20260324 MQ secure cap/gmab
+double strategy_term_mths = strategy_term_mths_aig(t);
+
+if (((fia->gmab_ind_aig == 1 && fia->gmab_type_crbg == STANDARD) || fia->secure_cap_ind_crbg == 1) 
+		&& fia->pol_yr(t) <= fia->surr_chg_period_aig)
+{
+	strategy_term_mths = fia->surr_chg_period_aig * 12;
+}
+
+if (mod(t + elapsed_mths, strategy_term_mths) == 0) 
+{
 	return 0.0;
+}
 
 fia->temp_key_cred_type_dyn_aig = fia->crediting_type_dyn_aig;//WTW - Gen2 - Mutating Lookup Term 
 double pct_to_hedge_local = pct_to_hedge;//WTW - Gen2 - Mutating Lookup Term used in expression
 
-return (fund_released_dth(t)
+double total_fund_released = fund_released_dth(t)
 	    + fund_released_surr(t)
 	    + fund_released_ann(t)
 	    + fund_released_withdrl(t)
-	    + fund_released_maturity(t))
-       * pct_to_hedge_local//WTW - Gen2 - Mutating Lookup Term used in expression
-	   //* crediting_part_rate(t) // 20200622 STW: discard part rate
-       * hedge_mkt_val_per_unit_notional(t);
+	    + fund_released_maturity(t);
+
+double opt_val_pct_total = hedge_mkt_val_per_unit_notional(t) + hedge_mkt_val_estimate_gmab_crbg(t);
+
+return total_fund_released * pct_to_hedge_local * opt_val_pct_total;
 
 }
 
@@ -3941,6 +3989,13 @@ fia->pol_yr_lookup_gen2 = fia->pol_yr(t);   // force call look-up key //WTW - Ge
 fia->temp_key_cred_type_dyn_aig = fia->crediting_type_dyn_aig;//WTW - Gen2 - Mutating Lookup Term 
 
 double index_term_cap_rate_min_cv = index_term_cap_rate_min_aig;
+
+if (fia->secure_cap_ind_crbg == 0 && fia->gmab_ind_aig == 1 && fia->gmab_type_crbg == STANDARD) //20260325 MQ
+{
+	fia->pol_yr_lookup_gen2 = fia->pol_yr(t);
+	fia->temp_key_cred_type_dyn_aig = fia->crediting_type_dyn_aig;
+	index_term_cap_rate_min_cv = index_term_cap_rate_min_gmab;
+}
 
 if ( fia->option_strike_annualization_aig == ANNUALIZED )
 {
@@ -4451,7 +4506,7 @@ else
 double FIAAFUND_LIAB_UDF::fiaafund_liab_index_val(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(75,"index_val",t);
+	return rebase_value(77,"index_val",t);
 }
 
 
@@ -4927,6 +4982,86 @@ return notional_amt_required(t - 1)
 
 //@@ END
 
+//@@ START - notional_amt_seccap_gmab_bef_crbg
+// Notional Amt Seccap Gmab Bef Crbg                                                                                             
+// Column:NOTIONAL_AMT_SECCAP_GMAB_BEF_CRBG
+//========================================================
+double FIAAFUND_LIAB_UDF::fiaafund_liab_notional_amt_seccap_gmab_bef_crbg(int t) {
+//^^^
+
+
+
+//^^^
+
+#line 1 "notional_amt_seccap_gmab_bef_crbg.FIAAFUND_LIAB.for"
+//20260325 Notional amount for Secure cap / GMAB option
+if (t <= commencement_period || t > final_period)
+	return NO_AVG;
+
+fia->temp_key_cred_type_dyn_aig = fia->crediting_type_dyn_aig;
+StrEnum::EnumValue hedge_defn_local = hedge_defn;
+
+if (hedge_defn_local == NO || fia->pol_yr(t) > fia->surr_chg_period_aig)
+	return NO_AVG;
+
+fia->temp_key_cred_type_dyn_aig = fia->crediting_type_dyn_aig; 
+double pct_to_hedge_local = pct_to_hedge;
+
+if (t + elapsed_mths == 1)
+	return fund_val_b(t) * pct_to_hedge_local;
+
+return notional_amt_seccap_gmab_crbg(t - 1)
+       - (admin_fee(t)
+	      + gmwb_chg(t))
+		* pct_to_hedge_local;
+
+}
+
+
+//@@ END
+
+//@@ START - notional_amt_seccap_gmab_crbg
+// Notional Amt Seccap Gmab Crbg                                                                                             
+// Column:NOTIONAL_AMT_SECCAP_GMAB_CRBG
+//========================================================
+double FIAAFUND_LIAB_UDF::fiaafund_liab_notional_amt_seccap_gmab_crbg(int t) {
+//^^^
+
+
+
+//^^^
+
+#line 1 "notional_amt_seccap_gmab_crbg.FIAAFUND_LIAB.for"
+//20260325 Notional amount for Secure cap / GMAB option
+if (t <= commencement_period || t > final_period)
+	return NO_AVG;
+
+fia->temp_key_cred_type_dyn_aig = fia->crediting_type_dyn_aig;
+StrEnum::EnumValue hedge_defn_local = hedge_defn;
+
+if (hedge_defn_local == NO || fia->pol_yr(t) > fia->surr_chg_period_aig)
+	return NO_AVG;
+
+fia->temp_key_cred_type_dyn_aig = fia->crediting_type_dyn_aig; 
+double pct_to_hedge_local = pct_to_hedge;
+
+if (t + elapsed_mths == 1)
+	return fund_val_b(t) * pct_to_hedge_local
+		      - (fund_released_dth(t)
+		      + fund_released_surr(t)
+			  + fund_released_ann(t)
+		      + fund_released_maturity(t)
+		      + fund_released_withdrl(t))
+			  * pct_to_hedge_local;
+
+return notional_amt_seccap_gmab_crbg(t - 1)
+       - fund_val_decrem(t);
+
+}
+
+
+//@@ END
+
 //@@ START - notional_to_hedge
 // Notional  Amount to Hedge                                                                                             
 // Column:NOTIONAL_TO_HEDGE
@@ -4934,7 +5069,7 @@ return notional_amt_required(t - 1)
 double FIAAFUND_LIAB_UDF::fiaafund_liab_notional_to_hedge(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(87,"notional_to_hedge",t);
+	return rebase_value(91,"notional_to_hedge",t);
 }
 
 
@@ -5026,7 +5161,7 @@ else
 double FIAAFUND_LIAB_UDF::fiaafund_liab_notional_to_hedge_cap(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(89,"notional_to_hedge_cap",t);
+	return rebase_value(93,"notional_to_hedge_cap",t);
 }
 
 
@@ -5055,7 +5190,7 @@ return notional_to_hedge(t)
 double FIAAFUND_LIAB_UDF::fiaafund_liab_notional_to_hedge_index(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(90,"notional_to_hedge_index",t);
+	return rebase_value(94,"notional_to_hedge_index",t);
 }
 
 
@@ -5081,7 +5216,7 @@ return notional_to_hedge(t)
 double FIAAFUND_LIAB_UDF::fiaafund_liab_notional_to_hedge_long_strike(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(91,"notional_to_hedge_long_strike",t);
+	return rebase_value(95,"notional_to_hedge_long_strike",t);
 }
 
 
@@ -5107,7 +5242,7 @@ return notional_to_hedge(t)
 double FIAAFUND_LIAB_UDF::fiaafund_liab_notional_to_hedge_net(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(92,"notional_to_hedge_net",t);
+	return rebase_value(96,"notional_to_hedge_net",t);
 }
 
 
@@ -5134,7 +5269,7 @@ return notional_to_hedge(t);
 double FIAAFUND_LIAB_UDF::fiaafund_liab_opt_budget(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(93,"opt_budget",t);
+	return rebase_value(97,"opt_budget",t);
 }
 
 
@@ -5277,7 +5412,7 @@ return option_budget;
 double FIAAFUND_LIAB_UDF::fiaafund_liab_opt_budget_amt(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(94,"opt_budget_amt",t);
+	return rebase_value(98,"opt_budget_amt",t);
 }
 
 
@@ -5329,21 +5464,38 @@ if (hedge_defn_local == NO)
 {
 	return NO_AVG;
 }
-else if ( strategy_term_elapsed_mths_eom_aig(t) == 1 )
+
+// 20260320 MQ Read in initial opt cost for secure cap and GMAB
+if (fia->secure_cap_ind_crbg == 1 && fia->pol_yr(t) <= fia->surr_chg_period_aig)
 {
-	//20250527 ZL change gim PV payoff% will impact the hedge assets purchased and sold in stat pricing run.
-	if (fia->gmab_ind_aig == 1 && t + elapsed_mths <= fia->surr_chg_period_aig * 12)
+	if (fia->gmab_ind_aig == 1 && fia->gmab_type_crbg == STANDARD)
 	{
 		fia->temp_key_cred_type_dyn_aig = fia->crediting_type_dyn_aig;
-		double payoff_hedge_cost_pct_local = fia->payoff_hedge_cost_pct_crbg;
-		return hedge_mkt_val_per_unit_notional_aig(t) + payoff_hedge_cost_pct_local;
+		return init_opt_cost_seccap_gmab;
+	}
+	else
+	{
+		fia->temp_key_cred_type_dyn_aig = fia->crediting_type_dyn_aig;
+		return init_opt_cost_seccap;
+	}
+}
+
+else if (strategy_term_elapsed_mths_eom_aig(t) == 1)
+{	
+	//20250527 ZL change gim PV payoff% will impact the hedge assets purchased and sold in stat pricing run.
+	if (fia->gmab_ind_aig == 1 && fia->gmab_type_crbg == AICO && t + elapsed_mths <= fia->surr_chg_period_aig * 12)
+	{
+		fia->temp_key_cred_type_dyn_aig = fia->crediting_type_dyn_aig;
+		double add_hedge_cost = fia->payoff_hedge_cost_pct_crbg;
+
+		return hedge_mkt_val_per_unit_notional_aig(t) + add_hedge_cost;
 	} 
 
 	return hedge_mkt_val_per_unit_notional_aig(t);
 }
 else
 {	
-	return opt_budget_cost_aig(t-1);
+	return opt_budget_cost_aig(t - 1);
 }
 
 }
@@ -5704,7 +5856,9 @@ if (t <= commencement_period || t > final_period/*maturity_period*/)
 	return NO_AVG;
 }
 
-if (mod(t + elapsed_mths, strategy_term_mths_aig(t)) == 1)
+//20260324 MQ secure cap
+if (!(fia->secure_cap_ind_crbg == 1 && fia->pol_yr(t) <= fia->surr_chg_period_aig && t + elapsed_mths > 1)
+	&& mod(t + elapsed_mths, strategy_term_mths_aig(t)) == 1)
 {
 	return opt_budget(t);
 }
@@ -5883,7 +6037,7 @@ return option_cost;
 double FIAAFUND_LIAB_UDF::fiaafund_liab_opt_payoff(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(103,"opt_payoff",t);
+	return rebase_value(107,"opt_payoff",t);
 }
 
 
@@ -6065,10 +6219,8 @@ double FIAAFUND_LIAB_UDF::fiaafund_liab_opt_payoff_aig(int t) {
 
 #line 1 "opt_payoff_aig.FIAAFUND_LIAB.for"
 // 20200622 STW: change to fix hedge logic
-if (/*hedge_defn_local == NO ||*/ t < commencement_period || t > final_period/*maturity_period*/)//WTW - Gen2 - Mutating Lookup Term used in expression
-{
+if (t < commencement_period || t > final_period)
 	return NO_AVG;
-}
 
 crediting_type_dyn_trigger_aig(t);  // 20191029 MTC - Force call trigger eval to switch crediting_type_dyn_aig
 fia->temp_key_cred_type_dyn_aig = fia->crediting_type_dyn_aig;//WTW - Gen2 - Mutating Lookup Term 
@@ -6077,20 +6229,58 @@ StrEnum::EnumValue hedge_defn_local = hedge_defn;//WTW - Gen2 - Mutating Lookup 
 fia->temp_key_cred_type_dyn_aig = fia->crediting_type_dyn_aig;//WTW - Gen2 - Mutating Lookup Term 
 xstring crediting_rate_defn_local = crediting_rate_defn;//WTW - Gen2 - Mutating Lookup Term used in expression
 
-if (hedge_defn_local == NO)//WTW - Gen2 - Mutating Lookup Term used in expression
-{
+if (hedge_defn_local == NO)
 	return NO_AVG;
-}
-else if ( crediting_rate_defn_local == "Fixed Rate" || strategy_term_elapsed_mths_eom_aig(t) != strategy_term_aig(t) * 12 )//WTW - Gen2 - Mutating Lookup Term used in expression
-{
+
+if ( crediting_rate_defn_local == "Fixed Rate")
 	return 0.0;
+
+fia->temp_key_cred_type_dyn_aig = fia->crediting_type_dyn_aig;
+double hedge_inefficiency_local = hedge_inefficiency_aig;
+
+double opt_payoff = 0.;
+
+if (strategy_term_elapsed_mths_eom_aig(t) == strategy_term_aig(t) * 12)
+{
+	opt_payoff = notional_amt_required_bef(t) * strategy_return_aig(t);
 }
-else
-{	
+
+//20260326 MQ secure cap / GMAB
+if (fia->secure_cap_ind_crbg == 1 && fia->pol_yr(t) <= fia->surr_chg_period_aig)
+{
+	if (t + elapsed_mths == fia->surr_chg_period_aig * 12)
+	{
+		opt_payoff = notional_amt_seccap_gmab_bef_crbg(t) * cumul_return_sc_period_crbg(t);
+
+		if (fia->gmab_ind_aig == 1 && fia->gmab_type_crbg == STANDARD)
+		{
+			fia->temp_key_cred_type_dyn_aig = fia->crediting_type_dyn_aig;
+			double gmab_rate = fia->gmab_rate_crbg;
+			double gmab_amt = notional_amt_seccap_gmab_bef_crbg(t) * gmab_rate * fia->surr_chg_period_aig;
+
+			opt_payoff = max(opt_payoff, gmab_amt);
+		}
+
+		return opt_payoff * (1 - hedge_inefficiency_local);
+	}
+	else
+	{
+		return 0.;
+	}
+}
+
+else if (fia->gmab_ind_aig == 1 && fia->gmab_type_crbg == STANDARD && t + elapsed_mths == fia->surr_chg_period_aig * 12)
+{
 	fia->temp_key_cred_type_dyn_aig = fia->crediting_type_dyn_aig;
-	double hedge_inefficiency_local = hedge_inefficiency_aig;
-	return notional_amt_required_bef(t) * strategy_return_aig(t) * (1 - hedge_inefficiency_local);
+	double gmab_rate = fia->gmab_rate_crbg;
+	double gmab_payoff = notional_amt_seccap_gmab_bef_crbg(t) * max(cumul_return_sc_period_crbg(t), 
+						gmab_rate * fia->surr_chg_period_aig);
+
+	return (opt_payoff + gmab_payoff) * (1 - hedge_inefficiency_local);
 }
+
+return opt_payoff * (1 - hedge_inefficiency_local);
+
 
 }
 
@@ -6372,7 +6562,7 @@ return option_rate_num;
 double FIAAFUND_LIAB_UDF::fiaafund_liab_pfwd_surr_fund_val(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(107,"pfwd_surr_fund_val",t);
+	return rebase_value(111,"pfwd_surr_fund_val",t);
 }
 
 
@@ -6402,7 +6592,7 @@ return pfwd_surr_fund_val_cv;
 double FIAAFUND_LIAB_UDF::fiaafund_liab_prem_alloc(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(108,"prem_alloc",t);
+	return rebase_value(112,"prem_alloc",t);
 }
 
 
@@ -6427,7 +6617,7 @@ return fia->prem_paid(t) * fund_val_split_prop + prem_bonus(t);
 double FIAAFUND_LIAB_UDF::fiaafund_liab_prem_bonus(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(109,"prem_bonus",t);
+	return rebase_value(113,"prem_bonus",t);
 }
 
 
@@ -6454,7 +6644,7 @@ return fia->prem_paid(t)
 double FIAAFUND_LIAB_UDF::fiaafund_liab_sfas133_gmwb_chg(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(110,"sfas133_gmwb_chg",t);
+	return rebase_value(114,"sfas133_gmwb_chg",t);
 }
 
 
@@ -6631,7 +6821,7 @@ return 1.0;
 double FIAAFUND_LIAB_UDF::fiaafund_liab_strategy_return_aig(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(112,"strategy_return_aig",t);
+	return rebase_value(116,"strategy_return_aig",t);
 }
 
 
@@ -6677,6 +6867,12 @@ if (crediting_rate_defn == POINT_TO_POINT || crediting_rate_defn == POINT_TO_POI
 		init_sprd_rate = min(index_term_init_spread_rate_aig(t), index_term_sprd_rate_max_col_aig(t));	// this sprd is for dynamic participation only
 		part_rate = max(crediting_part_rate_aig(t), index_term_part_rate_min_col_aig(t));
 		use_cap_as_sprd_rate = min(crediting_cap_rate(t), index_term_sprd_rate_max_col_aig(t));		
+	}
+
+	if (fia->secure_cap_ind_crbg == 1 && fia->pol_yr(t) <= fia->surr_chg_period_aig)
+	{
+		fia->temp_key_cred_type_dyn_aig = fia->crediting_type_dyn_aig;
+		cap_rate = fia->secure_cap_rate_crbg; // 20260320 MQ secure cap
 	}
 		
 	if ( fabs(index_term_beginning_index_val_bom_aig(t)) <= rate_ratio_threshold )
@@ -9237,225 +9433,233 @@ const CashFlowCommonData FIAAFUND_LIAB::mCFStaticData_0[] =
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_crediting_type_dyn_trigger_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->crediting_type_dyn_trigger_aig),
 	CashFlowCommonData(15, "crediting_type_dyn_zero_threshold_flag_aig", "fiaafund_liab_crediting_type_dyn_zero_threshold_flag_aig",  "crediting_type_dyn_zero_threshold_flag_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_crediting_type_dyn_zero_threshold_flag_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->crediting_type_dyn_zero_threshold_flag_aig),
-	CashFlowCommonData(16, "eprs_cost_rate_aig", "fiaafund_liab_eprs_cost_rate_aig",  "eprs_cost_rate_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(16, "cumul_return_sc_period_crbg", "fiaafund_liab_cumul_return_sc_period_crbg",  "cumul_return_sc_period_crbg",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_cumul_return_sc_period_crbg, 'E','Y', '3', 'P', (size_t)&modelOffset->cumul_return_sc_period_crbg),
+	CashFlowCommonData(17, "eprs_cost_rate_aig", "fiaafund_liab_eprs_cost_rate_aig",  "eprs_cost_rate_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_eprs_cost_rate_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->eprs_cost_rate_aig),
-	CashFlowCommonData(17, "fa_crediting_rate_aig", "fiaafund_liab_fa_crediting_rate_aig",  "fa_crediting_rate_aig",  CashFlowCommonData::AVG,
+	CashFlowCommonData(18, "fa_crediting_rate_aig", "fiaafund_liab_fa_crediting_rate_aig",  "fa_crediting_rate_aig",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_fa_crediting_rate_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->fa_crediting_rate_aig),
-	CashFlowCommonData(18, "fa_pricing_rate_aig", "fiaafund_liab_fa_pricing_rate_aig",  "fa_pricing_rate_aig",  CashFlowCommonData::AVG,
+	CashFlowCommonData(19, "fa_pricing_rate_aig", "fiaafund_liab_fa_pricing_rate_aig",  "fa_pricing_rate_aig",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_fa_pricing_rate_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->fa_pricing_rate_aig),
-	CashFlowCommonData(19, "fa_reference_rate_aig", "fiaafund_liab_fa_reference_rate_aig",  "fa_reference_rate_aig",  CashFlowCommonData::AVG,
+	CashFlowCommonData(20, "fa_reference_rate_aig", "fiaafund_liab_fa_reference_rate_aig",  "fa_reference_rate_aig",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_fa_reference_rate_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->fa_reference_rate_aig),
-	CashFlowCommonData(20, "fund_released_ann", "fiaafund_liab_fund_released_ann",  "fund_released_ann",  CashFlowCommonData::SUM,
+	CashFlowCommonData(21, "fund_released_ann", "fiaafund_liab_fund_released_ann",  "fund_released_ann",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_fund_released_ann, 'E','Y', '3', 'C', (size_t)&modelOffset->fund_released_ann),
-	CashFlowCommonData(21, "fund_released_dth", "fiaafund_liab_fund_released_dth",  "fund_released_dth",  CashFlowCommonData::SUM,
+	CashFlowCommonData(22, "fund_released_dth", "fiaafund_liab_fund_released_dth",  "fund_released_dth",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_fund_released_dth, 'E','Y', '3', 'C', (size_t)&modelOffset->fund_released_dth),
-	CashFlowCommonData(22, "fund_released_maturity", "fiaafund_liab_fund_released_maturity",  "fund_released_maturity",  CashFlowCommonData::SUM,
+	CashFlowCommonData(23, "fund_released_maturity", "fiaafund_liab_fund_released_maturity",  "fund_released_maturity",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_fund_released_maturity, 'E','Y', '3', 'C', (size_t)&modelOffset->fund_released_maturity),
-	CashFlowCommonData(23, "fund_released_surr", "fiaafund_liab_fund_released_surr",  "fund_released_surr",  CashFlowCommonData::SUM,
+	CashFlowCommonData(24, "fund_released_surr", "fiaafund_liab_fund_released_surr",  "fund_released_surr",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_fund_released_surr, 'E','Y', '3', 'C', (size_t)&modelOffset->fund_released_surr),
-	CashFlowCommonData(24, "fund_released_withdrl", "fiaafund_liab_fund_released_withdrl",  "fund_released_withdrl",  CashFlowCommonData::SUM,
+	CashFlowCommonData(25, "fund_released_withdrl", "fiaafund_liab_fund_released_withdrl",  "fund_released_withdrl",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_fund_released_withdrl, 'E','Y', '3', 'C', (size_t)&modelOffset->fund_released_withdrl),
-	CashFlowCommonData(25, "fund_val_b", "fiaafund_liab_fund_val_b",  "fund_val_b",  CashFlowCommonData::SUM,
+	CashFlowCommonData(26, "fund_val_b", "fiaafund_liab_fund_val_b",  "fund_val_b",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_fund_val_b, 'B','N', '3', 'C', (size_t)&modelOffset->fund_val_b),
-	CashFlowCommonData(26, "fund_val_b_bef", "fiaafund_liab_fund_val_b_bef",  "fund_val_b_bef",  CashFlowCommonData::SUM,
+	CashFlowCommonData(27, "fund_val_b_bef", "fiaafund_liab_fund_val_b_bef",  "fund_val_b_bef",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_fund_val_b_bef, 'B','N', '3', 'C', (size_t)&modelOffset->fund_val_b_bef),
-	CashFlowCommonData(27, "fund_val_decrem", "fiaafund_liab_fund_val_decrem",  "fund_val_decrem",  CashFlowCommonData::SUM,
+	CashFlowCommonData(28, "fund_val_decrem", "fiaafund_liab_fund_val_decrem",  "fund_val_decrem",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_fund_val_decrem, 'E','Y', '3', 'P', (size_t)&modelOffset->fund_val_decrem),
-	CashFlowCommonData(28, "fund_val_e", "fiaafund_liab_fund_val_e",  "fund_val_e",  CashFlowCommonData::SUM,
+	CashFlowCommonData(29, "fund_val_e", "fiaafund_liab_fund_val_e",  "fund_val_e",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_fund_val_e, 'E','N', '3', 'P', (size_t)&modelOffset->fund_val_e),
-	CashFlowCommonData(29, "fund_val_e_bef", "fiaafund_liab_fund_val_e_bef",  "fund_val_e_bef",  CashFlowCommonData::SUM,
+	CashFlowCommonData(30, "fund_val_e_bef", "fiaafund_liab_fund_val_e_bef",  "fund_val_e_bef",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_fund_val_e_bef, 'E','N', '3', 'C', (size_t)&modelOffset->fund_val_e_bef),
-	CashFlowCommonData(30, "fund_val_e_bef_maturity_aig", "fiaafund_liab_fund_val_e_bef_maturity_aig",  "fund_val_e_bef_maturity_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(31, "fund_val_e_bef_maturity_aig", "fiaafund_liab_fund_val_e_bef_maturity_aig",  "fund_val_e_bef_maturity_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_fund_val_e_bef_maturity_aig, 'E','N', '3', 'P', (size_t)&modelOffset->fund_val_e_bef_maturity_aig),
-	CashFlowCommonData(31, "fund_val_rebal", "fiaafund_liab_fund_val_rebal",  "fund_val_rebal",  CashFlowCommonData::SUM,
+	CashFlowCommonData(32, "fund_val_rebal", "fiaafund_liab_fund_val_rebal",  "fund_val_rebal",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_fund_val_rebal, 'B','Y', '3', 'C', (size_t)&modelOffset->fund_val_rebal),
-	CashFlowCommonData(32, "fund_weighted_crediting_pri_sprd_aig", "fiaafund_liab_fund_weighted_crediting_pri_sprd_aig",  "fund_weighted_crediting_pri_sprd_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(33, "fund_weighted_crediting_pri_sprd_aig", "fiaafund_liab_fund_weighted_crediting_pri_sprd_aig",  "fund_weighted_crediting_pri_sprd_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_fund_weighted_crediting_pri_sprd_aig, 'B','Y', '3', 'P', (size_t)&modelOffset->fund_weighted_crediting_pri_sprd_aig),
-	CashFlowCommonData(33, "gmab_av_b_aig", "fiaafund_liab_gmab_av_b_aig",  "gmab_av_b_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(34, "gmab_av_b_aig", "fiaafund_liab_gmab_av_b_aig",  "gmab_av_b_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_gmab_av_b_aig, 'E','N', '3', 'C', (size_t)&modelOffset->gmab_av_b_aig),
-	CashFlowCommonData(34, "gmab_av_e_aig", "fiaafund_liab_gmab_av_e_aig",  "gmab_av_e_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(35, "gmab_av_e_aig", "fiaafund_liab_gmab_av_e_aig",  "gmab_av_e_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_gmab_av_e_aig, 'E','N', '3', 'C', (size_t)&modelOffset->gmab_av_e_aig),
-	CashFlowCommonData(35, "gmab_av_e_bef_aig", "fiaafund_liab_gmab_av_e_bef_aig",  "gmab_av_e_bef_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(36, "gmab_av_e_bef_aig", "fiaafund_liab_gmab_av_e_bef_aig",  "gmab_av_e_bef_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_gmab_av_e_bef_aig, 'E','N', '3', 'C', (size_t)&modelOffset->gmab_av_e_bef_aig),
-	CashFlowCommonData(36, "gmab_chg_aig", "fiaafund_liab_gmab_chg_aig",  "gmab_chg_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(37, "gmab_chg_aig", "fiaafund_liab_gmab_chg_aig",  "gmab_chg_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_gmab_chg_aig, 'B','N', '3', 'C', (size_t)&modelOffset->gmab_chg_aig),
-	CashFlowCommonData(37, "gmab_chg_partial_e_aig", "fiaafund_liab_gmab_chg_partial_e_aig",  "gmab_chg_partial_e_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(38, "gmab_chg_partial_e_aig", "fiaafund_liab_gmab_chg_partial_e_aig",  "gmab_chg_partial_e_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_gmab_chg_partial_e_aig, 'B','N', '3', 'C', (size_t)&modelOffset->gmab_chg_partial_e_aig),
-	CashFlowCommonData(38, "gmab_chg_partial_e_bef_aig", "fiaafund_liab_gmab_chg_partial_e_bef_aig",  "gmab_chg_partial_e_bef_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(39, "gmab_chg_partial_e_bef_aig", "fiaafund_liab_gmab_chg_partial_e_bef_aig",  "gmab_chg_partial_e_bef_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_gmab_chg_partial_e_bef_aig, 'B','N', '3', 'C', (size_t)&modelOffset->gmab_chg_partial_e_bef_aig),
-	CashFlowCommonData(39, "gmab_global_payoff_crbg", "fiaafund_liab_gmab_global_payoff_crbg",  "gmab_global_payoff_crbg",  CashFlowCommonData::SUM,
+	CashFlowCommonData(40, "gmab_global_payoff_crbg", "fiaafund_liab_gmab_global_payoff_crbg",  "gmab_global_payoff_crbg",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_gmab_global_payoff_crbg, 'E','Y', '3', 'P', (size_t)&modelOffset->gmab_global_payoff_crbg),
-	CashFlowCommonData(40, "gmab_payoff_crbg", "fiaafund_liab_gmab_payoff_crbg",  "gmab_payoff_crbg",  CashFlowCommonData::SUM,
+	CashFlowCommonData(41, "gmab_payoff_crbg", "fiaafund_liab_gmab_payoff_crbg",  "gmab_payoff_crbg",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_gmab_payoff_crbg, 'E','Y', '3', 'P', (size_t)&modelOffset->gmab_payoff_crbg),
-	CashFlowCommonData(41, "gmwb_chg", "fiaafund_liab_gmwb_chg",  "gmwb_chg",  CashFlowCommonData::SUM,
+	CashFlowCommonData(42, "gmwb_chg", "fiaafund_liab_gmwb_chg",  "gmwb_chg",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_gmwb_chg, 'B','Y', '3', 'C', (size_t)&modelOffset->gmwb_chg),
-	CashFlowCommonData(42, "gmwb_chg_at_surr_aig", "fiaafund_liab_gmwb_chg_at_surr_aig",  "gmwb_chg_at_surr_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(43, "gmwb_chg_at_surr_aig", "fiaafund_liab_gmwb_chg_at_surr_aig",  "gmwb_chg_at_surr_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_gmwb_chg_at_surr_aig, 'E','Y', '3', 'C', (size_t)&modelOffset->gmwb_chg_at_surr_aig),
-	CashFlowCommonData(43, "gmwb_chg_at_surr_bef_aig", "fiaafund_liab_gmwb_chg_at_surr_bef_aig",  "gmwb_chg_at_surr_bef_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(44, "gmwb_chg_at_surr_bef_aig", "fiaafund_liab_gmwb_chg_at_surr_bef_aig",  "gmwb_chg_at_surr_bef_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_gmwb_chg_at_surr_bef_aig, 'E','Y', '3', 'C', (size_t)&modelOffset->gmwb_chg_at_surr_bef_aig),
-	CashFlowCommonData(44, "gmwb_income_base_credit_rate_protation_fct_at_wdl_aig", "fiaafund_liab_gmwb_income_base_credit_rate_protation_fct_at_wdl_aig",  "gmwb_income_base_credit_rate_protation_fct_at_wdl_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(45, "gmwb_income_base_credit_rate_protation_fct_at_wdl_aig", "fiaafund_liab_gmwb_income_base_credit_rate_protation_fct_at_wdl_aig",  "gmwb_income_base_credit_rate_protation_fct_at_wdl_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_gmwb_income_base_credit_rate_protation_fct_at_wdl_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->gmwb_income_base_credit_rate_protation_fct_at_wdl_aig),
-	CashFlowCommonData(45, "gmwb_income_base_credit_rate_protation_fct_e_aig", "fiaafund_liab_gmwb_income_base_credit_rate_protation_fct_e_aig",  "gmwb_income_base_credit_rate_protation_fct_e_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(46, "gmwb_income_base_credit_rate_protation_fct_e_aig", "fiaafund_liab_gmwb_income_base_credit_rate_protation_fct_e_aig",  "gmwb_income_base_credit_rate_protation_fct_e_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_gmwb_income_base_credit_rate_protation_fct_e_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->gmwb_income_base_credit_rate_protation_fct_e_aig),
-	CashFlowCommonData(46, "gmwb_income_base_credit_rate_protation_fct_e_bef_aig", "fiaafund_liab_gmwb_income_base_credit_rate_protation_fct_e_bef_aig",  "gmwb_income_base_credit_rate_protation_fct_e_bef_wdl_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(47, "gmwb_income_base_credit_rate_protation_fct_e_bef_aig", "fiaafund_liab_gmwb_income_base_credit_rate_protation_fct_e_bef_aig",  "gmwb_income_base_credit_rate_protation_fct_e_bef_wdl_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_gmwb_income_base_credit_rate_protation_fct_e_bef_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->gmwb_income_base_credit_rate_protation_fct_e_bef_aig),
-	CashFlowCommonData(47, "hedge_cash_flow", "fiaafund_liab_hedge_cash_flow",  "hedge_cash_flow",  CashFlowCommonData::SUM,
+	CashFlowCommonData(48, "hedge_cash_flow", "fiaafund_liab_hedge_cash_flow",  "hedge_cash_flow",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_hedge_cash_flow, 'E','Y', '3', 'P', (size_t)&modelOffset->hedge_cash_flow),
-	CashFlowCommonData(48, "hedge_inv_amt_bom", "fiaafund_liab_hedge_inv_amt_bom",  "hedge_inv_amt_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(49, "hedge_inv_amt_bom", "fiaafund_liab_hedge_inv_amt_bom",  "hedge_inv_amt_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_hedge_inv_amt_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->hedge_inv_amt_bom),
-	CashFlowCommonData(49, "hedge_mkt_val", "fiaafund_liab_hedge_mkt_val",  "hedge_mkt_val",  CashFlowCommonData::SUM,
+	CashFlowCommonData(50, "hedge_mkt_val", "fiaafund_liab_hedge_mkt_val",  "hedge_mkt_val",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_hedge_mkt_val, 'E','N', '3', 'P', (size_t)&modelOffset->hedge_mkt_val),
-	CashFlowCommonData(50, "hedge_mkt_val_aig", "fiaafund_liab_hedge_mkt_val_aig",  "hedge_mkt_val_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(51, "hedge_mkt_val_aig", "fiaafund_liab_hedge_mkt_val_aig",  "hedge_mkt_val_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_hedge_mkt_val_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->hedge_mkt_val_aig),
-	CashFlowCommonData(51, "hedge_mkt_val_growth", "fiaafund_liab_hedge_mkt_val_growth",  "hedge_mkt_val_growth",  CashFlowCommonData::SUM,
+	CashFlowCommonData(52, "hedge_mkt_val_estimate_gmab_crbg", "fiaafund_liab_hedge_mkt_val_estimate_gmab_crbg",  "hedge_mkt_val_estimate_gmab_crbg",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_hedge_mkt_val_estimate_gmab_crbg, 'E','Y', '3', 'P', (size_t)&modelOffset->hedge_mkt_val_estimate_gmab_crbg),
+	CashFlowCommonData(53, "hedge_mkt_val_growth", "fiaafund_liab_hedge_mkt_val_growth",  "hedge_mkt_val_growth",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_hedge_mkt_val_growth, 'E','Y', '3', 'P', (size_t)&modelOffset->hedge_mkt_val_growth),
-	CashFlowCommonData(52, "hedge_mkt_val_per_unit_notional", "fiaafund_liab_hedge_mkt_val_per_unit_notional",  "hedge_mkt_val_per_unit_notional",  CashFlowCommonData::AVG,
+	CashFlowCommonData(54, "hedge_mkt_val_per_unit_notional", "fiaafund_liab_hedge_mkt_val_per_unit_notional",  "hedge_mkt_val_per_unit_notional",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_hedge_mkt_val_per_unit_notional, 'E','N', '3', 'P', (size_t)&modelOffset->hedge_mkt_val_per_unit_notional),
-	CashFlowCommonData(53, "hedge_mkt_val_per_unit_notional_aig", "fiaafund_liab_hedge_mkt_val_per_unit_notional_aig",  "hedge_mkt_val_per_unit_notional_aig",  CashFlowCommonData::AVG,
+	CashFlowCommonData(55, "hedge_mkt_val_per_unit_notional_aig", "fiaafund_liab_hedge_mkt_val_per_unit_notional_aig",  "hedge_mkt_val_per_unit_notional_aig",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_hedge_mkt_val_per_unit_notional_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->hedge_mkt_val_per_unit_notional_aig),
-	CashFlowCommonData(54, "hedge_option_val_alpha_col_aig", "fiaafund_liab_hedge_option_val_alpha_col_aig",  "hedge_option_val_alpha_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(56, "hedge_option_val_alpha_col_aig", "fiaafund_liab_hedge_option_val_alpha_col_aig",  "hedge_option_val_alpha_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_hedge_option_val_alpha_col_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->hedge_option_val_alpha_col_aig),
-	CashFlowCommonData(55, "hedge_sale_amt_bom", "fiaafund_liab_hedge_sale_amt_bom",  "hedge_sale_amt_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(57, "hedge_sale_amt_bom", "fiaafund_liab_hedge_sale_amt_bom",  "hedge_sale_amt_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_hedge_sale_amt_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->hedge_sale_amt_bom),
-	CashFlowCommonData(56, "hedge_sale_amt_eom", "fiaafund_liab_hedge_sale_amt_eom",  "hedge_sale_amt_eom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(58, "hedge_sale_amt_eom", "fiaafund_liab_hedge_sale_amt_eom",  "hedge_sale_amt_eom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_hedge_sale_amt_eom, 'E','Y', '3', 'P', (size_t)&modelOffset->hedge_sale_amt_eom),
-	CashFlowCommonData(57, "index_term_aig", "fiaafund_liab_index_term_aig",  "index_term_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(59, "index_term_aig", "fiaafund_liab_index_term_aig",  "index_term_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_index_term_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->index_term_aig),
-	CashFlowCommonData(58, "index_term_beginning_index_val_bom_aig", "fiaafund_liab_index_term_beginning_index_val_bom_aig",  "index_term_beginning_index_val_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(60, "index_term_beginning_index_val_bom_aig", "fiaafund_liab_index_term_beginning_index_val_bom_aig",  "index_term_beginning_index_val_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_index_term_beginning_index_val_bom_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->index_term_beginning_index_val_bom_aig),
-	CashFlowCommonData(59, "index_term_cap_rate_max_col_aig", "fiaafund_liab_index_term_cap_rate_max_col_aig",  "index_term_cap_rate_max_col_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(61, "index_term_cap_rate_max_col_aig", "fiaafund_liab_index_term_cap_rate_max_col_aig",  "index_term_cap_rate_max_col_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_index_term_cap_rate_max_col_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->index_term_cap_rate_max_col_aig),
-	CashFlowCommonData(60, "index_term_cap_rate_min_col_aig", "fiaafund_liab_index_term_cap_rate_min_col_aig",  "index_term_cap_rate_min_col_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(62, "index_term_cap_rate_min_col_aig", "fiaafund_liab_index_term_cap_rate_min_col_aig",  "index_term_cap_rate_min_col_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_index_term_cap_rate_min_col_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->index_term_cap_rate_min_col_aig),
-	CashFlowCommonData(61, "index_term_elapsed_mths_eom_aig", "fiaafund_liab_index_term_elapsed_mths_eom_aig",  "index_term_elapsed_mths_eom_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(63, "index_term_elapsed_mths_eom_aig", "fiaafund_liab_index_term_elapsed_mths_eom_aig",  "index_term_elapsed_mths_eom_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_index_term_elapsed_mths_eom_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->index_term_elapsed_mths_eom_aig),
-	CashFlowCommonData(62, "index_term_elapsed_pct_eom_aig", "fiaafund_liab_index_term_elapsed_pct_eom_aig",  "index_term_elapsed_pct_eom_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(64, "index_term_elapsed_pct_eom_aig", "fiaafund_liab_index_term_elapsed_pct_eom_aig",  "index_term_elapsed_pct_eom_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_index_term_elapsed_pct_eom_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->index_term_elapsed_pct_eom_aig),
-	CashFlowCommonData(63, "index_term_end_duration_aig", "fiaafund_liab_index_term_end_duration_aig",  "index_term_end_duration_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(65, "index_term_end_duration_aig", "fiaafund_liab_index_term_end_duration_aig",  "index_term_end_duration_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_index_term_end_duration_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->index_term_end_duration_aig),
-	CashFlowCommonData(64, "index_term_floor_col_aig", "fiaafund_liab_index_term_floor_col_aig",  "index_term_floor_col_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(66, "index_term_floor_col_aig", "fiaafund_liab_index_term_floor_col_aig",  "index_term_floor_col_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_index_term_floor_col_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->index_term_floor_col_aig),
-	CashFlowCommonData(65, "index_term_index_return_aig", "fiaafund_liab_index_term_index_return_aig",  "index_term_index_return_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(67, "index_term_index_return_aig", "fiaafund_liab_index_term_index_return_aig",  "index_term_index_return_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_index_term_index_return_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->index_term_index_return_aig),
-	CashFlowCommonData(66, "index_term_init_cap_rate_aig", "fiaafund_liab_index_term_init_cap_rate_aig",  "index_term_init_cap_rate_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(68, "index_term_init_cap_rate_aig", "fiaafund_liab_index_term_init_cap_rate_aig",  "index_term_init_cap_rate_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_index_term_init_cap_rate_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->index_term_init_cap_rate_aig),
-	CashFlowCommonData(67, "index_term_init_part_rate_aig", "fiaafund_liab_index_term_init_part_rate_aig",  "index_term_init_part_rate_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(69, "index_term_init_part_rate_aig", "fiaafund_liab_index_term_init_part_rate_aig",  "index_term_init_part_rate_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_index_term_init_part_rate_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->index_term_init_part_rate_aig),
-	CashFlowCommonData(68, "index_term_init_spread_rate_aig", "fiaafund_liab_index_term_init_spread_rate_aig",  "index_term_init_spread_rate_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(70, "index_term_init_spread_rate_aig", "fiaafund_liab_index_term_init_spread_rate_aig",  "index_term_init_spread_rate_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_index_term_init_spread_rate_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->index_term_init_spread_rate_aig),
-	CashFlowCommonData(69, "index_term_mths_aig", "fiaafund_liab_index_term_mths_aig",  "index_term_mths_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(71, "index_term_mths_aig", "fiaafund_liab_index_term_mths_aig",  "index_term_mths_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_index_term_mths_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->index_term_mths_aig),
-	CashFlowCommonData(70, "index_term_part_rate_max_col_aig", "fiaafund_liab_index_term_part_rate_max_col_aig",  "index_term_part_rate_max_col_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(72, "index_term_part_rate_max_col_aig", "fiaafund_liab_index_term_part_rate_max_col_aig",  "index_term_part_rate_max_col_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_index_term_part_rate_max_col_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->index_term_part_rate_max_col_aig),
-	CashFlowCommonData(71, "index_term_part_rate_min_col_aig", "fiaafund_liab_index_term_part_rate_min_col_aig",  "index_term_part_rate_min_col_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(73, "index_term_part_rate_min_col_aig", "fiaafund_liab_index_term_part_rate_min_col_aig",  "index_term_part_rate_min_col_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_index_term_part_rate_min_col_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->index_term_part_rate_min_col_aig),
-	CashFlowCommonData(72, "index_term_sprd_rate_max_col_aig", "fiaafund_liab_index_term_sprd_rate_max_col_aig",  "index_term_sprd_rate_max_col_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(74, "index_term_sprd_rate_max_col_aig", "fiaafund_liab_index_term_sprd_rate_max_col_aig",  "index_term_sprd_rate_max_col_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_index_term_sprd_rate_max_col_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->index_term_sprd_rate_max_col_aig),
-	CashFlowCommonData(73, "index_term_sprd_rate_min_col_aig", "fiaafund_liab_index_term_sprd_rate_min_col_aig",  "index_term_sprd_rate_min_col_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(75, "index_term_sprd_rate_min_col_aig", "fiaafund_liab_index_term_sprd_rate_min_col_aig",  "index_term_sprd_rate_min_col_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_index_term_sprd_rate_min_col_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->index_term_sprd_rate_min_col_aig),
-	CashFlowCommonData(74, "index_term_start_duration_aig", "fiaafund_liab_index_term_start_duration_aig",  "index_term_start_duration_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(76, "index_term_start_duration_aig", "fiaafund_liab_index_term_start_duration_aig",  "index_term_start_duration_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_index_term_start_duration_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->index_term_start_duration_aig),
-	CashFlowCommonData(75, "index_val", "fiaafund_liab_index_val",  "index_val",  CashFlowCommonData::AVG,
+	CashFlowCommonData(77, "index_val", "fiaafund_liab_index_val",  "index_val",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_index_val, 'E','Y', '3', 'C', (size_t)&modelOffset->index_val),
-	CashFlowCommonData(76, "index_val_bom", "fiaafund_liab_index_val_bom",  "index_val_bom",  CashFlowCommonData::AVG,
+	CashFlowCommonData(78, "index_val_bom", "fiaafund_liab_index_val_bom",  "index_val_bom",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_index_val_bom, 'E','Y', '3', 'P', (size_t)&modelOffset->index_val_bom),
-	CashFlowCommonData(77, "initialize", "fiaafund_liab_initialize",  "initialize",  CashFlowCommonData::AVG,
+	CashFlowCommonData(79, "initialize", "fiaafund_liab_initialize",  "initialize",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_initialize, 'E','N', '3', 'N', (size_t)&modelOffset->initialize),
-	CashFlowCommonData(78, "lapse_dyn_base_prod_crediting_rt_aig", "fiaafund_liab_lapse_dyn_base_prod_crediting_rt_aig",  "lapse_dyn_base_prod_crediting_rt_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(80, "lapse_dyn_base_prod_crediting_rt_aig", "fiaafund_liab_lapse_dyn_base_prod_crediting_rt_aig",  "lapse_dyn_base_prod_crediting_rt_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_lapse_dyn_base_prod_crediting_rt_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->lapse_dyn_base_prod_crediting_rt_aig),
-	CashFlowCommonData(79, "min_accum_val_b_aig", "fiaafund_liab_min_accum_val_b_aig",  "min_accum_val_b_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(81, "min_accum_val_b_aig", "fiaafund_liab_min_accum_val_b_aig",  "min_accum_val_b_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_min_accum_val_b_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->min_accum_val_b_aig),
-	CashFlowCommonData(80, "min_accum_val_b_bef_aig", "fiaafund_liab_min_accum_val_b_bef_aig",  "min_accum_val_b_bef_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(82, "min_accum_val_b_bef_aig", "fiaafund_liab_min_accum_val_b_bef_aig",  "min_accum_val_b_bef_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_min_accum_val_b_bef_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->min_accum_val_b_bef_aig),
-	CashFlowCommonData(81, "min_accum_val_e_aig", "fiaafund_liab_min_accum_val_e_aig",  "min_accum_val_e_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(83, "min_accum_val_e_aig", "fiaafund_liab_min_accum_val_e_aig",  "min_accum_val_e_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_min_accum_val_e_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->min_accum_val_e_aig),
-	CashFlowCommonData(82, "min_accum_val_e_bef_aig", "fiaafund_liab_min_accum_val_e_bef_aig",  "min_accum_val_e_bef_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(84, "min_accum_val_e_bef_aig", "fiaafund_liab_min_accum_val_e_bef_aig",  "min_accum_val_e_bef_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_min_accum_val_e_bef_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->min_accum_val_e_bef_aig),
-	CashFlowCommonData(83, "min_accum_val_e_bef_maturity_aig", "fiaafund_liab_min_accum_val_e_bef_maturity_aig",  "min_accum_val_e_bef_maturity_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(85, "min_accum_val_e_bef_maturity_aig", "fiaafund_liab_min_accum_val_e_bef_maturity_aig",  "min_accum_val_e_bef_maturity_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_min_accum_val_e_bef_maturity_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->min_accum_val_e_bef_maturity_aig),
-	CashFlowCommonData(84, "net_crediting_rate_aig", "fiaafund_liab_net_crediting_rate_aig",  "net_crediting_rate_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(86, "net_crediting_rate_aig", "fiaafund_liab_net_crediting_rate_aig",  "net_crediting_rate_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_net_crediting_rate_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->net_crediting_rate_aig),
-	CashFlowCommonData(85, "notional_amt_required", "fiaafund_liab_notional_amt_required",  "notional_amt_required",  CashFlowCommonData::SUM,
+	CashFlowCommonData(87, "notional_amt_required", "fiaafund_liab_notional_amt_required",  "notional_amt_required",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_notional_amt_required, 'E','N', '3', 'P', (size_t)&modelOffset->notional_amt_required),
-	CashFlowCommonData(86, "notional_amt_required_bef", "fiaafund_liab_notional_amt_required_bef",  "notional_amt_required_bef",  CashFlowCommonData::SUM,
+	CashFlowCommonData(88, "notional_amt_required_bef", "fiaafund_liab_notional_amt_required_bef",  "notional_amt_required_bef",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_notional_amt_required_bef, 'E','N', '3', 'P', (size_t)&modelOffset->notional_amt_required_bef),
-	CashFlowCommonData(87, "notional_to_hedge", "fiaafund_liab_notional_to_hedge",  "notional_to_hedge",  CashFlowCommonData::SUM,
+	CashFlowCommonData(89, "notional_amt_seccap_gmab_bef_crbg", "fiaafund_liab_notional_amt_seccap_gmab_bef_crbg",  "notional_amt_seccap_gmab_bef_crbg",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_notional_amt_seccap_gmab_bef_crbg, 'E','Y', '3', 'P', (size_t)&modelOffset->notional_amt_seccap_gmab_bef_crbg),
+	CashFlowCommonData(90, "notional_amt_seccap_gmab_crbg", "fiaafund_liab_notional_amt_seccap_gmab_crbg",  "notional_amt_seccap_gmab_crbg",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_notional_amt_seccap_gmab_crbg, 'E','Y', '3', 'P', (size_t)&modelOffset->notional_amt_seccap_gmab_crbg),
+	CashFlowCommonData(91, "notional_to_hedge", "fiaafund_liab_notional_to_hedge",  "notional_to_hedge",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_notional_to_hedge, 'E','N', '3', 'C', (size_t)&modelOffset->notional_to_hedge),
-	CashFlowCommonData(88, "notional_to_hedge_aig", "fiaafund_liab_notional_to_hedge_aig",  "notional_to_hedge_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(92, "notional_to_hedge_aig", "fiaafund_liab_notional_to_hedge_aig",  "notional_to_hedge_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_notional_to_hedge_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->notional_to_hedge_aig),
-	CashFlowCommonData(89, "notional_to_hedge_cap", "fiaafund_liab_notional_to_hedge_cap",  "notional_to_hedge_cap",  CashFlowCommonData::SUM,
+	CashFlowCommonData(93, "notional_to_hedge_cap", "fiaafund_liab_notional_to_hedge_cap",  "notional_to_hedge_cap",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_notional_to_hedge_cap, 'E','N', '3', 'C', (size_t)&modelOffset->notional_to_hedge_cap),
-	CashFlowCommonData(90, "notional_to_hedge_index", "fiaafund_liab_notional_to_hedge_index",  "notional_to_hedge_index",  CashFlowCommonData::SUM,
+	CashFlowCommonData(94, "notional_to_hedge_index", "fiaafund_liab_notional_to_hedge_index",  "notional_to_hedge_index",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_notional_to_hedge_index, 'E','N', '3', 'C', (size_t)&modelOffset->notional_to_hedge_index),
-	CashFlowCommonData(91, "notional_to_hedge_long_strike", "fiaafund_liab_notional_to_hedge_long_strike",  "notional_to_hedge_long_strike",  CashFlowCommonData::SUM,
+	CashFlowCommonData(95, "notional_to_hedge_long_strike", "fiaafund_liab_notional_to_hedge_long_strike",  "notional_to_hedge_long_strike",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_notional_to_hedge_long_strike, 'E','N', '3', 'C', (size_t)&modelOffset->notional_to_hedge_long_strike),
-	CashFlowCommonData(92, "notional_to_hedge_net", "fiaafund_liab_notional_to_hedge_net",  "notional_to_hedge_net",  CashFlowCommonData::SUM,
+	CashFlowCommonData(96, "notional_to_hedge_net", "fiaafund_liab_notional_to_hedge_net",  "notional_to_hedge_net",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_notional_to_hedge_net, 'E','N', '3', 'C', (size_t)&modelOffset->notional_to_hedge_net),
-	CashFlowCommonData(93, "opt_budget", "fiaafund_liab_opt_budget",  "opt_budget",  CashFlowCommonData::AVG,
+	CashFlowCommonData(97, "opt_budget", "fiaafund_liab_opt_budget",  "opt_budget",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_opt_budget, 'E','N', '3', 'C', (size_t)&modelOffset->opt_budget),
-	CashFlowCommonData(94, "opt_budget_amt", "fiaafund_liab_opt_budget_amt",  "opt_budget_amt",  CashFlowCommonData::SUM,
+	CashFlowCommonData(98, "opt_budget_amt", "fiaafund_liab_opt_budget_amt",  "opt_budget_amt",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_opt_budget_amt, 'E','N', '3', 'C', (size_t)&modelOffset->opt_budget_amt),
-	CashFlowCommonData(95, "opt_budget_cost_aig", "fiaafund_liab_opt_budget_cost_aig",  "opt_budget_cost_aig",  CashFlowCommonData::AVG,
+	CashFlowCommonData(99, "opt_budget_cost_aig", "fiaafund_liab_opt_budget_cost_aig",  "opt_budget_cost_aig",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_opt_budget_cost_aig, 'B','Y', '3', 'P', (size_t)&modelOffset->opt_budget_cost_aig),
-	CashFlowCommonData(96, "opt_budget_eprs_aig", "fiaafund_liab_opt_budget_eprs_aig",  "opt_budget_eprs_aig",  CashFlowCommonData::AVG,
+	CashFlowCommonData(100, "opt_budget_eprs_aig", "fiaafund_liab_opt_budget_eprs_aig",  "opt_budget_eprs_aig",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_opt_budget_eprs_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->opt_budget_eprs_aig),
-	CashFlowCommonData(97, "opt_budget_interm_aig", "fiaafund_liab_opt_budget_interm_aig",  "opt_budget_interm_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(101, "opt_budget_interm_aig", "fiaafund_liab_opt_budget_interm_aig",  "opt_budget_interm_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_opt_budget_interm_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->opt_budget_interm_aig),
-	CashFlowCommonData(98, "opt_budget_renewal_aig", "fiaafund_liab_opt_budget_renewal_aig",  "opt_budget_renewal_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(102, "opt_budget_renewal_aig", "fiaafund_liab_opt_budget_renewal_aig",  "opt_budget_renewal_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_opt_budget_renewal_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->opt_budget_renewal_aig),
-	CashFlowCommonData(99, "opt_budget_strategy_term_renewal_aig", "fiaafund_liab_opt_budget_strategy_term_renewal_aig",  "opt_budget_strategy_term_renewal_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(103, "opt_budget_strategy_term_renewal_aig", "fiaafund_liab_opt_budget_strategy_term_renewal_aig",  "opt_budget_strategy_term_renewal_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_opt_budget_strategy_term_renewal_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->opt_budget_strategy_term_renewal_aig),
-	CashFlowCommonData(100, "opt_budget_tgt_aig", "fiaafund_liab_opt_budget_tgt_aig",  "opt_budget_tgt_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(104, "opt_budget_tgt_aig", "fiaafund_liab_opt_budget_tgt_aig",  "opt_budget_tgt_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_opt_budget_tgt_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->opt_budget_tgt_aig),
-	CashFlowCommonData(101, "opt_budget_tgt_interm_aig", "fiaafund_liab_opt_budget_tgt_interm_aig",  "opt_budget_tgt_interm_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(105, "opt_budget_tgt_interm_aig", "fiaafund_liab_opt_budget_tgt_interm_aig",  "opt_budget_tgt_interm_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_opt_budget_tgt_interm_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->opt_budget_tgt_interm_aig),
-	CashFlowCommonData(102, "opt_cost_atm_aig", "fiaafund_liab_opt_cost_atm_aig",  "opt_cost_atm_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(106, "opt_cost_atm_aig", "fiaafund_liab_opt_cost_atm_aig",  "opt_cost_atm_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_opt_cost_atm_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->opt_cost_atm_aig),
-	CashFlowCommonData(103, "opt_payoff", "fiaafund_liab_opt_payoff",  "opt_payoff",  CashFlowCommonData::SUM,
+	CashFlowCommonData(107, "opt_payoff", "fiaafund_liab_opt_payoff",  "opt_payoff",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_opt_payoff, 'E','Y', '3', 'C', (size_t)&modelOffset->opt_payoff),
-	CashFlowCommonData(104, "opt_payoff_aig", "fiaafund_liab_opt_payoff_aig",  "opt_payoff_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(108, "opt_payoff_aig", "fiaafund_liab_opt_payoff_aig",  "opt_payoff_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_opt_payoff_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->opt_payoff_aig),
-	CashFlowCommonData(105, "opt_strike_price", "fiaafund_liab_opt_strike_price",  "opt_strike_price",  CashFlowCommonData::AVG,
+	CashFlowCommonData(109, "opt_strike_price", "fiaafund_liab_opt_strike_price",  "opt_strike_price",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_opt_strike_price, 'E','N', '3', 'P', (size_t)&modelOffset->opt_strike_price),
-	CashFlowCommonData(106, "opt_value_net_numer", "fiaafund_liab_opt_value_net_numer",  "opt_value_net_numer",  CashFlowCommonData::SUM,
+	CashFlowCommonData(110, "opt_value_net_numer", "fiaafund_liab_opt_value_net_numer",  "opt_value_net_numer",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_opt_value_net_numer, 'E','Y', '3', 'P', (size_t)&modelOffset->opt_value_net_numer),
-	CashFlowCommonData(107, "pfwd_surr_fund_val", "fiaafund_liab_pfwd_surr_fund_val",  "pfwd_surr_fund_val",  CashFlowCommonData::SUM,
+	CashFlowCommonData(111, "pfwd_surr_fund_val", "fiaafund_liab_pfwd_surr_fund_val",  "pfwd_surr_fund_val",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_pfwd_surr_fund_val, 'E','Y', '3', 'C', (size_t)&modelOffset->pfwd_surr_fund_val),
-	CashFlowCommonData(108, "prem_alloc", "fiaafund_liab_prem_alloc",  "prem_alloc",  CashFlowCommonData::SUM,
+	CashFlowCommonData(112, "prem_alloc", "fiaafund_liab_prem_alloc",  "prem_alloc",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_prem_alloc, 'B','Y', '3', 'C', (size_t)&modelOffset->prem_alloc),
-	CashFlowCommonData(109, "prem_bonus", "fiaafund_liab_prem_bonus",  "prem_bonus",  CashFlowCommonData::SUM,
+	CashFlowCommonData(113, "prem_bonus", "fiaafund_liab_prem_bonus",  "prem_bonus",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_prem_bonus, 'B','Y', '3', 'C', (size_t)&modelOffset->prem_bonus),
-	CashFlowCommonData(110, "sfas133_gmwb_chg", "fiaafund_liab_sfas133_gmwb_chg",  "sfas133_gmwb_chg",  CashFlowCommonData::SUM,
+	CashFlowCommonData(114, "sfas133_gmwb_chg", "fiaafund_liab_sfas133_gmwb_chg",  "sfas133_gmwb_chg",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_sfas133_gmwb_chg, 'B','Y', '3', 'C', (size_t)&modelOffset->sfas133_gmwb_chg),
-	CashFlowCommonData(111, "startup", "fiaafund_liab_startup",  "startup",  CashFlowCommonData::SUM,
+	CashFlowCommonData(115, "startup", "fiaafund_liab_startup",  "startup",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::virtual_startup, 'E','Y', '3', 'N', (size_t)&modelOffset->startup),
-	CashFlowCommonData(112, "strategy_return_aig", "fiaafund_liab_strategy_return_aig",  "strategy_return_aig",  CashFlowCommonData::AVG,
+	CashFlowCommonData(116, "strategy_return_aig", "fiaafund_liab_strategy_return_aig",  "strategy_return_aig",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_strategy_return_aig, 'E','N', '3', 'C', (size_t)&modelOffset->strategy_return_aig),
-	CashFlowCommonData(113, "strategy_return_cumul_aig", "fiaafund_liab_strategy_return_cumul_aig",  "strategy_return_cumul_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(117, "strategy_return_cumul_aig", "fiaafund_liab_strategy_return_cumul_aig",  "strategy_return_cumul_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_strategy_return_cumul_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->strategy_return_cumul_aig),
-	CashFlowCommonData(114, "strategy_return_prorated_aig", "fiaafund_liab_strategy_return_prorated_aig",  "strategy_return_prorated_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(118, "strategy_return_prorated_aig", "fiaafund_liab_strategy_return_prorated_aig",  "strategy_return_prorated_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_strategy_return_prorated_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->strategy_return_prorated_aig),
-	CashFlowCommonData(115, "strategy_term_aig", "fiaafund_liab_strategy_term_aig",  "strategy_term_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(119, "strategy_term_aig", "fiaafund_liab_strategy_term_aig",  "strategy_term_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_strategy_term_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->strategy_term_aig),
-	CashFlowCommonData(116, "strategy_term_beginning_index_val_bom_aig", "fiaafund_liab_strategy_term_beginning_index_val_bom_aig",  "strategy_term_beginning_index_val_bom_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(120, "strategy_term_beginning_index_val_bom_aig", "fiaafund_liab_strategy_term_beginning_index_val_bom_aig",  "strategy_term_beginning_index_val_bom_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_strategy_term_beginning_index_val_bom_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->strategy_term_beginning_index_val_bom_aig),
-	CashFlowCommonData(117, "strategy_term_elapsed_mths_eom_aig", "fiaafund_liab_strategy_term_elapsed_mths_eom_aig",  "strategy_term_elapsed_mths_eom_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(121, "strategy_term_elapsed_mths_eom_aig", "fiaafund_liab_strategy_term_elapsed_mths_eom_aig",  "strategy_term_elapsed_mths_eom_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_strategy_term_elapsed_mths_eom_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->strategy_term_elapsed_mths_eom_aig),
-	CashFlowCommonData(118, "strategy_term_elapsed_pct_eom_aig", "fiaafund_liab_strategy_term_elapsed_pct_eom_aig",  "strategy_term_elapsed_pct_eom_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(122, "strategy_term_elapsed_pct_eom_aig", "fiaafund_liab_strategy_term_elapsed_pct_eom_aig",  "strategy_term_elapsed_pct_eom_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_strategy_term_elapsed_pct_eom_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->strategy_term_elapsed_pct_eom_aig),
-	CashFlowCommonData(119, "strategy_term_floor_col_aig", "fiaafund_liab_strategy_term_floor_col_aig",  "strategy_term_floor_col_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(123, "strategy_term_floor_col_aig", "fiaafund_liab_strategy_term_floor_col_aig",  "strategy_term_floor_col_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_strategy_term_floor_col_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->strategy_term_floor_col_aig),
-	CashFlowCommonData(120, "strategy_term_index_return_aig", "fiaafund_liab_strategy_term_index_return_aig",  "strategy_term_index_return_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(124, "strategy_term_index_return_aig", "fiaafund_liab_strategy_term_index_return_aig",  "strategy_term_index_return_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_strategy_term_index_return_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->strategy_term_index_return_aig),
-	CashFlowCommonData(121, "strategy_term_mths_aig", "fiaafund_liab_strategy_term_mths_aig",  "strategy_term_mths_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(125, "strategy_term_mths_aig", "fiaafund_liab_strategy_term_mths_aig",  "strategy_term_mths_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_strategy_term_mths_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->strategy_term_mths_aig),
-	CashFlowCommonData(122, "tier_number_aig", "fiaafund_liab_tier_number_aig",  "tier_number_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(126, "tier_number_aig", "fiaafund_liab_tier_number_aig",  "tier_number_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_tier_number_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->tier_number_aig),
-	CashFlowCommonData(123, "tier_strat_fee_aig", "fiaafund_liab_tier_strat_fee_aig",  "tier_strat_fee_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(127, "tier_strat_fee_aig", "fiaafund_liab_tier_strat_fee_aig",  "tier_strat_fee_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_tier_strat_fee_aig, 'B','Y', '3', 'P', (size_t)&modelOffset->tier_strat_fee_aig),
-	CashFlowCommonData(124, "tier_strat_fee_at_surr_aig", "fiaafund_liab_tier_strat_fee_at_surr_aig",  "tier_strat_fee_at_surr_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(128, "tier_strat_fee_at_surr_aig", "fiaafund_liab_tier_strat_fee_at_surr_aig",  "tier_strat_fee_at_surr_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_tier_strat_fee_at_surr_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->tier_strat_fee_at_surr_aig),
-	CashFlowCommonData(125, "tier_strat_fee_at_surr_bef_aig", "fiaafund_liab_tier_strat_fee_at_surr_bef_aig",  "tier_strat_fee_at_surr_bef_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(129, "tier_strat_fee_at_surr_bef_aig", "fiaafund_liab_tier_strat_fee_at_surr_bef_aig",  "tier_strat_fee_at_surr_bef_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIAAFUND_LIAB_UDF::fiaafund_liab_tier_strat_fee_at_surr_bef_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->tier_strat_fee_at_surr_bef_aig)
 };
 const CashFlowCommonData* FIAAFUND_LIAB::mCFStaticData[] = {
@@ -9585,6 +9789,10 @@ const CashFlowCommonData* FIAAFUND_LIAB::mCFStaticData[] = {
 	&FIAAFUND_LIAB::mCFStaticData_0[123],
 	&FIAAFUND_LIAB::mCFStaticData_0[124],
 	&FIAAFUND_LIAB::mCFStaticData_0[125],
+	&FIAAFUND_LIAB::mCFStaticData_0[126],
+	&FIAAFUND_LIAB::mCFStaticData_0[127],
+	&FIAAFUND_LIAB::mCFStaticData_0[128],
+	&FIAAFUND_LIAB::mCFStaticData_0[129],
 	nullptr};
 //const CashFlowCommonData END@2
 
@@ -9775,81 +9983,91 @@ TableMgr<VariantTable> FIAAFUND_LIAB::mgr_;
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
 	Descriptor(27, Attribute::DOUBLE,	"index_term_cap_rate_min_aig", Descriptor::NOT_INDEXED, (size_t)&modelOffset->index_term_cap_rate_min_aig,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(28, Attribute::STRING,	"index_term_cap_rate_min_table_aig", -1, (size_t)&modelOffset->index_term_cap_rate_min_table_aig,
+	Descriptor(28, Attribute::DOUBLE,	"index_term_cap_rate_min_gmab", Descriptor::NOT_INDEXED, (size_t)&modelOffset->index_term_cap_rate_min_gmab,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(29, Attribute::INT,	"index_term_duration_aig", -1, (size_t)&modelOffset->index_term_duration_aig,
+	Descriptor(29, Attribute::STRING,	"index_term_cap_rate_min_table_aig", -1, (size_t)&modelOffset->index_term_cap_rate_min_table_aig,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(30, Attribute::DOUBLE,	"index_term_floor_aig", Descriptor::NOT_INDEXED, (size_t)&modelOffset->index_term_floor_aig,
+	Descriptor(30, Attribute::STRING,	"index_term_cap_rate_min_table_gmab", -1, (size_t)&modelOffset->index_term_cap_rate_min_table_gmab,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(31, Attribute::DOUBLE,	"index_term_part_rate_max_aig", Descriptor::NOT_INDEXED, (size_t)&modelOffset->index_term_part_rate_max_aig,
+	Descriptor(31, Attribute::INT,	"index_term_duration_aig", -1, (size_t)&modelOffset->index_term_duration_aig,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(32, Attribute::DOUBLE,	"index_term_part_rate_min_aig", Descriptor::NOT_INDEXED, (size_t)&modelOffset->index_term_part_rate_min_aig,
+	Descriptor(32, Attribute::DOUBLE,	"index_term_floor_aig", Descriptor::NOT_INDEXED, (size_t)&modelOffset->index_term_floor_aig,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(33, Attribute::DOUBLE,	"index_term_sprd_rate_max_aig", Descriptor::NOT_INDEXED, (size_t)&modelOffset->index_term_sprd_rate_max_aig,
+	Descriptor(33, Attribute::DOUBLE,	"index_term_part_rate_max_aig", Descriptor::NOT_INDEXED, (size_t)&modelOffset->index_term_part_rate_max_aig,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(34, Attribute::DOUBLE,	"index_term_sprd_rate_min_aig", Descriptor::NOT_INDEXED, (size_t)&modelOffset->index_term_sprd_rate_min_aig,
+	Descriptor(34, Attribute::DOUBLE,	"index_term_part_rate_min_aig", Descriptor::NOT_INDEXED, (size_t)&modelOffset->index_term_part_rate_min_aig,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(35, Attribute::DOUBLE,	"index_term_trigger_rate_max_aig", Descriptor::NOT_INDEXED, (size_t)&modelOffset->index_term_trigger_rate_max_aig,
+	Descriptor(35, Attribute::DOUBLE,	"index_term_sprd_rate_max_aig", Descriptor::NOT_INDEXED, (size_t)&modelOffset->index_term_sprd_rate_max_aig,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(36, Attribute::DOUBLE,	"index_term_trigger_rate_min_aig", Descriptor::NOT_INDEXED, (size_t)&modelOffset->index_term_trigger_rate_min_aig,
+	Descriptor(36, Attribute::DOUBLE,	"index_term_sprd_rate_min_aig", Descriptor::NOT_INDEXED, (size_t)&modelOffset->index_term_sprd_rate_min_aig,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(37, Attribute::DOUBLE,	"init_fia_cap", Descriptor::NOT_INDEXED, (size_t)&modelOffset->init_fia_cap,
+	Descriptor(37, Attribute::DOUBLE,	"index_term_trigger_rate_max_aig", Descriptor::NOT_INDEXED, (size_t)&modelOffset->index_term_trigger_rate_max_aig,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(38, Attribute::DOUBLE,	"init_fund_val", Descriptor::NOT_INDEXED, (size_t)&modelOffset->init_fund_val,
+	Descriptor(38, Attribute::DOUBLE,	"index_term_trigger_rate_min_aig", Descriptor::NOT_INDEXED, (size_t)&modelOffset->index_term_trigger_rate_min_aig,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(39, Attribute::DOUBLE,	"init_part_rate", Descriptor::NOT_INDEXED, (size_t)&modelOffset->init_part_rate,
+	Descriptor(39, Attribute::DOUBLE,	"init_fia_cap", Descriptor::NOT_INDEXED, (size_t)&modelOffset->init_fia_cap,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(40, Attribute::DOUBLE,	"init_spread_rate_aig", Descriptor::NOT_INDEXED, (size_t)&modelOffset->init_spread_rate_aig,
+	Descriptor(40, Attribute::DOUBLE,	"init_fund_val", Descriptor::NOT_INDEXED, (size_t)&modelOffset->init_fund_val,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(41, Attribute::DOUBLE,	"init_trigger_rate_aig", Descriptor::NOT_INDEXED, (size_t)&modelOffset->init_trigger_rate_aig,
+	Descriptor(41, Attribute::DOUBLE,	"init_opt_cost_gmab", Descriptor::NOT_INDEXED, (size_t)&modelOffset->init_opt_cost_gmab,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(42, Attribute::STR_ENUM,	"lookback_defn", -1, (size_t)&modelOffset->lookback_defn,
+	Descriptor(42, Attribute::DOUBLE,	"init_opt_cost_seccap", Descriptor::NOT_INDEXED, (size_t)&modelOffset->init_opt_cost_seccap,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
+	Descriptor(43, Attribute::DOUBLE,	"init_opt_cost_seccap_gmab", Descriptor::NOT_INDEXED, (size_t)&modelOffset->init_opt_cost_seccap_gmab,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
+	Descriptor(44, Attribute::DOUBLE,	"init_part_rate", Descriptor::NOT_INDEXED, (size_t)&modelOffset->init_part_rate,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
+	Descriptor(45, Attribute::DOUBLE,	"init_spread_rate_aig", Descriptor::NOT_INDEXED, (size_t)&modelOffset->init_spread_rate_aig,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
+	Descriptor(46, Attribute::DOUBLE,	"init_trigger_rate_aig", Descriptor::NOT_INDEXED, (size_t)&modelOffset->init_trigger_rate_aig,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
+	Descriptor(47, Attribute::STR_ENUM,	"lookback_defn", -1, (size_t)&modelOffset->lookback_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &lookback_defnEnumList, Feature(true)),
-	Descriptor(43, Attribute::STR_ENUM,	"lookback_sampling_interval", -1, (size_t)&modelOffset->lookback_sampling_interval,
+	Descriptor(48, Attribute::STR_ENUM,	"lookback_sampling_interval", -1, (size_t)&modelOffset->lookback_sampling_interval,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &lookback_sampling_intervalEnumList, Feature(true)),
-	Descriptor(44, Attribute::INT,	"part_rate_solve_max_iter_aig", -1, (size_t)&modelOffset->part_rate_solve_max_iter_aig,
+	Descriptor(49, Attribute::INT,	"part_rate_solve_max_iter_aig", -1, (size_t)&modelOffset->part_rate_solve_max_iter_aig,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(45, Attribute::DOUBLE,	"part_rate_solve_tolerance_aig", Descriptor::NOT_INDEXED, (size_t)&modelOffset->part_rate_solve_tolerance_aig,
+	Descriptor(50, Attribute::DOUBLE,	"part_rate_solve_tolerance_aig", Descriptor::NOT_INDEXED, (size_t)&modelOffset->part_rate_solve_tolerance_aig,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(46, Attribute::DOUBLE,	"pct_to_hedge", Descriptor::NOT_INDEXED, (size_t)&modelOffset->pct_to_hedge,
+	Descriptor(51, Attribute::DOUBLE,	"pct_to_hedge", Descriptor::NOT_INDEXED, (size_t)&modelOffset->pct_to_hedge,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(47, Attribute::STR_ENUM,	"remove_par_sprd_min_max_aig", -1, (size_t)&modelOffset->remove_par_sprd_min_max_aig,
+	Descriptor(52, Attribute::STR_ENUM,	"remove_par_sprd_min_max_aig", -1, (size_t)&modelOffset->remove_par_sprd_min_max_aig,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &remove_par_sprd_min_max_aigEnumList, Feature(true)),
-	Descriptor(48, Attribute::DOUBLE,	"renewal_beta_down_aig", Descriptor::NOT_INDEXED, (size_t)&modelOffset->renewal_beta_down_aig,
+	Descriptor(53, Attribute::DOUBLE,	"renewal_beta_down_aig", Descriptor::NOT_INDEXED, (size_t)&modelOffset->renewal_beta_down_aig,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(49, Attribute::DOUBLE,	"renewal_beta_up_aig", Descriptor::NOT_INDEXED, (size_t)&modelOffset->renewal_beta_up_aig,
+	Descriptor(54, Attribute::DOUBLE,	"renewal_beta_up_aig", Descriptor::NOT_INDEXED, (size_t)&modelOffset->renewal_beta_up_aig,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(50, Attribute::DOUBLE,	"renewal_budget_reduction_aig", Descriptor::NOT_INDEXED, (size_t)&modelOffset->renewal_budget_reduction_aig,
+	Descriptor(55, Attribute::DOUBLE,	"renewal_budget_reduction_aig", Descriptor::NOT_INDEXED, (size_t)&modelOffset->renewal_budget_reduction_aig,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(51, Attribute::DOUBLE,	"renewal_glb_beta_down_aig", Descriptor::NOT_INDEXED, (size_t)&modelOffset->renewal_glb_beta_down_aig,
+	Descriptor(56, Attribute::DOUBLE,	"renewal_glb_beta_down_aig", Descriptor::NOT_INDEXED, (size_t)&modelOffset->renewal_glb_beta_down_aig,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(52, Attribute::DOUBLE,	"renewal_glb_beta_up_aig", Descriptor::NOT_INDEXED, (size_t)&modelOffset->renewal_glb_beta_up_aig,
+	Descriptor(57, Attribute::DOUBLE,	"renewal_glb_beta_up_aig", Descriptor::NOT_INDEXED, (size_t)&modelOffset->renewal_glb_beta_up_aig,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(53, Attribute::DOUBLE,	"renewal_migration_beg_yr_aig", Descriptor::NOT_INDEXED, (size_t)&modelOffset->renewal_migration_beg_yr_aig,
+	Descriptor(58, Attribute::DOUBLE,	"renewal_migration_beg_yr_aig", Descriptor::NOT_INDEXED, (size_t)&modelOffset->renewal_migration_beg_yr_aig,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(54, Attribute::DOUBLE,	"renewal_pri_sprd_tgt_aig", Descriptor::NOT_INDEXED, (size_t)&modelOffset->renewal_pri_sprd_tgt_aig,
+	Descriptor(59, Attribute::DOUBLE,	"renewal_pri_sprd_tgt_aig", Descriptor::NOT_INDEXED, (size_t)&modelOffset->renewal_pri_sprd_tgt_aig,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(55, Attribute::DOUBLE,	"renewal_surr_chg_offest_aig", Descriptor::NOT_INDEXED, (size_t)&modelOffset->renewal_surr_chg_offest_aig,
+	Descriptor(60, Attribute::DOUBLE,	"renewal_surr_chg_offest_aig", Descriptor::NOT_INDEXED, (size_t)&modelOffset->renewal_surr_chg_offest_aig,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(56, Attribute::INT,	"strategy_term_duration_aig", -1, (size_t)&modelOffset->strategy_term_duration_aig,
+	Descriptor(61, Attribute::INT,	"strategy_term_duration_aig", -1, (size_t)&modelOffset->strategy_term_duration_aig,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(57, Attribute::DOUBLE,	"strategy_term_floor_aig", Descriptor::NOT_INDEXED, (size_t)&modelOffset->strategy_term_floor_aig,
+	Descriptor(62, Attribute::DOUBLE,	"strategy_term_floor_aig", Descriptor::NOT_INDEXED, (size_t)&modelOffset->strategy_term_floor_aig,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(58, Attribute::STR_ENUM,	"use_option_cost_tables_defn_aig", -1, (size_t)&modelOffset->use_option_cost_tables_defn_aig,
+	Descriptor(63, Attribute::STR_ENUM,	"use_option_cost_tables_defn_aig", -1, (size_t)&modelOffset->use_option_cost_tables_defn_aig,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &use_option_cost_tables_defn_aigEnumList, Feature(true)),
-	Descriptor(59, Attribute::INT,	"msnumelement", -1, (size_t)&modelOffset->msnumelement,
+	Descriptor(64, Attribute::INT,	"msnumelement", -1, (size_t)&modelOffset->msnumelement,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(60, Attribute::SCALAR_INT,	"commencement_period", -1, (size_t)&modelOffset->commencement_period,
+	Descriptor(65, Attribute::SCALAR_INT,	"commencement_period", -1, (size_t)&modelOffset->commencement_period,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&FIAAFUND_LIAB_UDF::fiaafund_liab_commencement_period)),
-	Descriptor(61, Attribute::SCALAR_INT,	"elapsed_mths", -1, (size_t)&modelOffset->elapsed_mths,
+	Descriptor(66, Attribute::SCALAR_INT,	"elapsed_mths", -1, (size_t)&modelOffset->elapsed_mths,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&FIAAFUND_LIAB_UDF::fiaafund_liab_elapsed_mths)),
-	Descriptor(62, Attribute::SCALAR_DOUBLE,	"final_period", -1, (size_t)&modelOffset->final_period,
+	Descriptor(67, Attribute::SCALAR_DOUBLE,	"final_period", -1, (size_t)&modelOffset->final_period,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((dF)&FIAAFUND_LIAB_UDF::fiaafund_liab_final_period)),
-	Descriptor(63, Attribute::SCALAR_INT,	"lookback_mths", -1, (size_t)&modelOffset->lookback_mths,
+	Descriptor(68, Attribute::SCALAR_INT,	"lookback_mths", -1, (size_t)&modelOffset->lookback_mths,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&FIAAFUND_LIAB_UDF::fiaafund_liab_lookback_mths)),
-	Descriptor(64, Attribute::SCALAR_INT,	"lookback_sampling_mths", -1, (size_t)&modelOffset->lookback_sampling_mths,
+	Descriptor(69, Attribute::SCALAR_INT,	"lookback_sampling_mths", -1, (size_t)&modelOffset->lookback_sampling_mths,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&FIAAFUND_LIAB_UDF::fiaafund_liab_lookback_sampling_mths)),
-	Descriptor(65, Attribute::SCALAR_INT,	"maturity_period", -1, (size_t)&modelOffset->maturity_period,
+	Descriptor(70, Attribute::SCALAR_INT,	"maturity_period", -1, (size_t)&modelOffset->maturity_period,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&FIAAFUND_LIAB_UDF::fiaafund_liab_maturity_period)),
 	};
 
@@ -9920,8 +10138,13 @@ TableMgr<VariantTable> FIAAFUND_LIAB::mgr_;
 	&FIAAFUND_LIAB::descriptor_0[63],
 	&FIAAFUND_LIAB::descriptor_0[64],
 	&FIAAFUND_LIAB::descriptor_0[65],
+	&FIAAFUND_LIAB::descriptor_0[66],
+	&FIAAFUND_LIAB::descriptor_0[67],
+	&FIAAFUND_LIAB::descriptor_0[68],
+	&FIAAFUND_LIAB::descriptor_0[69],
+	&FIAAFUND_LIAB::descriptor_0[70],
 	nullptr};
-	const size_t FIAAFUND_LIAB::sDescriptorCount = 66;
+	const size_t FIAAFUND_LIAB::sDescriptorCount = 71;
 
 //factory
 FIAAFUND_LIAB* FIAAFUND_LIAB::makeThis(int isSubmodel, ModelClass* owner, FIAAFUND_LIAB* peer, 
@@ -10076,7 +10299,7 @@ FIAAFUND_LIAB::FIAAFUND_LIAB(int columnCount, Descriptor* mocd[], Product* persO
 //constructor begincolumn
 FIAAFUND_LIAB::FIAAFUND_LIAB(const xstring &modelClassName,
 		int isSm, ModelClass *owner, ModelClass *peer, int mainRebase,
-		const char *name, ModelClass* arrayPersistentObj) : ModelClass(125, FIAAFUND_LIAB::descriptorTable, arrayPersistentObj), Variable(*this)
+		const char *name, ModelClass* arrayPersistentObj) : ModelClass(129, FIAAFUND_LIAB::descriptorTable, arrayPersistentObj), Variable(*this)
   , sm_bond_is(0)
   , sm_bond_pv(0)
   , sm_bond_ym(0)
@@ -10223,7 +10446,7 @@ FIAAFUND_LIAB::FIAAFUND_LIAB(const xstring &modelClassName,
 
 	setSlidingSpace();
 
-	for (int cf_no = 1; cf_no <= 125; cf_no++)
+	for (int cf_no = 1; cf_no <= 129; cf_no++)
 #ifdef CF_MEMORY
 		setPtr_col(cf_no, 0);
 #else
@@ -10634,7 +10857,7 @@ void FIAAFUND_LIAB::after_startup(int decrement) {
 //ms_BeforeStartup END@2
 
 HVector<ModelClass::ddfStruct> FIAAFUND_LIAB::ddfVector;
-BitArray FIAAFUND_LIAB::dataVariables(66);
+BitArray FIAAFUND_LIAB::dataVariables(71);
 bool FIAAFUND_LIAB::hasBeenWritten = false;
 
 

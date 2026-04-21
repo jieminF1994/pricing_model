@@ -64,6 +64,9 @@ double fiaafund_liab_crediting_type_dyn_trigger_aig(int t);
 // flag for first year after dynamic switch 
 double fiaafund_liab_crediting_type_dyn_zero_threshold_flag_aig(int t);
 
+// Cumul Return Sc Period Crbg 
+double fiaafund_liab_cumul_return_sc_period_crbg(int t);
+
 // cost percentage of EPRS features 
 double fiaafund_liab_eprs_cost_rate_aig(int t);
 
@@ -168,6 +171,9 @@ double fiaafund_liab_hedge_mkt_val(int t);
 
 // Hedge Market Value: 
 double fiaafund_liab_hedge_mkt_val_aig(int t);
+
+// Option Mkt Val Estimate Gmab 
+double fiaafund_liab_hedge_mkt_val_estimate_gmab_crbg(int t);
 
 // Hedge Market Value Growth 
 double fiaafund_liab_hedge_mkt_val_growth(int t);
@@ -276,6 +282,12 @@ double fiaafund_liab_notional_amt_required(int t);
 
 // Notional Amount Required Before Decrements 
 double fiaafund_liab_notional_amt_required_bef(int t);
+
+// Notional Amt Seccap Gmab Bef Crbg 
+double fiaafund_liab_notional_amt_seccap_gmab_bef_crbg(int t);
+
+// Notional Amt Seccap Gmab Crbg 
+double fiaafund_liab_notional_amt_seccap_gmab_crbg(int t);
 
 // Notional  Amount to Hedge 
 double fiaafund_liab_notional_to_hedge(int t);
