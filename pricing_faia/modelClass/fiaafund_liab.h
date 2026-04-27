@@ -428,6 +428,7 @@ strategy_return_switch_start_duration_aig = t_high;     // 20180930 MTC
  	ColumnAccessor < mCFStaticData_0 > admin_fee;
  	ColumnAccessor < mCFStaticData_0 > credited_int;
  	ColumnAccessor < mCFStaticData_0 > crediting_cap_rate;
+ 	ColumnAccessor < mCFStaticData_0 > crediting_cap_rate_2nd_strat_crbg;
  	ColumnAccessor < mCFStaticData_0 > crediting_part_rate;
  	ColumnAccessor < mCFStaticData_0 > crediting_part_rate_aig;
  	ColumnAccessor < mCFStaticData_0 > crediting_part_rate_base_aig;
@@ -440,6 +441,7 @@ strategy_return_switch_start_duration_aig = t_high;     // 20180930 MTC
  	ColumnAccessor < mCFStaticData_0 > crediting_trigger_rate_aig;
  	ColumnAccessor < mCFStaticData_0 > crediting_type_dyn_trigger_aig;
  	ColumnAccessor < mCFStaticData_0 > crediting_type_dyn_zero_threshold_flag_aig;
+ 	ColumnAccessor < mCFStaticData_0 > cumul_return_sc_period_crbg;
  	ColumnAccessor < mCFStaticData_0 > eprs_cost_rate_aig;
  	ColumnAccessor < mCFStaticData_0 > fa_crediting_rate_aig;
  	ColumnAccessor < mCFStaticData_0 > fa_pricing_rate_aig;
@@ -475,6 +477,7 @@ strategy_return_switch_start_duration_aig = t_high;     // 20180930 MTC
  	ColumnAccessor < mCFStaticData_0 > hedge_inv_amt_bom;
  	ColumnAccessor < mCFStaticData_0 > hedge_mkt_val;
  	ColumnAccessor < mCFStaticData_0 > hedge_mkt_val_aig;
+ 	ColumnAccessor < mCFStaticData_0 > hedge_mkt_val_estimate_gmab_crbg;
  	ColumnAccessor < mCFStaticData_0 > hedge_mkt_val_growth;
  	ColumnAccessor < mCFStaticData_0 > hedge_mkt_val_per_unit_notional;
  	ColumnAccessor < mCFStaticData_0 > hedge_mkt_val_per_unit_notional_aig;
@@ -511,6 +514,8 @@ strategy_return_switch_start_duration_aig = t_high;     // 20180930 MTC
  	ColumnAccessor < mCFStaticData_0 > net_crediting_rate_aig;
  	ColumnAccessor < mCFStaticData_0 > notional_amt_required;
  	ColumnAccessor < mCFStaticData_0 > notional_amt_required_bef;
+ 	ColumnAccessor < mCFStaticData_0 > notional_amt_seccap_gmab_bef_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > notional_amt_seccap_gmab_crbg;
  	ColumnAccessor < mCFStaticData_0 > notional_to_hedge;
  	ColumnAccessor < mCFStaticData_0 > notional_to_hedge_aig;
  	ColumnAccessor < mCFStaticData_0 > notional_to_hedge_cap;
@@ -518,14 +523,14 @@ strategy_return_switch_start_duration_aig = t_high;     // 20180930 MTC
  	ColumnAccessor < mCFStaticData_0 > notional_to_hedge_long_strike;
  	ColumnAccessor < mCFStaticData_0 > notional_to_hedge_net;
  	ColumnAccessor < mCFStaticData_0 > opt_budget;
+ 	ColumnAccessor < mCFStaticData_0 > opt_budget_2nd_strat_aig;
  	ColumnAccessor < mCFStaticData_0 > opt_budget_amt;
  	ColumnAccessor < mCFStaticData_0 > opt_budget_cost_aig;
  	ColumnAccessor < mCFStaticData_0 > opt_budget_eprs_aig;
- 	ColumnAccessor < mCFStaticData_0 > opt_budget_interm_aig;
  	ColumnAccessor < mCFStaticData_0 > opt_budget_renewal_aig;
  	ColumnAccessor < mCFStaticData_0 > opt_budget_strategy_term_renewal_aig;
+ 	ColumnAccessor < mCFStaticData_0 > opt_budget_tgt_2nd_strat_aig;
  	ColumnAccessor < mCFStaticData_0 > opt_budget_tgt_aig;
- 	ColumnAccessor < mCFStaticData_0 > opt_budget_tgt_interm_aig;
  	ColumnAccessor < mCFStaticData_0 > opt_cost_atm_aig;
  	ColumnAccessor < mCFStaticData_0 > opt_payoff;
  	ColumnAccessor < mCFStaticData_0 > opt_payoff_aig;
@@ -680,6 +685,9 @@ public :
 	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > index_term_cap_rate_min_table_aig;
   inline xstring	Get_index_term_cap_rate_min_table_aig() {
 		return index_term_cap_rate_min_table_aig; }
+	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > index_term_cap_rate_min_table_gmab;
+  inline xstring	Get_index_term_cap_rate_min_table_gmab() {
+		return index_term_cap_rate_min_table_gmab; }
 	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > index_term_duration_aig;
   inline int	Get_index_term_duration_aig() {
 		return index_term_duration_aig; }
@@ -714,6 +722,15 @@ public :
 		return init_fund_val; }
   inline void Set_init_fund_val(const double &v) {
 		init_fund_val.setValue(v); }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_opt_cost_gmab;
+  inline double	Get_init_opt_cost_gmab() {
+		return init_opt_cost_gmab; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_opt_cost_seccap;
+  inline double	Get_init_opt_cost_seccap() {
+		return init_opt_cost_seccap; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_opt_cost_seccap_gmab;
+  inline double	Get_init_opt_cost_seccap_gmab() {
+		return init_opt_cost_seccap_gmab; }
 	Attribute::Proxy <double, DESCRIPTOR_TABLE > init_part_rate;
   inline double	Get_init_part_rate() {
 		return init_part_rate; }

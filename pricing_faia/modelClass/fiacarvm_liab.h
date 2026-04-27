@@ -335,6 +335,7 @@ public :
  	ColumnAccessor < mCFStaticData_0 > crediting_rate;
  	ColumnAccessor < mCFStaticData_0 > crediting_rate_black_scholes_aig;
  	ColumnAccessor < mCFStaticData_0 > crediting_rate_index0_aig;
+ 	ColumnAccessor < mCFStaticData_0 > crediting_rate_secure_cap_crbg;
  	ColumnAccessor < mCFStaticData_0 > dth_benefits_b_bef_aig;
  	ColumnAccessor < mCFStaticData_0 > dth_benefits_e_aig;
  	ColumnAccessor < mCFStaticData_0 > dth_benefits_pv;
