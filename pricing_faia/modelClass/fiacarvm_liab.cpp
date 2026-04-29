@@ -1684,7 +1684,8 @@ else
 	csv	= max(csv, min_wdl_val_b_cv);
 
 	//20250218 MQ GROP for GMAB.
-	if (fia->gmab_ind_aig == 1 && pol_yr(t) > fia->gmab_csv_grop_yr_aig && fund_val_b_cv > SMALL_DOUBLE)
+	if (fia->gmab_ind_aig == 1 && fia->gmab_type_crbg == AICO //AICO only
+		&& pol_yr(t) > fia->gmab_csv_grop_yr_aig && fund_val_b_cv > SMALL_DOUBLE)
 	{
 		csv = max(csv, prem_cumul_prop_wdl_aig(t - 1));
 	}
@@ -1736,7 +1737,8 @@ else
 	csv	= max(csv, min_wdl_val_b_bef_cv);
 
 	//20250218 MQ GROP for GMAB.
-	if (fia->gmab_ind_aig == 1 && pol_yr(t) > fia->gmab_csv_grop_yr_aig && fund_val_b_bef_cv > SMALL_DOUBLE)
+	if (fia->gmab_ind_aig == 1 && fia->gmab_type_crbg == AICO //AICO only
+	&& pol_yr(t) > fia->gmab_csv_grop_yr_aig && fund_val_b_bef_cv > SMALL_DOUBLE)
 	{
 		csv = max(csv, prem_cumul_prop_wdl_aig(t - 1));
 	}
@@ -1785,7 +1787,8 @@ else
 	csv = max(csv, min_wdl_val_final_e_aig(t));
 
 	//20250218 MQ GROP for GMAB.
-	if (fia->gmab_ind_aig == 1 && pol_yr(t) >= fia->gmab_csv_grop_yr_aig && fund_val_e_aig(t) > SMALL_DOUBLE)
+	if (fia->gmab_ind_aig == 1 && fia->gmab_type_crbg == AICO //AICO only
+		&& pol_yr(t) >= fia->gmab_csv_grop_yr_aig && fund_val_e_aig(t) > SMALL_DOUBLE)
 	{
 		csv = max(csv, prem_cumul_prop_wdl_aig(t));
 	}
@@ -2160,6 +2163,10 @@ if ( fia->use_option_cost_tables_defn_aig == NO )
 	throw FatalError("fiacarvm_liab->crediting_rate: Black-Scholes must be updated before use!");
 	crediting_rate_cv = crediting_rate_black_scholes_aig(t);
 }
+else if (fia->secure_cap_ind_crbg == 1 && pol_yr(t) <= fia->surr_chg_period_aig)
+{
+	crediting_rate_cv = crediting_rate_secure_cap_crbg(t); //20260325 Secure cap
+}
 else
 {
 	crediting_rate_cv = crediting_rate_index0_aig(t); //20230105 SJ: The crediting rate column is refactored for model efficiency.
@@ -2398,10 +2405,10 @@ else
 	rf = rates->get_misc_rate(opt_cost_lookup_month_cv, "RiskFree", EFFECTIVE_ANNUAL); 
 
 if((fia->res_period >= fia->sm_fia_account[0]->strategy_term_aig(fia->res_period - 1) * 12 + 1) 
-	&& (fia->crediting_type_dyn_interm_aig != "NA")
+	&& (fia->crediting_type_dyn_2nd_strat_aig != "NA")
 	&& (fia->crediting_type_dyn_defn_aig == DYNAMIC_SWITCHING_ON))
 {
-	fia->crediting_type_dyn_aig = fia->crediting_type_dyn_interm_aig;
+	fia->crediting_type_dyn_aig = fia->crediting_type_dyn_2nd_strat_aig;
 }
 else
 {
@@ -2606,6 +2613,64 @@ return accum_option_pct;
 
 //@@ END
 
+//@@ START - crediting_rate_secure_cap_crbg
+// Crediting Rate Secure Cap Crbg                                                                                             
+// Column:CREDITING_RATE_SECURE_CAP_CRBG
+//========================================================
+double FIACARVM_LIAB_UDF::fiacarvm_liab_crediting_rate_secure_cap_crbg(int t) {
+//^^^
+
+
+
+//^^^
+
+#line 1 "crediting_rate_secure_cap_crbg.FIACARVM_LIAB.for"
+//20260326 New column for secure cap crediting rate
+if (t <= 0 || t > max_calc_period)
+	return NO_AVG;
+
+if (fia->secure_cap_ind_crbg == 1 && pol_yr(t) <= fia->surr_chg_period_aig)
+{
+	int index_term = (int)fia->sm_fia_account[0]->index_term_aig(fia->res_period);
+	if (mod(pol_yr(t), index_term) != 0)
+		return 0;
+
+	fia->temp_key_cred_type_dyn_aig = fia->crediting_type_dyn_aig;
+	double cap_rate = fia->secure_cap_rate_crbg;
+
+	double index_term_mths = index_term * 12;
+	int index_term_elapsed_mths	= mod(fia->res_period, index_term_mths);
+	int opt_lookup_month = max(fia->res_period - index_term_elapsed_mths, 0);
+
+	double rf;
+	if (fia->gen2_defn == YES)
+		rf = fia_rates->get_misc_rate(opt_lookup_month, "RiskFree", EFFECTIVE_ANNUAL); 
+	else
+		rf = rates->get_misc_rate(opt_lookup_month, "RiskFree", EFFECTIVE_ANNUAL); 
+
+	double long_option_cost 
+		=  fia->sm_fia_account[0]->get_option_price_aig(opt_lookup_month, 1.0, CALL, index_term_mths, index_term_mths);
+				
+	double short_option_cost
+		=  fia->sm_fia_account[0]->get_option_price_aig(opt_lookup_month, 1. + cap_rate, CALL, index_term_mths, index_term_mths);
+
+	double net_opt_value = long_option_cost - short_option_cost;
+
+	if (fabs(fia->fund_val_b(fia->res_period + 1)) < model_point_amount_threshold)
+		return 0.0;
+	else
+		return net_opt_value * pow(1.0 + rf, index_term);
+}
+
+return 0.;
+
+
+
+}
+
+
+//@@ END
+
 //@@ START - dth_benefits_b_bef_aig
 // Death benefits:                                                                                             
 // Column:DTH_BENEFITS_B_BEF_AIG
@@ -2659,9 +2724,12 @@ else {
 	throw FatalError("Unhandled fia->dth_ben_def requested in fia_carvm_stat->dth_benefits!");
 }
 
-/*if (fia->gmwb_dth_ben_flag_aig) {
-	dth_ben_base_cv = max(dth_ben_base_cv, gmwb_dth_ben_e_aig(t - 1));
-}*/
+//20250218 MQ GROP for GMAB.
+if (fia->gmab_ind_aig == 1 && fia->gmab_type_crbg == AICO //AICO only
+	&& pol_yr(t) > fia->gmab_csv_grop_yr_aig && fund_val_b_bef_cv > SMALL_DOUBLE)
+{
+	dth_ben_base_cv = max(dth_ben_base_cv, prem_cumul_prop_wdl_aig(t - 1));
+}
 
 double deaths_cv;
 if (carvm_cont_defn == YES)
@@ -2727,6 +2795,13 @@ else if (fia->dth_ben_defn == NYIA_DEATH_BENEFIT)
 // 20200603 DTL: NYIA
 else {
 	throw FatalError("Unhandled fia->dth_ben_def requested in fia_carvm_stat->dth_benefits!");
+}
+
+//AICO GMDB
+if (fia->gmab_ind_aig == 1 && fia->gmab_type_crbg == AICO 
+	&& pol_yr(t) >= fia->gmab_csv_grop_yr_aig && fund_val_e_cv > SMALL_DOUBLE)
+{
+	dth_ben_base_cv = max(dth_ben_base_cv, prem_cumul_prop_wdl_aig(t));
 }
 
 double deaths_cv       = surv(t - 1) * dth_claim_rate_experience_aig(t);
@@ -3186,10 +3261,17 @@ else
 	//20241205 MQ GMAB logic
 	if (fia->gmab_ind_aig == 1 && pol_yr(t) == fia->surr_chg_period_aig) 
 	{
-		double gmab_cap = prem_cumul_prop_wdl_aig(t) * fia->gmab_av_cap_rt_aig;	
-
-		fund_val_cv = max(fund_val_cv, min(gmab_av_e_aig(t), gmab_cap));
-		fund_val_cv = max(fund_val_cv, prem_cumul_prop_wdl_aig(t));
+		double gmab_av = gmab_av_e_aig(t);
+		if (fia->gmab_type_crbg == AICO) 
+		{
+			double gmab_cap = prem_cumul_prop_wdl_aig(t) * fia->gmab_av_cap_rt_aig;	
+			fund_val_cv = max(fund_val_cv, min(gmab_av, gmab_cap)); 
+			fund_val_cv = max(fund_val_cv, prem_cumul_prop_wdl_aig(t));
+		}
+		else //20260323 MQ Standard GMAB
+		{
+			fund_val_cv = max(fund_val_cv, gmab_av); 
+		}
 	}
 }
 
@@ -3223,6 +3305,12 @@ if (pol_yr(t) > fia->surr_chg_period_aig)
 	return 0.;
 }
 
+if (fia->gmab_type_crbg == STANDARD) //20260323 MQ STANDARD GMAB
+{
+	return max(0.0, gmab_av_e_aig(t - 1) - pfwd_surr_aig(t));
+}
+
+//AICO
 double reduction_factor = 0.;
 
 if (fund_val_b_bef_aig(t) > SMALL_DOUBLE)
@@ -3270,7 +3358,25 @@ if (t == 0)
 }
 else
 {
-	gmab_av_cv = gmab_av_b_aig(t) * ( 1 + crediting_rate(t) * fia->gmab_credit_rt_mult_aig);
+	//20260323 MQ STANDARD GMAB
+	if (fia->gmab_type_crbg == STANDARD)
+	{
+		if (pol_yr(t) == fia->surr_chg_period_aig)
+		{
+			fia->temp_key_cred_type_dyn_aig = fia->crediting_type_dyn_aig;
+			double gmab_rate = fia->gmab_rate_crbg;
+
+			gmab_av_cv = gmab_av_b_aig(t) * ( 1 + fia->surr_chg_period_aig * gmab_rate);
+		}
+		else
+		{
+			gmab_av_cv = gmab_av_b_aig(t);
+		}
+	}
+	else //AICO
+	{
+		gmab_av_cv = gmab_av_b_aig(t) * ( 1 + crediting_rate(t) * fia->gmab_credit_rt_mult_aig);
+	}
 }
 
 return gmab_av_cv;
@@ -4331,9 +4437,8 @@ if (
 	double gmwb_income_credit_base_cv = gmwb_income_credit_base_e_bef_aig(t);
 	double gmwb_income_credit_rate_cv;
 
-	if ( fia->gmwb_prem_rollup_credit_type_aig == FIXED_RATE )
+	if ( fia->gmwb_prem_rollup_credit_type_aig == CONSTANT_RATE )
 	{
-		fia->pol_yr_lookup_gen2 = pol_yr(t);
 		gmwb_income_credit_rate_cv = fia->gmwb_rollup_rate;
 	}
 	else if ( fia->gmwb_prem_rollup_credit_type_aig == INDEX_GROWTH )
@@ -4855,18 +4960,16 @@ if (t < 0 || t > max_calc_period)
 
 double index_term_cap_rate_min_cv;
 
-int policy_month_cv		= (int)pol_mth_aig(t);
-
-if (fia->crediting_type_dyn_defn_aig == DYNAMIC_SWITCHING_ON && fia->crediting_type_dyn_interm_aig != "NA"
+if (fia->crediting_type_dyn_defn_aig == DYNAMIC_SWITCHING_ON && fia->crediting_type_dyn_2nd_strat_aig != "NA"
 		&& fia->res_period >= fia->sm_fia_account[0]->strategy_term_aig(fia->res_period - 1) * 12 + 1 )
 {
-	fia->pol_yr_lookup_gen2 = fia->pol_yr(policy_month_cv);   
-	fia->temp_key_cred_type_dyn_aig = fia->crediting_type_dyn_interm_aig;
+	fia->pol_yr_lookup_gen2 = pol_yr(t);   //20260324 bug fix
+	fia->temp_key_cred_type_dyn_aig = fia->crediting_type_dyn_2nd_strat_aig;
 	index_term_cap_rate_min_cv = fia->sm_fia_account[0]->index_term_cap_rate_min_aig;
 }			
 else
 {
-	fia->pol_yr_lookup_gen2 = fia->pol_yr(policy_month_cv);   
+	fia->pol_yr_lookup_gen2 = pol_yr(t);  //20260324 bug fix
 	fia->temp_key_cred_type_dyn_aig = fia->crediting_type_aig;
 	index_term_cap_rate_min_cv = fia->sm_fia_account[0]->index_term_cap_rate_min_aig;
 }
@@ -4896,9 +4999,7 @@ if (t < 0 || t > max_calc_period)
 
 double index_term_par_rate_min_cv;
 
-int policy_month_cv		= (int)pol_mth_aig(t);
-
-fia->pol_yr_lookup_gen2 = fia->pol_yr(policy_month_cv); 
+fia->pol_yr_lookup_gen2 = pol_yr(t);  //20260324 bug fix
 fia->temp_key_cred_type_dyn_aig = fia->crediting_type_aig;
 index_term_par_rate_min_cv = fia->sm_fia_account[0]->index_term_part_rate_min_aig;
 
@@ -4927,9 +5028,7 @@ if (t < 0 || t > max_calc_period)
 
 double index_term_sprd_rate_max_cv;
 
-int policy_month_cv		= (int)pol_mth_aig(t);
-
-fia->pol_yr_lookup_gen2 = fia->pol_yr(policy_month_cv); 
+fia->pol_yr_lookup_gen2 = pol_yr(t);  //20260324 bug fix
 fia->temp_key_cred_type_dyn_aig = fia->crediting_type_aig;
 index_term_sprd_rate_max_cv = fia->sm_fia_account[0]->index_term_sprd_rate_max_aig;
 
@@ -4958,9 +5057,7 @@ if (t < 0 || t > max_calc_period)
 
 double index_term_trigger_rate_min_cv;
 
-int policy_month_cv		= (int)pol_mth_aig(t);
-
-fia->pol_yr_lookup_gen2 = fia->pol_yr(policy_month_cv); 
+fia->pol_yr_lookup_gen2 = pol_yr(t);   //20260324 bug fix
 fia->temp_key_cred_type_dyn_aig = fia->crediting_type_aig;
 index_term_trigger_rate_min_cv = fia->sm_fia_account[0]->index_term_trigger_rate_min_aig;
 
@@ -8740,185 +8837,187 @@ const CashFlowCommonData FIACARVM_LIAB::mCFStaticData_0[] =
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_crediting_rate_black_scholes_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->crediting_rate_black_scholes_aig),
 	CashFlowCommonData(26, "crediting_rate_index0_aig", "fiacarvm_liab_crediting_rate_index0_aig",  "crediting_rate_index0_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_crediting_rate_index0_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->crediting_rate_index0_aig),
-	CashFlowCommonData(27, "dth_benefits_b_bef_aig", "fiacarvm_liab_dth_benefits_b_bef_aig",  "dth_benefits_b_bef_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(27, "crediting_rate_secure_cap_crbg", "fiacarvm_liab_crediting_rate_secure_cap_crbg",  "crediting_rate_secure_cap_crbg",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_crediting_rate_secure_cap_crbg, 'E','Y', '3', 'P', (size_t)&modelOffset->crediting_rate_secure_cap_crbg),
+	CashFlowCommonData(28, "dth_benefits_b_bef_aig", "fiacarvm_liab_dth_benefits_b_bef_aig",  "dth_benefits_b_bef_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_dth_benefits_b_bef_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->dth_benefits_b_bef_aig),
-	CashFlowCommonData(28, "dth_benefits_e_aig", "fiacarvm_liab_dth_benefits_e_aig",  "dth_benefits_e_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(29, "dth_benefits_e_aig", "fiacarvm_liab_dth_benefits_e_aig",  "dth_benefits_e_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_dth_benefits_e_aig, 'E','N', '3', 'N', (size_t)&modelOffset->dth_benefits_e_aig),
-	CashFlowCommonData(29, "dth_benefits_pv", "fiacarvm_liab_dth_benefits_pv",  "dth_benefits_pv",  CashFlowCommonData::SUM,
+	CashFlowCommonData(30, "dth_benefits_pv", "fiacarvm_liab_dth_benefits_pv",  "dth_benefits_pv",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_dth_benefits_pv, 'E','N', '3', 'N', (size_t)&modelOffset->dth_benefits_pv),
-	CashFlowCommonData(30, "dth_claim_rate_blended_experience_aig", "fiacarvm_liab_dth_claim_rate_blended_experience_aig",  "dth_claim_rate_blended_experience_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(31, "dth_claim_rate_blended_experience_aig", "fiacarvm_liab_dth_claim_rate_blended_experience_aig",  "dth_claim_rate_blended_experience_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_dth_claim_rate_blended_experience_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->dth_claim_rate_blended_experience_aig),
-	CashFlowCommonData(31, "dth_claim_rate_experience_aig", "fiacarvm_liab_dth_claim_rate_experience_aig",  "dth_claim_rate_experience_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(32, "dth_claim_rate_experience_aig", "fiacarvm_liab_dth_claim_rate_experience_aig",  "dth_claim_rate_experience_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_dth_claim_rate_experience_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->dth_claim_rate_experience_aig),
-	CashFlowCommonData(32, "dth_claim_rate_female_experience_aig", "fiacarvm_liab_dth_claim_rate_female_experience_aig",  "dth_claim_rate_female_experience_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(33, "dth_claim_rate_female_experience_aig", "fiacarvm_liab_dth_claim_rate_female_experience_aig",  "dth_claim_rate_female_experience_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_dth_claim_rate_female_experience_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->dth_claim_rate_female_experience_aig),
-	CashFlowCommonData(33, "dth_claim_rate_last_survivor_experience_aig", "fiacarvm_liab_dth_claim_rate_last_survivor_experience_aig",  "dth_claim_rate_last_survivor_experience_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(34, "dth_claim_rate_last_survivor_experience_aig", "fiacarvm_liab_dth_claim_rate_last_survivor_experience_aig",  "dth_claim_rate_last_survivor_experience_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_dth_claim_rate_last_survivor_experience_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->dth_claim_rate_last_survivor_experience_aig),
-	CashFlowCommonData(34, "dth_claim_rate_male_experience_aig", "fiacarvm_liab_dth_claim_rate_male_experience_aig",  "dth_claim_rate_male_experience_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(35, "dth_claim_rate_male_experience_aig", "fiacarvm_liab_dth_claim_rate_male_experience_aig",  "dth_claim_rate_male_experience_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_dth_claim_rate_male_experience_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->dth_claim_rate_male_experience_aig),
-	CashFlowCommonData(35, "fund_val_b_aig", "fiacarvm_liab_fund_val_b_aig",  "fund_val_b_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(36, "fund_val_b_aig", "fiacarvm_liab_fund_val_b_aig",  "fund_val_b_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_fund_val_b_aig, 'E','N', '3', 'N', (size_t)&modelOffset->fund_val_b_aig),
-	CashFlowCommonData(36, "fund_val_b_bef_aig", "fiacarvm_liab_fund_val_b_bef_aig",  "fund_val_b_bef_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(37, "fund_val_b_bef_aig", "fiacarvm_liab_fund_val_b_bef_aig",  "fund_val_b_bef_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_fund_val_b_bef_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->fund_val_b_bef_aig),
-	CashFlowCommonData(37, "fund_val_e_aig", "fiacarvm_liab_fund_val_e_aig",  "fund_val_e_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(38, "fund_val_e_aig", "fiacarvm_liab_fund_val_e_aig",  "fund_val_e_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_fund_val_e_aig, 'E','N', '3', 'N', (size_t)&modelOffset->fund_val_e_aig),
-	CashFlowCommonData(38, "fund_val_e_bef_aig", "fiacarvm_liab_fund_val_e_bef_aig",  "fund_val_e_bef_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(39, "fund_val_e_bef_aig", "fiacarvm_liab_fund_val_e_bef_aig",  "fund_val_e_bef_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_fund_val_e_bef_aig, 'E','N', '3', 'N', (size_t)&modelOffset->fund_val_e_bef_aig),
-	CashFlowCommonData(39, "gmab_av_b_aig", "fiacarvm_liab_gmab_av_b_aig",  "gmab_av_b_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(40, "gmab_av_b_aig", "fiacarvm_liab_gmab_av_b_aig",  "gmab_av_b_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_gmab_av_b_aig, 'E','N', '3', 'N', (size_t)&modelOffset->gmab_av_b_aig),
-	CashFlowCommonData(40, "gmab_av_e_aig", "fiacarvm_liab_gmab_av_e_aig",  "gmab_av_e_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(41, "gmab_av_e_aig", "fiacarvm_liab_gmab_av_e_aig",  "gmab_av_e_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_gmab_av_e_aig, 'E','N', '3', 'N', (size_t)&modelOffset->gmab_av_e_aig),
-	CashFlowCommonData(41, "gmwb_ann_benefits", "fiacarvm_liab_gmwb_ann_benefits",  "gmwb_ann_benefits",  CashFlowCommonData::SUM,
+	CashFlowCommonData(42, "gmwb_ann_benefits", "fiacarvm_liab_gmwb_ann_benefits",  "gmwb_ann_benefits",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_gmwb_ann_benefits, 'E','N', '3', 'N', (size_t)&modelOffset->gmwb_ann_benefits),
-	CashFlowCommonData(42, "gmwb_ann_benefits_pv", "fiacarvm_liab_gmwb_ann_benefits_pv",  "gmwb_ann_benefits_pv",  CashFlowCommonData::SUM,
+	CashFlowCommonData(43, "gmwb_ann_benefits_pv", "fiacarvm_liab_gmwb_ann_benefits_pv",  "gmwb_ann_benefits_pv",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_gmwb_ann_benefits_pv, 'E','N', '3', 'N', (size_t)&modelOffset->gmwb_ann_benefits_pv),
-	CashFlowCommonData(43, "gmwb_chg", "fiacarvm_liab_gmwb_chg",  "gmwb_chg",  CashFlowCommonData::SUM,
+	CashFlowCommonData(44, "gmwb_chg", "fiacarvm_liab_gmwb_chg",  "gmwb_chg",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_gmwb_chg, 'E','N', '3', 'N', (size_t)&modelOffset->gmwb_chg),
-	CashFlowCommonData(44, "gmwb_flex_mawp_adj_aig", "fiacarvm_liab_gmwb_flex_mawp_adj_aig",  "gmwb_flex_mawp_adj_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(45, "gmwb_flex_mawp_adj_aig", "fiacarvm_liab_gmwb_flex_mawp_adj_aig",  "gmwb_flex_mawp_adj_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_gmwb_flex_mawp_adj_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->gmwb_flex_mawp_adj_aig),
-	CashFlowCommonData(45, "gmwb_income_base_b_aig", "fiacarvm_liab_gmwb_income_base_b_aig",  "gmwb_income_base_b_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(46, "gmwb_income_base_b_aig", "fiacarvm_liab_gmwb_income_base_b_aig",  "gmwb_income_base_b_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_gmwb_income_base_b_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->gmwb_income_base_b_aig),
-	CashFlowCommonData(46, "gmwb_income_base_b_bef_aig", "fiacarvm_liab_gmwb_income_base_b_bef_aig",  "gmwb_income_base_b_bef_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(47, "gmwb_income_base_b_bef_aig", "fiacarvm_liab_gmwb_income_base_b_bef_aig",  "gmwb_income_base_b_bef_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_gmwb_income_base_b_bef_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->gmwb_income_base_b_bef_aig),
-	CashFlowCommonData(47, "gmwb_income_base_e_aig", "fiacarvm_liab_gmwb_income_base_e_aig",  "gmwb_income_base_e_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(48, "gmwb_income_base_e_aig", "fiacarvm_liab_gmwb_income_base_e_aig",  "gmwb_income_base_e_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_gmwb_income_base_e_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->gmwb_income_base_e_aig),
-	CashFlowCommonData(48, "gmwb_income_base_e_bef_aig", "fiacarvm_liab_gmwb_income_base_e_bef_aig",  "gmwb_income_base_e_bef_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(49, "gmwb_income_base_e_bef_aig", "fiacarvm_liab_gmwb_income_base_e_bef_aig",  "gmwb_income_base_e_bef_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_gmwb_income_base_e_bef_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->gmwb_income_base_e_bef_aig),
-	CashFlowCommonData(49, "gmwb_income_base_ny_b_aig", "fiacarvm_liab_gmwb_income_base_ny_b_aig",  "gmwb_income_base_ny_b_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(50, "gmwb_income_base_ny_b_aig", "fiacarvm_liab_gmwb_income_base_ny_b_aig",  "gmwb_income_base_ny_b_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_gmwb_income_base_ny_b_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->gmwb_income_base_ny_b_aig),
-	CashFlowCommonData(50, "gmwb_income_base_ny_b_bef_aig", "fiacarvm_liab_gmwb_income_base_ny_b_bef_aig",  "gmwb_income_base_ny_b_bef_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(51, "gmwb_income_base_ny_b_bef_aig", "fiacarvm_liab_gmwb_income_base_ny_b_bef_aig",  "gmwb_income_base_ny_b_bef_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_gmwb_income_base_ny_b_bef_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->gmwb_income_base_ny_b_bef_aig),
-	CashFlowCommonData(51, "gmwb_income_base_ny_e_aig", "fiacarvm_liab_gmwb_income_base_ny_e_aig",  "gmwb_income_base_ny_e_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(52, "gmwb_income_base_ny_e_aig", "fiacarvm_liab_gmwb_income_base_ny_e_aig",  "gmwb_income_base_ny_e_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_gmwb_income_base_ny_e_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->gmwb_income_base_ny_e_aig),
-	CashFlowCommonData(52, "gmwb_income_base_ny_e_bef_aig", "fiacarvm_liab_gmwb_income_base_ny_e_bef_aig",  "gmwb_income_base_ny_e_bef_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(53, "gmwb_income_base_ny_e_bef_aig", "fiacarvm_liab_gmwb_income_base_ny_e_bef_aig",  "gmwb_income_base_ny_e_bef_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_gmwb_income_base_ny_e_bef_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->gmwb_income_base_ny_e_bef_aig),
-	CashFlowCommonData(53, "gmwb_income_credit_base_b_aig", "fiacarvm_liab_gmwb_income_credit_base_b_aig",  "gmwb_income_credit_base_b_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(54, "gmwb_income_credit_base_b_aig", "fiacarvm_liab_gmwb_income_credit_base_b_aig",  "gmwb_income_credit_base_b_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_gmwb_income_credit_base_b_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->gmwb_income_credit_base_b_aig),
-	CashFlowCommonData(54, "gmwb_income_credit_base_b_bef_aig", "fiacarvm_liab_gmwb_income_credit_base_b_bef_aig",  "gmwb_income_credit_base_b_bef_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(55, "gmwb_income_credit_base_b_bef_aig", "fiacarvm_liab_gmwb_income_credit_base_b_bef_aig",  "gmwb_income_credit_base_b_bef_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_gmwb_income_credit_base_b_bef_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->gmwb_income_credit_base_b_bef_aig),
-	CashFlowCommonData(55, "gmwb_income_credit_base_e_aig", "fiacarvm_liab_gmwb_income_credit_base_e_aig",  "gmwb_income_credit_base_e_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(56, "gmwb_income_credit_base_e_aig", "fiacarvm_liab_gmwb_income_credit_base_e_aig",  "gmwb_income_credit_base_e_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_gmwb_income_credit_base_e_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->gmwb_income_credit_base_e_aig),
-	CashFlowCommonData(56, "gmwb_income_credit_base_e_bef_aig", "fiacarvm_liab_gmwb_income_credit_base_e_bef_aig",  "gmwb_income_credit_base_e_bef_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(57, "gmwb_income_credit_base_e_bef_aig", "fiacarvm_liab_gmwb_income_credit_base_e_bef_aig",  "gmwb_income_credit_base_e_bef_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_gmwb_income_credit_base_e_bef_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->gmwb_income_credit_base_e_bef_aig),
-	CashFlowCommonData(57, "gmwb_income_credit_e_bef_aig", "fiacarvm_liab_gmwb_income_credit_e_bef_aig",  "gmwb_income_credit_e_bef_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(58, "gmwb_income_credit_e_bef_aig", "fiacarvm_liab_gmwb_income_credit_e_bef_aig",  "gmwb_income_credit_e_bef_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_gmwb_income_credit_e_bef_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->gmwb_income_credit_e_bef_aig),
-	CashFlowCommonData(58, "gmwb_inf_b_aig", "fiacarvm_liab_gmwb_inf_b_aig",  "gmwb_inf_b_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(59, "gmwb_inf_b_aig", "fiacarvm_liab_gmwb_inf_b_aig",  "gmwb_inf_b_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_gmwb_inf_b_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->gmwb_inf_b_aig),
-	CashFlowCommonData(59, "gmwb_inf_b_bef_aig", "fiacarvm_liab_gmwb_inf_b_bef_aig",  "gmwb_inf_b_bef_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(60, "gmwb_inf_b_bef_aig", "fiacarvm_liab_gmwb_inf_b_bef_aig",  "gmwb_inf_b_bef_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_gmwb_inf_b_bef_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->gmwb_inf_b_bef_aig),
-	CashFlowCommonData(60, "gmwb_inf_e_aig", "fiacarvm_liab_gmwb_inf_e_aig",  "gmwb_inf_e_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(61, "gmwb_inf_e_aig", "fiacarvm_liab_gmwb_inf_e_aig",  "gmwb_inf_e_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_gmwb_inf_e_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->gmwb_inf_e_aig),
-	CashFlowCommonData(61, "gmwb_inf_e_bef_aig", "fiacarvm_liab_gmwb_inf_e_bef_aig",  "gmwb_inf_e_bef_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(62, "gmwb_inf_e_bef_aig", "fiacarvm_liab_gmwb_inf_e_bef_aig",  "gmwb_inf_e_bef_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_gmwb_inf_e_bef_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->gmwb_inf_e_bef_aig),
-	CashFlowCommonData(62, "gmwb_max_annual_wdl_pct_aig", "fiacarvm_liab_gmwb_max_annual_wdl_pct_aig",  "gmwb_max_annual_wdl_pct_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(63, "gmwb_max_annual_wdl_pct_aig", "fiacarvm_liab_gmwb_max_annual_wdl_pct_aig",  "gmwb_max_annual_wdl_pct_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_gmwb_max_annual_wdl_pct_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->gmwb_max_annual_wdl_pct_aig),
-	CashFlowCommonData(63, "gmwb_max_wdl_amt_aig", "fiacarvm_liab_gmwb_max_wdl_amt_aig",  "gmwb_max_wdl_amt_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(64, "gmwb_max_wdl_amt_aig", "fiacarvm_liab_gmwb_max_wdl_amt_aig",  "gmwb_max_wdl_amt_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_gmwb_max_wdl_amt_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->gmwb_max_wdl_amt_aig),
-	CashFlowCommonData(64, "gmwb_min_income_base_e_bef_aig", "fiacarvm_liab_gmwb_min_income_base_e_bef_aig",  "gmwb_min_income_base_e_bef_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(65, "gmwb_min_income_base_e_bef_aig", "fiacarvm_liab_gmwb_min_income_base_e_bef_aig",  "gmwb_min_income_base_e_bef_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_gmwb_min_income_base_e_bef_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->gmwb_min_income_base_e_bef_aig),
-	CashFlowCommonData(65, "gmwb_pip_annual_wdl_pct_aig", "fiacarvm_liab_gmwb_pip_annual_wdl_pct_aig",  "gmwb_pip_annual_wdl_pct_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(66, "gmwb_pip_annual_wdl_pct_aig", "fiacarvm_liab_gmwb_pip_annual_wdl_pct_aig",  "gmwb_pip_annual_wdl_pct_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_gmwb_pip_annual_wdl_pct_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->gmwb_pip_annual_wdl_pct_aig),
-	CashFlowCommonData(66, "guar_min_contract_val", "fiacarvm_liab_guar_min_contract_val",  "guar_min_contract_val",  CashFlowCommonData::SUM,
+	CashFlowCommonData(67, "guar_min_contract_val", "fiacarvm_liab_guar_min_contract_val",  "guar_min_contract_val",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_guar_min_contract_val, 'E','N', '3', 'N', (size_t)&modelOffset->guar_min_contract_val),
-	CashFlowCommonData(67, "index_term_cap_rate_min_aig", "fiacarvm_liab_index_term_cap_rate_min_aig",  "index_term_cap_rate_min_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(68, "index_term_cap_rate_min_aig", "fiacarvm_liab_index_term_cap_rate_min_aig",  "index_term_cap_rate_min_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_index_term_cap_rate_min_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->index_term_cap_rate_min_aig),
-	CashFlowCommonData(68, "index_term_par_rate_min_aig", "fiacarvm_liab_index_term_par_rate_min_aig",  "index_term_par_rate_min_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(69, "index_term_par_rate_min_aig", "fiacarvm_liab_index_term_par_rate_min_aig",  "index_term_par_rate_min_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_index_term_par_rate_min_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->index_term_par_rate_min_aig),
-	CashFlowCommonData(69, "index_term_sprd_rate_max_aig", "fiacarvm_liab_index_term_sprd_rate_max_aig",  "index_term_sprd_rate_max_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(70, "index_term_sprd_rate_max_aig", "fiacarvm_liab_index_term_sprd_rate_max_aig",  "index_term_sprd_rate_max_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_index_term_sprd_rate_max_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->index_term_sprd_rate_max_aig),
-	CashFlowCommonData(70, "index_term_trigger_rate_min_aig", "fiacarvm_liab_index_term_trigger_rate_min_aig",  "index_term_trigger_rate_min_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(71, "index_term_trigger_rate_min_aig", "fiacarvm_liab_index_term_trigger_rate_min_aig",  "index_term_trigger_rate_min_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_index_term_trigger_rate_min_aig, 'E','Y', '3', 'P', (size_t)&modelOffset->index_term_trigger_rate_min_aig),
-	CashFlowCommonData(71, "initialize", "fiacarvm_liab_initialize",  "initialize",  CashFlowCommonData::AVG,
+	CashFlowCommonData(72, "initialize", "fiacarvm_liab_initialize",  "initialize",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_initialize, 'E','N', '3', 'N', (size_t)&modelOffset->initialize),
-	CashFlowCommonData(72, "min_accum_val_b_aig", "fiacarvm_liab_min_accum_val_b_aig",  "min_accum_val_b_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(73, "min_accum_val_b_aig", "fiacarvm_liab_min_accum_val_b_aig",  "min_accum_val_b_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_min_accum_val_b_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->min_accum_val_b_aig),
-	CashFlowCommonData(73, "min_accum_val_b_bef_aig", "fiacarvm_liab_min_accum_val_b_bef_aig",  "min_accum_val_b_bef_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(74, "min_accum_val_b_bef_aig", "fiacarvm_liab_min_accum_val_b_bef_aig",  "min_accum_val_b_bef_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_min_accum_val_b_bef_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->min_accum_val_b_bef_aig),
-	CashFlowCommonData(74, "min_accum_val_e_aig", "fiacarvm_liab_min_accum_val_e_aig",  "min_accum_val_e_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(75, "min_accum_val_e_aig", "fiacarvm_liab_min_accum_val_e_aig",  "min_accum_val_e_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_min_accum_val_e_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->min_accum_val_e_aig),
-	CashFlowCommonData(75, "min_accum_val_e_bef_aig", "fiacarvm_liab_min_accum_val_e_bef_aig",  "min_accum_val_e_bef_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(76, "min_accum_val_e_bef_aig", "fiacarvm_liab_min_accum_val_e_bef_aig",  "min_accum_val_e_bef_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_min_accum_val_e_bef_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->min_accum_val_e_bef_aig),
-	CashFlowCommonData(76, "min_wdl_val_alt_b_aig", "fiacarvm_liab_min_wdl_val_alt_b_aig",  "min_wdl_val_alt_b_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(77, "min_wdl_val_alt_b_aig", "fiacarvm_liab_min_wdl_val_alt_b_aig",  "min_wdl_val_alt_b_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_min_wdl_val_alt_b_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->min_wdl_val_alt_b_aig),
-	CashFlowCommonData(77, "min_wdl_val_alt_base_b_aig", "fiacarvm_liab_min_wdl_val_alt_base_b_aig",  "min_wdl_val_alt_base_b_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(78, "min_wdl_val_alt_base_b_aig", "fiacarvm_liab_min_wdl_val_alt_base_b_aig",  "min_wdl_val_alt_base_b_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_min_wdl_val_alt_base_b_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->min_wdl_val_alt_base_b_aig),
-	CashFlowCommonData(78, "min_wdl_val_alt_base_e_aig", "fiacarvm_liab_min_wdl_val_alt_base_e_aig",  "min_wdl_val_alt_base_e_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(79, "min_wdl_val_alt_base_e_aig", "fiacarvm_liab_min_wdl_val_alt_base_e_aig",  "min_wdl_val_alt_base_e_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_min_wdl_val_alt_base_e_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->min_wdl_val_alt_base_e_aig),
-	CashFlowCommonData(79, "min_wdl_val_alt_base_e_bef_aig", "fiacarvm_liab_min_wdl_val_alt_base_e_bef_aig",  "min_wdl_val_alt_base_e_bef_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(80, "min_wdl_val_alt_base_e_bef_aig", "fiacarvm_liab_min_wdl_val_alt_base_e_bef_aig",  "min_wdl_val_alt_base_e_bef_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_min_wdl_val_alt_base_e_bef_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->min_wdl_val_alt_base_e_bef_aig),
-	CashFlowCommonData(80, "min_wdl_val_alt_e_aig", "fiacarvm_liab_min_wdl_val_alt_e_aig",  "min_wdl_val_alt_e_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(81, "min_wdl_val_alt_e_aig", "fiacarvm_liab_min_wdl_val_alt_e_aig",  "min_wdl_val_alt_e_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_min_wdl_val_alt_e_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->min_wdl_val_alt_e_aig),
-	CashFlowCommonData(81, "min_wdl_val_alt_e_bef_aig", "fiacarvm_liab_min_wdl_val_alt_e_bef_aig",  "min_wdl_val_alt_e_bef_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(82, "min_wdl_val_alt_e_bef_aig", "fiacarvm_liab_min_wdl_val_alt_e_bef_aig",  "min_wdl_val_alt_e_bef_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_min_wdl_val_alt_e_bef_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->min_wdl_val_alt_e_bef_aig),
-	CashFlowCommonData(82, "min_wdl_val_b_aig", "fiacarvm_liab_min_wdl_val_b_aig",  "min_wdl_val_b_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(83, "min_wdl_val_b_aig", "fiacarvm_liab_min_wdl_val_b_aig",  "min_wdl_val_b_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_min_wdl_val_b_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->min_wdl_val_b_aig),
-	CashFlowCommonData(83, "min_wdl_val_b_bef_aig", "fiacarvm_liab_min_wdl_val_b_bef_aig",  "min_wdl_val_b_bef_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(84, "min_wdl_val_b_bef_aig", "fiacarvm_liab_min_wdl_val_b_bef_aig",  "min_wdl_val_b_bef_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_min_wdl_val_b_bef_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->min_wdl_val_b_bef_aig),
-	CashFlowCommonData(84, "min_wdl_val_e_aig", "fiacarvm_liab_min_wdl_val_e_aig",  "min_wdl_val_e_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(85, "min_wdl_val_e_aig", "fiacarvm_liab_min_wdl_val_e_aig",  "min_wdl_val_e_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_min_wdl_val_e_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->min_wdl_val_e_aig),
-	CashFlowCommonData(85, "min_wdl_val_e_bef_aig", "fiacarvm_liab_min_wdl_val_e_bef_aig",  "min_wdl_val_e_bef_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(86, "min_wdl_val_e_bef_aig", "fiacarvm_liab_min_wdl_val_e_bef_aig",  "min_wdl_val_e_bef_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_min_wdl_val_e_bef_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->min_wdl_val_e_bef_aig),
-	CashFlowCommonData(86, "min_wdl_val_final_b_aig", "fiacarvm_liab_min_wdl_val_final_b_aig",  "min_wdl_val_final_b_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(87, "min_wdl_val_final_b_aig", "fiacarvm_liab_min_wdl_val_final_b_aig",  "min_wdl_val_final_b_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_min_wdl_val_final_b_aig, 'B','Y', '3', 'N', (size_t)&modelOffset->min_wdl_val_final_b_aig),
-	CashFlowCommonData(87, "min_wdl_val_final_e_aig", "fiacarvm_liab_min_wdl_val_final_e_aig",  "min_wdl_val_final_e_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(88, "min_wdl_val_final_e_aig", "fiacarvm_liab_min_wdl_val_final_e_aig",  "min_wdl_val_final_e_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_min_wdl_val_final_e_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->min_wdl_val_final_e_aig),
-	CashFlowCommonData(88, "min_wdl_val_final_e_bef_aig", "fiacarvm_liab_min_wdl_val_final_e_bef_aig",  "min_wdl_val_final_e_bef_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(89, "min_wdl_val_final_e_bef_aig", "fiacarvm_liab_min_wdl_val_final_e_bef_aig",  "min_wdl_val_final_e_bef_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_min_wdl_val_final_e_bef_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->min_wdl_val_final_e_bef_aig),
-	CashFlowCommonData(89, "nh_benefits_pv", "fiacarvm_liab_nh_benefits_pv",  "nh_benefits_pv",  CashFlowCommonData::SUM,
+	CashFlowCommonData(90, "nh_benefits_pv", "fiacarvm_liab_nh_benefits_pv",  "nh_benefits_pv",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_nh_benefits_pv, 'E','N', '3', 'N', (size_t)&modelOffset->nh_benefits_pv),
-	CashFlowCommonData(90, "nh_incid_rate", "fiacarvm_liab_nh_incid_rate",  "nh_incid_rate",  CashFlowCommonData::AVG,
+	CashFlowCommonData(91, "nh_incid_rate", "fiacarvm_liab_nh_incid_rate",  "nh_incid_rate",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_nh_incid_rate, 'E','Y', '3', 'N', (size_t)&modelOffset->nh_incid_rate),
-	CashFlowCommonData(91, "pfwd_entitlement_b_aig", "fiacarvm_liab_pfwd_entitlement_b_aig",  "pfwd_entitlement_b_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(92, "pfwd_entitlement_b_aig", "fiacarvm_liab_pfwd_entitlement_b_aig",  "pfwd_entitlement_b_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_pfwd_entitlement_b_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->pfwd_entitlement_b_aig),
-	CashFlowCommonData(92, "pfwd_entitlement_b_bef_aig", "fiacarvm_liab_pfwd_entitlement_b_bef_aig",  "pfwd_entitlement_b_bef_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(93, "pfwd_entitlement_b_bef_aig", "fiacarvm_liab_pfwd_entitlement_b_bef_aig",  "pfwd_entitlement_b_bef_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_pfwd_entitlement_b_bef_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->pfwd_entitlement_b_bef_aig),
-	CashFlowCommonData(93, "pfwd_entitlement_e_aig", "fiacarvm_liab_pfwd_entitlement_e_aig",  "pfwd_entitlement_e_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(94, "pfwd_entitlement_e_aig", "fiacarvm_liab_pfwd_entitlement_e_aig",  "pfwd_entitlement_e_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_pfwd_entitlement_e_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->pfwd_entitlement_e_aig),
-	CashFlowCommonData(94, "pfwd_entitlement_e_bef_aig", "fiacarvm_liab_pfwd_entitlement_e_bef_aig",  "pfwd_entitlement_e_bef_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(95, "pfwd_entitlement_e_bef_aig", "fiacarvm_liab_pfwd_entitlement_e_bef_aig",  "pfwd_entitlement_e_bef_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_pfwd_entitlement_e_bef_aig, 'E','N', '3', 'N', (size_t)&modelOffset->pfwd_entitlement_e_bef_aig),
-	CashFlowCommonData(95, "pfwd_pct_aig", "fiacarvm_liab_pfwd_pct_aig",  "pfwd_pct_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(96, "pfwd_pct_aig", "fiacarvm_liab_pfwd_pct_aig",  "pfwd_pct_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_pfwd_pct_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->pfwd_pct_aig),
-	CashFlowCommonData(96, "pfwd_surr_aig", "fiacarvm_liab_pfwd_surr_aig",  "pfwd_surr_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(97, "pfwd_surr_aig", "fiacarvm_liab_pfwd_surr_aig",  "pfwd_surr_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_pfwd_surr_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->pfwd_surr_aig),
-	CashFlowCommonData(97, "pfwd_surr_cumul_aig", "fiacarvm_liab_pfwd_surr_cumul_aig",  "pfwd_surr_cumul_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(98, "pfwd_surr_cumul_aig", "fiacarvm_liab_pfwd_surr_cumul_aig",  "pfwd_surr_cumul_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_pfwd_surr_cumul_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->pfwd_surr_cumul_aig),
-	CashFlowCommonData(98, "pfwd_surr_pv", "fiacarvm_liab_pfwd_surr_pv",  "pfwd_surr_pv",  CashFlowCommonData::SUM,
+	CashFlowCommonData(99, "pfwd_surr_pv", "fiacarvm_liab_pfwd_surr_pv",  "pfwd_surr_pv",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_pfwd_surr_pv, 'E','N', '3', 'N', (size_t)&modelOffset->pfwd_surr_pv),
-	CashFlowCommonData(99, "pol_mth_aig", "fiacarvm_liab_pol_mth_aig",  "pol_mth_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(100, "pol_mth_aig", "fiacarvm_liab_pol_mth_aig",  "pol_mth_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_pol_mth_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->pol_mth_aig),
-	CashFlowCommonData(100, "pol_yr", "fiacarvm_liab_pol_yr",  "pol_yr",  CashFlowCommonData::AVG,
+	CashFlowCommonData(101, "pol_yr", "fiacarvm_liab_pol_yr",  "pol_yr",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_pol_yr, 'B','N', '3', 'N', (size_t)&modelOffset->pol_yr),
-	CashFlowCommonData(101, "policies_female_experience_aig", "fiacarvm_liab_policies_female_experience_aig",  "policies_female_experience_aig",  CashFlowCommonData::AVG,
+	CashFlowCommonData(102, "policies_female_experience_aig", "fiacarvm_liab_policies_female_experience_aig",  "policies_female_experience_aig",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_policies_female_experience_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->policies_female_experience_aig),
-	CashFlowCommonData(102, "policies_joint_experience_aig", "fiacarvm_liab_policies_joint_experience_aig",  "policies_joint_experience_aig",  CashFlowCommonData::AVG,
+	CashFlowCommonData(103, "policies_joint_experience_aig", "fiacarvm_liab_policies_joint_experience_aig",  "policies_joint_experience_aig",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_policies_joint_experience_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->policies_joint_experience_aig),
-	CashFlowCommonData(103, "policies_last_survivor_experience_aig", "fiacarvm_liab_policies_last_survivor_experience_aig",  "policies_last_survivor_experience_aig",  CashFlowCommonData::AVG,
+	CashFlowCommonData(104, "policies_last_survivor_experience_aig", "fiacarvm_liab_policies_last_survivor_experience_aig",  "policies_last_survivor_experience_aig",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_policies_last_survivor_experience_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->policies_last_survivor_experience_aig),
-	CashFlowCommonData(104, "policies_male_experience_aig", "fiacarvm_liab_policies_male_experience_aig",  "policies_male_experience_aig",  CashFlowCommonData::AVG,
+	CashFlowCommonData(105, "policies_male_experience_aig", "fiacarvm_liab_policies_male_experience_aig",  "policies_male_experience_aig",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_policies_male_experience_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->policies_male_experience_aig),
-	CashFlowCommonData(105, "prem_bonus_recapture_aig", "fiacarvm_liab_prem_bonus_recapture_aig",  "prem_bonus_recapture_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(106, "prem_bonus_recapture_aig", "fiacarvm_liab_prem_bonus_recapture_aig",  "prem_bonus_recapture_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_prem_bonus_recapture_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->prem_bonus_recapture_aig),
-	CashFlowCommonData(106, "prem_cumul_prop_wdl_aig", "fiacarvm_liab_prem_cumul_prop_wdl_aig",  "prem_cumul_prop_wdl_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(107, "prem_cumul_prop_wdl_aig", "fiacarvm_liab_prem_cumul_prop_wdl_aig",  "prem_cumul_prop_wdl_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_prem_cumul_prop_wdl_aig, 'E','N', '3', 'N', (size_t)&modelOffset->prem_cumul_prop_wdl_aig),
-	CashFlowCommonData(107, "res_integrated", "fiacarvm_liab_res_integrated",  "res_integrated",  CashFlowCommonData::SUM,
+	CashFlowCommonData(108, "res_integrated", "fiacarvm_liab_res_integrated",  "res_integrated",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_res_integrated, 'E','N', '3', 'N', (size_t)&modelOffset->res_integrated),
-	CashFlowCommonData(108, "res_integrated_annuitzn", "fiacarvm_liab_res_integrated_annuitzn",  "res_integrated_annuitzn",  CashFlowCommonData::SUM,
+	CashFlowCommonData(109, "res_integrated_annuitzn", "fiacarvm_liab_res_integrated_annuitzn",  "res_integrated_annuitzn",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_res_integrated_annuitzn, 'E','N', '3', 'N', (size_t)&modelOffset->res_integrated_annuitzn),
-	CashFlowCommonData(109, "res_integrated_cash_val", "fiacarvm_liab_res_integrated_cash_val",  "res_integrated_cash_val",  CashFlowCommonData::SUM,
+	CashFlowCommonData(110, "res_integrated_cash_val", "fiacarvm_liab_res_integrated_cash_val",  "res_integrated_cash_val",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_res_integrated_cash_val, 'E','N', '3', 'N', (size_t)&modelOffset->res_integrated_cash_val),
-	CashFlowCommonData(110, "startup", "fiacarvm_liab_startup",  "startup",  CashFlowCommonData::SUM,
+	CashFlowCommonData(111, "startup", "fiacarvm_liab_startup",  "startup",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::virtual_startup, 'E','N', '3', 'N', (size_t)&modelOffset->startup),
-	CashFlowCommonData(111, "surr_chg_b_aig", "fiacarvm_liab_surr_chg_b_aig",  "surr_chg_b_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(112, "surr_chg_b_aig", "fiacarvm_liab_surr_chg_b_aig",  "surr_chg_b_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_surr_chg_b_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->surr_chg_b_aig),
-	CashFlowCommonData(112, "surr_chg_b_bef_aig", "fiacarvm_liab_surr_chg_b_bef_aig",  "surr_chg_b_bef_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(113, "surr_chg_b_bef_aig", "fiacarvm_liab_surr_chg_b_bef_aig",  "surr_chg_b_bef_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_surr_chg_b_bef_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->surr_chg_b_bef_aig),
-	CashFlowCommonData(113, "surr_chg_e_aig", "fiacarvm_liab_surr_chg_e_aig",  "surr_chg_e_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(114, "surr_chg_e_aig", "fiacarvm_liab_surr_chg_e_aig",  "surr_chg_e_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_surr_chg_e_aig, 'E','Y', '3', 'N', (size_t)&modelOffset->surr_chg_e_aig),
-	CashFlowCommonData(114, "surr_chg_e_bef_aig", "fiacarvm_liab_surr_chg_e_bef_aig",  "surr_chg_e_bef_aig",  CashFlowCommonData::SUM,
+	CashFlowCommonData(115, "surr_chg_e_bef_aig", "fiacarvm_liab_surr_chg_e_bef_aig",  "surr_chg_e_bef_aig",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_surr_chg_e_bef_aig, 'E','N', '3', 'N', (size_t)&modelOffset->surr_chg_e_bef_aig),
-	CashFlowCommonData(115, "surr_chg_pct", "fiacarvm_liab_surr_chg_pct",  "surr_chg_pct",  CashFlowCommonData::SUM,
+	CashFlowCommonData(116, "surr_chg_pct", "fiacarvm_liab_surr_chg_pct",  "surr_chg_pct",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_surr_chg_pct, 'E','N', '3', 'N', (size_t)&modelOffset->surr_chg_pct),
-	CashFlowCommonData(116, "surv", "fiacarvm_liab_surv",  "surv",  CashFlowCommonData::AVG,
+	CashFlowCommonData(117, "surv", "fiacarvm_liab_surv",  "surv",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&FIACARVM_LIAB_UDF::fiacarvm_liab_surv, 'E','N', '3', 'N', (size_t)&modelOffset->surv)
 };
 const CashFlowCommonData* FIACARVM_LIAB::mCFStaticData[] = {
@@ -9039,6 +9138,7 @@ const CashFlowCommonData* FIACARVM_LIAB::mCFStaticData[] = {
 	&FIACARVM_LIAB::mCFStaticData_0[114],
 	&FIACARVM_LIAB::mCFStaticData_0[115],
 	&FIACARVM_LIAB::mCFStaticData_0[116],
+	&FIACARVM_LIAB::mCFStaticData_0[117],
 	nullptr};
 //const CashFlowCommonData END@2
 
@@ -9595,7 +9695,7 @@ FIACARVM_LIAB::FIACARVM_LIAB(int columnCount, Descriptor* mocd[], Product* persO
 //constructor begincolumn
 FIACARVM_LIAB::FIACARVM_LIAB(const xstring &modelClassName,
 		int isSm, ModelClass *owner, ModelClass *peer, int mainRebase,
-		const char *name, ModelClass* arrayPersistentObj) : ModelClass(116, FIACARVM_LIAB::descriptorTable, arrayPersistentObj), Variable(*this)
+		const char *name, ModelClass* arrayPersistentObj) : ModelClass(117, FIACARVM_LIAB::descriptorTable, arrayPersistentObj), Variable(*this)
   , sm_bond_is(0)
   , sm_bond_pv(0)
   , sm_bond_ym(0)
@@ -9687,7 +9787,7 @@ FIACARVM_LIAB::FIACARVM_LIAB(const xstring &modelClassName,
 
 	setSlidingSpace();
 
-	for (int cf_no = 1; cf_no <= 116; cf_no++)
+	for (int cf_no = 1; cf_no <= 117; cf_no++)
 #ifdef CF_MEMORY
 		setPtr_col(cf_no, 0);
 #else

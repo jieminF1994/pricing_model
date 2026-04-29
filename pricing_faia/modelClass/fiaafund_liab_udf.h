@@ -28,6 +28,9 @@ double fiaafund_liab_credited_int(int t);
 // Crediting Cap Rate (Solved from Call Spread) 
 double fiaafund_liab_crediting_cap_rate(int t);
 
+// Crediting Cap Rate 2Nd Strat Crbg 
+double fiaafund_liab_crediting_cap_rate_2nd_strat_crbg(int t);
+
 // Crediting Part Rate (Solved from Call Spread) 
 double fiaafund_liab_crediting_part_rate(int t);
 
@@ -63,6 +66,9 @@ double fiaafund_liab_crediting_type_dyn_trigger_aig(int t);
 
 // flag for first year after dynamic switch 
 double fiaafund_liab_crediting_type_dyn_zero_threshold_flag_aig(int t);
+
+// Cumul Return Sc Period Crbg 
+double fiaafund_liab_cumul_return_sc_period_crbg(int t);
 
 // cost percentage of EPRS features 
 double fiaafund_liab_eprs_cost_rate_aig(int t);
@@ -168,6 +174,9 @@ double fiaafund_liab_hedge_mkt_val(int t);
 
 // Hedge Market Value: 
 double fiaafund_liab_hedge_mkt_val_aig(int t);
+
+// Seasoned opt val 
+double fiaafund_liab_hedge_mkt_val_gmab_only_crbg(int t);
 
 // Hedge Market Value Growth 
 double fiaafund_liab_hedge_mkt_val_growth(int t);
@@ -277,6 +286,12 @@ double fiaafund_liab_notional_amt_required(int t);
 // Notional Amount Required Before Decrements 
 double fiaafund_liab_notional_amt_required_bef(int t);
 
+// Notional Amt Seccap Gmab Bef Crbg 
+double fiaafund_liab_notional_amt_seccap_gmab_bef_crbg(int t);
+
+// Notional Amt Seccap Gmab Crbg 
+double fiaafund_liab_notional_amt_seccap_gmab_crbg(int t);
+
 // Notional  Amount to Hedge 
 double fiaafund_liab_notional_to_hedge(int t);
 
@@ -298,6 +313,9 @@ double fiaafund_liab_notional_to_hedge_net(int t);
 // Available Option Budget 
 double fiaafund_liab_opt_budget(int t);
 
+// Option budget for 2nd strategy 
+double fiaafund_liab_opt_budget_2nd_strat_aig(int t);
+
 // Option Budget Amount 
 double fiaafund_liab_opt_budget_amt(int t);
 
@@ -307,20 +325,17 @@ double fiaafund_liab_opt_budget_cost_aig(int t);
 // Opt Budget for EPRS 
 double fiaafund_liab_opt_budget_eprs_aig(int t);
 
-// Option budget for intermediate strategy 
-double fiaafund_liab_opt_budget_interm_aig(int t);
-
 // Option budget for the initial strategy 
 double fiaafund_liab_opt_budget_renewal_aig(int t);
 
 // Available Option Budget at Strategy Term Renewal 
 double fiaafund_liab_opt_budget_strategy_term_renewal_aig(int t);
 
+// target opt budget for 2nd strategy 
+double fiaafund_liab_opt_budget_tgt_2nd_strat_aig(int t);
+
 // Option budget: 
 double fiaafund_liab_opt_budget_tgt_aig(int t);
-
-// target opt budget for intermediate strategy 
-double fiaafund_liab_opt_budget_tgt_interm_aig(int t);
 
 // ATM Opt Cost. Created when Solving for Particiaption Rate for Fee4rate Phase 2 
 double fiaafund_liab_opt_cost_atm_aig(int t);
