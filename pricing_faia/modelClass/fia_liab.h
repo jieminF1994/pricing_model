@@ -1261,6 +1261,9 @@ public :
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > admin_fee_per_pol;
   inline double	Get_admin_fee_per_pol() {
 		return admin_fee_per_pol; }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > allow_renew_into_prog_trigger_crbg;
+  inline xstring	Get_allow_renew_into_prog_trigger_crbg() {
+		return allow_renew_into_prog_trigger_crbg; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > allowable_threshold_deviation_aig;
   inline double	Get_allowable_threshold_deviation_aig() {
 		return allowable_threshold_deviation_aig; }
@@ -2062,11 +2065,6 @@ public :
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmwb_wdl_utilization_init_population_aig;
   inline double	Get_gmwb_wdl_utilization_init_population_aig() {
 		return gmwb_wdl_utilization_init_population_aig; }
-	Attribute::Proxy <StringEnum, DESCRIPTOR_TABLE > gmwb_wdl_utilization_level_aig;
-  inline xstring	Get_gmwb_wdl_utilization_level_aig() {
-		return gmwb_wdl_utilization_level_aig; }
-  inline void Set_gmwb_wdl_utilization_level_aig(const xstring &v) {
-		gmwb_wdl_utilization_level_aig.setValue(v); }
 	static Attribute::Descriptor descriptor_256[];
 #ifdef MICROSOFT
 #pragma warning(push)
@@ -2077,6 +2075,11 @@ public :
 #ifdef MICROSOFT
 #pragma warning(pop)
 #endif	MICROSOFT
+	Attribute::Proxy <StringEnum, DESCRIPTOR_TABLE > gmwb_wdl_utilization_level_aig;
+  inline xstring	Get_gmwb_wdl_utilization_level_aig() {
+		return gmwb_wdl_utilization_level_aig; }
+  inline void Set_gmwb_wdl_utilization_level_aig(const xstring &v) {
+		gmwb_wdl_utilization_level_aig.setValue(v); }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmwb_wdl_utilization_primary_transition_prob_aig;
   inline double	Get_gmwb_wdl_utilization_primary_transition_prob_aig() {
 		return gmwb_wdl_utilization_primary_transition_prob_aig; }
@@ -2753,6 +2756,9 @@ public :
 	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > opt_budget_defn_aig;
   inline xstring	Get_opt_budget_defn_aig() {
 		return opt_budget_defn_aig; }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > opt_budget_equals_nmr_crbg;
+  inline xstring	Get_opt_budget_equals_nmr_crbg() {
+		return opt_budget_equals_nmr_crbg; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > opt_budget_tgt_alpha_aig;
   inline double	Get_opt_budget_tgt_alpha_aig() {
 		return opt_budget_tgt_alpha_aig; }
@@ -2842,6 +2848,9 @@ public :
 	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > prof_distribn_mode;
   inline xstring	Get_prof_distribn_mode() {
 		return prof_distribn_mode; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > prog_trigger_rate_crbg;
+  inline double	Get_prog_trigger_rate_crbg() {
+		return prog_trigger_rate_crbg; }
 	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > proj_date;
   inline xstring	Get_proj_date() {
 		return proj_date; }
@@ -2872,15 +2881,6 @@ public :
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > purch_rate_curr_sprd;
   inline double	Get_purch_rate_curr_sprd() {
 		return purch_rate_curr_sprd; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > purch_rate_guar_fixed;
-  inline double	Get_purch_rate_guar_fixed() {
-		return purch_rate_guar_fixed; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > pv_benefits_defn_aig;
-  inline xstring	Get_pv_benefits_defn_aig() {
-		return pv_benefits_defn_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > quota_share_reinsured_aig;
-  inline double	Get_quota_share_reinsured_aig() {
-		return quota_share_reinsured_aig; }
 	static Attribute::Descriptor descriptor_512[];
 #ifdef MICROSOFT
 #pragma warning(push)
@@ -2891,6 +2891,15 @@ public :
 #ifdef MICROSOFT
 #pragma warning(pop)
 #endif	MICROSOFT
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > purch_rate_guar_fixed;
+  inline double	Get_purch_rate_guar_fixed() {
+		return purch_rate_guar_fixed; }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > pv_benefits_defn_aig;
+  inline xstring	Get_pv_benefits_defn_aig() {
+		return pv_benefits_defn_aig; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > quota_share_reinsured_aig;
+  inline double	Get_quota_share_reinsured_aig() {
+		return quota_share_reinsured_aig; }
 	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > rate_setting_cycle_aig;
   inline xstring	Get_rate_setting_cycle_aig() {
 		return rate_setting_cycle_aig; }

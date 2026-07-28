@@ -64,9 +64,6 @@ double fiaafund_liab_crediting_trigger_rate_aig(int t);
 // Flag to indicate a dynamic change to the crediting type: 
 double fiaafund_liab_crediting_type_dyn_trigger_aig(int t);
 
-// flag for first year after dynamic switch 
-double fiaafund_liab_crediting_type_dyn_zero_threshold_flag_aig(int t);
-
 // Cumul Return Sc Period Crbg 
 double fiaafund_liab_cumul_return_sc_period_crbg(int t);
 
@@ -253,6 +250,9 @@ double fiaafund_liab_index_term_start_duration_aig(int t);
 // Index Value 
 double fiaafund_liab_index_val(int t);
 
+// Index Val 2Nd Strat Crbg 
+double fiaafund_liab_index_val_2nd_strat_crbg(int t);
+
 // Index Value Beginning of Month 
 double fiaafund_liab_index_val_bom(int t);
 
@@ -340,6 +340,9 @@ double fiaafund_liab_opt_budget_tgt_aig(int t);
 // ATM Opt Cost. Created when Solving for Particiaption Rate for Fee4rate Phase 2 
 double fiaafund_liab_opt_cost_atm_aig(int t);
 
+// Opt Cost Gmab Crbg 
+double fiaafund_liab_opt_cost_gmab_init_crbg(int t);
+
 // Option Payoff 
 double fiaafund_liab_opt_payoff(int t);
 
@@ -361,6 +364,18 @@ double fiaafund_liab_prem_alloc(int t);
 // Premium Bonus 
 double fiaafund_liab_prem_bonus(int t);
 
+// Prog Trigger Ind Crbg 
+double fiaafund_liab_prog_trigger_ind_crbg(int t);
+
+// Prog Trigger Memory Pct Crbg 
+double fiaafund_liab_prog_trigger_memory_pct_crbg(int t);
+
+// Prog Trigger Term Ends 
+double fiaafund_liab_prog_trigger_term_end_crbg(int t);
+
+// Renew Into 2Nd Strategy 
+double fiaafund_liab_renew_into_2nd_strategy_crbg(int t);
+
 // SFAS133 GMWB Charge 
 double fiaafund_liab_sfas133_gmwb_chg(int t);
 
@@ -372,6 +387,9 @@ double fiaafund_liab_strategy_return_aig(int t);
 
 // Cumulative Strategy Return 
 double fiaafund_liab_strategy_return_cumul_aig(int t);
+
+// Strategy Return Prog Trigger Crbg 
+double fiaafund_liab_strategy_return_prog_trigger_crbg(int t);
 
 // Prorated strategy return: 
 double fiaafund_liab_strategy_return_prorated_aig(int t);

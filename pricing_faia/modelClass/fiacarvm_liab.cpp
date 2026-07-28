@@ -2404,25 +2404,29 @@ if (fia->gen2_defn == YES)
 else
 	rf = rates->get_misc_rate(opt_cost_lookup_month_cv, "RiskFree", EFFECTIVE_ANNUAL); 
 
-if((fia->res_period >= fia->sm_fia_account[0]->strategy_term_aig(fia->res_period - 1) * 12 + 1) 
-	&& (fia->crediting_type_dyn_2nd_strat_aig != "NA")
-	&& (fia->crediting_type_dyn_defn_aig == DYNAMIC_SWITCHING_ON))
+//20260617 MQ strategy switching
+xstring crediting_type_local; 
+int into_2nd_strat;
+
+if(xint(fia->sm_fia_account[0]->renew_into_2nd_strategy_crbg(fia->res_period)) == 1) 
 {
-	fia->crediting_type_dyn_aig = fia->crediting_type_dyn_2nd_strat_aig;
+	crediting_type_local = fia->crediting_type_dyn_2nd_strat_aig;
+	into_2nd_strat = 1;
 }
 else
 {
-	fia->crediting_type_dyn_aig = fia->crediting_type_aig;
+	crediting_type_local = fia->crediting_type_aig;
+	into_2nd_strat = 0;
 }
 
 fia->pol_yr_lookup_gen2 = fia->pol_yr(t); 
-fia->temp_key_cred_type_dyn_aig = fia->crediting_type_dyn_aig;
+fia->temp_key_cred_type_dyn_aig = crediting_type_local;
 StrEnum::EnumValue crediting_rate_defn_local = fia->sm_fia_account[0]->crediting_rate_defn;
 
 if (crediting_rate_defn_local == FIXED_RATE)  //Fixed Strategy
 {
 	fia->pol_yr_lookup_gen2 = fia->pol_yr(t); 
-	fia->temp_key_cred_type_dyn_aig = fia->crediting_type_dyn_aig;
+	fia->temp_key_cred_type_dyn_aig = crediting_type_local;
 	fixed_rate = fia->crediting_rate_min;
 
 	fixed_rate_num = fixed_rate * fia->sm_fia_account[0]->fund_val_b(fia->res_period+1);//JYL 20230721: fixing small inconsistency per MQIN's request
@@ -2450,7 +2454,7 @@ if (t <= index_term_yrs_cv && init_index_term_elapsed_mths!= 0) //return outerlo
 //20221011 SJ END
 
 fia->pol_yr_lookup_gen2 = fia->pol_yr(t); 
-fia->temp_key_cred_type_dyn_aig = fia->crediting_type_dyn_aig;
+fia->temp_key_cred_type_dyn_aig = crediting_type_local;
 StrEnum::EnumValue crediting_dyn_lever_local = fia->sm_fia_account[0]->crediting_dyn_lever;
 
 int yrs_to_eoit; //eoit (end of index term).
@@ -2462,7 +2466,7 @@ else
 int yrs_to_next_eoit = yrs_to_eoit + index_term_yrs_cv + 1;
 
 fia->pol_yr_lookup_gen2 = fia->pol_yr(t);
-fia->temp_key_cred_type_dyn_aig = fia->crediting_type_dyn_aig;
+fia->temp_key_cred_type_dyn_aig = crediting_type_local;
 if (crediting_rate_defn_local == POINT_TO_POINT && crediting_dyn_lever_local == DYNAMIC_CAP) //Cap strategy
 {
 	k_long = 1.0;
@@ -2472,11 +2476,11 @@ if (crediting_rate_defn_local == POINT_TO_POINT && crediting_dyn_lever_local == 
 		return crediting_rate_index0_aig(t - index_term_yrs_cv);
 
 	cost_of_long_option_pct 
-		=   fia->sm_fia_account[0]->get_option_price_aig( opt_cost_lookup_month_cv, k_long, CALL, index_term_mths_cv, index_term_mths_cv );
+		=   fia->sm_fia_account[0]->get_option_price_aig( opt_cost_lookup_month_cv, k_long, CALL, index_term_mths_cv, index_term_mths_cv, into_2nd_strat);
 				// / index_term_yrs_cv; //20221011 SJ: Remove index term for Multi-year strategy change
 
 	cost_of_short_option_pct 
-		=   fia->sm_fia_account[0]->get_option_price_aig( opt_cost_lookup_month_cv, k_short, CALL, index_term_mths_cv, index_term_mths_cv );
+		=   fia->sm_fia_account[0]->get_option_price_aig( opt_cost_lookup_month_cv, k_short, CALL, index_term_mths_cv, index_term_mths_cv, into_2nd_strat);
 				// / index_term_yrs_cv; //20221011 SJ: Remove index term for Multi-year strategy change
 
 	net_opt_value = cost_of_long_option_pct - cost_of_short_option_pct;
@@ -2484,7 +2488,7 @@ if (crediting_rate_defn_local == POINT_TO_POINT && crediting_dyn_lever_local == 
 else 
 {
 	fia->pol_yr_lookup_gen2 = fia->pol_yr(t);
-	fia->temp_key_cred_type_dyn_aig = fia->crediting_type_dyn_aig;
+	fia->temp_key_cred_type_dyn_aig = crediting_type_local;
 	if ( crediting_rate_defn_local == POINT_TO_POINT_SPREAD &&  //Spread Strategy
 				 (crediting_dyn_lever_local == DYNAMIC_CAP || crediting_dyn_lever_local == DYNAMIC_SPREAD ))
 	{
@@ -2494,7 +2498,7 @@ else
 			return crediting_rate_index0_aig(t - index_term_yrs_cv);
 
 		cost_of_long_option_pct 
-				=   fia->sm_fia_account[0]->get_option_price_aig( opt_cost_lookup_month_cv, k_long, CALL, index_term_mths_cv, index_term_mths_cv );
+				=   fia->sm_fia_account[0]->get_option_price_aig( opt_cost_lookup_month_cv, k_long, CALL, index_term_mths_cv, index_term_mths_cv, into_2nd_strat);
 				  // / index_term_yrs_cv; //20221011 SJ: Remove index term for Multi-year strategy change
 
 		net_opt_value = cost_of_long_option_pct;
@@ -2502,7 +2506,7 @@ else
 	else
 	{
 		fia->pol_yr_lookup_gen2 = fia->pol_yr(t);
-		fia->temp_key_cred_type_dyn_aig = fia->crediting_type_dyn_aig;
+		fia->temp_key_cred_type_dyn_aig = crediting_type_local;
 		if ( crediting_rate_defn_local == POINT_TO_POINT_SPREAD && 
 				  crediting_dyn_lever_local == DYNAMIC_PARTICIPATION) //Dynamic par strategy
 		{
@@ -2521,7 +2525,7 @@ else
 			k_long = 1.0 + fixed_spread_rate_cv / part_rate_cv;
 
 			cost_of_long_option_pct 
-					=   fia->sm_fia_account[0]->get_option_price_aig( opt_cost_lookup_month_cv, k_long, CALL, index_term_mths_cv, index_term_mths_cv )
+					=   fia->sm_fia_account[0]->get_option_price_aig( opt_cost_lookup_month_cv, k_long, CALL, index_term_mths_cv, index_term_mths_cv, into_2nd_strat)
 					  // / index_term_yrs_cv //20221011 SJ: Remove index term for Multi-year strategy change
 					  * part_rate_cv;
 			net_opt_value = cost_of_long_option_pct;
@@ -2529,7 +2533,7 @@ else
 		else
 		{				
 			fia->pol_yr_lookup_gen2 = fia->pol_yr(t);
-			fia->temp_key_cred_type_dyn_aig = fia->crediting_type_dyn_aig;
+			fia->temp_key_cred_type_dyn_aig = crediting_type_local;
 			if ( crediting_dyn_lever_local == DYNAMIC_PARTICIPATION_AND_SPREAD) //Par and Spread
 			{
 				double sprd_rate_cv = index_term_sprd_rate_max_aig(t);
@@ -2546,7 +2550,7 @@ else
 				}
 				
 				cost_of_long_option_pct = 
-						fia->sm_fia_account[0]->get_option_price_aig(opt_cost_lookup_month_cv, 1 + sprd_rate_cv / part_rate_cv, CALL, index_term_mths_cv, index_term_mths_cv);
+						fia->sm_fia_account[0]->get_option_price_aig(opt_cost_lookup_month_cv, 1 + sprd_rate_cv / part_rate_cv, CALL, index_term_mths_cv, index_term_mths_cv, into_2nd_strat);
 						cost_of_long_option_pct *= part_rate_cv;
 
 				net_opt_value = cost_of_long_option_pct;
@@ -2555,27 +2559,37 @@ else
 			else 
 			{
 				fia->pol_yr_lookup_gen2 = fia->pol_yr(t);
-				fia->temp_key_cred_type_dyn_aig = fia->crediting_type_dyn_aig;
-				if (crediting_dyn_lever_local == DYNAMIC_TRIGGER)
+				fia->temp_key_cred_type_dyn_aig = crediting_type_local;
+				if (crediting_dyn_lever_local == DYNAMIC_TRIGGER || crediting_dyn_lever_local == PROGRESSIVE_TRIGGER)
 				{
 					double trigger_rate_cv = index_term_trigger_rate_min_aig(t);
 
 					if(t > yrs_to_next_eoit && index_term_trigger_rate_min_aig(t) == index_term_trigger_rate_min_aig(t - index_term_yrs_cv))
 						return crediting_rate_index0_aig(t - index_term_yrs_cv);
 
-					fia->temp_key_cred_type_dyn_aig = fia->crediting_type_dyn_aig;
+					fia->temp_key_cred_type_dyn_aig = crediting_type_local;
 					string index_id_regex_str = fia->sm_fia_account[0]->cast_xstring_to_string_aig(fia->sm_fia_account[0]->crediting_eqt_index);
 					string option_duration_str = "D" + to_string(int(index_term_mths_cv));
 				
-					string rate_lookup 
-						= "BINY_" + index_id_regex_str + "_" + option_duration_str + "_K100";
-				
+					string rate_lookup = "BINY_" + index_id_regex_str + "_" + option_duration_str + "_K100";
+
+					if (crediting_dyn_lever_local == PROGRESSIVE_TRIGGER) //20260716 MQ
+					{
+						int strat_term_mths = (int)fia->sm_fia_account[0]->strategy_term_mths_aig(fia->res_period);
+						option_duration_str = "D" + to_string(int(strat_term_mths));
+						
+						rate_lookup = "BINYPT_" + index_id_regex_str + "_" + option_duration_str + "_K100";
+					}
+
 					double option_cost_one_percent = 0.0;
 					if (fia->gen2_defn == YES)
 						option_cost_one_percent = fia_rates->get_misc_rate(opt_cost_lookup_month_cv, xstring(rate_lookup), EFFECTIVE_ANNUAL);
 					else
 						option_cost_one_percent = rates->get_misc_rate(opt_cost_lookup_month_cv, xstring(rate_lookup), EFFECTIVE_ANNUAL);
 					
+					if (crediting_dyn_lever_local == PROGRESSIVE_TRIGGER) //20260716 MQ
+						option_cost_one_percent *= 100.;
+
 					net_opt_value = trigger_rate_cv * option_cost_one_percent; //20231204 ZL: remove 0.01 due to the new format of scenario file
 				}
 			//20230118 SJ END
@@ -2584,7 +2598,7 @@ else
 					net_opt_value = 0.0;
 
 					fia->pol_yr_lookup_gen2 = fia->pol_yr(t); 
-					fia->temp_key_cred_type_dyn_aig = fia->crediting_type_dyn_aig;
+					fia->temp_key_cred_type_dyn_aig = crediting_type_local;
 					if (fia->res_period == 1 && crediting_rate_defn_local != FIXED_RATE)
 					{
 						string warning_msg = "fiacarvm_liab->crediting_rate_index0_aig(t): You're running a crediting rate strategy that has not yet been coded into the CARVM submodel.";
@@ -4960,13 +4974,12 @@ if (t < 0 || t > max_calc_period)
 
 double index_term_cap_rate_min_cv;
 
-if (fia->crediting_type_dyn_defn_aig == DYNAMIC_SWITCHING_ON && fia->crediting_type_dyn_2nd_strat_aig != "NA"
-		&& fia->res_period >= fia->sm_fia_account[0]->strategy_term_aig(fia->res_period - 1) * 12 + 1 )
+if(xint(fia->sm_fia_account[0]->renew_into_2nd_strategy_crbg(fia->res_period)) == 1) //20260617 MQ strategy switching
 {
 	fia->pol_yr_lookup_gen2 = pol_yr(t);   //20260324 bug fix
 	fia->temp_key_cred_type_dyn_aig = fia->crediting_type_dyn_2nd_strat_aig;
 	index_term_cap_rate_min_cv = fia->sm_fia_account[0]->index_term_cap_rate_min_aig;
-}			
+}	
 else
 {
 	fia->pol_yr_lookup_gen2 = pol_yr(t);  //20260324 bug fix
