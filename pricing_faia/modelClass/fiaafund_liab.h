@@ -428,7 +428,6 @@ strategy_return_switch_start_duration_aig = t_high;     // 20180930 MTC
  	ColumnAccessor < mCFStaticData_0 > admin_fee;
  	ColumnAccessor < mCFStaticData_0 > credited_int;
  	ColumnAccessor < mCFStaticData_0 > crediting_cap_rate;
- 	ColumnAccessor < mCFStaticData_0 > crediting_cap_rate_2nd_strat_crbg;
  	ColumnAccessor < mCFStaticData_0 > crediting_part_rate;
  	ColumnAccessor < mCFStaticData_0 > crediting_part_rate_aig;
  	ColumnAccessor < mCFStaticData_0 > crediting_part_rate_base_aig;
@@ -440,7 +439,7 @@ strategy_return_switch_start_duration_aig = t_high;     // 20180930 MTC
  	ColumnAccessor < mCFStaticData_0 > crediting_spread_rate_aig;
  	ColumnAccessor < mCFStaticData_0 > crediting_trigger_rate_aig;
  	ColumnAccessor < mCFStaticData_0 > crediting_type_dyn_trigger_aig;
- 	ColumnAccessor < mCFStaticData_0 > cumul_return_sc_period_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > crediting_type_dyn_zero_threshold_flag_aig;
  	ColumnAccessor < mCFStaticData_0 > eprs_cost_rate_aig;
  	ColumnAccessor < mCFStaticData_0 > fa_crediting_rate_aig;
  	ColumnAccessor < mCFStaticData_0 > fa_pricing_rate_aig;
@@ -476,7 +475,6 @@ strategy_return_switch_start_duration_aig = t_high;     // 20180930 MTC
  	ColumnAccessor < mCFStaticData_0 > hedge_inv_amt_bom;
  	ColumnAccessor < mCFStaticData_0 > hedge_mkt_val;
  	ColumnAccessor < mCFStaticData_0 > hedge_mkt_val_aig;
- 	ColumnAccessor < mCFStaticData_0 > hedge_mkt_val_gmab_only_crbg;
  	ColumnAccessor < mCFStaticData_0 > hedge_mkt_val_growth;
  	ColumnAccessor < mCFStaticData_0 > hedge_mkt_val_per_unit_notional;
  	ColumnAccessor < mCFStaticData_0 > hedge_mkt_val_per_unit_notional_aig;
@@ -502,7 +500,6 @@ strategy_return_switch_start_duration_aig = t_high;     // 20180930 MTC
  	ColumnAccessor < mCFStaticData_0 > index_term_sprd_rate_min_col_aig;
  	ColumnAccessor < mCFStaticData_0 > index_term_start_duration_aig;
  	ColumnAccessor < mCFStaticData_0 > index_val;
- 	ColumnAccessor < mCFStaticData_0 > index_val_2nd_strat_crbg;
  	ColumnAccessor < mCFStaticData_0 > index_val_bom;
  	ColumnAccessor < mCFStaticData_0 > initialize;
  	ColumnAccessor < mCFStaticData_0 > lapse_dyn_base_prod_crediting_rt_aig;
@@ -514,8 +511,6 @@ strategy_return_switch_start_duration_aig = t_high;     // 20180930 MTC
  	ColumnAccessor < mCFStaticData_0 > net_crediting_rate_aig;
  	ColumnAccessor < mCFStaticData_0 > notional_amt_required;
  	ColumnAccessor < mCFStaticData_0 > notional_amt_required_bef;
- 	ColumnAccessor < mCFStaticData_0 > notional_amt_seccap_gmab_bef_crbg;
- 	ColumnAccessor < mCFStaticData_0 > notional_amt_seccap_gmab_crbg;
  	ColumnAccessor < mCFStaticData_0 > notional_to_hedge;
  	ColumnAccessor < mCFStaticData_0 > notional_to_hedge_aig;
  	ColumnAccessor < mCFStaticData_0 > notional_to_hedge_cap;
@@ -523,16 +518,15 @@ strategy_return_switch_start_duration_aig = t_high;     // 20180930 MTC
  	ColumnAccessor < mCFStaticData_0 > notional_to_hedge_long_strike;
  	ColumnAccessor < mCFStaticData_0 > notional_to_hedge_net;
  	ColumnAccessor < mCFStaticData_0 > opt_budget;
- 	ColumnAccessor < mCFStaticData_0 > opt_budget_2nd_strat_aig;
  	ColumnAccessor < mCFStaticData_0 > opt_budget_amt;
  	ColumnAccessor < mCFStaticData_0 > opt_budget_cost_aig;
  	ColumnAccessor < mCFStaticData_0 > opt_budget_eprs_aig;
+ 	ColumnAccessor < mCFStaticData_0 > opt_budget_interm_aig;
  	ColumnAccessor < mCFStaticData_0 > opt_budget_renewal_aig;
  	ColumnAccessor < mCFStaticData_0 > opt_budget_strategy_term_renewal_aig;
- 	ColumnAccessor < mCFStaticData_0 > opt_budget_tgt_2nd_strat_aig;
  	ColumnAccessor < mCFStaticData_0 > opt_budget_tgt_aig;
+ 	ColumnAccessor < mCFStaticData_0 > opt_budget_tgt_interm_aig;
  	ColumnAccessor < mCFStaticData_0 > opt_cost_atm_aig;
- 	ColumnAccessor < mCFStaticData_0 > opt_cost_gmab_init_crbg;
  	ColumnAccessor < mCFStaticData_0 > opt_payoff;
  	ColumnAccessor < mCFStaticData_0 > opt_payoff_aig;
  	ColumnAccessor < mCFStaticData_0 > opt_strike_price;
@@ -540,15 +534,10 @@ strategy_return_switch_start_duration_aig = t_high;     // 20180930 MTC
  	ColumnAccessor < mCFStaticData_0 > pfwd_surr_fund_val;
  	ColumnAccessor < mCFStaticData_0 > prem_alloc;
  	ColumnAccessor < mCFStaticData_0 > prem_bonus;
- 	ColumnAccessor < mCFStaticData_0 > prog_trigger_ind_crbg;
- 	ColumnAccessor < mCFStaticData_0 > prog_trigger_memory_pct_crbg;
- 	ColumnAccessor < mCFStaticData_0 > prog_trigger_term_end_crbg;
- 	ColumnAccessor < mCFStaticData_0 > renew_into_2nd_strategy_crbg;
  	ColumnAccessor < mCFStaticData_0 > sfas133_gmwb_chg;
  	ColumnAccessor < mCFStaticData_0 > startup;
  	ColumnAccessor < mCFStaticData_0 > strategy_return_aig;
  	ColumnAccessor < mCFStaticData_0 > strategy_return_cumul_aig;
- 	ColumnAccessor < mCFStaticData_0 > strategy_return_prog_trigger_crbg;
  	ColumnAccessor < mCFStaticData_0 > strategy_return_prorated_aig;
  	ColumnAccessor < mCFStaticData_0 > strategy_term_aig;
  	ColumnAccessor < mCFStaticData_0 > strategy_term_beginning_index_val_bom_aig;
@@ -588,11 +577,6 @@ public :
 #ifdef MICROSOFT
 #pragma warning(pop)
 #endif	MICROSOFT
-	Attribute::Proxy <double, DESCRIPTOR_TABLE > cap_rate_lookup;
-  inline double	Get_cap_rate_lookup() {
-		return cap_rate_lookup; }
-  inline void Set_cap_rate_lookup(const double &v) {
-		cap_rate_lookup.setValue(v); }
 	Attribute::Proxy <double, DESCRIPTOR_TABLE > crediting_cap_max;
   inline double	Get_crediting_cap_max() {
 		return crediting_cap_max; }
@@ -623,9 +607,6 @@ public :
 		return crediting_rate_guar_mths; }
   inline void Set_crediting_rate_guar_mths(const int &v) {
 		crediting_rate_guar_mths.setValue(v); }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > crediting_rate_type;
-  inline xstring	Get_crediting_rate_type() {
-		return crediting_rate_type; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > crediting_rt_chg_threshold_aig;
   inline double	Get_crediting_rt_chg_threshold_aig() {
 		return crediting_rt_chg_threshold_aig; }
@@ -733,21 +714,6 @@ public :
 		return init_fund_val; }
   inline void Set_init_fund_val(const double &v) {
 		init_fund_val.setValue(v); }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_opt_cost_5yr_gmab;
-  inline double	Get_init_opt_cost_5yr_gmab() {
-		return init_opt_cost_5yr_gmab; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_opt_cost_cs_gmab;
-  inline double	Get_init_opt_cost_cs_gmab() {
-		return init_opt_cost_cs_gmab; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_opt_cost_part_gmab;
-  inline double	Get_init_opt_cost_part_gmab() {
-		return init_opt_cost_part_gmab; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_opt_cost_seccap;
-  inline double	Get_init_opt_cost_seccap() {
-		return init_opt_cost_seccap; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_opt_cost_trig_gmab;
-  inline double	Get_init_opt_cost_trig_gmab() {
-		return init_opt_cost_trig_gmab; }
 	Attribute::Proxy <double, DESCRIPTOR_TABLE > init_part_rate;
   inline double	Get_init_part_rate() {
 		return init_part_rate; }
@@ -771,11 +737,6 @@ public :
 	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > lookback_sampling_interval;
   inline xstring	Get_lookback_sampling_interval() {
 		return lookback_sampling_interval; }
-	Attribute::Proxy <xstring, DESCRIPTOR_TABLE > opt_type_lookup;
-  inline xstring	Get_opt_type_lookup() {
-		return opt_type_lookup; }
-  inline void Set_opt_type_lookup(const xstring &v) {
-		opt_type_lookup.setValue(v); }
 	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > part_rate_solve_max_iter_aig;
   inline int	Get_part_rate_solve_max_iter_aig() {
 		return part_rate_solve_max_iter_aig; }
@@ -785,15 +746,6 @@ public :
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > pct_to_hedge;
   inline double	Get_pct_to_hedge() {
 		return pct_to_hedge; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > prog_trigger_bailout_threshold_crbg;
-  inline double	Get_prog_trigger_bailout_threshold_crbg() {
-		return prog_trigger_bailout_threshold_crbg; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > prog_trigger_barrier_level_crbg;
-  inline double	Get_prog_trigger_barrier_level_crbg() {
-		return prog_trigger_barrier_level_crbg; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > prog_trigger_multiplier_crbg;
-  inline double	Get_prog_trigger_multiplier_crbg() {
-		return prog_trigger_multiplier_crbg; }
 	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > remove_par_sprd_min_max_aig;
   inline xstring	Get_remove_par_sprd_min_max_aig() {
 		return remove_par_sprd_min_max_aig; }
@@ -837,21 +789,6 @@ public :
 		return renewal_surr_chg_offest_aig; }
   inline void Set_renewal_surr_chg_offest_aig(const double &v) {
 		renewal_surr_chg_offest_aig.setValue(v); }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > seasoned_opt_cost_5yr_combo;
-  inline double	Get_seasoned_opt_cost_5yr_combo() {
-		return seasoned_opt_cost_5yr_combo; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > seasoned_opt_cost_cs_gmab;
-  inline double	Get_seasoned_opt_cost_cs_gmab() {
-		return seasoned_opt_cost_cs_gmab; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > seasoned_opt_cost_part_gmab;
-  inline double	Get_seasoned_opt_cost_part_gmab() {
-		return seasoned_opt_cost_part_gmab; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > seasoned_opt_cost_seccap;
-  inline double	Get_seasoned_opt_cost_seccap() {
-		return seasoned_opt_cost_seccap; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > seasoned_opt_cost_trig_gmab;
-  inline double	Get_seasoned_opt_cost_trig_gmab() {
-		return seasoned_opt_cost_trig_gmab; }
 	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > strategy_term_duration_aig;
   inline int	Get_strategy_term_duration_aig() {
 		return strategy_term_duration_aig; }
@@ -905,13 +842,13 @@ std::string cast_xstring_to_string_aig(const xstring& input_xstring);
 
 // Get option price from ESG:
 #line 1 "get_option_price_aig.fiaafund_liab.for"
-double get_option_price_aig(int projection_month, double strike, StrEnum::EnumValue opt_defn, 
-	int option_duration_mths, int input_strike_period_mths, int into_2nd_strat = 0);
+double get_option_price_aig(
+	int projection_month, double strike, StrEnum::EnumValue opt_defn, int option_duration_mths, int input_strike_period_mths);
 
 // Get option strike from ESG tables:
 #line 1 "get_option_strike_aig.fiaafund_liab.for"
-double get_option_strike_aig(int projection_month, double cost, StrEnum::EnumValue opt_defn, 
-	int option_duration_mths, int output_strike_period_mths, int into_2nd_strat = 0);
+double get_option_strike_aig(
+	int projection_month, double cost, StrEnum::EnumValue opt_defn, int option_duration_mths, int output_strike_period_mths);
 
 // Equity Index Rolling Average of Past x Months
 #line 1 "index_val_avg_calc.fiaafund_liab.for"

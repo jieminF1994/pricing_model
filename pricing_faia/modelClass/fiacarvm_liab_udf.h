@@ -97,9 +97,6 @@ double fiacarvm_liab_crediting_rate_black_scholes_aig(int t);
 // Crediting Rate Index0 Aig 
 double fiacarvm_liab_crediting_rate_index0_aig(int t);
 
-// Crediting Rate Secure Cap Crbg 
-double fiacarvm_liab_crediting_rate_secure_cap_crbg(int t);
-
 // Death benefits: 
 double fiacarvm_liab_dth_benefits_b_bef_aig(int t);
 
