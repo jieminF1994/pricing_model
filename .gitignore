@@ -21,3 +21,6 @@
 *.out
 build/
 cmake-build-*/
+
+# Support docs (RSDs, study guides, etc.) - not tracked
+support/
