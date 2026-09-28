@@ -1,13 +1,12 @@
 ﻿
 //MODELCLASS BEGIN
+//MODELCLASS aa_comp_comp
 //MODELCLASS adco_asset
 //MODELCLASS ann_pba_pba
 //MODELCLASS asset_asset
-//MODELCLASS automation
 //MODELCLASS a_subport_asset
 //MODELCLASS bond_asset
 //MODELCLASS bond_cf_asset
-//MODELCLASS comp_comp
 //MODELCLASS eio_asset
 //MODELCLASS epa_asset
 //MODELCLASS epl_liab
@@ -15,16 +14,14 @@
 //MODELCLASS fiacarvm_liab
 //MODELCLASS fia_liab
 //MODELCLASS hdg_grp_comp
-//MODELCLASS intex_asset
 //MODELCLASS invstrat_asset
 //MODELCLASS liab_liab
+//MODELCLASS mrb_gaap
 //MODELCLASS mtg_asset
 //MODELCLASS mtg_cf_asset
 //MODELCLASS rates_economy
 //MODELCLASS seg_comp
-//MODELCLASS sfas133_gaap
 //MODELCLASS sfas97rd_gaap
-//MODELCLASS util_rafm
 //MODELCLASS END
 
 #if defined(MICROSOFT)
@@ -75,13 +72,12 @@ extern MemCount gMem;
 extern MY_DLL Parmfile *p;
 #include "column2.h"
 #include "ModelClass\asset_asset_udf.h"
+#include "ModelClass\aa_comp_comp.h"
 #include "ModelClass\adco_asset.h"
 #include "ModelClass\ann_pba_pba.h"
-#include "ModelClass\automation.h"
 #include "ModelClass\a_subport_asset.h"
 #include "ModelClass\bond_asset.h"
 #include "ModelClass\bond_cf_asset.h"
-#include "ModelClass\comp_comp.h"
 #include "ModelClass\eio_asset.h"
 #include "ModelClass\epa_asset.h"
 #include "ModelClass\epl_liab.h"
@@ -89,16 +85,14 @@ extern MY_DLL Parmfile *p;
 #include "ModelClass\fiacarvm_liab.h"
 #include "ModelClass\fia_liab.h"
 #include "ModelClass\hdg_grp_comp.h"
-#include "ModelClass\intex_asset.h"
 #include "ModelClass\invstrat_asset.h"
 #include "ModelClass\liab_liab.h"
+#include "ModelClass\mrb_gaap.h"
 #include "ModelClass\mtg_asset.h"
 #include "ModelClass\mtg_cf_asset.h"
 #include "ModelClass\rates_economy.h"
 #include "ModelClass\seg_comp.h"
-#include "ModelClass\sfas133_gaap.h"
 #include "ModelClass\sfas97rd_gaap.h"
-#include "ModelClass\util_rafm.h"
 #pragma optimize( "gs", on )
 
 #include "generatedCppHeader.h"
@@ -109,7 +103,7 @@ extern MY_DLL Parmfile *p;
 //Redundant includes only for snip test:
 //iomanip included for "setprecision()"
 #include <iomanip>
-#include <strstream> //WTW - Gen2
+#include <strstream>
 typedef vector<vector<string>> sowfinput;
 typedef vector<string> sowfcols;
 typedef map <xstring, long, less <xstring> > sowfmap;
@@ -120,7 +114,9 @@ typedef vector<vector<string>> deptaskinput;
 typedef vector<string> deptaskcols;
 typedef map <xstring, long, less <xstring> > deptaskmap;
 typedef deptaskmap::iterator deptaskmapiter;
-//extern MY_DLL strstream log_screen; //WTW - Gen2 - MY_DLL is not supported
+const int pv = 0;
+const int is = 1;
+const int ym = 2;
 const int EFFECTIVE_RATE = 0;
 const int EFFECTIVE_ANNUAL = 1;
 const int NOMINAL_SEMIANNUAL = 2;
@@ -138,9 +134,8 @@ const double LEAST_ANNUAL_GROWTH_RATE = -0.9999;
 const double LEAST_BOND_EQUIVALENT_RATE = 0.0001;
 const double SPOT_SHIFT_FOR_EFFECTIVE_DURATION_CALCULATION = 0.0001;
 const double ONE_MILLION = 1000000.0;
-//WTW - Gen2 - Move Extern definitions to rates header
-//const double MINIMUM_MONTHLY_YIELD_RATIO = -0.9; // annual yield = (1.0-0.9)^12 = 1.0e-12
-//const double MAXIMUM_MONTHLY_YIELD_RATIO	 = 999999999.0; // annual yield = (1.0+999999999.0)^12 = 1.0e+120
+const double MINIMUM_MONTHLY_YIELD_RATIO = -0.9; // annual yield = (1.0-0.9)^12 = 1.0e-12
+const double MAXIMUM_MONTHLY_YIELD_RATIO	 = 999999999.0; // annual yield = (1.0+999999999.0)^12 = 1.0e+120
 const int DECIMALS_TO_ROUND = 6;
 const int ROUND_NEGATIVE_TOZERO = 0;
 const int ROUND_NEAR = 1;
@@ -154,11 +149,10 @@ const int SUM_OVER_NEGATIVE = -101;
 const int TIER = -98;
 const int ANY_GROUP = -99;
 const bool DO_NOT_ISSUE_WARNINGS = false;
-//WTW - Gen2 - Move Extern definitions to rates header
-//const int CALL_CODE = 1; 
-//const int PUT_CODE = 2; 
-//const int CONTINUOUS_PAYOUT_CODE = 3;
-//const int FUTURES_CODE = 4;
+const int CALL_CODE = 1;
+const int PUT_CODE = 2;
+const int CONTINUOUS_PAYOUT_CODE = 3;
+const int FUTURES_CODE = 4;
 // Model point type
 const int NEW_PURCH = 0;
 const int INIT_MP = 1;
@@ -208,11 +202,13 @@ const int HEDGE_CASH_FLOW = 0;
 const int HEDGE_MKT_VAL = 1;
 const int HEDGE_ARRAY_SIZE = 2;
 // global calculation flags
-//extern bool pricing_flag;//WTW - Gen2 - Move Extern definitions to rates header
+extern bool pricing_flag;
 extern bool factors_flag;
 extern bool nb_flag;
 extern bool alm_flag;
 extern bool tcm_flag;
+extern bool pba_disc_rate_flag;
+extern int pba_segment_size;
 extern bool avr_flag;
 extern bool imr_flag;
 extern bool gaap_flag;
@@ -220,17 +216,12 @@ extern bool tgt_cap_flag;
 extern bool stoch_flag;
 extern bool valn_flag;
 extern bool time_step_flag;
-extern bool sfas133_valn_flag;
+extern bool mrb_valn_flag;
 extern bool sop031_valn_flag;
 extern bool sfas97rd_valn_flag;
-extern bool sfas97lp_valn_flag;
-extern bool sfas97lp_gpr_valn_flag;
 extern bool sfas91_valn_flag;
-extern bool sfas60_valn_flag;
-extern bool sfas60_gpr_valn_flag;
+extern bool gaap_ldti_valn_flag;
 extern bool sfas120_nlp_valn_flag;
-extern bool sfas120_valn_flag;
-extern bool sfas120_gpr_valn_flag;
 extern bool loc_gpr_valn_flag;
 extern bool pba_valn_flag;
 extern bool pba_scen_amt_valn_flag;
@@ -239,6 +230,7 @@ extern bool res_scen_amt_valn_flag;
 extern bool res_det_res_valn_flag;
 extern bool res_ag38_8d_valn_flag;
 extern bool std_scen_valn_flag;
+extern bool std_scen_prescribed_assump_flag;
 extern bool rbc_std_scen_valn_flag;
 extern bool rbc_std_scen_step2_valn_flag;
 extern bool res_std_scen_valn_flag;
@@ -261,33 +253,32 @@ extern double aggregate_amount_threshold;
 extern double model_point_amount_threshold;
 extern double rate_ratio_threshold;
 extern vector<string> valn_periods;
+
 // utility functions - elaborated in rates/economy externs
-//WTW - Gen2 - Move Extern definitions to rates header
-/*extern double round_result(int rounding, int negative, double x, int n);
+extern double round_result(int rounding, int negative, double x, int n);
 extern double factorial(int n);
 extern int n_choose_k(int n, int k);
 extern xstring check_date_format(const xstring &date);
+extern int month_from_day_number(int nSerialDate);
+extern int year_from_day_number(int nSerialDate);
+extern int day_from_day_number(int nSerialDate);
+extern int month_number_from_date(int year, int month); 
+extern int day_number_from_date(int nYear, int nMonth, int nDay);
 extern int get_mth_from_date(const xstring &date);
 extern int get_yr_from_date(const xstring &date);
 extern int get_day_from_date(const xstring &date);
-extern int month_from_day_number(int nSerialDate);//WTW - Gen2 - add new formula to replace unsupported MonthFromDayNumber() function
-extern int year_from_day_number(int nSerialDate);//WTW - Gen2 - add new formula to replace unsupported YearFromDayNumber() function
-extern int day_from_day_number(int nSerialDate);//WTW - Gen2 - add new formula to replace unsupported DayFromDayNumber() function
-extern int month_number_from_date(int year, int month); //WTW - Gen2 - add new formula to replace unsupported MonthNumberFromDate() function
-extern int day_number_from_date(int nYear, int nMonth, int nDay); //WTW - Gen2 - add new formula to replace unsupported DayNumberFromDate() function
 extern int get_end_of_mth_day(int yr, int mth);
 extern xstring add_mths_to_date(const xstring &date, int mths);
 extern int get_mth_from_adj_date(const xstring &date, int mths);
 extern double convert_rate_basis(double orig_rate, double orig_rate_basis, double new_rate_basis);
 extern double convert_decrem_rate_basis(double orig_rate, double orig_rate_basis, double new_rate_basis);
-extern long int determine_tbl_size(int sNumberOfDims, ...);
 extern xstring get_file_name(const xstring &source_file);
 extern xstring get_file_path(const xstring &source_file);
-extern xstring get_base_group_name(const xstring &tag, bool seriatim_flag = false);
+extern xstring get_base_group_name(const xstring &tag, bool split_flag = false);
 extern xstring get_string_of_date(double date);
 extern xstring get_string_of_enum_val(StrEnum::EnumValue type);
 extern int date_diff(xstring first_date, xstring second_date);
-extern int number_of_decimals(double xxx, int digits);//WTW - Gen2 - replace preprocessor #define with formula
+extern int number_of_decimals(double xxx,int digits);
 extern xstring write_string(double value, int string_length, int significant_digits);
 extern xstring write_array_to_string(SmartArray <double> value_array, int low, int high);
 extern void read_from_string(xstring temp_string, SmartArray <double> &temp_array);
@@ -308,25 +299,8 @@ extern double bs_opt_val_continuous_highest_gain(int call_or_put, double current
 extern double bs_opt_val_highest_gain(int call_or_put, double current_price, double observed_max, double observed_min, double strike_price, double length_of_sampling_period, int sampling_freq, double yrs_to_expiry, double risk_free_rate, double init_div_yld, double index_vol, int scen_int_freq, int scen_index_freq);
 extern double bs_opt_val_mthly_sum_cap(int crediting_mths, int known_index_vals, double sum_capped_amts,  double mthly_cap_rate, double yrs_to_expiry, double risk_free_rate, double init_div_yld, double index_vol, int scen_int_freq, int scen_index_freq);
 extern double cumul_bivariate_normal_distribn(double x, double y, double rho);
-extern double cumul_normal_distribn(double x);*/
+extern double cumul_normal_distribn(double x);
 
-// RAFM SQLite
-#ifndef _RAFMSQLITE_H_
-#define _RAFMSQLITE_H_
-
-#include <string>
-#include <vector>
-
-using namespace std;
-
-// 20210614 STW: upgrade to RAFM 2.9
-/*
-extern void openDatabase(string dbPath);
-extern void closeDatabase();
-extern string readCsvFile(string csvPath);
-extern void executeQuery(string sql, vector<string>& columns, vector<vector<string>>& results);
-*/
-#endif
 #endif
 extern int trace_wanted;
 
@@ -369,8 +343,21 @@ ostringstream PVCText;
 extern int PVCLen;
 extern int PVCSigDig;
 
-// yield maintenance detail
-ofstream& YMFile = * new ofstream;
+#if defined(__SEC_ASSET_H_)
+int pv_cp_asset_defn = -1;
+int pv_cp_model_point = -1;
+#endif
+
+// Bond option pricing tables and other bond tables
+#if defined (__BOND_ASSET_H_)
+SmartArray <double>& pv_accumulated_cash_flows = * new SmartArray <double>; 
+SmartArray <double>& pv_discount_factors = * new SmartArray <double>;
+SmartArray <double>& pv_discounted_cash_flows = * new SmartArray <double>;
+SmartArray <double>& pv_time_weighted_discounted_cash_flows = * new SmartArray <double>;
+SmartArray <double>& pv_call_amount = * new SmartArray <double>;
+SmartArray <double>& pv_put_amount = * new SmartArray <double>;
+SmartArray <double>& pv_scheduled_principal_payments = * new SmartArray <double>; // for WAL calculation
+#endif
 
 #if defined (__BOND_ASSET_H_) || defined (__MTG_ASSET_H_) || defined (__SEC_ASSET_H_)
 int pv_months = 0;
@@ -385,6 +372,7 @@ bool pv_par_val_per_unit_of_par_calculation = false;
 bool pv_initialize_interest_savings_table = false;
 SmartArray <double>& pv_cash_flows = * new SmartArray <double>;
 SmartArray <double>& pv_interest_savings_after_prepayments = * new SmartArray <double>;
+#endif
 
 #if defined (__BOND_ASSET_H_) || defined (__MTG_ASSET_H_)
 bool pv_initialize_yield_maintenance_table = false;
@@ -392,23 +380,9 @@ SmartArray <double>& pv_yield_maintenance_cash_flows = * new SmartArray <double>
 SmartArray <double>& pv_yield_maintenance_par_plus_accrued = * new SmartArray <double>;
 #endif
 
-// Bond option pricing tables and other bond tables
-#if defined(__BOND_ASSET_H_)
-SmartArray <double>& pv_accumulated_cash_flows = * new SmartArray <double>; 
-SmartArray <double>& pv_discount_factors = * new SmartArray <double>;
-SmartArray <double>& pv_discounted_cash_flows = * new SmartArray <double>;
-SmartArray <double>& pv_time_weighted_discounted_cash_flows = * new SmartArray <double>;
-SmartArray <double>& pv_call_amount = * new SmartArray <double>;
-SmartArray <double>& pv_put_amount = * new SmartArray <double>;
-SmartArray <double>& pv_scheduled_principal_payments = * new SmartArray <double>; // for WAL calculation
-#endif
+// yield maintenance detail
+ofstream& YMFile = * new ofstream;
 
-#if defined(__SEC_ASSET_H_)
-int pv_cp_asset_defn = -1;
-int pv_cp_model_point = -1;
-#endif
-
-#endif
 
 extern MY_DLL long scenario_number;
 extern MY_DLL long layer;
@@ -421,7 +395,6 @@ extern const int& last_proj_task_loop;
 extern const int& proj_task_loop_num;
 extern const int& num_of_proj_task_loops;
 
-extern MY_DLL2 int use_overlay_code;
 extern MY_DLL int trace_level_wanted;
 extern MY_DLL int trace_level;
 extern MY_DLL bool bEmitTurboDebugger;
@@ -438,9 +411,6 @@ void ASSET_ASSET::removeSMPointers(ModelClass* modelToRemove){
 
 	if(modelToRemove == sm_adco)
 		sm_adco = 0;
-
-	if(modelToRemove == sm_intex)
-		sm_intex = 0;
 
 }		
 
@@ -467,7 +437,6 @@ return 0;
 
 }
 
-
 //@@ END
 
 //@@ START - asset_detail_rpt_inv_strat_flag
@@ -492,7 +461,6 @@ if (asset_detail_rpt_inv_strat_defn == YES
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -519,7 +487,6 @@ return proj_start_mth + t - 1
 
 }
 
-
 //@@ END
 
 //@@ START - cal_yr
@@ -544,7 +511,6 @@ return proj_start_yr + cal_yr_relative(t) - 1;
 
 }
 
-
 //@@ END
 
 //@@ START - cal_yr_relative
@@ -565,7 +531,6 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 return 1 + floor((proj_start_mth + t - 2) / 12.0);
 
 }
-
 
 //@@ END
 
@@ -589,10 +554,9 @@ int year = cal_yr(t);
 int month = cal_mth(t);
 int day = 1;
 
-return DayNumberFromDate(year, month, day);
+return day_number_from_date(year, month, day);
 
 }
-
 
 //@@ END
 
@@ -608,6 +572,7 @@ double ASSET_ASSET_UDF::asset_asset_finalize(int t) {
 //^^^
 
 #line 1 "finalize.ASSET_ASSET.for"
+//resize to original sizes
 #if defined(__BOND_ASSET_H_)
 if (sm_bond.size() > num_bonds_init)
 	sm_bond.resize(num_bonds_init);
@@ -656,7 +621,6 @@ if (adco)
 return 1;
 
 }
-
 
 //@@ END
 
@@ -780,7 +744,6 @@ return 1.0;
 
 }
 
-
 //@@ END
 
 //@@ START - mths_to_asset_sale
@@ -810,7 +773,6 @@ if (mkt_val_calc_freq_sale == WHENEVER_NEEDED)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -854,7 +816,7 @@ if (t == 0)
 				- proj_start_mth +  1);
 	}
 
-if (t == last_model_period)	
+if (t == projection_period_to)	
 	return 0;  
 
 if (mths_to_next_mkt_val_calc(t - 1) > 0)	
@@ -880,7 +842,6 @@ else // if (mths_to_next_mkt_val_calc(t - 1) == 0
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -947,6 +908,26 @@ return NO_AVG;
 
 }
 
+//@@ END
+
+//@@ START - pre_finalize
+// Pre-Finalize                                                                                             
+// Column:PRE_FINALIZE
+//========================================================
+double ASSET_ASSET_UDF::asset_asset_pre_finalize(int t) {
+//^^^
+
+
+
+//^^^
+
+#line 1 "pre_finalize.ASSET_ASSET.for"
+if (t != final_period)
+	return NO_AVG;
+
+return finalize(t);
+
+}
 
 //@@ END
 
@@ -963,6 +944,10 @@ double ASSET_ASSET_UDF::virtual_startup(int t) {
 
 #line 1 "startup.ASSET_ASSET.for"
 #if 0 // START_HEADER
+#if defined(GEN2_ALM_RUN)
+	#define __ASSET_ASSET_H_
+#endif
+
 #include <sstream> // for ostringstream
 #include <utility> // for pair templates
 #endif // END_HEADER
@@ -1002,8 +987,21 @@ ostringstream PVCText;
 extern int PVCLen;
 extern int PVCSigDig;
 
-// yield maintenance detail
-ofstream& YMFile = * new ofstream;
+#if defined(__SEC_ASSET_H_)
+int pv_cp_asset_defn = -1;
+int pv_cp_model_point = -1;
+#endif
+
+// Bond option pricing tables and other bond tables
+#if defined (__BOND_ASSET_H_)
+SmartArray <double>& pv_accumulated_cash_flows = * new SmartArray <double>; 
+SmartArray <double>& pv_discount_factors = * new SmartArray <double>;
+SmartArray <double>& pv_discounted_cash_flows = * new SmartArray <double>;
+SmartArray <double>& pv_time_weighted_discounted_cash_flows = * new SmartArray <double>;
+SmartArray <double>& pv_call_amount = * new SmartArray <double>;
+SmartArray <double>& pv_put_amount = * new SmartArray <double>;
+SmartArray <double>& pv_scheduled_principal_payments = * new SmartArray <double>; // for WAL calculation
+#endif
 
 #if defined (__BOND_ASSET_H_) || defined (__MTG_ASSET_H_) || defined (__SEC_ASSET_H_)
 int pv_months = 0;
@@ -1018,6 +1016,7 @@ bool pv_par_val_per_unit_of_par_calculation = false;
 bool pv_initialize_interest_savings_table = false;
 SmartArray <double>& pv_cash_flows = * new SmartArray <double>;
 SmartArray <double>& pv_interest_savings_after_prepayments = * new SmartArray <double>;
+#endif
 
 #if defined (__BOND_ASSET_H_) || defined (__MTG_ASSET_H_)
 bool pv_initialize_yield_maintenance_table = false;
@@ -1025,23 +1024,9 @@ SmartArray <double>& pv_yield_maintenance_cash_flows = * new SmartArray <double>
 SmartArray <double>& pv_yield_maintenance_par_plus_accrued = * new SmartArray <double>;
 #endif
 
-// Bond option pricing tables and other bond tables
-#if defined(__BOND_ASSET_H_)
-SmartArray <double>& pv_accumulated_cash_flows = * new SmartArray <double>; 
-SmartArray <double>& pv_discount_factors = * new SmartArray <double>;
-SmartArray <double>& pv_discounted_cash_flows = * new SmartArray <double>;
-SmartArray <double>& pv_time_weighted_discounted_cash_flows = * new SmartArray <double>;
-SmartArray <double>& pv_call_amount = * new SmartArray <double>;
-SmartArray <double>& pv_put_amount = * new SmartArray <double>;
-SmartArray <double>& pv_scheduled_principal_payments = * new SmartArray <double>; // for WAL calculation
-#endif
+// yield maintenance detail
+ofstream& YMFile = * new ofstream;
 
-#if defined(__SEC_ASSET_H_)
-int pv_cp_asset_defn = -1;
-int pv_cp_model_point = -1;
-#endif
-
-#endif
 #endif // END_EXTERNS
 
 #if 0 // START_CLASS
@@ -1049,24 +1034,18 @@ xstring asset_detail_rpt_id;
 xstring yld_maint_rpt_id;
 
 // Asset sub portfolio map
-typedef map <xstring, int, less<xstring> > asubportmap;
-asubportmap asset_sub_port_map;
-asubportmap::iterator asset_sub_port_map_iter;
+map <xstring, int, less<xstring> > asset_sub_port_map;
+map <xstring, int, less<xstring> >::iterator asset_sub_port_map_iter;
 
 // Existing asset sequence number map
-typedef map <xstring, int, less<xstring> > seqmap;
-seqmap existing_asset_sequence_num_map;
+map <xstring, int, less<xstring> > existing_asset_sequence_num_map;
 
 // Asset category map
-typedef map <xstring, int, less<xstring> > acatmap;
-acatmap asset_category_map;
+map <xstring, int, less<xstring> >  asset_category_map;
 
 // Initial cash account_id balance maps
-typedef map <xstring, double, less<xstring> > icbmap;
-icbmap init_cash_bal_map;
-icbmap::iterator init_cash_bal_map_iter;
-
-typedef map <int, long, less <int> > mpmap;
+map <xstring, double, less<xstring> > init_cash_bal_map;
+map <xstring, double, less<xstring> >::iterator init_cash_bal_map_iter;
 
 int asset_mp_sequence_num;
 int purch_asset_mp_num;
@@ -1091,6 +1070,9 @@ SmartArray <double> psa_base_rate;
 
 const char *zAssetFund[2];
 const char *zSalesClass[5];
+
+SEG_COMP * seg_element;
+
 #endif // END_CLASS
 
 #if 0 // START_CONSTRUCTOR
@@ -1153,7 +1135,7 @@ if (alm_flag)
 	asset_sub_ports.resize(0);
 
 	if (asset_sub_ports_selected != "NONE")
-		split_string_usl(asset_sub_ports_selected.c_str(), asset_sub_ports, ",");//WTW - Gen2 - split_tring internal RAFM function
+		split_string_usl(asset_sub_ports_selected.c_str(), asset_sub_ports, ",");
 	else
 		throw FatalError ("No asset sub portfolios have been specified. Please correct asset_sub_ports_selected input variable.");
 
@@ -1172,7 +1154,6 @@ return 1.0;
 
 }
 
-
 //@@ END
 
 //@@ START - final_period
@@ -1187,7 +1168,6 @@ int ASSET_ASSET_UDF::asset_asset_final_period() {
 return last_proj_period;
 
 }
-
 
 //@@ END
 
@@ -1204,7 +1184,6 @@ return add_mths_to_date(proj_date, valn_period);
 
 }
 
-
 //@@ END
 
 //@@ START - proj_start_date
@@ -1216,10 +1195,9 @@ int ASSET_ASSET_UDF::asset_asset_proj_start_date() {
 
 
 #line 1 "proj_start_date.ASSET_ASSET.for"
-return MonthNumberFromDate(proj_start_yr, proj_start_mth);
+return day_number_from_date(proj_start_yr, proj_start_mth, 1);
 
 }
-
 
 //@@ END
 
@@ -1241,7 +1219,6 @@ return proj_mth + 1;
 
 }
 
-
 //@@ END
 
 //@@ START - proj_start_yr
@@ -1262,7 +1239,6 @@ return get_yr_from_date(proj_date_adj);
 
 }
 
-
 //@@ END
 
 //@@ START - scen_day
@@ -1278,7 +1254,6 @@ return 29;
 
 }
 
-
 //@@ END
 
 //@@ START - start_period
@@ -1293,7 +1268,6 @@ int ASSET_ASSET_UDF::asset_asset_start_period() {
 return 0;
 
 }
-
 
 //@@ END
 
@@ -1378,104 +1352,72 @@ for (seg_num = 0; seg_num < company->sm_seg.size(); seg_num++)
 #if defined(__BOND_ASSET_H_)
 for (mp = num_bonds_init; mp < sm_bond.size(); mp++)
 	{
-	BOND_ASSET *current_bond_element;
-	current_bond_element = sm_bond[mp];
-	seg_num = current_bond_element->seg_num;
+	seg_num = sm_bond[mp][0]->seg_num;
 	company->sm_seg[seg_num]->bond_mp_map_inactive[mp] = mp;
 
-	current_bond_element->purch_asset_id = "NONE";
-
-	if(!current_bond_element->bond_pv->isShrunk)
-		current_bond_element->bond_pv->shrink();
-	if(!current_bond_element->bond_is->isShrunk)
-		current_bond_element->bond_is->shrink();
-	if(!current_bond_element->bond_ym->isShrunk)
-		current_bond_element->bond_ym->shrink();
+	sm_bond[mp][0]->purch_asset_id = "NONE";
 	}
 #endif
 #if defined(__MTG_ASSET_H_)
 for (mp = num_mtgs_init; mp < sm_mtg.size(); mp++)
 	{
-	MTG_ASSET *current_mortgage_element;
-	current_mortgage_element = sm_mtg[mp];
-	seg_num = current_mortgage_element->seg_num;
+	seg_num = sm_mtg[mp][0]->seg_num;
 	company->sm_seg[seg_num]->mtg_mp_map_inactive[mp] = mp;
 
-	current_mortgage_element->purch_asset_id = "NONE";
-
-	if(!current_mortgage_element->mtg_pv->isShrunk)
-		current_mortgage_element->mtg_pv->shrink();
-	if(!current_mortgage_element->mtg_is->isShrunk)
-		current_mortgage_element->mtg_is->shrink();
-	if(!current_mortgage_element->mtg_ym->isShrunk)
-		current_mortgage_element->mtg_ym->shrink();
+	sm_mtg[mp][0]->purch_asset_id = "NONE";
 	}
 #endif
 #if defined(__SEC_ASSET_H_)
 for (mp = num_secs_init; mp < sm_sec.size(); mp++)
 	{
-	SEC_ASSET *current_sec_element;
-	current_sec_element = sm_sec[mp];
-	seg_num = current_sec_element->seg_num;
+	seg_num = sm_sec[mp]->seg_num;
 	company->sm_seg[seg_num]->sec_mp_map_inactive[mp] = mp;
 
-	current_sec_element->purch_asset_id = "NONE";
-	current_sec_element->cp_mp_num = -1;
+	sm_sec[mp]->purch_asset_id = "NONE";
+	sm_sec[mp]->cp_mp_num = -1;
 
-	if(!current_sec_element->sec_pv->isShrunk)
-		current_sec_element->sec_pv->shrink();
 	}
 #endif
 #if defined(__IRD_ASSET_H_)
 for (mp = num_irds_init; mp < sm_ird.size(); mp++)
 	{
-	IRD_ASSET *current_ird_element;
-	current_ird_element = sm_ird[mp];
-	seg_num = current_ird_element->seg_num;
+	seg_num = sm_ird[mp][0]->seg_num;
 	company->sm_seg[seg_num]->ird_mp_map_inactive[mp] = mp;
 
-	current_ird_element->purch_asset_id = "NONE";
+	sm_ird[mp][0]->purch_asset_id = "NONE";
 	}
 #endif
 #if defined(__RE_ASSET_H_)
 for (mp = num_res_init; mp < sm_re.size(); mp++)
 	{
-	RE_ASSET *current_re_element;
-	current_re_element = sm_re[mp];
-	seg_num = current_re_element->seg_num;
+	seg_num = sm_re[mp]->seg_num;
 	company->sm_seg[seg_num]->re_mp_map_inactive[mp] = mp;
 
-	current_re_element->purch_asset_id = "NONE";
+	sm_re[mp]->purch_asset_id = "NONE";
 	}
 #endif
 #if defined(__EQT_ASSET_H_)
 for (mp = num_eqts_init; mp < sm_eqt.size(); mp++)
 	{
-	EQT_ASSET *current_eqt_element;
-	current_eqt_element = sm_eqt[mp];
-	seg_num = current_eqt_element->seg_num;
+	seg_num = sm_eqt[mp]->seg_num;
 	company->sm_seg[seg_num]->eqt_mp_map_inactive[mp] = mp;
 
-	current_eqt_element->purch_asset_id = "NONE";
+	sm_eqt[mp]->purch_asset_id = "NONE";
 	}
 #endif
 #if defined(__EIO_ASSET_H_)
 for (mp = num_eios_init; mp < sm_eio.size(); mp++)
 	{
-	EIO_ASSET *current_eio_element;
-	current_eio_element = sm_eio[mp];
-	seg_num = current_eio_element->seg_num;
+	seg_num = sm_eio[mp][0]->seg_num;
 	company->sm_seg[seg_num]->eio_mp_map_inactive[mp] = mp;
 
-	current_eio_element->purch_asset_id = "NONE";
+	sm_eio[mp][0]->purch_asset_id = "NONE";
 	}
 #endif
 #if defined(__EPA_ASSET_H_)
 for (mp = num_epas_init; mp < sm_epa.size(); mp++)
 	{
-	EPA_ASSET *current_epa_element;
-	current_epa_element = sm_epa[mp];
-	seg_num = current_epa_element->seg_num;
+	seg_num = sm_epa[mp]->seg_num;
 	company->sm_seg[seg_num]->epa_mp_map_inactive[mp] = mp;
 	}
 #endif
@@ -1494,21 +1436,33 @@ if (new_asset // Existing asset at projection date or new purchase
 	{
 	for (int row = 0; row < asset_sub_ports.size(); row++)
 		{
-		// Set lookup key
-		asset_sub_port_id = asset_sub_ports[row];
-
 		// split the comma separated list of asset categories
 		vector <string> sub_port_assign_cats;
-		split_string_usl(asset_sub_port_categories.c_str(), sub_port_assign_cats, ",");//WTW - Gen2 - split_tring internal RAFM function
-	
-		if (asset_sub_port_asset_type == asset_type
-			&& asset_sub_port_port_defn == port_defn
-			&& (asset_sub_port_categories == "ALL"
+
+		// Set lookup key
+		asset_sub_port_id = asset_sub_ports[row];
+		split_string_usl(asset_sub_port_categories.c_str(), sub_port_assign_cats, ",");
+		asset_sub_port_id = asset_sub_ports[row];
+		xstring asset_sub_port_asset_type_local = asset_sub_port_asset_type;
+		asset_sub_port_id = asset_sub_ports[row];
+		StrEnum::EnumValue asset_sub_port_port_defn_local = asset_sub_port_port_defn;
+		asset_sub_port_id = asset_sub_ports[row];
+		xstring asset_sub_port_categories_local = asset_sub_port_categories;
+		asset_sub_port_id = asset_sub_ports[row];
+		xstring asset_sub_port_existing_or_purch_defn_local = asset_sub_port_existing_or_purch_defn;
+		asset_sub_port_id = asset_sub_ports[row];
+		double asset_sub_port_dur_min_local = asset_sub_port_dur_min;
+		asset_sub_port_id = asset_sub_ports[row];
+		double asset_sub_port_dur_max_local = asset_sub_port_dur_max;
+		
+		if (asset_sub_port_asset_type_local == asset_type
+			&& asset_sub_port_port_defn_local == port_defn
+			&& (asset_sub_port_categories_local == "ALL"
 				|| find(sub_port_assign_cats.begin(), sub_port_assign_cats.end(), category_id) != sub_port_assign_cats.end())
-			&& (asset_sub_port_existing_or_purch_defn == "Both"
-				|| (asset_sub_port_existing_or_purch_defn == "Existing"
+			&& (asset_sub_port_existing_or_purch_defn_local == "Both"
+				|| (asset_sub_port_existing_or_purch_defn_local == "Existing"
 					&& existing_asset_flag)
-				|| (asset_sub_port_existing_or_purch_defn == "Purchased"
+				|| (asset_sub_port_existing_or_purch_defn_local == "Purchased"
 					&& !existing_asset_flag)))	
 			{
 			// These asset types do not have a duration value
@@ -1517,10 +1471,9 @@ if (new_asset // Existing asset at projection date or new purchase
 				|| asset_type == "Index Option")
 				return row;				
 				
-			if ((asset_sub_port_dur_min <= dur_for_transfer
-				&& dur_for_transfer < asset_sub_port_dur_max)
-				//20220613 STW: add a condition for model efficiency improvement
-				|| fast_stat_calc_aig == YES)
+			if ((asset_sub_port_dur_min_local <= dur_for_transfer
+				&& dur_for_transfer < asset_sub_port_dur_max_local) ||
+				company->calc_eff_dur_crbg == NO)
 				return row;  				
 			}
 		}
@@ -1541,13 +1494,81 @@ if (new_asset // Existing asset at projection date or new purchase
 
 	if (new_asset)
 		{
-		makeRunLogYellow();
 		log_screen << "Warning: New purchase asset does not match any asset sub portfolio criteria. Please correct your input." 
 			       << MSG_ERROR;
 		}
 	}
 
 return sub_port_id_prev;
+}
+
+
+
+#line 1 "bond_initialize_values.ASSET_ASSET.for"                                                                                   
+double ASSET_ASSET::bond_initialize_values(int element_num, int stage)
+{
+#if defined(__BOND_ASSET_H_)
+int t = 0;
+	
+if (stage == 1)
+	{
+	asset->sm_bond[element_num][1]->initialize(t);
+	return asset->sm_bond[element_num][1]->net_yld_at_issue;
+	}
+else if (stage == 2)
+	{
+	asset->sm_bond[element_num][1]->initialize(t);
+		
+	asset->sm_bond[element_num][1]->refinancing_rate_opt_sprd;		
+	asset->sm_bond[element_num][1]->mkt_sprd(0);
+
+	// initializations before anticipated yield calculation
+	asset->sm_bond[element_num][1]->mkt_val(0);
+	asset->sm_bond[element_num][1]->eff_dur(0);
+	asset->sm_bond[element_num][1]->net_yld(0);
+
+	asset->sm_bond[element_num][0]->initial_values->yld_numer = asset->sm_bond[element_num][1]->yld_numer(0);
+	asset->sm_bond[element_num][0]->initial_values->dflt_amt = asset->sm_bond[element_num][1]->dflt_amt(0);
+	asset->sm_bond[element_num][0]->initial_values->mkt_val_bef_sale = asset->sm_bond[element_num][1]->mkt_val_bef_sale(0);
+	asset->sm_bond[element_num][0]->initial_values->eff_dur = asset->sm_bond[element_num][1]->eff_dur(0);
+	asset->sm_bond[element_num][0]->initial_values->mkt_sprd = asset->sm_bond[element_num][1]->mkt_sprd(0);
+	asset->sm_bond[element_num][0]->initial_values->net_yld = asset->sm_bond[element_num][1]->net_yld(0);
+	asset->sm_bond[element_num][0]->initial_values->amortzn_cost_period = asset->sm_bond[element_num][1]->amortzn_cost_period;
+	asset->sm_bond[element_num][0]->initial_values->opt_sprd = asset->sm_bond[element_num][1]->opt_sprd(0);
+	asset->sm_bond[element_num][0]->initial_values->refinancing_rate_opt_sprd = asset->sm_bond[element_num][1]->refinancing_rate_opt_sprd;
+	asset->sm_bond[element_num][0]->initial_values->weighted_avg_life = asset->sm_bond[element_num][1]->weighted_avg_life(0);
+		
+	return 0.0;
+	}
+else if (stage == 3)
+	{
+	asset->sm_bond[element_num][2]->initialize(t);		
+	return asset->sm_bond[element_num][2]->mkt_val_bef_sale(t);
+	}
+#endif
+
+return 0.0;
+}
+
+
+
+#line 1 "eio_initialize_values.ASSET_ASSET.for"                                                                                   
+void ASSET_ASSET::eio_initialize_values(int element_num)
+{
+#if defined(__EIO_ASSET_H_)
+int t = 0;
+	
+asset->sm_eio[element_num][1]->initialize(t);
+
+asset->sm_eio[element_num][0]->initial_values->spot_sprd_adj = asset->sm_eio[element_num][1]->spot_sprd_adj(0);
+asset->sm_eio[element_num][0]->initial_values->volatility_sprd_adj = asset->sm_eio[element_num][1]->volatility_sprd_adj(0);
+
+asset->sm_eio[element_num][0]->initial_values->yld_numer = asset->sm_eio[element_num][1]->yld_numer(0);
+asset->sm_eio[element_num][0]->initial_values->mkt_val_bef_sale = asset->sm_eio[element_num][1]->mkt_val_bef_sale(0);
+
+#endif
+
+return;
 }
 
 
@@ -1562,7 +1583,7 @@ int pos = 0;
 if (xxx(0, 13) == "ProjTaskLoop ")
 	{
 	xxx = xxx(13);
-	pos = xxx.find(" ");
+	pos = xxx.find("|");
 	if (pos > 0)
 		xxx = xxx(pos + 1);
 	else
@@ -1572,6 +1593,104 @@ else if ((pos = xxx.find(" #")) > 0)
 	xxx = xxx(0, pos);
 
 return xxx;
+}
+
+
+
+#line 1 "ird_initialize_values.ASSET_ASSET.for"                                                                                   
+void ASSET_ASSET::ird_initialize_values(int element_num)
+{
+#if defined(__IRD_ASSET_H_)
+int t = 0;
+	
+asset->sm_ird[element_num][1]->initialize(t);
+
+asset->sm_ird[element_num][0]->initial_values->spot_sprd_adj = asset->sm_ird[element_num][1]->spot_sprd_adj(0);
+asset->sm_ird[element_num][0]->initial_values->volatility_sprd_adj = asset->sm_ird[element_num][1]->volatility_sprd_adj(0);
+
+asset->sm_ird[element_num][0]->initial_values->yld_numer = asset->sm_ird[element_num][1]->yld_numer(0);
+asset->sm_ird[element_num][0]->initial_values->dflt_amt = asset->sm_ird[element_num][1]->dflt_amt(0);
+asset->sm_ird[element_num][0]->initial_values->mkt_val_bef_sale = asset->sm_ird[element_num][1]->mkt_val_bef_sale(0);
+asset->sm_ird[element_num][0]->initial_values->eff_dur = asset->sm_ird[element_num][1]->eff_dur(0);
+	
+#endif
+
+return;
+}
+
+
+
+#line 1 "mtg_initialize_values.ASSET_ASSET.for"                                                                                   
+void ASSET_ASSET::mtg_initialize_values(int t, int element_num, int stage)
+{
+#if defined(__MTG_ASSET_H_)
+if (stage == 1)
+	{
+	if (t == 0)
+		{
+		asset->sm_mtg[element_num][1]->initialize(t);
+		asset->sm_mtg[element_num][0]->intex_net_yld[t] = asset->sm_mtg[element_num][1]->intex_net_yld[t]; 
+		asset->sm_mtg[element_num][0]->intex_accr_int[t] = asset->sm_mtg[element_num][1]->intex_accr_int[t];
+		asset->sm_mtg[element_num][0]->intex_cost_basis[t] = asset->sm_mtg[element_num][1]->intex_cost_basis[t];
+		asset->sm_mtg[element_num][0]->intex_bk_val[t] = asset->sm_mtg[element_num][1]->intex_bk_val[t];
+		asset->sm_mtg[element_num][0]->intex_mkt_val[t] = asset->sm_mtg[element_num][1]->intex_mkt_val[t];
+		asset->sm_mtg[element_num][0]->intex_eff_dur[t] = asset->sm_mtg[element_num][1]->intex_eff_dur[t];
+		asset->sm_mtg[element_num][0]->intex_notional_amt[t] = asset->sm_mtg[element_num][1]->intex_notional_amt[t];
+		asset->sm_mtg[element_num][0]->intex_weighted_avg_life[t] = asset->sm_mtg[element_num][1]->intex_weighted_avg_life[t];
+		asset->sm_mtg[element_num][0]->intex_yrs_to_maturity[t] = asset->sm_mtg[element_num][1]->intex_yrs_to_maturity[t];
+		}
+	else
+		{	
+		asset->sm_mtg[element_num][0]->intex_net_yld[t] = asset->sm_mtg[element_num][1]->intex_net_yld[t];
+		asset->sm_mtg[element_num][0]->intex_accr_int[t] = asset->sm_mtg[element_num][1]->intex_accr_int[t];
+		asset->sm_mtg[element_num][0]->intex_cost_basis[t] = asset->sm_mtg[element_num][1]->intex_cost_basis[t];
+		asset->sm_mtg[element_num][0]->intex_bk_val[t] = asset->sm_mtg[element_num][1]->intex_bk_val[t];
+
+		asset->sm_mtg[element_num][0]->intex_mkt_val[t] = asset->sm_mtg[element_num][1]->intex_mkt_val[t];
+		asset->sm_mtg[element_num][0]->intex_eff_dur[t] = asset->sm_mtg[element_num][1]->intex_eff_dur[t];
+		asset->sm_mtg[element_num][0]->intex_weighted_avg_life[t] = asset->sm_mtg[element_num][1]->intex_weighted_avg_life[t];
+
+		asset->sm_mtg[element_num][0]->intex_notional_amt[t] = asset->sm_mtg[element_num][1]->intex_notional_amt[t];
+		asset->sm_mtg[element_num][0]->intex_dflt_amt[t] = asset->sm_mtg[element_num][1]->intex_dflt_amt[t];
+		asset->sm_mtg[element_num][0]->intex_int_pmt[t] = asset->sm_mtg[element_num][1]->intex_int_pmt[t];
+		asset->sm_mtg[element_num][0]->intex_sched_prin_pmt[t] = asset->sm_mtg[element_num][1]->intex_sched_prin_pmt[t];
+		asset->sm_mtg[element_num][0]->intex_opt_pmt[t] = asset->sm_mtg[element_num][1]->intex_opt_pmt[t];
+		asset->sm_mtg[element_num][0]->intex_amortzn_of_disc[t] = asset->sm_mtg[element_num][1]->intex_amortzn_of_disc[t];
+		asset->sm_mtg[element_num][0]->intex_realzd_cap_gain_prepmt[t] = asset->sm_mtg[element_num][1]->intex_realzd_cap_gain_prepmt[t];
+		asset->sm_mtg[element_num][0]->intex_realzd_cap_loss_dflt[t] = asset->sm_mtg[element_num][1]->intex_realzd_cap_loss_dflt[t];
+		asset->sm_mtg[element_num][0]->intex_unrealzd_cap_loss_from_dflt[t] = asset->sm_mtg[element_num][1]->intex_unrealzd_cap_loss_from_dflt[t];
+		asset->sm_mtg[element_num][0]->intex_cost_basis_dflt[t] = asset->sm_mtg[element_num][1]->intex_cost_basis_dflt[t];
+		asset->sm_mtg[element_num][0]->intex_yrs_to_maturity[t] = asset->sm_mtg[element_num][1]->intex_yrs_to_maturity[t];
+		}
+	}
+else if (stage == 2)
+	{
+	asset->sm_mtg[element_num][1]->initialize(t);
+		
+	// net_yld must be called first
+	//   because the prepayment interest differenital may be set to Net Yield
+	asset->sm_mtg[element_num][1]->net_yld(t);
+	asset->sm_mtg[element_num][1]->mkt_val(t);
+	asset->sm_mtg[element_num][1]->eff_dur(t);
+
+	asset->sm_mtg[element_num][0]->initial_values->yld_numer = asset->sm_mtg[element_num][1]->yld_numer(0);
+	asset->sm_mtg[element_num][0]->initial_values->dflt_amt = asset->sm_mtg[element_num][1]->dflt_amt(0);
+	asset->sm_mtg[element_num][0]->initial_values->mkt_val_bef_sale = asset->sm_mtg[element_num][1]->mkt_val_bef_sale(0);
+	asset->sm_mtg[element_num][0]->initial_values->eff_dur = asset->sm_mtg[element_num][1]->eff_dur(0);
+	asset->sm_mtg[element_num][0]->initial_values->mkt_sprd = asset->sm_mtg[element_num][1]->mkt_sprd(0);
+	asset->sm_mtg[element_num][0]->initial_values->mths_to_next_reset = asset->sm_mtg[element_num][1]->mths_to_next_reset(0);
+	asset->sm_mtg[element_num][0]->initial_values->net_yld = asset->sm_mtg[element_num][1]->net_yld(0);
+	if (!asset->sm_mtg[element_num][0]->intex_asset)
+		asset->sm_mtg[element_num][0]->initial_values->pmt_rate = asset->sm_mtg[element_num][1]->sm_mtg_cf->pmt_rate(0);
+	else
+		asset->sm_mtg[element_num][0]->initial_values->pmt_rate = 0.0;
+
+	asset->sm_mtg[element_num][0]->initial_values->weighted_avg_life = asset->sm_mtg[element_num][1]->weighted_avg_life(0);
+	}
+
+#endif
+
+return;
 }
 
 
@@ -1684,27 +1803,28 @@ void ASSET_ASSET::write_proxy_bond(void)
 int bond_size = 0;
 int mtg_size = 0;
 
-#if defined(__BOND_ASSET_H_)
-bond_size = sm_bond.size();
-
 #if defined(__MTG_ASSET_H_)
 mtg_size = sm_mtg.size();
 #endif
 
+#if defined(__BOND_ASSET_H_)
+bond_size = sm_bond.size();
+#endif
+
+#if defined(__BOND_ASSET_H_)
 if (bond_size + mtg_size <= 0)
 	{
-	makeRunLogYellow();
 	log_screen << "Warning: The proxy bond creation process has been requested. "
 	           << "However, there are no bond or mortgage assets included in the projection. " 
 	           << "No proxy bonds will be created." << MSG_ERROR;
 	return;
 	}
 
-xstring data_file_name;
+xstring data_file_name_local;
 if (bond_size > 0)
-	data_file_name = sm_bond[0]->dataFileName();
+	data_file_name_local = replaceWildcards(sm_bond[0][0]->data_file_name);
 else if (mtg_size > 0)
-	data_file_name = sm_mtg[0]->dataFileName();
+	data_file_name_local = replaceWildcards(sm_mtg[0][0]->data_file_name);
 
 xstring mp_file_search_string;
 xstring mp_file_replace_string;
@@ -1732,11 +1852,11 @@ else
 	}
 
 xstring proxy_bond_mp_file
-= xstring(data_file_name(0, data_file_name.find(mp_file_search_string)))
+= xstring(data_file_name_local(0, data_file_name_local.find(mp_file_search_string)))
   + mp_file_replace_string;
 
 xstring proxy_bond_sch_file
-= xstring(data_file_name(0, data_file_name.find(mp_file_search_string)))
+= xstring(data_file_name_local(0, data_file_name_local.find(mp_file_search_string)))
   + sch_file_replace_string;
 
 // remove any old file that is hanging around
@@ -1756,21 +1876,21 @@ if (first_time)
 		if (time_step_flag)
 			{
 			mp_file_name
-			= xstring(data_file_name(0, data_file_name.find(mp_file_search_string)))
+			= xstring(data_file_name_local(0, data_file_name_local.find(mp_file_search_string)))
 			  + "_proxy_bond_" + xstring(proj_set_loop_num) + "_" + xstring(proj_set_sub_loop_num);
 
 			sch_file_name
-			= xstring(data_file_name(0, data_file_name.find(mp_file_search_string)))
+			= xstring(data_file_name_local(0, data_file_name_local.find(mp_file_search_string)))
 			  + "_proxy_bond_sch_" + xstring(proj_set_loop_num) + "_" + xstring(proj_set_sub_loop_num);
 			}
 		else
 			{
 			mp_file_name
-			= xstring(data_file_name(0, data_file_name.find(mp_file_search_string)))
+			= xstring(data_file_name_local(0, data_file_name_local.find(mp_file_search_string)))
 			  + "_proxy_bond";
 
 			sch_file_name
-			= xstring(data_file_name(0, data_file_name.find(mp_file_search_string)))
+			= xstring(data_file_name_local(0, data_file_name_local.find(mp_file_search_string)))
 			  + "_proxy_bond_sch";
 			}
 
@@ -1783,11 +1903,11 @@ if (first_time)
 if (time_step_flag && valn_flag && proj_set_loop_num > 1)
 	{
 	xstring initial_proxy_bond_mp_file
-	= xstring(data_file_name(0, data_file_name.find(mp_file_search_string)))
+	= xstring(data_file_name_local(0, data_file_name_local.find(mp_file_search_string)))
 	  + mp_file_replace_string_first_pass;
 
 	xstring initial_proxy_bond_sch_file
-	= xstring(data_file_name(0, data_file_name.find(sch_file_search_string)))
+	= xstring(data_file_name_local(0, data_file_name_local.find(sch_file_search_string)))
 	  + sch_file_replace_string_first_pass;
 
 	return; 
@@ -1841,7 +1961,8 @@ if (!proxy_bond_output.is_open())
 	<< "avr_contribn_pct_mp" << ","			
 	<< "avr_max_pct_mp" << ","				
 	<< "avr_obj_pct_mp" << ","				
-	<< "rbc_c1_pct_mp" << endl;				
+	<< "rbc_c1_pct_mp" << ","
+	<< "unique_id_mp" << endl;	
 	}
 
 // Define and initialize local variables to be written
@@ -1970,7 +2091,7 @@ static SmartArray <double> total_par_val_call_base;
 
 for (int seg_num = 0; seg_num < company->sm_seg.size(); seg_num++)
 	{
-	SEG_COMP *seg_element = company->sm_seg[seg_num];
+	seg_element = company->sm_seg[seg_num];
 	int a_sub_port_size = sm_asset_sub_port[seg_num].size();
 	seg_id = seg_element->seg_id;
 	int bond_mp_size = seg_element->bond_mp_map_active_init.size();
@@ -1985,14 +2106,17 @@ for (int seg_num = 0; seg_num < company->sm_seg.size(); seg_num++)
 
 		asset_sub_port_id = asset_sub_ports[sub_port_num];
 		category_id = asset_sub_port_proxy_bond_category;
+		asset_sub_port_id = asset_sub_ports[sub_port_num];
 		sale_class = asset_sub_port_proxy_bond_sale_class;
-	
-		if (asset_sub_port_asset_type != "Bond" && asset_sub_port_asset_type != "Mortgage")
+		asset_sub_port_id = asset_sub_ports[sub_port_num];
+		xstring asset_sub_port_asset_type_local = asset_sub_port_asset_type;
+
+		if (asset_sub_port_asset_type_local != "Bond" && asset_sub_port_asset_type_local != "Mortgage")
 			continue;
 		else 
 			{
-			mpmap::iterator mp_map_iter;
-			if (asset_sub_port_asset_type == "Bond" && bond_mp_size > 0)
+			map <int, long, less <int> >::iterator mp_map_iter;
+			if (asset_sub_port_asset_type_local == "Bond" && bond_mp_size > 0)
 				{
 				if (sink_fund_sch_base_non.size() < bond_mp_size)
 					sink_fund_sch_base_non.resize(bond_mp_size);
@@ -2014,15 +2138,14 @@ for (int seg_num = 0; seg_num < company->sm_seg.size(); seg_num++)
 					 mp_map_iter++)
 					{
 					int mp = mp_map_iter->first;
-					BOND_ASSET *bond_element = sm_bond[mp];
 
-					if (bond_element->sub_port_id(last_proj_period) != sub_port_num)
+					if (sm_bond[mp][0]->sub_port_id(last_proj_period) != sub_port_num)
 						continue;	
 
 					bool non_callable = true;
 					if (proxy_bond_defn == CALLABLE_SEPARATE) 
 						{
-						call_year = get_yr_from_date(bond_element->call_opt_first_date);
+						call_year = get_yr_from_date(sm_bond[mp][0]->call_opt_first_date);
 						if (call_year < 9999)
 							non_callable = false;
 						}
@@ -2030,111 +2153,111 @@ for (int seg_num = 0; seg_num < company->sm_seg.size(); seg_num++)
 					if (non_callable)
 						{
 						// issue_date and maturity date
-						if (date_diff(bond_element->issue_date, earliest_issue_date_non) < 0)
-							earliest_issue_date_non = bond_element->issue_date;
+						if (date_diff(sm_bond[mp][0]->issue_date, earliest_issue_date_non) < 0)
+							earliest_issue_date_non = sm_bond[mp][0]->issue_date;
 
-						if (date_diff(bond_element->maturity_date, latest_maturity_date_non) > 0)
-							latest_maturity_date_non = bond_element->maturity_date;
+						if (date_diff(sm_bond[mp][0]->maturity_date, latest_maturity_date_non) > 0)
+							latest_maturity_date_non = sm_bond[mp][0]->maturity_date;
 
 						// book value
-						local_bk_val_non = bond_element->bk_val(last_proj_period);
-						local_bk_val_non *= bond_element->pct_to_use;
+						local_bk_val_non = sm_bond[mp][0]->bk_val(last_proj_period);
+						local_bk_val_non *= sm_bond[mp][0]->pct_to_use;
 						total_bk_val_non += local_bk_val_non;
 						
 						// cost basis
-						local_cost_basis_non = bond_element->cost_basis(last_proj_period);
-						local_cost_basis_non *= bond_element->pct_to_use;
+						local_cost_basis_non = sm_bond[mp][0]->cost_basis(last_proj_period);
+						local_cost_basis_non *= sm_bond[mp][0]->pct_to_use;
 						total_cost_basis_non += local_cost_basis_non;
 						
 						// par value and par value at issue
-						local_par_val_non = bond_element->notional_amt(last_proj_period);
-						local_par_val_non *= bond_element->pct_to_use;
+						local_par_val_non = sm_bond[mp][0]->notional_amt(last_proj_period);
+						local_par_val_non *= sm_bond[mp][0]->pct_to_use;
 						
-						if (bond_element->init_par_val > rate_ratio_threshold) 
-							total_par_val_at_issue_non += bond_element->init_par_val;
+						if (sm_bond[mp][0]->init_par_val > rate_ratio_threshold) 
+							total_par_val_at_issue_non += sm_bond[mp][0]->init_par_val;
 						else 
 							total_par_val_at_issue_non += local_par_val_non;
 
 						total_par_val_non += local_par_val_non;
 
 						// taxable pct
-						local_taxable_pct_non_nom = bond_element->taxable_pct * bond_element->cost_basis(last_proj_period) ;
-						local_taxable_pct_non_nom *= bond_element->pct_to_use;
+						local_taxable_pct_non_nom = sm_bond[mp][0]->taxable_pct * sm_bond[mp][0]->cost_basis(last_proj_period) ;
+						local_taxable_pct_non_nom *= sm_bond[mp][0]->pct_to_use;
 						total_taxable_pct_non_nom += local_taxable_pct_non_nom;
 						
 						//pmt rate
-						local_coup_rate_non = bond_element->sm_bond_cf->pmt_rate(last_proj_period);
-						local_WAL_non = bond_element->weighted_avg_life(last_proj_period);
+						local_coup_rate_non = sm_bond[mp][0]->sm_bond_cf->pmt_rate(last_proj_period);
+						local_WAL_non = sm_bond[mp][0]->weighted_avg_life(last_proj_period);
 						local_total_pmt_non = local_coup_rate_non * local_par_val_non * local_WAL_non;
 						total_coup_num_non += local_total_pmt_non;
 						total_coup_denom_non += local_par_val_non * local_WAL_non;
 						
 						// sinking fund
-						if (bond_element->sinking_fund_defn == YES)
-							sink_fund_sch_base_non[mp] = bond_element->sinking_fund_sch_base(last_proj_period);
+						if (sm_bond[mp][0]->sinking_fund_defn == YES)
+							sink_fund_sch_base_non[mp] = sm_bond[mp][0]->sinking_fund_sch_base(last_proj_period);
 						else
 							sink_fund_sch_base_non[mp] = 1.0;
 
 						if (sink_fund_sch_base_non[mp] > rate_ratio_threshold)
-							local_sink_fund_base_non[mp] = bond_element->notional_amt(last_proj_period) / sink_fund_sch_base_non[mp];
+							local_sink_fund_base_non[mp] = sm_bond[mp][0]->notional_amt(last_proj_period) / sink_fund_sch_base_non[mp];
 						}
 					else // callable
 						{
 						//issue_date and maturity date
-						if (date_diff(bond_element->issue_date, earliest_issue_date_call) < 0)
-							earliest_issue_date_call = bond_element->issue_date;
+						if (date_diff(sm_bond[mp][0]->issue_date, earliest_issue_date_call) < 0)
+							earliest_issue_date_call = sm_bond[mp][0]->issue_date;
 
-						if (date_diff(bond_element->maturity_date, latest_maturity_date_call) > 0)
-							latest_maturity_date_call = bond_element->maturity_date;
+						if (date_diff(sm_bond[mp][0]->maturity_date, latest_maturity_date_call) > 0)
+							latest_maturity_date_call = sm_bond[mp][0]->maturity_date;
 
 						// book value
-						local_bk_val_call = bond_element->bk_val(last_proj_period);
-						local_bk_val_call *= bond_element->pct_to_use;
+						local_bk_val_call = sm_bond[mp][0]->bk_val(last_proj_period);
+						local_bk_val_call *= sm_bond[mp][0]->pct_to_use;
 						total_bk_val_call += local_bk_val_call;
 						
 						// cost basis
-						local_cost_basis_call = bond_element->cost_basis(last_proj_period);
-						local_cost_basis_call *= bond_element->pct_to_use;
+						local_cost_basis_call = sm_bond[mp][0]->cost_basis(last_proj_period);
+						local_cost_basis_call *= sm_bond[mp][0]->pct_to_use;
 						total_cost_basis_call += local_cost_basis_call;
 						
 						// par value and par value at issue
-						local_par_val_call = bond_element->notional_amt(last_proj_period);
-						local_par_val_call *= bond_element->pct_to_use;
+						local_par_val_call = sm_bond[mp][0]->notional_amt(last_proj_period);
+						local_par_val_call *= sm_bond[mp][0]->pct_to_use;
 						
-						if (bond_element->init_par_val > rate_ratio_threshold) 
-							total_par_val_at_issue_call += bond_element->init_par_val;
+						if (sm_bond[mp][0]->init_par_val > rate_ratio_threshold) 
+							total_par_val_at_issue_call += sm_bond[mp][0]->init_par_val;
 						else 
 							total_par_val_at_issue_call += local_par_val_call;
 
 						total_par_val_call += local_par_val_call;
 						
 						// taxable pct
-						local_taxable_pct_call_nom = bond_element->taxable_pct * bond_element->cost_basis(last_proj_period);
-						local_taxable_pct_call_nom *= bond_element->pct_to_use;
+						local_taxable_pct_call_nom = sm_bond[mp][0]->taxable_pct * sm_bond[mp][0]->cost_basis(last_proj_period);
+						local_taxable_pct_call_nom *= sm_bond[mp][0]->pct_to_use;
 						total_taxable_pct_call_nom += local_taxable_pct_call_nom;
 
 						// pmt rate
-						local_coup_rate_call = bond_element->sm_bond_cf->pmt_rate(last_proj_period);
-						local_WAL_call = bond_element->weighted_avg_life(last_proj_period);
+						local_coup_rate_call = sm_bond[mp][0]->sm_bond_cf->pmt_rate(last_proj_period);
+						local_WAL_call = sm_bond[mp][0]->weighted_avg_life(last_proj_period);
 						local_total_pmt_call = local_coup_rate_call * local_par_val_call * local_WAL_call;
 						total_coup_num_call += local_total_pmt_call;
 						total_coup_denom_call += local_par_val_call * local_WAL_call;
 						
 						// sinking fund
-						if (bond_element->sinking_fund_defn == YES)
-							sink_fund_sch_base_call[mp] = bond_element->sinking_fund_sch_base(last_proj_period);
+						if (sm_bond[mp][0]->sinking_fund_defn == YES)
+							sink_fund_sch_base_call[mp] = sm_bond[mp][0]->sinking_fund_sch_base(last_proj_period);
 						else
 							sink_fund_sch_base_call[mp] = 1.0;
 
 						if (sink_fund_sch_base_call[mp] > rate_ratio_threshold)
-							local_sink_fund_base_call[mp] = bond_element->notional_amt(last_proj_period) / sink_fund_sch_base_call[mp];
+							local_sink_fund_base_call[mp] = sm_bond[mp][0]->notional_amt(last_proj_period) / sink_fund_sch_base_call[mp];
 
 						// call schedule dates
-						if (date_diff(bond_element->call_opt_first_date, earliest_call_sch_date) < 0)
-							earliest_call_sch_date = bond_element->call_opt_first_date;
+						if (date_diff(sm_bond[mp][0]->call_opt_first_date, earliest_call_sch_date) < 0)
+							earliest_call_sch_date = sm_bond[mp][0]->call_opt_first_date;
 						
-						if (bond_element->call_first_period < earliest_call_first_period)
-							earliest_call_first_period = bond_element->call_first_period;
+						if (sm_bond[mp][0]->call_first_period < earliest_call_first_period)
+							earliest_call_first_period = sm_bond[mp][0]->call_first_period;
 						} // if (non_callable)
 					} // for (mp_map_iter
 
@@ -2155,17 +2278,16 @@ for (int seg_num = 0; seg_num < company->sm_seg.size(); seg_num++)
 							 mp_map_iter++)
 							{
 							int mp = mp_map_iter->first;
-							BOND_ASSET *bond_element = sm_bond[mp];
 							
-							if (bond_element->sub_port_id(last_proj_period) != sub_port_num)
+							if (sm_bond[mp][0]->sub_port_id(last_proj_period) != sub_port_num)
 								continue;
 							
-							int sch_start_period = bond_element->start_period;
+							int sch_start_period = sm_bond[mp][0]->start_period;
 							
 							bool non_callable = true;
 							if (proxy_bond_defn == CALLABLE_SEPARATE) 
 								{
-								call_year = get_yr_from_date(bond_element->call_opt_first_date);
+								call_year = get_yr_from_date(sm_bond[mp][0]->call_opt_first_date);
 								if (call_year < 9999)
 									non_callable = false;
 								}
@@ -2173,13 +2295,13 @@ for (int seg_num = 0; seg_num < company->sm_seg.size(); seg_num++)
 							if (!non_callable)
 								continue;
 
-							if (bond_element->sinking_fund_defn == YES
-								&& month < bond_element->sinking_fund_sch.size())
+							if (sm_bond[mp][0]->sinking_fund_defn == YES
+								&& month < sm_bond[mp][0]->sinking_fund_sch.size())
 								{
-								local_sink_amt_non = bond_element->sinking_fund_sch[month - sch_start_period] * local_sink_fund_base_non[mp];
-								sink_fund_sch_base_non[mp] -= bond_element->sinking_fund_sch[month - sch_start_period];									
+								local_sink_amt_non = sm_bond[mp][0]->sinking_fund_sch[month - sch_start_period] * local_sink_fund_base_non[mp];
+								sink_fund_sch_base_non[mp] -= sm_bond[mp][0]->sinking_fund_sch[month - sch_start_period];									
 								}
-							else if (month == bond_element->maturity_period)
+							else if (month == sm_bond[mp][0]->maturity_period)
 								local_sink_amt_non = sink_fund_sch_base_non[mp] * local_sink_fund_base_non[mp];
 							else 
 								local_sink_amt_non = 0.0;
@@ -2221,23 +2343,22 @@ for (int seg_num = 0; seg_num < company->sm_seg.size(); seg_num++)
 						 	mp_map_iter++)
 							{
 							int mp = mp_map_iter->first;
-							BOND_ASSET *bond_element = sm_bond[mp];
 							
-							if (bond_element->sub_port_id(last_proj_period) != sub_port_num)
+							if (sm_bond[mp][0]->sub_port_id(last_proj_period) != sub_port_num)
 								continue;
 							
-							call_year = get_yr_from_date(bond_element->call_opt_first_date);														
+							call_year = get_yr_from_date(sm_bond[mp][0]->call_opt_first_date);														
 							if (call_year == 9999)
 								continue;
 							
-							int sch_start_period = bond_element->start_period;
+							int sch_start_period = sm_bond[mp][0]->start_period;
 
 							// call
-							if (month < bond_element->call_price_sch.size()
+							if (month < sm_bond[mp][0]->call_price_sch.size()
 								&& month >= earliest_call_first_period)
 								{
-								int period = max(month, bond_element->call_first_period);
-								local_call_sch_amt = bond_element->call_price_sch[period - sch_start_period] * local_par_val_call;	
+								int period = max(month, sm_bond[mp][0]->call_first_period);
+								local_call_sch_amt = sm_bond[mp][0]->call_price_sch[period - sch_start_period] * local_par_val_call;	
 								}
 							else
 								local_call_sch_amt = 0.0;								 
@@ -2245,13 +2366,13 @@ for (int seg_num = 0; seg_num < company->sm_seg.size(); seg_num++)
 							total_call_sch_amt += local_call_sch_amt;
 
 							// sinking fund
-							if (bond_element->sinking_fund_defn == YES
-								&& month < bond_element->sinking_fund_sch.size())
+							if (sm_bond[mp][0]->sinking_fund_defn == YES
+								&& month < sm_bond[mp][0]->sinking_fund_sch.size())
 								{
-								local_sink_amt_call = bond_element->sinking_fund_sch[month] * local_sink_fund_base_call[mp];
-								sink_fund_sch_base_call[mp] -= bond_element->sinking_fund_sch[month - sch_start_period];
+								local_sink_amt_call = sm_bond[mp][0]->sinking_fund_sch[month] * local_sink_fund_base_call[mp];
+								sink_fund_sch_base_call[mp] -= sm_bond[mp][0]->sinking_fund_sch[month - sch_start_period];
 								}
-							else if (month == bond_element->maturity_period)
+							else if (month == sm_bond[mp][0]->maturity_period)
 								local_sink_amt_non = sink_fund_sch_base_call[mp] * local_sink_fund_base_call[mp];
 							else 
 								local_sink_amt_non = 0.0;
@@ -2272,10 +2393,11 @@ for (int seg_num = 0; seg_num < company->sm_seg.size(); seg_num++)
 
 					write_proxy_bond_sch(asset_id_call, proxy_bond_sch_file, call_sch_value, sink_fund_value_call);
 					} // if (total_bk_val_call > rate_ratio_threshold)
-				} // if (asset_sub_port_asset_type == "Bond")
+				} // if (asset_sub_port_asset_type_local == "Bond")
+			#endif
 
-			#if defined(__MTG_ASSET_H_)
-			if (asset_sub_port_asset_type == "Mortgage" && mtg_mp_size > 0)
+			#if defined(__MTG_ASSET_H_) && defined(__BOND_ASSET_H_)
+			if (asset_sub_port_asset_type_local == "Mortgage" && mtg_mp_size > 0)
 				{
 				if (local_par_val_array_non.size() < mtg_mp_size)
 					local_par_val_array_non.resize(mtg_mp_size);
@@ -2297,41 +2419,40 @@ for (int seg_num = 0; seg_num < company->sm_seg.size(); seg_num++)
 					 mp_map_iter++)
 					{	
 					int mp = mp_map_iter->first;
-					MTG_ASSET *mtg_element = sm_mtg[mp];
 					
-					if (mtg_element->sub_port_id(last_proj_period) != sub_port_num)
+					if (sm_mtg[mp][0]->sub_port_id(last_proj_period) != sub_port_num)
 						continue;
 
 					bool non_callable = true;
 					if (proxy_bond_defn == CALLABLE_SEPARATE
-						&& mtg_element->prepmt_first_period < mtg_element->maturity_period)
+						&& sm_mtg[mp][0]->prepmt_first_period < sm_mtg[mp][0]->maturity_period)
 						non_callable = false;
 
 					if (non_callable)
 						{
 						// issue_date and maturity date
-						if (date_diff(mtg_element->issue_date, earliest_issue_date_non) < 0)
-							earliest_issue_date_non = mtg_element->issue_date;
+						if (date_diff(sm_mtg[mp][0]->issue_date, earliest_issue_date_non) < 0)
+							earliest_issue_date_non = sm_mtg[mp][0]->issue_date;
 
-						if (date_diff(mtg_element->maturity_date, latest_maturity_date_non) > 0)
-							latest_maturity_date_non = mtg_element->maturity_date;
+						if (date_diff(sm_mtg[mp][0]->maturity_date, latest_maturity_date_non) > 0)
+							latest_maturity_date_non = sm_mtg[mp][0]->maturity_date;
 							
 						// book value
-						local_bk_val_non = mtg_element->bk_val(last_proj_period);
-						local_bk_val_non *= mtg_element->pct_to_use;
+						local_bk_val_non = sm_mtg[mp][0]->bk_val(last_proj_period);
+						local_bk_val_non *= sm_mtg[mp][0]->pct_to_use;
 						total_bk_val_non += local_bk_val_non;
 						
 						// cost basis
-						local_cost_basis_non = mtg_element->cost_basis(last_proj_period);
-						local_cost_basis_non *= mtg_element->pct_to_use;
+						local_cost_basis_non = sm_mtg[mp][0]->cost_basis(last_proj_period);
+						local_cost_basis_non *= sm_mtg[mp][0]->pct_to_use;
 						total_cost_basis_non += local_cost_basis_non;
 						
 						// par value and par value at issue
-						local_par_val_non = mtg_element->notional_amt(last_proj_period);
-						local_par_val_non *= mtg_element->pct_to_use;
+						local_par_val_non = sm_mtg[mp][0]->notional_amt(last_proj_period);
+						local_par_val_non *= sm_mtg[mp][0]->pct_to_use;
 
-						if (mtg_element->init_par_val > rate_ratio_threshold) 
-							total_par_val_at_issue_non += mtg_element->init_par_val;
+						if (sm_mtg[mp][0]->init_par_val > rate_ratio_threshold) 
+							total_par_val_at_issue_non += sm_mtg[mp][0]->init_par_val;
 						else 
 							total_par_val_at_issue_non += local_par_val_non;
 
@@ -2341,16 +2462,16 @@ for (int seg_num = 0; seg_num < company->sm_seg.size(); seg_num++)
 						total_taxable_pct_non_nom = total_cost_basis_non;
 
 						// pmt rate
-						local_coup_rate_non = mtg_element->sm_mtg_cf->pmt_rate(last_proj_period) + mtg_element->servicing_fee;
-						local_WAL_non = mtg_element->weighted_avg_life(last_proj_period);
+						local_coup_rate_non = sm_mtg[mp][0]->sm_mtg_cf->pmt_rate(last_proj_period) + sm_mtg[mp][0]->servicing_fee;
+						local_WAL_non = sm_mtg[mp][0]->weighted_avg_life(last_proj_period);
 						local_total_pmt_non = local_coup_rate_non * local_par_val_non * local_WAL_non;
 						total_coup_num_non += local_total_pmt_non;
 						total_coup_denom_non += local_par_val_non * local_WAL_non;
 						
 						// pmt amt array at last_proj_period
-						local_int_rate = mtg_element->sm_mtg_cf->pmt_rate(last_proj_period) + mtg_element->servicing_fee;
+						local_int_rate = sm_mtg[mp][0]->sm_mtg_cf->pmt_rate(last_proj_period) + sm_mtg[mp][0]->servicing_fee;
 						angle_n = (1.0 - pow(1.0 / (1.0 + local_int_rate / 12.0),
-						 		   (double) (mtg_element->maturity_period - last_proj_period)))
+						 		   (double) (sm_mtg[mp][0]->maturity_period - last_proj_period)))
 			  						/ (local_int_rate / 12.0);
 						local_pmt_amt_non[mp] = local_par_val_non / angle_n;
 						local_par_val_array_non[mp] = local_par_val_non;
@@ -2358,28 +2479,28 @@ for (int seg_num = 0; seg_num < company->sm_seg.size(); seg_num++)
 					else // callable
 						{
 						// issue_date and maturity date
-						if (date_diff(mtg_element->issue_date, earliest_issue_date_call) < 0)
-							earliest_issue_date_call = mtg_element->issue_date;
+						if (date_diff(sm_mtg[mp][0]->issue_date, earliest_issue_date_call) < 0)
+							earliest_issue_date_call = sm_mtg[mp][0]->issue_date;
 
-						if (date_diff(mtg_element->maturity_date, latest_maturity_date_call) > 0)
-							latest_maturity_date_call = mtg_element->maturity_date;
+						if (date_diff(sm_mtg[mp][0]->maturity_date, latest_maturity_date_call) > 0)
+							latest_maturity_date_call = sm_mtg[mp][0]->maturity_date;
 							
 						// book value
-						local_bk_val_call = mtg_element->bk_val(last_proj_period);
-						local_bk_val_call *= mtg_element->pct_to_use;
+						local_bk_val_call = sm_mtg[mp][0]->bk_val(last_proj_period);
+						local_bk_val_call *= sm_mtg[mp][0]->pct_to_use;
 						total_bk_val_call += local_bk_val_call;
 						
 						// cost basis
-						local_cost_basis_call = mtg_element->cost_basis(last_proj_period);
-						local_cost_basis_call *= mtg_element->pct_to_use;
+						local_cost_basis_call = sm_mtg[mp][0]->cost_basis(last_proj_period);
+						local_cost_basis_call *= sm_mtg[mp][0]->pct_to_use;
 						total_cost_basis_call += local_cost_basis_call;
 						
 						// par value and par value at issue
-						local_par_val_call = mtg_element->notional_amt(last_proj_period);
-						local_par_val_call*= mtg_element->pct_to_use;
+						local_par_val_call = sm_mtg[mp][0]->notional_amt(last_proj_period);
+						local_par_val_call*= sm_mtg[mp][0]->pct_to_use;
 						
-						if (mtg_element->init_par_val != 0.0) 
-							total_par_val_at_issue_call += mtg_element->init_par_val;
+						if (sm_mtg[mp][0]->init_par_val != 0.0) 
+							total_par_val_at_issue_call += sm_mtg[mp][0]->init_par_val;
 						else 
 							total_par_val_at_issue_call += local_par_val_call;
 
@@ -2389,16 +2510,16 @@ for (int seg_num = 0; seg_num < company->sm_seg.size(); seg_num++)
 						total_taxable_pct_call_nom = total_cost_basis_call;
 
 						// pmt rate
-						local_coup_rate_call = mtg_element->sm_mtg_cf->pmt_rate(last_proj_period) + mtg_element->servicing_fee;
-						local_WAL_call = mtg_element->weighted_avg_life(last_proj_period);
+						local_coup_rate_call = sm_mtg[mp][0]->sm_mtg_cf->pmt_rate(last_proj_period) + sm_mtg[mp][0]->servicing_fee;
+						local_WAL_call = sm_mtg[mp][0]->weighted_avg_life(last_proj_period);
 						local_total_pmt_call = local_coup_rate_call * local_par_val_call * local_WAL_call;
 						total_coup_num_call += local_total_pmt_call;
 						total_coup_denom_call += local_par_val_call * local_WAL_call;
 						
 						// pmt amt array at last_proj_period
-						local_int_rate = mtg_element->sm_mtg_cf->pmt_rate(last_proj_period) + mtg_element->servicing_fee;
+						local_int_rate = sm_mtg[mp][0]->sm_mtg_cf->pmt_rate(last_proj_period) + sm_mtg[mp][0]->servicing_fee;
 						angle_n = (1.0 - pow(1.0 / (1.0 + local_int_rate / 12.0),
-								   (double) (mtg_element->maturity_period - last_proj_period)))
+								   (double) (sm_mtg[mp][0]->maturity_period - last_proj_period)))
 				  					/ (local_int_rate / 12.0);
 						local_pmt_amt_call[mp]=  local_par_val_call / angle_n;
 						local_par_val_array_call[mp] = local_par_val_call;
@@ -2424,26 +2545,25 @@ for (int seg_num = 0; seg_num < company->sm_seg.size(); seg_num++)
 							mp_map_iter++)
 							{
 							int mp = mp_map_iter->first;
-							MTG_ASSET *mtg_element = sm_mtg[mp];
 								
-							if (mtg_element->sub_port_id(last_proj_period) != sub_port_num)
+							if (sm_mtg[mp][0]->sub_port_id(last_proj_period) != sub_port_num)
 								continue;
 
 							if (proxy_bond_defn == CALLABLE_SEPARATE 
-								&& mtg_element->prepmt_first_period < mtg_element->maturity_period) // callable
+								&& sm_mtg[mp][0]->prepmt_first_period < sm_mtg[mp][0]->maturity_period) // callable
 								continue;
 								
-							int sch_start_period = mtg_element->start_period;
+							int sch_start_period = sm_mtg[mp][0]->start_period;
 									
-							local_par_val_non = mtg_element->notional_amt(last_proj_period);
+							local_par_val_non = sm_mtg[mp][0]->notional_amt(last_proj_period);
 								
 							// balloon amt
-							if (mtg_element->balloon_pmt_flag == YES)
+							if (sm_mtg[mp][0]->balloon_pmt_flag == YES)
 								{
-								local_balloon_amt_non = mtg_element->sm_mtg_cf->balloon_pmt(month);
+								local_balloon_amt_non = sm_mtg[mp][0]->sm_mtg_cf->balloon_pmt(month);
 								local_par_val_array_non[mp] -= local_balloon_amt_non;
 								}
-							else if (month == mtg_element->maturity_period)
+							else if (month == sm_mtg[mp][0]->maturity_period)
 								local_balloon_amt_non = local_par_val_array_non[mp];
 							else
 								local_balloon_amt_non = 0.0;
@@ -2451,7 +2571,7 @@ for (int seg_num = 0; seg_num < company->sm_seg.size(); seg_num++)
 							// principal amt
 							if (local_par_val_array_non[mp] > rate_ratio_threshold)
 								{
-								local_int_rate = mtg_element->sm_mtg_cf->pmt_rate(month) + mtg_element->servicing_fee;
+								local_int_rate = sm_mtg[mp][0]->sm_mtg_cf->pmt_rate(month) + sm_mtg[mp][0]->servicing_fee;
 								local_int_pmt = local_par_val_array_non[mp] * local_int_rate / 12.0;
 								local_sched_prin_pmt = local_pmt_amt_non[mp] - local_int_pmt;
 								}
@@ -2500,41 +2620,40 @@ for (int seg_num = 0; seg_num < company->sm_seg.size(); seg_num++)
 							mp_map_iter++)
 							{
 							int mp = mp_map_iter->first;
-							MTG_ASSET *mtg_element = sm_mtg[mp];
 								
-							if (mtg_element->sub_port_id(last_proj_period) != sub_port_num)
+							if (sm_mtg[mp][0]->sub_port_id(last_proj_period) != sub_port_num)
 								continue;
 								
-							if (mtg_element->prepmt_first_period >= mtg_element->maturity_period ) // non_callable
+							if (sm_mtg[mp][0]->prepmt_first_period >= sm_mtg[mp][0]->maturity_period ) // non_callable
 								continue;
 								
-							int sch_start_period = mtg_element->start_period;
+							int sch_start_period = sm_mtg[mp][0]->start_period;
 								 
 							// call schedule
 							local_par_val_non = local_par_val_call_base[mp];
 							 	
 							// starting period is earlier than first entry in the table
-							if (month < mtg_element->prepmt_penalty_sch.size()
+							if (month < sm_mtg[mp][0]->prepmt_penalty_sch.size()
 								&& month >= earliest_call_first_period)
 							 	{
-								int period = max(month, mtg_element->prepmt_first_period);
+								int period = max(month, sm_mtg[mp][0]->prepmt_first_period);
 								// convert prepmt premium factor into call schdule
-								local_call_sch_amt = (1.0 + mtg_element->prepmt_penalty_sch[period - sch_start_period]) * local_par_val_call; 
+								local_call_sch_amt = (1.0 + sm_mtg[mp][0]->prepmt_penalty_sch[period - sch_start_period]) * local_par_val_call; 
 								}
 							else
 								local_call_sch_amt = 0.0;								 
 									
-							local_par_val_call_base[mp] = mtg_element->notional_amt(last_proj_period);
+							local_par_val_call_base[mp] = sm_mtg[mp][0]->notional_amt(last_proj_period);
 							total_call_sch_amt += local_call_sch_amt;
 							total_par_val_call_base[month - last_proj_period] += local_par_val_call;
 								
 							// balloon amt
-							if (month == mtg_element->balloon_pmt_period)
+							if (month == sm_mtg[mp][0]->balloon_pmt_period)
 								{
-								local_balloon_amt_call = mtg_element->sm_mtg_cf->balloon_pmt(month);
+								local_balloon_amt_call = sm_mtg[mp][0]->sm_mtg_cf->balloon_pmt(month);
 								local_par_val_array_call[mp] -= local_balloon_amt_call;									
 								}
-							else if (month == mtg_element->maturity_period)
+							else if (month == sm_mtg[mp][0]->maturity_period)
 								local_balloon_amt_call = local_par_val_array_call[mp];
 							else
 								local_balloon_amt_call = 0.0;
@@ -2542,7 +2661,7 @@ for (int seg_num = 0; seg_num < company->sm_seg.size(); seg_num++)
 							// principal amt
 							if (local_par_val_array_call[mp] > rate_ratio_threshold)
 								{
-								local_int_rate = mtg_element->sm_mtg_cf->pmt_rate(month) + mtg_element->servicing_fee;
+								local_int_rate = sm_mtg[mp][0]->sm_mtg_cf->pmt_rate(month) + sm_mtg[mp][0]->servicing_fee;
 								local_int_pmt = local_par_val_array_call[mp] * local_int_rate / 12.0;
 								local_sched_prin_pmt = local_pmt_amt_call[mp] - local_int_pmt;
 								}
@@ -2572,9 +2691,10 @@ for (int seg_num = 0; seg_num < company->sm_seg.size(); seg_num++)
 
 					write_proxy_bond_sch(asset_id_call, proxy_bond_sch_file, call_sch_value, sink_fund_value_call);
 					} // if (total_bk_val_call > rate_ratio_threshold)
-				} // if (asset_sub_port_asset_type == "Mortgage" && mtg_mp_size > 0)
+				} // if (asset_sub_port_asset_type_local == "Mortgage" && mtg_mp_size > 0)
 			#endif
 
+			#if defined(__BOND_ASSET_H_)
 			// Write model point data
 			for (int mp_type = 1; mp_type <= 2; mp_type++) // 1 for non_callable; 2 for callable
 				{
@@ -2657,7 +2777,8 @@ for (int seg_num = 0; seg_num < company->sm_seg.size(); seg_num++)
 				<< avr_contribn_pct << ","
 				<< avr_max_pct << ","
 				<< avr_obj_pct << ","
-				<< rbc_c1_pct << endl;
+				<< rbc_c1_pct << ","   
+				<< counter_asset << endl;   
 			
 				counter_asset++;
 				} // for (int mp_type
@@ -2682,7 +2803,7 @@ for (int seg_num = 0; seg_num < company->sm_seg.size(); seg_num++)
 			total_taxable_pct_call_nom = 0.0;
 			earliest_call_sch_date = "9999/01/01";
 			earliest_call_first_period = 9999;
-			} // if (asset_sub_port_asset_type != "Bond" && asset_sub_port_asset_type != "Mortgage")
+			} // if (asset_sub_port_asset_type_local != "Bond" && asset_sub_port_asset_type_local != "Mortgage")
 		} // for (int sub_port_num
 	} // for (int seg_num
 #endif		
@@ -2826,7 +2947,9 @@ const CashFlowCommonData ASSET_ASSET::mCFStaticData_0[] =
                      (dPFi)(dPXi)&ASSET_ASSET_UDF::asset_asset_mths_to_next_mkt_val_calc, 'E','N', '3', 'C', (size_t)&modelOffset->mths_to_next_mkt_val_calc),
 	CashFlowCommonData(11, "mths_to_sec_yld_calc", "asset_asset_mths_to_sec_yld_calc",  "mths_to_sec_yld_calc",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&ASSET_ASSET_UDF::asset_asset_mths_to_sec_yld_calc, 'E','N', '3', 'C', (size_t)&modelOffset->mths_to_sec_yld_calc),
-	CashFlowCommonData(12, "startup", "asset_asset_startup",  "startup",  CashFlowCommonData::AVG,
+	CashFlowCommonData(12, "pre_finalize", "asset_asset_pre_finalize",  "pre_finalize",  CashFlowCommonData::AVG,
+                     (dPFi)(dPXi)&ASSET_ASSET_UDF::asset_asset_pre_finalize, 'E','N', '3', 'N', (size_t)&modelOffset->pre_finalize),
+	CashFlowCommonData(13, "startup", "asset_asset_startup",  "startup",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&ASSET_ASSET_UDF::virtual_startup, 'E','N', '3', 'N', (size_t)&modelOffset->startup)
 };
 const CashFlowCommonData* ASSET_ASSET::mCFStaticData[] = {
@@ -2843,6 +2966,7 @@ const CashFlowCommonData* ASSET_ASSET::mCFStaticData[] = {
 	&ASSET_ASSET::mCFStaticData_0[10],
 	&ASSET_ASSET::mCFStaticData_0[11],
 	&ASSET_ASSET::mCFStaticData_0[12],
+	&ASSET_ASSET::mCFStaticData_0[13],
 	nullptr};
 //const CashFlowCommonData END@2
 
@@ -2942,14 +3066,6 @@ namespace {
 		,ChoicePair(StrEnum::NO, "No")
 	};
 	const EnumList asset_sub_port_rpt_defnEnumList(2, asset_sub_port_rpt_defnChoicePairs);
-
-	// EnumList for fast_stat_calc_aig                                                                                       
-	const ChoicePair fast_stat_calc_aigChoicePairs[] = {
-		ChoicePair(StrEnum::UNDEFINED, StrEnum::undefinedString)
-		,ChoicePair(StrEnum::YES, "Yes")
-		,ChoicePair(StrEnum::NO, "No")
-	};
-	const EnumList fast_stat_calc_aigEnumList(2, fast_stat_calc_aigChoicePairs);
 
 	// EnumList for intex_defn                                                                                       
 	const ChoicePair intex_defnChoicePairs[] = {
@@ -3096,49 +3212,47 @@ TableMgr<VariantTable> ASSET_ASSET::mgr_;
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
 	Descriptor(26, Attribute::STRING,	"asset_sub_ports_selected", -1, (size_t)&modelOffset->asset_sub_ports_selected,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(27, Attribute::STR_ENUM,	"fast_stat_calc_aig", -1, (size_t)&modelOffset->fast_stat_calc_aig,
-				Descriptor::NOT_SHARED, false, false, (size_t)0, &fast_stat_calc_aigEnumList, Feature(true)),
-	Descriptor(28, Attribute::STR_ENUM,	"intex_defn", -1, (size_t)&modelOffset->intex_defn,
+	Descriptor(27, Attribute::STR_ENUM,	"intex_defn", -1, (size_t)&modelOffset->intex_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &intex_defnEnumList, Feature(true)),
-	Descriptor(29, Attribute::STRING,	"inv_assump_set_id", -1, (size_t)&modelOffset->inv_assump_set_id,
+	Descriptor(28, Attribute::STRING,	"inv_assump_set_id", -1, (size_t)&modelOffset->inv_assump_set_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(30, Attribute::STR_ENUM,	"mkt_val_calc_freq", -1, (size_t)&modelOffset->mkt_val_calc_freq,
+	Descriptor(29, Attribute::STR_ENUM,	"mkt_val_calc_freq", -1, (size_t)&modelOffset->mkt_val_calc_freq,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &mkt_val_calc_freqEnumList, Feature(true)),
-	Descriptor(31, Attribute::STR_ENUM,	"mkt_val_calc_freq_sale", -1, (size_t)&modelOffset->mkt_val_calc_freq_sale,
+	Descriptor(30, Attribute::STR_ENUM,	"mkt_val_calc_freq_sale", -1, (size_t)&modelOffset->mkt_val_calc_freq_sale,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &mkt_val_calc_freq_saleEnumList, Feature(true)),
-	Descriptor(32, Attribute::STR_ENUM,	"mkt_val_calc_freq_sec_net_yld", -1, (size_t)&modelOffset->mkt_val_calc_freq_sec_net_yld,
+	Descriptor(31, Attribute::STR_ENUM,	"mkt_val_calc_freq_sec_net_yld", -1, (size_t)&modelOffset->mkt_val_calc_freq_sec_net_yld,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &mkt_val_calc_freq_sec_net_yldEnumList, Feature(true)),
-	Descriptor(33, Attribute::INT,	"mkt_val_calc_freq_yrs", -1, (size_t)&modelOffset->mkt_val_calc_freq_yrs,
+	Descriptor(32, Attribute::INT,	"mkt_val_calc_freq_yrs", -1, (size_t)&modelOffset->mkt_val_calc_freq_yrs,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(34, Attribute::STRING,	"proj_date", -1, (size_t)&modelOffset->proj_date,
+	Descriptor(33, Attribute::STRING,	"proj_date", -1, (size_t)&modelOffset->proj_date,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(35, Attribute::STR_ENUM,	"proxy_bond_defn", -1, (size_t)&modelOffset->proxy_bond_defn,
+	Descriptor(34, Attribute::STR_ENUM,	"proxy_bond_defn", -1, (size_t)&modelOffset->proxy_bond_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &proxy_bond_defnEnumList, Feature(true)),
-	Descriptor(36, Attribute::STR_ENUM,	"rebase_pv_clone_defn", -1, (size_t)&modelOffset->rebase_pv_clone_defn,
+	Descriptor(35, Attribute::STR_ENUM,	"rebase_pv_clone_defn", -1, (size_t)&modelOffset->rebase_pv_clone_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &rebase_pv_clone_defnEnumList, Feature(true)),
-	Descriptor(37, Attribute::STRING,	"ms_bond_readfile", -1, (size_t)&modelOffset->ms_bond_readfile,
+	Descriptor(36, Attribute::STRING,	"ms_bond_readfile", -1, (size_t)&modelOffset->ms_bond_readfile,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(38, Attribute::STRING,	"ms_eio_readfile", -1, (size_t)&modelOffset->ms_eio_readfile,
+	Descriptor(37, Attribute::STRING,	"ms_eio_readfile", -1, (size_t)&modelOffset->ms_eio_readfile,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(39, Attribute::STRING,	"ms_epa_readfile", -1, (size_t)&modelOffset->ms_epa_readfile,
+	Descriptor(38, Attribute::STRING,	"ms_epa_readfile", -1, (size_t)&modelOffset->ms_epa_readfile,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(40, Attribute::STRING,	"ms_mtg_readfile", -1, (size_t)&modelOffset->ms_mtg_readfile,
+	Descriptor(39, Attribute::STRING,	"ms_mtg_readfile", -1, (size_t)&modelOffset->ms_mtg_readfile,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(41, Attribute::INT,	"msnumelement", -1, (size_t)&modelOffset->msnumelement,
+	Descriptor(40, Attribute::INT,	"msnumelement", -1, (size_t)&modelOffset->msnumelement,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(42, Attribute::SCALAR_INT,	"final_period", -1, (size_t)&modelOffset->final_period,
+	Descriptor(41, Attribute::SCALAR_INT,	"final_period", -1, (size_t)&modelOffset->final_period,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&ASSET_ASSET_UDF::asset_asset_final_period)),
-	Descriptor(43, Attribute::SCALAR_STRING,	"proj_date_adj", -1, (size_t)&modelOffset->proj_date_adj,
+	Descriptor(42, Attribute::SCALAR_STRING,	"proj_date_adj", -1, (size_t)&modelOffset->proj_date_adj,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((sF)&ASSET_ASSET_UDF::asset_asset_proj_date_adj)),
-	Descriptor(44, Attribute::SCALAR_INT,	"proj_start_date", -1, (size_t)&modelOffset->proj_start_date,
+	Descriptor(43, Attribute::SCALAR_INT,	"proj_start_date", -1, (size_t)&modelOffset->proj_start_date,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&ASSET_ASSET_UDF::asset_asset_proj_start_date)),
-	Descriptor(45, Attribute::SCALAR_INT,	"proj_start_mth", -1, (size_t)&modelOffset->proj_start_mth,
+	Descriptor(44, Attribute::SCALAR_INT,	"proj_start_mth", -1, (size_t)&modelOffset->proj_start_mth,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&ASSET_ASSET_UDF::asset_asset_proj_start_mth)),
-	Descriptor(46, Attribute::SCALAR_INT,	"proj_start_yr", -1, (size_t)&modelOffset->proj_start_yr,
+	Descriptor(45, Attribute::SCALAR_INT,	"proj_start_yr", -1, (size_t)&modelOffset->proj_start_yr,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&ASSET_ASSET_UDF::asset_asset_proj_start_yr)),
-	Descriptor(47, Attribute::SCALAR_INT,	"scen_day", -1, (size_t)&modelOffset->scen_day,
+	Descriptor(46, Attribute::SCALAR_INT,	"scen_day", -1, (size_t)&modelOffset->scen_day,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&ASSET_ASSET_UDF::asset_asset_scen_day)),
-	Descriptor(48, Attribute::SCALAR_INT,	"start_period", -1, (size_t)&modelOffset->start_period,
+	Descriptor(47, Attribute::SCALAR_INT,	"start_period", -1, (size_t)&modelOffset->start_period,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&ASSET_ASSET_UDF::asset_asset_start_period)),
 	};
 
@@ -3191,9 +3305,8 @@ TableMgr<VariantTable> ASSET_ASSET::mgr_;
 	&ASSET_ASSET::descriptor_0[45],
 	&ASSET_ASSET::descriptor_0[46],
 	&ASSET_ASSET::descriptor_0[47],
-	&ASSET_ASSET::descriptor_0[48],
 	nullptr};
-	const size_t ASSET_ASSET::sDescriptorCount = 49;
+	const size_t ASSET_ASSET::sDescriptorCount = 48;
 
 //factory
 ASSET_ASSET* ASSET_ASSET::makeThis(int isSubmodel, ModelClass* owner, ASSET_ASSET* peer, 
@@ -3240,11 +3353,6 @@ ASSET_ASSET* ASSET_ASSET::makeThis(int isSubmodel, ModelClass* owner, ASSET_ASSE
 	if (find(unusedModels.begin(), unusedModels.end(), name + "|adco") == unusedModels.end()) {
 	newP->sm_adco = ADCO_ASSET::makeThis(1, newP, peer?peer->sm_adco:0, mainRebase, name + "|adco", (ADCO_ASSET_persistent_object*)(arrayTemplate?arrayTemplate->sm_adco:0));
 	newP->adopt(newP->sm_adco);
-	}
-
-	if (find(unusedModels.begin(), unusedModels.end(), name + "|intex") == unusedModels.end()) {
-	newP->sm_intex = INTEX_ASSET::makeThis(1, newP, peer?peer->sm_intex:0, mainRebase, name + "|intex", (INTEX_ASSET_persistent_object*)(arrayTemplate?arrayTemplate->sm_intex:0));
-	newP->adopt(newP->sm_intex);
 	}
 
 
@@ -3315,11 +3423,6 @@ ASSET_ASSET_persistent_object* ASSET_ASSET_persistent_object::makeThis(int isSub
 	newP->adopt(newP->sm_adco);
 	}
 
-	if (find(unusedModels.begin(), unusedModels.end(), name + "|intex") == unusedModels.end()) {
-	newP->sm_intex = (INTEX_ASSET*)INTEX_ASSET_persistent_object::makeThis(1, newP, peer?peer->sm_intex:0, mainRebase, name + "|intex", (INTEX_ASSET_persistent_object*)(arrayTemplate?arrayTemplate->sm_intex:0), fixedArray);
-	newP->adopt(newP->sm_intex);
-	}
-
 	// only do this for topmodel created
    if (!arrayTemplate && newP == CP) {
 		IsMainRebaseForClonesVisitor().visitAll(CP);
@@ -3344,32 +3447,21 @@ typedef xstring (ASSET_ASSET_UDF::*sPFs) (xstring);
 
 // constructor if this model class is the base class of another model class
 ASSET_ASSET::ASSET_ASSET(int columnCount, Descriptor* mocd[], Product* persObj) : ModelClass(columnCount, mocd, persObj), Variable(*this)
-  , sm_bond_is(0)
-  , sm_bond_pv(0)
-  , sm_bond_ym(0)
-  , sm_mtg_is(0)
-  , sm_mtg_pv(0)
-  , sm_mtg_ym(0)
 
   , sm_adco(0)
   , sm_asset_sub_port(0, 0, 0)
   , sm_bond(0, 0, 0)
   , sm_eio(0, 0, 0)
   , sm_epa(0, 0, 0)
-  , sm_intex(0)
   , sm_mtg(0, 0, 0)
 	, adco(company_asset_adco)
 	, asset(company_asset)
 	, bond(company_asset_bond)
-	, bond_is(company_asset_bond_bond_cf_bond_is)
 	, epa(company_asset_epa)
 	, epl(company_liab_epl)
 	, fia(company_liab_fia)
-	, intex(company_asset_intex)
 	, liab(company_liab)
 	, mtg(company_asset_mtg)
-	, mtg_pv(company_asset_mtg_mtg_cf_mtg_pv)
-	, mtg_ym(company_asset_mtg_mtg_cf_mtg_ym)
 	, rates(company_rates)
 {
 	gProxyInitialiser = 0;
@@ -3385,33 +3477,22 @@ ASSET_ASSET::ASSET_ASSET(int columnCount, Descriptor* mocd[], Product* persObj) 
 //constructor begincolumn
 ASSET_ASSET::ASSET_ASSET(const xstring &modelClassName,
 		int isSm, ModelClass *owner, ModelClass *peer, int mainRebase,
-		const char *name, ModelClass* arrayPersistentObj) : ModelClass(12, ASSET_ASSET::descriptorTable, arrayPersistentObj), Variable(*this)
-  , sm_bond_is(0)
-  , sm_bond_pv(0)
-  , sm_bond_ym(0)
-  , sm_mtg_is(0)
-  , sm_mtg_pv(0)
-  , sm_mtg_ym(0)
+		const char *name, ModelClass* arrayPersistentObj) : ModelClass(13, ASSET_ASSET::descriptorTable, arrayPersistentObj), Variable(*this)
 
   , sm_adco(0)
   , sm_asset_sub_port(0, 0, 0)
   , sm_bond(0, 0, 0)
   , sm_eio(0, 0, 0)
   , sm_epa(0, 0, 0)
-  , sm_intex(0)
   , sm_mtg(0, 0, 0)
 	, adco(company_asset_adco)
 	, asset(company_asset)
 	, bond(company_asset_bond)
-	, bond_is(company_asset_bond_bond_cf_bond_is)
 	, epa(company_asset_epa)
 	, epl(company_liab_epl)
 	, fia(company_liab_fia)
-	, intex(company_asset_intex)
 	, liab(company_liab)
 	, mtg(company_asset_mtg)
-	, mtg_pv(company_asset_mtg_mtg_cf_mtg_pv)
-	, mtg_ym(company_asset_mtg_mtg_cf_mtg_ym)
 	, rates(company_rates)
  // Tables...
  // Generic Tables ...
@@ -3443,7 +3524,7 @@ ASSET_ASSET::ASSET_ASSET(const xstring &modelClassName,
        isMainModel = !isSm;
 		modelName = name;
 
-#ifdef __CREATE_COMP_COMP_CLASS_
+#ifdef __CREATE_AA_COMP_COMP_CLASS_
        company = 0;
 #endif
 #ifdef __CREATE_ASSET_ASSET_CLASS_
@@ -3455,23 +3536,11 @@ ASSET_ASSET::ASSET_ASSET(const xstring &modelClassName,
 #ifdef __CREATE_BOND_ASSET_CLASS_
        company_asset_bond = 0;
 #endif
-#ifdef __CREATE_BOND_CF_ASSET_CLASS_
-       company_asset_bond_bond_cf_bond_is = 0;
-#endif
 #ifdef __CREATE_EPA_ASSET_CLASS_
        company_asset_epa = 0;
 #endif
-#ifdef __CREATE_INTEX_ASSET_CLASS_
-       company_asset_intex = 0;
-#endif
 #ifdef __CREATE_MTG_ASSET_CLASS_
        company_asset_mtg = 0;
-#endif
-#ifdef __CREATE_MTG_CF_ASSET_CLASS_
-       company_asset_mtg_mtg_cf_mtg_pv = 0;
-#endif
-#ifdef __CREATE_MTG_CF_ASSET_CLASS_
-       company_asset_mtg_mtg_cf_mtg_ym = 0;
 #endif
 #ifdef __CREATE_LIAB_LIAB_CLASS_
        company_liab = 0;
@@ -3501,7 +3570,7 @@ ASSET_ASSET::ASSET_ASSET(const xstring &modelClassName,
 
 	setSlidingSpace();
 
-	for (int cf_no = 1; cf_no <= 12; cf_no++)
+	for (int cf_no = 1; cf_no <= 13; cf_no++)
 #ifdef CF_MEMORY
 		setPtr_col(cf_no, 0);
 #else
@@ -3542,8 +3611,8 @@ ASSET_ASSET::ASSET_ASSET(const xstring &modelClassName,
 
  void ASSET_ASSET::copy_names() {
 
-#ifdef __CREATE_COMP_COMP_CLASS_
-		company = (COMP_COMP*)(findUnique("company"));
+#ifdef __CREATE_AA_COMP_COMP_CLASS_
+		company = (AA_COMP_COMP*)(findUnique("company"));
 #endif
 #ifdef __CREATE_ASSET_ASSET_CLASS_
 		company_asset = (ASSET_ASSET*)(findUnique("company|asset"));
@@ -3554,23 +3623,11 @@ ASSET_ASSET::ASSET_ASSET(const xstring &modelClassName,
 #ifdef __CREATE_BOND_ASSET_CLASS_
 		company_asset_bond = (BOND_ASSET*)(findUnique("company|asset|bond"));
 #endif
-#ifdef __CREATE_BOND_CF_ASSET_CLASS_
-		company_asset_bond_bond_cf_bond_is = (BOND_CF_ASSET*)(findUnique("company|asset|bond|bond_cf|bond_is"));
-#endif
 #ifdef __CREATE_EPA_ASSET_CLASS_
 		company_asset_epa = (EPA_ASSET*)(findUnique("company|asset|epa"));
 #endif
-#ifdef __CREATE_INTEX_ASSET_CLASS_
-		company_asset_intex = (INTEX_ASSET*)(findUnique("company|asset|intex"));
-#endif
 #ifdef __CREATE_MTG_ASSET_CLASS_
 		company_asset_mtg = (MTG_ASSET*)(findUnique("company|asset|mtg"));
-#endif
-#ifdef __CREATE_MTG_CF_ASSET_CLASS_
-		company_asset_mtg_mtg_cf_mtg_pv = (MTG_CF_ASSET*)(findUnique("company|asset|mtg|mtg_cf|mtg_pv"));
-#endif
-#ifdef __CREATE_MTG_CF_ASSET_CLASS_
-		company_asset_mtg_mtg_cf_mtg_ym = (MTG_CF_ASSET*)(findUnique("company|asset|mtg|mtg_cf|mtg_ym"));
 #endif
 #ifdef __CREATE_LIAB_LIAB_CLASS_
 		company_liab = (LIAB_LIAB*)(findUnique("company|liab"));
@@ -3794,19 +3851,12 @@ ASSET_ASSET_persistent_object::ASSET_ASSET_persistent_object(const xstring &mode
 			ASSET_ASSET(modelClassName, isSm, owner, peer, mainRebase, name, arrayPersistentObj), 
 			mReadArray(true),
 			pfl(0)
-	, sm_bond_is(ASSET_ASSET::sm_bond_is)
-	, sm_bond_pv(ASSET_ASSET::sm_bond_pv)
-	, sm_bond_ym(ASSET_ASSET::sm_bond_ym)
-	, sm_mtg_is(ASSET_ASSET::sm_mtg_is)
-	, sm_mtg_pv(ASSET_ASSET::sm_mtg_pv)
-	, sm_mtg_ym(ASSET_ASSET::sm_mtg_ym)
 
 	, sm_adco(ASSET_ASSET::sm_adco)
 	, sm_asset_sub_port(ASSET_ASSET::sm_asset_sub_port)
 	, sm_bond(ASSET_ASSET::sm_bond)
 	, sm_eio(ASSET_ASSET::sm_eio)
 	, sm_epa(ASSET_ASSET::sm_epa)
-	, sm_intex(ASSET_ASSET::sm_intex)
 	, sm_mtg(ASSET_ASSET::sm_mtg)
 	{
 
@@ -3930,9 +3980,6 @@ void ASSET_ASSET::after_startup(int decrement) {
   if(sm_adco)
    sm_adco->doBeforeStartupProcessing(decrement);
 
-  if(sm_intex)
-   sm_intex->doBeforeStartupProcessing(decrement);
-
 }
 //after_startup END@2
 
@@ -3990,7 +4037,7 @@ void ASSET_ASSET::after_startup(int decrement) {
 //ms_BeforeStartup END@2
 
 HVector<ModelClass::ddfStruct> ASSET_ASSET::ddfVector;
-BitArray ASSET_ASSET::dataVariables(49);
+BitArray ASSET_ASSET::dataVariables(48);
 bool ASSET_ASSET::hasBeenWritten = false;
 
 

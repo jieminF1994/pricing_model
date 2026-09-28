@@ -1,13 +1,12 @@
 ﻿
 //MODELCLASS BEGIN
+//MODELCLASS aa_comp_comp
 //MODELCLASS adco_asset
 //MODELCLASS ann_pba_pba
 //MODELCLASS asset_asset
-//MODELCLASS automation
 //MODELCLASS a_subport_asset
 //MODELCLASS bond_asset
 //MODELCLASS bond_cf_asset
-//MODELCLASS comp_comp
 //MODELCLASS eio_asset
 //MODELCLASS epa_asset
 //MODELCLASS epl_liab
@@ -15,16 +14,14 @@
 //MODELCLASS fiacarvm_liab
 //MODELCLASS fia_liab
 //MODELCLASS hdg_grp_comp
-//MODELCLASS intex_asset
 //MODELCLASS invstrat_asset
 //MODELCLASS liab_liab
+//MODELCLASS mrb_gaap
 //MODELCLASS mtg_asset
 //MODELCLASS mtg_cf_asset
 //MODELCLASS rates_economy
 //MODELCLASS seg_comp
-//MODELCLASS sfas133_gaap
 //MODELCLASS sfas97rd_gaap
-//MODELCLASS util_rafm
 //MODELCLASS END
 
 #if defined(MICROSOFT)
@@ -75,30 +72,27 @@ extern MemCount gMem;
 extern MY_DLL Parmfile *p;
 #include "column2.h"
 #include "ModelClass\epa_asset_udf.h"
+#include "ModelClass\aa_comp_comp.h"
 #include "ModelClass\adco_asset.h"
 #include "ModelClass\ann_pba_pba.h"
 #include "ModelClass\asset_asset.h"
-#include "ModelClass\automation.h"
 #include "ModelClass\a_subport_asset.h"
 #include "ModelClass\bond_asset.h"
 #include "ModelClass\bond_cf_asset.h"
-#include "ModelClass\comp_comp.h"
 #include "ModelClass\eio_asset.h"
 #include "ModelClass\epl_liab.h"
 #include "ModelClass\fiaafund_liab.h"
 #include "ModelClass\fiacarvm_liab.h"
 #include "ModelClass\fia_liab.h"
 #include "ModelClass\hdg_grp_comp.h"
-#include "ModelClass\intex_asset.h"
 #include "ModelClass\invstrat_asset.h"
 #include "ModelClass\liab_liab.h"
+#include "ModelClass\mrb_gaap.h"
 #include "ModelClass\mtg_asset.h"
 #include "ModelClass\mtg_cf_asset.h"
 #include "ModelClass\rates_economy.h"
 #include "ModelClass\seg_comp.h"
-#include "ModelClass\sfas133_gaap.h"
 #include "ModelClass\sfas97rd_gaap.h"
-#include "ModelClass\util_rafm.h"
 #pragma optimize( "gs", on )
 
 #include "generatedCppHeader.h"
@@ -109,7 +103,7 @@ extern MY_DLL Parmfile *p;
 //Redundant includes only for snip test:
 //iomanip included for "setprecision()"
 #include <iomanip>
-#include <strstream> //WTW - Gen2
+#include <strstream>
 typedef vector<vector<string>> sowfinput;
 typedef vector<string> sowfcols;
 typedef map <xstring, long, less <xstring> > sowfmap;
@@ -120,7 +114,9 @@ typedef vector<vector<string>> deptaskinput;
 typedef vector<string> deptaskcols;
 typedef map <xstring, long, less <xstring> > deptaskmap;
 typedef deptaskmap::iterator deptaskmapiter;
-//extern MY_DLL strstream log_screen; //WTW - Gen2 - MY_DLL is not supported
+const int pv = 0;
+const int is = 1;
+const int ym = 2;
 const int EFFECTIVE_RATE = 0;
 const int EFFECTIVE_ANNUAL = 1;
 const int NOMINAL_SEMIANNUAL = 2;
@@ -138,9 +134,8 @@ const double LEAST_ANNUAL_GROWTH_RATE = -0.9999;
 const double LEAST_BOND_EQUIVALENT_RATE = 0.0001;
 const double SPOT_SHIFT_FOR_EFFECTIVE_DURATION_CALCULATION = 0.0001;
 const double ONE_MILLION = 1000000.0;
-//WTW - Gen2 - Move Extern definitions to rates header
-//const double MINIMUM_MONTHLY_YIELD_RATIO = -0.9; // annual yield = (1.0-0.9)^12 = 1.0e-12
-//const double MAXIMUM_MONTHLY_YIELD_RATIO	 = 999999999.0; // annual yield = (1.0+999999999.0)^12 = 1.0e+120
+const double MINIMUM_MONTHLY_YIELD_RATIO = -0.9; // annual yield = (1.0-0.9)^12 = 1.0e-12
+const double MAXIMUM_MONTHLY_YIELD_RATIO	 = 999999999.0; // annual yield = (1.0+999999999.0)^12 = 1.0e+120
 const int DECIMALS_TO_ROUND = 6;
 const int ROUND_NEGATIVE_TOZERO = 0;
 const int ROUND_NEAR = 1;
@@ -154,11 +149,10 @@ const int SUM_OVER_NEGATIVE = -101;
 const int TIER = -98;
 const int ANY_GROUP = -99;
 const bool DO_NOT_ISSUE_WARNINGS = false;
-//WTW - Gen2 - Move Extern definitions to rates header
-//const int CALL_CODE = 1; 
-//const int PUT_CODE = 2; 
-//const int CONTINUOUS_PAYOUT_CODE = 3;
-//const int FUTURES_CODE = 4;
+const int CALL_CODE = 1;
+const int PUT_CODE = 2;
+const int CONTINUOUS_PAYOUT_CODE = 3;
+const int FUTURES_CODE = 4;
 // Model point type
 const int NEW_PURCH = 0;
 const int INIT_MP = 1;
@@ -208,11 +202,13 @@ const int HEDGE_CASH_FLOW = 0;
 const int HEDGE_MKT_VAL = 1;
 const int HEDGE_ARRAY_SIZE = 2;
 // global calculation flags
-//extern bool pricing_flag;//WTW - Gen2 - Move Extern definitions to rates header
+extern bool pricing_flag;
 extern bool factors_flag;
 extern bool nb_flag;
 extern bool alm_flag;
 extern bool tcm_flag;
+extern bool pba_disc_rate_flag;
+extern int pba_segment_size;
 extern bool avr_flag;
 extern bool imr_flag;
 extern bool gaap_flag;
@@ -220,17 +216,12 @@ extern bool tgt_cap_flag;
 extern bool stoch_flag;
 extern bool valn_flag;
 extern bool time_step_flag;
-extern bool sfas133_valn_flag;
+extern bool mrb_valn_flag;
 extern bool sop031_valn_flag;
 extern bool sfas97rd_valn_flag;
-extern bool sfas97lp_valn_flag;
-extern bool sfas97lp_gpr_valn_flag;
 extern bool sfas91_valn_flag;
-extern bool sfas60_valn_flag;
-extern bool sfas60_gpr_valn_flag;
+extern bool gaap_ldti_valn_flag;
 extern bool sfas120_nlp_valn_flag;
-extern bool sfas120_valn_flag;
-extern bool sfas120_gpr_valn_flag;
 extern bool loc_gpr_valn_flag;
 extern bool pba_valn_flag;
 extern bool pba_scen_amt_valn_flag;
@@ -239,6 +230,7 @@ extern bool res_scen_amt_valn_flag;
 extern bool res_det_res_valn_flag;
 extern bool res_ag38_8d_valn_flag;
 extern bool std_scen_valn_flag;
+extern bool std_scen_prescribed_assump_flag;
 extern bool rbc_std_scen_valn_flag;
 extern bool rbc_std_scen_step2_valn_flag;
 extern bool res_std_scen_valn_flag;
@@ -261,33 +253,32 @@ extern double aggregate_amount_threshold;
 extern double model_point_amount_threshold;
 extern double rate_ratio_threshold;
 extern vector<string> valn_periods;
+
 // utility functions - elaborated in rates/economy externs
-//WTW - Gen2 - Move Extern definitions to rates header
-/*extern double round_result(int rounding, int negative, double x, int n);
+extern double round_result(int rounding, int negative, double x, int n);
 extern double factorial(int n);
 extern int n_choose_k(int n, int k);
 extern xstring check_date_format(const xstring &date);
+extern int month_from_day_number(int nSerialDate);
+extern int year_from_day_number(int nSerialDate);
+extern int day_from_day_number(int nSerialDate);
+extern int month_number_from_date(int year, int month); 
+extern int day_number_from_date(int nYear, int nMonth, int nDay);
 extern int get_mth_from_date(const xstring &date);
 extern int get_yr_from_date(const xstring &date);
 extern int get_day_from_date(const xstring &date);
-extern int month_from_day_number(int nSerialDate);//WTW - Gen2 - add new formula to replace unsupported MonthFromDayNumber() function
-extern int year_from_day_number(int nSerialDate);//WTW - Gen2 - add new formula to replace unsupported YearFromDayNumber() function
-extern int day_from_day_number(int nSerialDate);//WTW - Gen2 - add new formula to replace unsupported DayFromDayNumber() function
-extern int month_number_from_date(int year, int month); //WTW - Gen2 - add new formula to replace unsupported MonthNumberFromDate() function
-extern int day_number_from_date(int nYear, int nMonth, int nDay); //WTW - Gen2 - add new formula to replace unsupported DayNumberFromDate() function
 extern int get_end_of_mth_day(int yr, int mth);
 extern xstring add_mths_to_date(const xstring &date, int mths);
 extern int get_mth_from_adj_date(const xstring &date, int mths);
 extern double convert_rate_basis(double orig_rate, double orig_rate_basis, double new_rate_basis);
 extern double convert_decrem_rate_basis(double orig_rate, double orig_rate_basis, double new_rate_basis);
-extern long int determine_tbl_size(int sNumberOfDims, ...);
 extern xstring get_file_name(const xstring &source_file);
 extern xstring get_file_path(const xstring &source_file);
-extern xstring get_base_group_name(const xstring &tag, bool seriatim_flag = false);
+extern xstring get_base_group_name(const xstring &tag, bool split_flag = false);
 extern xstring get_string_of_date(double date);
 extern xstring get_string_of_enum_val(StrEnum::EnumValue type);
 extern int date_diff(xstring first_date, xstring second_date);
-extern int number_of_decimals(double xxx, int digits);//WTW - Gen2 - replace preprocessor #define with formula
+extern int number_of_decimals(double xxx,int digits);
 extern xstring write_string(double value, int string_length, int significant_digits);
 extern xstring write_array_to_string(SmartArray <double> value_array, int low, int high);
 extern void read_from_string(xstring temp_string, SmartArray <double> &temp_array);
@@ -308,25 +299,8 @@ extern double bs_opt_val_continuous_highest_gain(int call_or_put, double current
 extern double bs_opt_val_highest_gain(int call_or_put, double current_price, double observed_max, double observed_min, double strike_price, double length_of_sampling_period, int sampling_freq, double yrs_to_expiry, double risk_free_rate, double init_div_yld, double index_vol, int scen_int_freq, int scen_index_freq);
 extern double bs_opt_val_mthly_sum_cap(int crediting_mths, int known_index_vals, double sum_capped_amts,  double mthly_cap_rate, double yrs_to_expiry, double risk_free_rate, double init_div_yld, double index_vol, int scen_int_freq, int scen_index_freq);
 extern double cumul_bivariate_normal_distribn(double x, double y, double rho);
-extern double cumul_normal_distribn(double x);*/
+extern double cumul_normal_distribn(double x);
 
-// RAFM SQLite
-#ifndef _RAFMSQLITE_H_
-#define _RAFMSQLITE_H_
-
-#include <string>
-#include <vector>
-
-using namespace std;
-
-// 20210614 STW: upgrade to RAFM 2.9
-/*
-extern void openDatabase(string dbPath);
-extern void closeDatabase();
-extern string readCsvFile(string csvPath);
-extern void executeQuery(string sql, vector<string>& columns, vector<vector<string>>& results);
-*/
-#endif
 #endif
 extern int trace_wanted;
 
@@ -351,7 +325,10 @@ const int EPV_SCHED_PRIN_PMT = 10;
 const int EPV_YRS_TO_MATURITY = 11;
 const int EPV_WEIGHTED_AVG_LIFE = 12;
 const int EPV_NUM_VALUES = 13;
+const int SCH_NUM_VALUES = 16;
 map <xstring, int, less <xstring> > tas_epa_fields;
+vector<vector<string>> epa_sch_input;
+vector<string> epa_columns;
 
 extern MY_DLL long scenario_number;
 extern MY_DLL long layer;
@@ -364,7 +341,6 @@ extern const int& last_proj_task_loop;
 extern const int& proj_task_loop_num;
 extern const int& num_of_proj_task_loops;
 
-extern MY_DLL2 int use_overlay_code;
 extern MY_DLL int trace_level_wanted;
 extern MY_DLL int trace_level;
 extern MY_DLL bool bEmitTurboDebugger;
@@ -409,7 +385,6 @@ return cost_basis_bef_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - accr_int
@@ -434,7 +409,6 @@ return accr_int_bef_sale(t)
 	   * (1.0 - sold_pct(t));
 
 }
-
 
 //@@ END
 
@@ -461,7 +435,6 @@ return accr_int(t - 1)
 
 }
 
-
 //@@ END
 
 //@@ START - accr_int_bef_fund_match_sale
@@ -486,7 +459,6 @@ return accr_int_bef_sale(t)
 	   * (1.0 - sold_pct_planned(t));
 
 }
-
 
 //@@ END
 
@@ -513,7 +485,6 @@ return accr_int_bef_rebal_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - accr_int_bef_rebal_sale
@@ -538,7 +509,6 @@ return accr_int_bef_fund_match_sale(t)
 	   * (1.0 - sold_pct_fund_match(t));
 
 }
-
 
 //@@ END
 
@@ -567,7 +537,6 @@ return get_epa_value("accr_int", t)
 
 }
 
-
 //@@ END
 
 //@@ START - accr_int_dflt
@@ -593,7 +562,6 @@ return dflt_amt(t)
 
 }
 
-
 //@@ END
 
 //@@ START - accr_int_rent
@@ -617,7 +585,6 @@ if (t < commencement_period || t > maturity_period)
 return accr_int(t);
 
 }
-
 
 //@@ END
 
@@ -646,7 +613,6 @@ return accr_int_bef_sale(t)
 	   * sold_pct(t);
 
 }
-
 
 //@@ END
 
@@ -680,7 +646,6 @@ return 0.0;
 
 }
 
-
 //@@ END
 
 //@@ START - avr_basic_contribn
@@ -705,7 +670,6 @@ return avr_basic_contribn_bef_sale(t)
 	   * (1.0 - sold_pct(t));
 
 }
-
 
 //@@ END
 
@@ -732,7 +696,6 @@ return bk_val_bef_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - avr_max
@@ -758,7 +721,6 @@ return avr_max_bef_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - avr_max_bef_sale
@@ -780,7 +742,6 @@ return bk_val_bef_sale(t)
 	   * avr_max_pct;
 
 }
-
 
 //@@ END
 
@@ -807,7 +768,6 @@ return avr_obj_bef_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - avr_obj_bef_sale
@@ -833,7 +793,6 @@ return bk_val_bef_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - avr_realzd_cap_gain
@@ -857,7 +816,6 @@ if (t <= commencement_period || t > maturity_period)
 return - dflt_amt(t);
 
 }
-
 
 //@@ END
 
@@ -884,7 +842,6 @@ return bk_val_bef_neg_cash_flow_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - bk_val_bef_fund_match_sale
@@ -909,7 +866,6 @@ return bk_val_bef_sale(t)
 	   * (1.0 - sold_pct_planned(t));
 
 }
-
 
 //@@ END
 
@@ -936,7 +892,6 @@ return bk_val_bef_rebal_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - bk_val_bef_rebal_sale
@@ -961,7 +916,6 @@ return bk_val_bef_fund_match_sale(t)
 	   * (1.0 - sold_pct_fund_match(t));
 
 }
-
 
 //@@ END
 
@@ -990,7 +944,6 @@ return get_epa_value("bk_val", t)
 
 }
 
-
 //@@ END
 
 //@@ START - bk_val_plus_accr_int_bef_rebal_sale
@@ -1012,7 +965,6 @@ return bk_val_bef_rebal_sale (t)
 	   + accr_int_bef_rebal_sale (t);
 
 }
-
 
 //@@ END
 
@@ -1039,7 +991,6 @@ return proj_start_mth + t - 1
 
 }
 
-
 //@@ END
 
 //@@ START - cal_yr
@@ -1064,7 +1015,6 @@ return proj_start_yr + cal_yr_relative(t) - 1;
 
 }
 
-
 //@@ END
 
 //@@ START - cal_yr_relative
@@ -1085,7 +1035,6 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 return 1 + floor((proj_start_mth + t - 2) / 12.0);
 
 }
-
 
 //@@ END
 
@@ -1111,7 +1060,6 @@ return realzd_cap_gain(t)
 	   + unrealzd_cap_gain_incr(t);
 
 }
-
 
 //@@ END
 
@@ -1142,7 +1090,6 @@ return (mkt_val_bef_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - cash_flow
@@ -1170,7 +1117,6 @@ return sched_prin_pmt(t)
 
 }
 
-
 //@@ END
 
 //@@ START - cost_basis
@@ -1195,7 +1141,6 @@ return cost_basis_bef_sale(t)
 	   * (1.0 - sold_pct(t));
 
 }
-
 
 //@@ END
 
@@ -1223,7 +1168,6 @@ return cost_basis_bef_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - cost_basis_aft_dflt
@@ -1248,7 +1192,6 @@ return cost_basis(t - 1)
 	   * remaining_pct_aft_dflt(t);
 
 }
-
 
 //@@ END
 
@@ -1276,7 +1219,6 @@ return get_epa_value("cost_basis", t)
        * remaining_pct_aft_dflt(t);
 
 }
-
 
 //@@ END
 
@@ -1306,7 +1248,6 @@ return cost_basis(t - 1)
 
 }
 
-
 //@@ END
 
 //@@ START - cost_basis_sold
@@ -1335,7 +1276,6 @@ return cost_basis_bef_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - date
@@ -1358,10 +1298,9 @@ int year = cal_yr(t);
 int month = cal_mth(t);
 int day = 1;
 
-return DayNumberFromDate(year, month, day);
+return day_number_from_date(year, month, day);
 
 }
-
 
 //@@ END
 
@@ -1397,7 +1336,6 @@ return (cost_basis(t - 1) + accr_int(t - 1))
 
 }
 
-
 //@@ END
 
 //@@ START - dflt_pct
@@ -1422,8 +1360,9 @@ if (asset_defn == EQUITY)
 	return NO_AVG;
 
 double annual_dflt_pct_prelim
-= (rates->get_dflt_rate(t,
+= (rates_ptr->get_dflt_rate(t,
 		    category_id,
+			weighted_avg_life(start_period), //PBA excess defaults are based on WAL of asset on valuation date
 			EFFECTIVE_ANNUAL)); 
 
 double annual_dflt_pct
@@ -1434,7 +1373,6 @@ double annual_dflt_pct
 return 1.0 - pow(1.0 - annual_dflt_pct, (1.0 / 12.0));
 
 }
-
 
 //@@ END
 
@@ -1463,7 +1401,6 @@ return eff_dur(t);
 
 }
 
-
 //@@ END
 
 //@@ START - eff_dur
@@ -1490,7 +1427,6 @@ if (asset_defn == EQUITY)
 return get_epa_value("eff_dur", t);
 
 }
-
 
 //@@ END
 
@@ -1521,6 +1457,65 @@ return epa_pct_remaining(t - 1)
 
 }
 
+//@@ END
+
+//@@ START - excess_dflt_amt
+// Excess Defaults for PBA                                                                                             
+// Column:EXCESS_DFLT_AMT
+//========================================================
+double EPA_ASSET_UDF::epa_asset_excess_dflt_amt(int t) {
+//^^^
+
+
+
+//^^^
+
+#line 1 "excess_dflt_amt.EPA_ASSET.for"
+if (t <= commencement_period || t > maturity_period)
+	return NO_AVG;
+
+return (cost_basis(t - 1) +  accr_int(t - 1))
+	   * excess_dflt_pct(t);
+
+}
+
+//@@ END
+
+//@@ START - excess_dflt_pct
+// Excess Default Pct                                                                                             
+// Column:EXCESS_DFLT_PCT
+//========================================================
+double EPA_ASSET_UDF::epa_asset_excess_dflt_pct(int t) {
+//^^^
+
+
+
+//^^^
+
+#line 1 "excess_dflt_pct.EPA_ASSET.for"
+if (t <= commencement_period || t > maturity_period || seg_element->pba_disc_rate_seg_flag)
+	return NO_AVG;
+
+double dflt_sprd_related_factor_local = 0.0;
+double dflt_max_net_sprd_adj_factor_local = 0.0;	
+
+//EXCESS DEFAULTS FOR VM22
+#if defined(__ANN_PBA_PBA_H_)
+if (pba_scen_amt_valn_flag)
+	{
+	seg_element->sm_ann_pba[0]->wal_lookup = weighted_avg_life(start_period);
+	seg_element->sm_ann_pba[0]->category_id = category_id;
+	dflt_sprd_related_factor_local = seg_element->sm_ann_pba[0]->dflt_sprd_related_factor;
+
+	seg_element->sm_ann_pba[0]->seg_id_lookup = seg_id;
+	seg_element->sm_ann_pba[0]->existing_asset_lookup = "Init MP";
+	dflt_max_net_sprd_adj_factor_local = seg_element->sm_ann_pba[0]->dflt_max_net_sprd_adj_factor;
+	}
+#endif
+
+return (dflt_sprd_related_factor_local + dflt_max_net_sprd_adj_factor_local) / 12.0;
+
+}
 
 //@@ END
 
@@ -1537,13 +1532,13 @@ double EPA_ASSET_UDF::epa_asset_finalize(int t) {
 
 #line 1 "finalize.EPA_ASSET.for"
 if (time_step_flag && !valn_flag
-	&& proj_set_sub_loop_num < valn_periods.size())
+	&& proj_set_sub_loop_num < valn_periods.size()
+	&& t < maturity_period)
 	write_state_of_world_mp();
 
 return 1.0;
 
 }
-
 
 //@@ END
 
@@ -1554,7 +1549,7 @@ return 1.0;
 double EPA_ASSET_UDF::epa_asset_gaap_inc_bk_val(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(44,"gaap_inc_bk_val",t);
+	return rebase_value(46,"gaap_inc_bk_val",t);
 }
 
 
@@ -1575,7 +1570,6 @@ return 0.0;
 
 }
 
-
 //@@ END
 
 //@@ START - gaap_inc_unrealzd_cap_gain
@@ -1585,7 +1579,7 @@ return 0.0;
 double EPA_ASSET_UDF::epa_asset_gaap_inc_unrealzd_cap_gain(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(45,"gaap_inc_unrealzd_cap_gain",t);
+	return rebase_value(47,"gaap_inc_unrealzd_cap_gain",t);
 }
 
 
@@ -1600,7 +1594,6 @@ return gaap_inc_bk_val(t) - cost_basis(t);
 
 }
 
-
 //@@ END
 
 //@@ START - gaap_surp_bk_val
@@ -1610,7 +1603,7 @@ return gaap_inc_bk_val(t) - cost_basis(t);
 double EPA_ASSET_UDF::epa_asset_gaap_surp_bk_val(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(46,"gaap_surp_bk_val",t);
+	return rebase_value(48,"gaap_surp_bk_val",t);
 }
 
 
@@ -1631,7 +1624,6 @@ return 0.0;
 
 }
 
-
 //@@ END
 
 //@@ START - gaap_unrealzd_cap_gain_incr
@@ -1641,7 +1633,7 @@ return 0.0;
 double EPA_ASSET_UDF::epa_asset_gaap_unrealzd_cap_gain_incr(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(47,"gaap_unrealzd_cap_gain_incr",t);
+	return rebase_value(49,"gaap_unrealzd_cap_gain_incr",t);
 }
 
 
@@ -1657,7 +1649,6 @@ return gaap_inc_unrealzd_cap_gain(t)
 
 }
 
-
 //@@ END
 
 //@@ START - imr_realzd_cap_gain
@@ -1667,7 +1658,7 @@ return gaap_inc_unrealzd_cap_gain(t)
 double EPA_ASSET_UDF::epa_asset_imr_realzd_cap_gain(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(48,"imr_realzd_cap_gain",t);
+	return rebase_value(50,"imr_realzd_cap_gain",t);
 }
 
 
@@ -1685,7 +1676,6 @@ return realzd_cap_gain_opt_pmt(t);
 
 }
 
-
 //@@ END
 
 //@@ START - imr_realzd_cap_gain_from_sale
@@ -1695,7 +1685,7 @@ return realzd_cap_gain_opt_pmt(t);
 double EPA_ASSET_UDF::epa_asset_imr_realzd_cap_gain_from_sale(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(49,"imr_realzd_cap_gain_from_sale",t);
+	return rebase_value(51,"imr_realzd_cap_gain_from_sale",t);
 }
 
 
@@ -1713,7 +1703,6 @@ return realzd_cap_gain_sale(t);
 
 }
 
-
 //@@ END
 
 //@@ START - imr_yrs_to_maturity
@@ -1723,7 +1712,7 @@ return realzd_cap_gain_sale(t);
 double EPA_ASSET_UDF::epa_asset_imr_yrs_to_maturity(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(50,"imr_yrs_to_maturity",t);
+	return rebase_value(52,"imr_yrs_to_maturity",t);
 }
 
 
@@ -1740,7 +1729,6 @@ if (asset_defn == EQUITY)
 return get_epa_value("yrs_to_maturity", t);
 
 }
-
 
 //@@ END
 
@@ -1762,7 +1750,7 @@ if (isMainModel)
 
 	if (loaded_proj_task_loop != proj_task_loop_num)
 		{
-		rates->initialize(t);
+		rates_ptr->initialize(t);
 		
 		loaded_proj_task_loop = proj_task_loop_num;
 		}
@@ -1783,7 +1771,6 @@ return 1.0;
 
 }
 
-
 //@@ END
 
 //@@ START - int_div_and_rent
@@ -1801,12 +1788,9 @@ double EPA_ASSET_UDF::epa_asset_int_div_and_rent(int t) {
 if (t <= commencement_period || t > maturity_period)
 	return NO_AVG;
 
-return int_pmt(t)
-	   + opt_inc(t)
-	   + accr_int_sold(t);
+return int_pmt(t);
 
 }
-
 
 //@@ END
 
@@ -1817,7 +1801,7 @@ return int_pmt(t)
 double EPA_ASSET_UDF::epa_asset_int_pmt(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(53,"int_pmt",t);
+	return rebase_value(55,"int_pmt",t);
 }
 
 
@@ -1833,7 +1817,6 @@ return get_epa_value("int_pmt", t)
        * remaining_pct_aft_dflt(t);
 
 }
-
 
 //@@ END
 
@@ -1864,7 +1847,6 @@ return mkt_val_bef_sale(t) / bk_val_bef_sale(t);
 
 }
 
-
 //@@ END
 
 //@@ START - mkt_val
@@ -1874,7 +1856,7 @@ return mkt_val_bef_sale(t) / bk_val_bef_sale(t);
 double EPA_ASSET_UDF::epa_asset_mkt_val(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(55,"mkt_val",t);
+	return rebase_value(57,"mkt_val",t);
 }
 
 
@@ -1890,7 +1872,6 @@ return mkt_val_bef_neg_cash_flow_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - mkt_val_bef_fund_match_sale
@@ -1900,7 +1881,7 @@ return mkt_val_bef_neg_cash_flow_sale(t)
 double EPA_ASSET_UDF::epa_asset_mkt_val_bef_fund_match_sale(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(56,"mkt_val_bef_fund_match_sale",t);
+	return rebase_value(58,"mkt_val_bef_fund_match_sale",t);
 }
 
 
@@ -1915,7 +1896,6 @@ return mkt_val_bef_sale(t)
 	   * (1.0 - sold_pct_planned(t));
 
 }
-
 
 //@@ END
 
@@ -1939,7 +1919,6 @@ return mkt_val_bef_rebal_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - mkt_val_bef_rebal_sale
@@ -1961,7 +1940,6 @@ return mkt_val_bef_fund_match_sale(t)
        * (1.0 - sold_pct_fund_match(t));
 
 }
-
 
 //@@ END
 
@@ -1990,7 +1968,6 @@ return get_epa_value("mkt_val", t)
 
 }
 
-
 //@@ END
 
 //@@ START - mkt_val_for_dur_bef_neg_cash_flow_sale
@@ -2000,7 +1977,7 @@ return get_epa_value("mkt_val", t)
 double EPA_ASSET_UDF::epa_asset_mkt_val_for_dur_bef_neg_cash_flow_sale(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(60,"mkt_val_for_dur_bef_neg_cash_flow_sale",t);
+	return rebase_value(62,"mkt_val_for_dur_bef_neg_cash_flow_sale",t);
 }
 
 
@@ -2014,18 +1991,9 @@ if (t < commencement_period || t > maturity_period)
 if (neg_asset_flag < 0)
 	return NO_AVG;
 
-// 20210607 STW: import IA Prod v3.0 RSD v2 change and wrap it with a flag. The code has not been tested yet.
-if(ia_prod_v3_rsd_2_aig == YES)
-{
-	return mkt_val_bef_neg_cash_flow_sale(t) + accr_int_bef_neg_cash_flow_sale(t); // added by HYH on 5/24/2021
-}
-else
-{
-	return mkt_val_bef_neg_cash_flow_sale(t);
-}
+return mkt_val_bef_neg_cash_flow_sale(t);
 
 }
-
 
 //@@ END
 
@@ -2036,7 +2004,7 @@ else
 double EPA_ASSET_UDF::epa_asset_mkt_val_for_dur_bef_rebal_sale(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(61,"mkt_val_for_dur_bef_rebal_sale",t);
+	return rebase_value(63,"mkt_val_for_dur_bef_rebal_sale",t);
 }
 
 
@@ -2050,18 +2018,9 @@ if (t < commencement_period || t > maturity_period)
 if (neg_asset_flag < 0)
 	return NO_AVG;
 
-// 20210607 STW: import IA Prod v3.0 RSD v2 change and wrap it with a flag. The code has not been tested yet.
-if(ia_prod_v3_rsd_2_aig == YES)
-{
-	return mkt_val_bef_rebal_sale(t) + accr_int_bef_rebal_sale(t); // added by HYH on 5/24/2021;
-}
-else
-{
-	return mkt_val_bef_rebal_sale(t);
-}
+return mkt_val_bef_rebal_sale(t);
 
 }
-
 
 //@@ END
 
@@ -2072,7 +2031,7 @@ else
 double EPA_ASSET_UDF::epa_asset_mkt_val_for_dur_sold(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(62,"mkt_val_for_dur_sold",t);
+	return rebase_value(64,"mkt_val_for_dur_sold",t);
 }
 
 
@@ -2091,7 +2050,6 @@ return mkt_val_bef_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - mkt_val_for_eff_dur
@@ -2109,18 +2067,9 @@ double EPA_ASSET_UDF::epa_asset_mkt_val_for_eff_dur(int t) {
 if (t < commencement_period || t > maturity_period)
 	return NO_AVG;
 
-// 20210607 STW: import IA Prod v3.0 RSD v2 change and wrap it with a flag. The code has not been tested yet.
-if(ia_prod_v3_rsd_2_aig == YES)
-{
-	return mkt_val(t) + accr_int(t); // added by HYH on 5/24/2021;
-}
-else
-{
-	return mkt_val(t);
-}
+return mkt_val(t);
 
 }
-
 
 //@@ END
 
@@ -2147,7 +2096,6 @@ return mkt_val_bef_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - mkt_val_times_dur_bef_neg_cash_flow_sale
@@ -2168,20 +2116,10 @@ if (t < commencement_period || t > maturity_period)
 if (neg_asset_flag < 0)
 	return NO_AVG;
 
-// 20210607 STW: import IA Prod v3.0 RSD v2 change and wrap it with a flag. The code has not been tested yet.
-if(ia_prod_v3_rsd_2_aig == YES)
-{
-	return mkt_val_for_dur_bef_neg_cash_flow_sale(t) //mkt_val_bef_neg_cash_flow_sale(t) //changed by HYH 5/24/2021
-		   * dur_val(t);
-}
-else
-{
-	return mkt_val_bef_neg_cash_flow_sale(t)
-		   * dur_val(t);
-}
+return mkt_val_bef_neg_cash_flow_sale(t)
+	   * dur_val(t);
 
 }
-
 
 //@@ END
 
@@ -2208,7 +2146,6 @@ return mkt_val_for_dur_bef_rebal_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - mkt_val_times_eff_dur
@@ -2231,7 +2168,6 @@ return mkt_val_for_eff_dur(t)
 
 }
 
-
 //@@ END
 
 //@@ START - notional_amt
@@ -2241,7 +2177,7 @@ return mkt_val_for_eff_dur(t)
 double EPA_ASSET_UDF::epa_asset_notional_amt(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(68,"notional_amt",t);
+	return rebase_value(70,"notional_amt",t);
 }
 
 
@@ -2257,7 +2193,6 @@ return notional_amt_bef_neg_cash_flow_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - notional_amt_bef_fund_match_sale
@@ -2267,7 +2202,7 @@ return notional_amt_bef_neg_cash_flow_sale(t)
 double EPA_ASSET_UDF::epa_asset_notional_amt_bef_fund_match_sale(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(69,"notional_amt_bef_fund_match_sale",t);
+	return rebase_value(71,"notional_amt_bef_fund_match_sale",t);
 }
 
 
@@ -2282,7 +2217,6 @@ return notional_amt_bef_sale(t)
 		* (1.0 - sold_pct_planned(t));
 
 }
-
 
 //@@ END
 
@@ -2306,7 +2240,6 @@ return notional_amt_bef_rebal_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - notional_amt_bef_rebal_sale
@@ -2328,7 +2261,6 @@ return notional_amt_bef_fund_match_sale(t)
        * (1.0 - sold_pct_fund_match(t));
 
 }
-
 
 //@@ END
 
@@ -2357,7 +2289,6 @@ return get_epa_value("notional_amt", t)
 
 }
 
-
 //@@ END
 
 //@@ START - opt_inc
@@ -2367,7 +2298,7 @@ return get_epa_value("notional_amt", t)
 double EPA_ASSET_UDF::epa_asset_opt_inc(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(73,"opt_inc",t);
+	return rebase_value(75,"opt_inc",t);
 }
 
 
@@ -2384,7 +2315,6 @@ return get_epa_value("opt_inc", t)
 
 }
 
-
 //@@ END
 
 //@@ START - opt_pmt
@@ -2394,7 +2324,7 @@ return get_epa_value("opt_inc", t)
 double EPA_ASSET_UDF::epa_asset_opt_pmt(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(74,"opt_pmt",t);
+	return rebase_value(76,"opt_pmt",t);
 }
 
 
@@ -2411,7 +2341,6 @@ return get_epa_value("opt_pmt", t)
 
 }
 
-
 //@@ END
 
 //@@ START - rbc_c1
@@ -2421,7 +2350,7 @@ return get_epa_value("opt_pmt", t)
 double EPA_ASSET_UDF::epa_asset_rbc_c1(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(75,"rbc_c1",t);
+	return rebase_value(77,"rbc_c1",t);
 }
 
 
@@ -2437,7 +2366,6 @@ return rbc_c1_bef_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - rbc_c1_bef_sale
@@ -2447,7 +2375,7 @@ return rbc_c1_bef_sale(t)
 double EPA_ASSET_UDF::epa_asset_rbc_c1_bef_sale(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(76,"rbc_c1_bef_sale",t);
+	return rebase_value(78,"rbc_c1_bef_sale",t);
 }
 
 
@@ -2463,7 +2391,6 @@ return rbc_c1_pct
 
 }
 
-
 //@@ END
 
 //@@ START - realzd_cap_gain
@@ -2473,7 +2400,7 @@ return rbc_c1_pct
 double EPA_ASSET_UDF::epa_asset_realzd_cap_gain(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(77,"realzd_cap_gain",t);
+	return rebase_value(79,"realzd_cap_gain",t);
 }
 
 
@@ -2489,7 +2416,6 @@ return + realzd_cap_gain_opt_pmt(t)
 
 }
 
-
 //@@ END
 
 //@@ START - realzd_cap_gain_opt_pmt
@@ -2499,7 +2425,7 @@ return + realzd_cap_gain_opt_pmt(t)
 double EPA_ASSET_UDF::epa_asset_realzd_cap_gain_opt_pmt(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(78,"realzd_cap_gain_opt_pmt",t);
+	return rebase_value(80,"realzd_cap_gain_opt_pmt",t);
 }
 
 
@@ -2516,7 +2442,6 @@ return get_epa_value("realzd_cap_gain_opt_pmt", t)
 
 }
 
-
 //@@ END
 
 //@@ START - realzd_cap_gain_sale
@@ -2526,7 +2451,7 @@ return get_epa_value("realzd_cap_gain_opt_pmt", t)
 double EPA_ASSET_UDF::epa_asset_realzd_cap_gain_sale(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(79,"realzd_cap_gain_sale",t);
+	return rebase_value(81,"realzd_cap_gain_sale",t);
 }
 
 
@@ -2545,7 +2470,6 @@ return cap_gain_from_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - realzd_cap_loss_dflt
@@ -2555,7 +2479,7 @@ return cap_gain_from_sale(t)
 double EPA_ASSET_UDF::epa_asset_realzd_cap_loss_dflt(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(80,"realzd_cap_loss_dflt",t);
+	return rebase_value(82,"realzd_cap_loss_dflt",t);
 }
 
 
@@ -2573,7 +2497,6 @@ return dflt_amt(t);
 
 }
 
-
 //@@ END
 
 //@@ START - remaining_pct_aft_dflt
@@ -2583,7 +2506,7 @@ return dflt_amt(t);
 double EPA_ASSET_UDF::epa_asset_remaining_pct_aft_dflt(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(81,"remaining_pct_aft_dflt",t);
+	return rebase_value(83,"remaining_pct_aft_dflt",t);
 }
 
 
@@ -2600,7 +2523,6 @@ if (asset_defn == EQUITY)
 return 1.0 - dflt_pct(t);
 
 }
-
 
 //@@ END
 
@@ -2625,7 +2547,6 @@ return get_epa_value("sched_prin_pmt", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sold_pct
@@ -2635,7 +2556,7 @@ return get_epa_value("sched_prin_pmt", t)
 double EPA_ASSET_UDF::epa_asset_sold_pct(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(83,"sold_pct",t);
+	return rebase_value(85,"sold_pct",t);
 }
 
 
@@ -2653,7 +2574,6 @@ return max(0, 1.0 - (1.0 - sold_pct_planned(t))
 
 }
 
-
 //@@ END
 
 //@@ START - sold_pct_fund_match
@@ -2663,7 +2583,7 @@ return max(0, 1.0 - (1.0 - sold_pct_planned(t))
 double EPA_ASSET_UDF::epa_asset_sold_pct_fund_match(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(84,"sold_pct_fund_match",t);
+	return rebase_value(86,"sold_pct_fund_match",t);
 }
 
 
@@ -2671,11 +2591,9 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 //^^^
 
 #line 1 "sold_pct_fund_match.EPA_ASSET.for"
-//this column value is set using SetValue from inside the asset sales routines
-return NO_AVG;
+return sold_pct_fund_match_value;
 
 }
-
 
 //@@ END
 
@@ -2686,7 +2604,7 @@ return NO_AVG;
 double EPA_ASSET_UDF::epa_asset_sold_pct_neg_cash_flow(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(85,"sold_pct_neg_cash_flow",t);
+	return rebase_value(87,"sold_pct_neg_cash_flow",t);
 }
 
 
@@ -2694,11 +2612,9 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 //^^^
 
 #line 1 "sold_pct_neg_cash_flow.EPA_ASSET.for"
-//this column value is set using SetValue from inside the asset sales routines
-return NO_AVG;
+return sold_pct_neg_cash_flow_value;
 
 }
-
 
 //@@ END
 
@@ -2709,7 +2625,7 @@ return NO_AVG;
 double EPA_ASSET_UDF::epa_asset_sold_pct_planned(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(86,"sold_pct_planned",t);
+	return rebase_value(88,"sold_pct_planned",t);
 }
 
 
@@ -2717,11 +2633,9 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 //^^^
 
 #line 1 "sold_pct_planned.EPA_ASSET.for"
-//this column value is set using SetValue from inside the asset sales routines
-return NO_AVG;
+return sold_pct_planned_value;
 
 }
-
 
 //@@ END
 
@@ -2732,7 +2646,7 @@ return NO_AVG;
 double EPA_ASSET_UDF::epa_asset_sold_pct_rebal(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(87,"sold_pct_rebal",t);
+	return rebase_value(89,"sold_pct_rebal",t);
 }
 
 
@@ -2740,11 +2654,9 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 //^^^
 
 #line 1 "sold_pct_rebal.EPA_ASSET.for"
-//this column value is set using SetValue from inside the asset sales routines
-return NO_AVG;
+return sold_pct_rebal_value;
 
 }
-
 
 //@@ END
 
@@ -2760,6 +2672,15 @@ double EPA_ASSET_UDF::virtual_startup(int t) {
 //^^^
 
 #line 1 "startup.EPA_ASSET.for"
+#if 0 // START_HEADER
+#if defined(GEN2_ALM_RUN)
+	#define __EPA_ASSET_H_
+#endif
+
+#include <io.h>
+
+#endif // END_HEADER 
+
 #if 0 // START_EXTERNS
 extern sowmpoutput epa_state_of_world_mp_output;
 extern bool is_asset_initialize;
@@ -2777,19 +2698,28 @@ const int EPV_SCHED_PRIN_PMT = 10;
 const int EPV_YRS_TO_MATURITY = 11;
 const int EPV_WEIGHTED_AVG_LIFE = 12;
 const int EPV_NUM_VALUES = 13;
+const int SCH_NUM_VALUES = 16;
 map <xstring, int, less <xstring> > tas_epa_fields;
+vector<vector<string>> epa_sch_input;
+vector<string> epa_columns;
 #endif // END_EXTERNS
 
 #if 0 // START_CLASS
 int sequence_id;
-Schedule * EPAData;
 int epa_last_cash_flow_period;
 bool no_cash_flows_in_epa_file;
-SmartArray <SmartArray <double> > epa_values;
+SmartArray <SmartArray <double>> epa_values;
 double init_yld_numer;
 double init_dflt_amt;
 StrEnum::EnumValue port_defn;
-map <xstring, long, less <xstring> > sched_byte_pos;
+SEG_COMP *seg_element;
+
+#if defined(ASSET_ONLY_MODEL)
+RATES_ECONOMY /*modelobject_name: EPA_RATES*/ *rates_ptr;
+#else
+RATES_ECONOMY /*modelobject_name: RATES*/ *rates_ptr;
+#endif
+
 #endif // END_CLASS
 
 #if 0 // START_CONSTRUCTOR
@@ -2803,14 +2733,12 @@ port_defn = INVESTMENT;
 
 if (use_mp == NO)
 	{
-	skipModelPoint();
-	return 1;
+	throw NonFatalError("Model Point Use Definition is set to No for EPA asset_id: " + xstring(asset_id));
 	}
 
 if (fabs(pct_to_use_mp) < rate_ratio_threshold)
 	{
-	skipModelPoint();
-	return 1;
+	throw NonFatalError("Percent to Use Definition is set to 0% for asset_id: " + xstring(asset_id));
 	}
 
 if (isMainModel)
@@ -2819,18 +2747,13 @@ if (isMainModel)
 	stoch_flag = true;
 
 	#if defined(ASSET_ONLY_MODEL)
-	rates = sm_epa_rates;
+	rates_ptr = sm_epa_rates;
 	#endif
-	last_proj_period = last_model_period;
+	last_proj_period = projection_period_to;
 	}	
 else	
 	{
-	#if defined(ASSET_ONLY_MODEL)
-	if (sm_epa_rates && !sm_epa_rates->isShrunk)
-		sm_epa_rates->shrink();
-	#endif
-
-	rates = asset->rates;
+	rates_ptr = rates;
 	}
 
 // Data Validation
@@ -2842,7 +2765,6 @@ if (num_of_proj_task_loops == 0
 return 1.0;
 
 }
-
 
 //@@ END
 
@@ -2892,7 +2814,6 @@ return asset->asset_sub_port_assign(t, 0, asset_defn,
 
 }
 
-
 //@@ END
 
 //@@ START - tax_exempt_inc
@@ -2902,7 +2823,7 @@ return asset->asset_sub_port_assign(t, 0, asset_defn,
 double EPA_ASSET_UDF::epa_asset_tax_exempt_inc(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(90,"tax_exempt_inc",t);
+	return rebase_value(92,"tax_exempt_inc",t);
 }
 
 
@@ -2913,10 +2834,12 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 if (t <= commencement_period || t > maturity_period)
 	return NO_AVG;
 
-return get_epa_value("tax_exempt_inc", t);
+if (epa_file_defn == SCHEDULE_FILE)
+	return get_epa_value("tax_exempt_inc", t);
+
+return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -2927,7 +2850,7 @@ return get_epa_value("tax_exempt_inc", t);
 double EPA_ASSET_UDF::epa_asset_unrealzd_cap_gain(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(91,"unrealzd_cap_gain",t);
+	return rebase_value(93,"unrealzd_cap_gain",t);
 }
 
 
@@ -2943,7 +2866,6 @@ return unrealzd_cap_gain_bef_neg_cash_flow_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - unrealzd_cap_gain_bef_fund_match_sale
@@ -2953,7 +2875,7 @@ return unrealzd_cap_gain_bef_neg_cash_flow_sale(t)
 double EPA_ASSET_UDF::epa_asset_unrealzd_cap_gain_bef_fund_match_sale(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(92,"unrealzd_cap_gain_bef_fund_match_sale",t);
+	return rebase_value(94,"unrealzd_cap_gain_bef_fund_match_sale",t);
 }
 
 
@@ -2969,7 +2891,6 @@ return unrealzd_cap_gain_bef_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - unrealzd_cap_gain_bef_neg_cash_flow_sale
@@ -2979,7 +2900,7 @@ return unrealzd_cap_gain_bef_sale(t)
 double EPA_ASSET_UDF::epa_asset_unrealzd_cap_gain_bef_neg_cash_flow_sale(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(93,"unrealzd_cap_gain_bef_neg_cash_flow_sale",t);
+	return rebase_value(95,"unrealzd_cap_gain_bef_neg_cash_flow_sale",t);
 }
 
 
@@ -2995,7 +2916,6 @@ return unrealzd_cap_gain_bef_rebal_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - unrealzd_cap_gain_bef_rebal_sale
@@ -3005,7 +2925,7 @@ return unrealzd_cap_gain_bef_rebal_sale(t)
 double EPA_ASSET_UDF::epa_asset_unrealzd_cap_gain_bef_rebal_sale(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(94,"unrealzd_cap_gain_bef_rebal_sale",t);
+	return rebase_value(96,"unrealzd_cap_gain_bef_rebal_sale",t);
 }
 
 
@@ -3020,7 +2940,6 @@ return unrealzd_cap_gain_bef_fund_match_sale(t)
 	   * (1.0 - sold_pct_fund_match(t));
 
 }
-
 
 //@@ END
 
@@ -3043,7 +2962,6 @@ return bk_val_bef_sale(t) - cost_basis_bef_sale(t);
 
 }
 
-
 //@@ END
 
 //@@ START - unrealzd_cap_gain_gaap_surp
@@ -3053,7 +2971,7 @@ return bk_val_bef_sale(t) - cost_basis_bef_sale(t);
 double EPA_ASSET_UDF::epa_asset_unrealzd_cap_gain_gaap_surp(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(96,"unrealzd_cap_gain_gaap_surp",t);
+	return rebase_value(98,"unrealzd_cap_gain_gaap_surp",t);
 }
 
 
@@ -3068,7 +2986,6 @@ return gaap_surp_bk_val(t) - cost_basis(t);
 
 }
 
-
 //@@ END
 
 //@@ START - unrealzd_cap_gain_incr
@@ -3078,7 +2995,7 @@ return gaap_surp_bk_val(t) - cost_basis(t);
 double EPA_ASSET_UDF::epa_asset_unrealzd_cap_gain_incr(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(97,"unrealzd_cap_gain_incr",t);
+	return rebase_value(99,"unrealzd_cap_gain_incr",t);
 }
 
 
@@ -3094,7 +3011,6 @@ return unrealzd_cap_gain_bef_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - unrealzd_cap_gain_released_on_sale
@@ -3104,7 +3020,7 @@ return unrealzd_cap_gain_bef_sale(t)
 double EPA_ASSET_UDF::epa_asset_unrealzd_cap_gain_released_on_sale(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(98,"unrealzd_cap_gain_released_on_sale",t);
+	return rebase_value(100,"unrealzd_cap_gain_released_on_sale",t);
 }
 
 
@@ -3122,7 +3038,6 @@ return unrealzd_cap_gain_bef_sale(t)
        * sold_pct(t);
 
 }
-
 
 //@@ END
 
@@ -3149,7 +3064,6 @@ return unrealzd_cap_gain_bef_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - weighted_avg_life
@@ -3159,7 +3073,7 @@ return unrealzd_cap_gain_bef_sale(t)
 double EPA_ASSET_UDF::epa_asset_weighted_avg_life(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(100,"weighted_avg_life",t);
+	return rebase_value(102,"weighted_avg_life",t);
 }
 
 
@@ -3177,7 +3091,6 @@ return get_epa_value("weighted_avg_life", t);
 
 }
 
-
 //@@ END
 
 //@@ START - yld_denom
@@ -3187,7 +3100,7 @@ return get_epa_value("weighted_avg_life", t);
 double EPA_ASSET_UDF::epa_asset_yld_denom(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(101,"yld_denom",t);
+	return rebase_value(103,"yld_denom",t);
 }
 
 
@@ -3205,7 +3118,6 @@ return bk_val(t - 1) +  accr_int(t - 1);
 
 }
 
-
 //@@ END
 
 //@@ START - yld_numer
@@ -3215,7 +3127,7 @@ return bk_val(t - 1) +  accr_int(t - 1);
 double EPA_ASSET_UDF::epa_asset_yld_numer(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(102,"yld_numer",t);
+	return rebase_value(104,"yld_numer",t);
 }
 
 
@@ -3236,7 +3148,6 @@ return accr_inc(t);
 
 }
 
-
 //@@ END
 
 //@@ START - asset_fund_index
@@ -3252,7 +3163,6 @@ if (port_defn == INVESTMENT)
 	return INVESTMENT_FUND_INDEX;
 
 // else set to "Investment" default value
-makeRunLogYellow();
 log_screen << "Warning: Invalid portfolio definition (" << port_defn
 		   <<") for EPA ID = " << asset_id
 		   << "." << MSG_ERROR;
@@ -3263,7 +3173,6 @@ port_defn = INVESTMENT;
 return INVESTMENT_FUND_INDEX;
 
 }
-
 
 //@@ END
 
@@ -3280,6 +3189,23 @@ return 0;
 
 }
 
+//@@ END
+
+//@@ START - data_file_name
+// Data File Name                                                                                             
+// Calculated Variable:DATA_FILE_NAME
+//========================================================
+xstring EPA_ASSET_UDF::epa_asset_data_file_name() {
+//^^^
+
+
+#line 1 "data_file_name.EPA_ASSET.for"
+if (time_step_flag)
+	return replaceWildcards("<*data*>" + data_file_name_input + "_" + xstring(proj_set_loop_num) + "_" + xstring(proj_set_sub_loop_num) + ".csv");
+else
+	return replaceWildcards("<*data*>" + data_file_name_input + ".csv");
+
+}
 
 //@@ END
 
@@ -3292,10 +3218,24 @@ xstring EPA_ASSET_UDF::epa_asset_data_grp_id() {
 
 
 #line 1 "data_grp_id.EPA_ASSET.for"
-return get_base_group_name(group, false);//WTW - Gen2 - Move Extern definitions to rates header
+return get_base_group_name(group, true);
 
 }
 
+//@@ END
+
+//@@ START - existing_asset_indicator
+// Existing Asset Indicator                                                                                             
+// Calculated Variable:EXISTING_ASSET_INDICATOR
+//========================================================
+int EPA_ASSET_UDF::epa_asset_existing_asset_indicator() {
+//^^^
+
+
+#line 1 "existing_asset_indicator.EPA_ASSET.for"
+return INIT_MP;//ALL EPAs are existing
+
+}
 
 //@@ END
 
@@ -3322,7 +3262,6 @@ return COST_BASIS;
 
 }
 
-
 //@@ END
 
 //@@ START - gaap_val_defn
@@ -3348,7 +3287,6 @@ return COST_BASIS;
 
 }
 
-
 //@@ END
 
 //@@ START - maturity_period
@@ -3363,7 +3301,6 @@ int EPA_ASSET_UDF::epa_asset_maturity_period() {
 return epa_last_cash_flow_period - proj_date_offset;
 
 }
-
 
 //@@ END
 
@@ -3383,7 +3320,6 @@ return 1;
 
 }
 
-
 //@@ END
 
 //@@ START - pct_to_use
@@ -3396,12 +3332,11 @@ double EPA_ASSET_UDF::epa_asset_pct_to_use() {
 
 #line 1 "pct_to_use.EPA_ASSET.for"
 if (!isMainModel)
-	return seg->existing_asset_pct_to_use;
+	return seg_element->existing_asset_pct_to_use;
 
 return pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -3420,7 +3355,6 @@ return min(get_yr_from_date(planned_sale_date) - proj_start_yr,
 
 }
 
-
 //@@ END
 
 //@@ START - proj_date_adj
@@ -3435,7 +3369,6 @@ xstring EPA_ASSET_UDF::epa_asset_proj_date_adj() {
 return add_mths_to_date(proj_date, valn_period);
 
 }
-
 
 //@@ END
 
@@ -3456,7 +3389,6 @@ return valn_period;
 
 }
 
-
 //@@ END
 
 //@@ START - proj_start_date
@@ -3468,10 +3400,9 @@ int EPA_ASSET_UDF::epa_asset_proj_start_date() {
 
 
 #line 1 "proj_start_date.EPA_ASSET.for"
-return MonthNumberFromDate(proj_start_yr, proj_start_mth);
+return day_number_from_date(proj_start_yr, proj_start_mth, 1);
 
 }
-
 
 //@@ END
 
@@ -3493,7 +3424,6 @@ return proj_mth + 1;
 
 }
 
-
 //@@ END
 
 //@@ START - proj_start_yr
@@ -3514,7 +3444,6 @@ return get_yr_from_date(proj_date_adj);
 
 }
 
-
 //@@ END
 
 //@@ START - sale_class_id
@@ -3526,10 +3455,21 @@ int EPA_ASSET_UDF::epa_asset_sale_class_id() {
 
 
 #line 1 "sale_class_id.EPA_ASSET.for"
-return sale_class.ord();
+if (sale_class == NOT_ASSIGNED)
+	return 1;
+
+if (sale_class == AVAILABLE_FOR_SALE)
+	return 2;
+
+if (sale_class == TRADING)
+	return 3;
+
+if (sale_class == HELD_TO_MATURITY)
+	return 4;
+
+return 0;
 
 }
-
 
 //@@ END
 
@@ -3545,10 +3485,9 @@ int EPA_ASSET_UDF::epa_asset_seg_num() {
 if (isMainModel)
 	return 0;
 
-return seg->getElementNumber();
+return seg_element->getElementNumber();
 
 }
-
 
 //@@ END
 
@@ -3565,7 +3504,6 @@ return max(0, commencement_period);
 
 }
 
-
 //@@ END
 
 
@@ -3573,7 +3511,15 @@ return max(0, commencement_period);
 double EPA_ASSET::get_epa_value(const xstring &col_name, int t)
 {
 if (epa_file_defn == SCHEDULE_FILE)
-	return EPAData->getvalue(t + proj_date_offset, col_name, 1);
+	{
+	if (find(epa_columns.begin(), epa_columns.end(), col_name) != epa_columns.end())
+		{
+		int index = find(epa_columns.begin(), epa_columns.end(), col_name) - epa_columns.begin();
+		return epa_values[t + proj_date_offset][index];
+		}
+
+	return 0.0; //element not found
+	}
 
 return epa_values[t + proj_date_offset][tas_epa_fields[col_name]];
 }
@@ -3609,30 +3555,68 @@ else
 
 if (is_first_proj_task_loop || num_of_proj_task_loops == 0)
 	{
-	EPAData = new Schedule;
-	set_sched_byte_markers(epa_file);
+	epa_sch_input.clear();
+	
+	if (asset_defn == BOND)
+		epa_columns = {"sched_val", "period", "int_pmt", "sched_prin_pmt", "opt_pmt", "notional_amt", 
+					   "cost_basis", "bk_val", "mkt_val", "accr_int", "opt_inc", "realzd_cap_gain_opt_pmt", 
+					   "tax_exempt_inc", "yrs_to_maturity", "weighted_avg_life", "eff_dur"};
+	else if (asset_defn == MORTGAGE)
+		epa_columns = {"sched_val", "period", "int_pmt", "sched_prin_pmt", "opt_pmt", "notional_amt", 
+					   "cost_basis", "bk_val", "mkt_val", "accr_int", "opt_inc", "realzd_cap_gain_opt_pmt", 
+					   "yrs_to_maturity", "weighted_avg_life", "eff_dur"};
+	else if (asset_defn == SECURITIZED_ASSET)
+		epa_columns = {"sched_val", "period", "int_pmt", "sched_prin_pmt", "notional_amt", "cost_basis", 
+					   "bk_val", "mkt_val", "accr_int", "weighted_avg_life", "eff_dur"};
+	else if (asset_defn == INTEREST_RATE_DERIVATIVE)
+		epa_columns = {"sched_val", "period", "int_pmt", "notional_amt", "cost_basis", "bk_val", 
+					   "mkt_val", "accr_int", "eff_dur"};
+	else //if (asset_defn == EQUITY)
+		epa_columns = {"sched_val", "period", "int_pmt", "notional_amt", "cost_basis", "bk_val", 
+					   "mkt_val"};
+
+	OutputFileReader ofr;
+	epa_sch_input = ofr.readFile(epa_file.getStdStr(), epa_columns);
+
+	if (!epa_sch_input.size())
+		throw FatalError("Could not read EPA Cash Flow File: " 
+			              + epa_file + " "
+			              + "Please check your data.");
+	
+	if (epa_values.size() < valn_period + last_proj_period + 1)
+		epa_values.resize(valn_period + last_proj_period + 1);
 	}
 
-if (!EPAData->is_open())
-	EPAData->open(epa_file, ',', true);
+int num_periods = 0;
+int time = 0;
 
-int byte_pos = sched_byte_pos[sched_val];
-EPAData->read(sched_val, byte_pos, 1);		
+for (int row = 0; row < epa_sch_input.size(); row++)
+	{
+	if (eq(epa_sch_input[row][0], sched_val))
+		{
+		time = atoi(epa_sch_input[row][1].c_str());
+		if (time > valn_period + last_proj_period)
+			continue;
+			
+		num_periods++;
+		epa_values[time].resize(0);
 
-if (LOOKUP_FAILED > 0 && LOOKUP_FAILED < 6)
-	return false; 
-
-epa_last_cash_flow_period = EPAData->numrows - 1;
+		for (int col = 0; col < epa_sch_input[row].size(); col++)
+			epa_values[time].push_back(atof(epa_sch_input[row][col].c_str()));
+		}
+	}
+	
+epa_last_cash_flow_period = num_periods - 1;
 
 // Check for expired EPA file
 if (epa_last_cash_flow_period < last_proj_period)
 	{
+	int index = find(epa_columns.begin(), epa_columns.end(), "notional_amt") - epa_columns.begin();
 	double epa_data_notional_amt 
-	= EPAData->getvalue(epa_last_cash_flow_period, "notional_amt", 1);
+	= epa_values[epa_last_cash_flow_period][index];
 	
 	if (fabs(epa_data_notional_amt) > model_point_amount_threshold)
 		{
-		makeRunLogYellow();
 		log_screen.setf(ios::fixed);
 		log_screen << "Warning. EPA Cash Flows for "
 				   << epa_file
@@ -3753,7 +3737,7 @@ for (int loop = 0; loop < 3; loop++)
 	epa_id = epa_file(0, epa_file.find_last_of(".")) + "." + epa_ext;
 
 	// Adjust file extension of the EPA file as required
-	if (!access(epa_id, 0)) // file with iteration number extension exists so use it
+	if (!_access_s(epa_id, 0)) // file with iteration number extension exists so use it
 		break;
 	}
 
@@ -3762,7 +3746,6 @@ epa_data_file.open(epa_id);
 
 if (!epa_data_file.is_open())
 	{
-	makeRunLogYellow();
 	log_screen << "Error. Could not open EPA File " << epa_id
 			<< MSG_ERROR;
 
@@ -3793,7 +3776,6 @@ if (epa_asset_defn != BOND_CODE
 	&& epa_asset_defn != IRD_CODE
 	&& epa_asset_defn != EQUITY_CODE)
 	{
-	makeRunLogYellow();
 	log_screen.setf(ios::fixed);
 	log_screen << "Warning: The US Library only supports Bond, Mortgage, Securitized asset, "
 			   << "Interest rate derivative, and Equity EPA files. "
@@ -3807,7 +3789,6 @@ if (epa_asset_defn != BOND_CODE
 
 if (epa_alt_acct == 999)
 	{
-	makeRunLogYellow();
 	log_screen.setf(ios::fixed);
 	log_screen << "Warning: The US Library does not support the alternate accounting EPA format. "
 			   << "EPA file " << epa_id << " has been discarded." << MSG_ERROR;
@@ -3880,7 +3861,6 @@ while (t <= valn_period + last_proj_period)
 			{
 			no_cash_flows_in_epa_file = true;
 
-			makeRunLogYellow();
 			log_screen.setf(ios::fixed);
 			log_screen << "Warning: No cash flows in EPA file " << epa_id
 					   << ". This EPA file has been discarded." << MSG_ERROR;
@@ -3924,7 +3904,6 @@ while (t <= valn_period + last_proj_period)
 			{
 			epa_values[t][EPV_NOTIONAL_AMT] = epa_values[t][EPV_BK_VAL];
 
-			makeRunLogYellow();
 			log_screen.setf(ios::fixed);
 			log_screen << "Warning: EPA interest rate derivative notional_amt"
 					   << " at projection date is zero in the EPA file " << epa_id
@@ -3990,7 +3969,6 @@ while (t <= valn_period + last_proj_period)
 				{
 				no_cash_flows_in_epa_file = true;
 
-				makeRunLogYellow();
 				log_screen.setf(ios::fixed);
 				log_screen << "Warning: No cash flows in EPA file " << epa_id
 						   << ". This EPA file has been discarded." << MSG_ERROR;
@@ -4003,7 +3981,6 @@ while (t <= valn_period + last_proj_period)
 				{
 				if (fabs(epa_data_notional_amt) > model_point_amount_threshold)
 					{
-					makeRunLogYellow();
 					log_screen.setf(ios::fixed);
 					log_screen << "Warning: EPA Cash Flows for "
 							<< epa_id
@@ -4105,7 +4082,6 @@ while (t <= valn_period + last_proj_period)
 					+ epa_values[t][EPV_OPT_PMT]) == 0)
 				{
 				issue_warning = false;
-				makeRunLogYellow();
 				log_screen << "Warning: EPA cash flow data values in the " << epa_id
 						   << MSG_ERROR;
 				log_screen << " ... file have gone to zero in period " << t
@@ -4125,75 +4101,17 @@ return true;
 
 
 
-#line 1 "set_sched_byte_markers.EPA_ASSET.for"                                                                                   
-void EPA_ASSET::set_sched_byte_markers(const xstring &sched_file)
-{
-using namespace std;
-
-int comma_pos = 0;
-xstring sched_val_prior = "0";
-long byte_pos = 0;
-bool found_diff = false;
-int diff = 0;
-string buffer;
-xstring sched_val;
-ifstream schedfile;
-
-sched_byte_pos.clear();
-
-//NOTE: using text mode here in order to count bytes consistent 
-//      with other read routine.
-schedfile.open(sched_file);
-
-if (schedfile.eof())
-	throw FatalError("Could not open Schedule file " + sched_file);
-
-while (!schedfile.eof() && getline(schedfile, buffer))
-	{
-	// Find the first comma
-	comma_pos = buffer.find_first_of(",");
-
-	if (comma_pos !=std::string::npos)
-		{
-		// not a continuation line
-		sched_val = buffer.substr(0, comma_pos);
-		
-	    if (sched_val != sched_val_prior)
-			{
-	    	sched_byte_pos[sched_val] = byte_pos;		
-		    sched_val_prior = sched_val;
-			}
-
-		// optimized tellg() process for grid processing
-		if (!found_diff)
-			{
-			int size = schedfile.tellg();
-			diff = size - buffer.size();
-			found_diff = true;
-			}
-
-		byte_pos += buffer.size() + diff;
-		}
-	}
-
-schedfile.close();
-
-return;
-}
-
-
-
 #line 1 "validate_data.EPA_ASSET.for"                                                                                   
 void EPA_ASSET::validate_data(void) 
 {
-if (!read_epa_file(replaceWildcards(epa_file)) && data_validation_defn == YES)
+bool epa_read = read_epa_file(replaceWildcards(epa_file));
+
+if (!epa_read && data_validation_defn == YES)
 	{
-	makeRunLogYellow();
 	log_strm << "Warning: Unable to process epa file " << epa_file << "." 
 	         << "EPA record " << asset_id << " will be skipped. Please check your data." << endl;
 
-	skipModelPoint();
-	return;
+	throw NonFatalError("");
 	}
 
 return;
@@ -4206,10 +4124,10 @@ void EPA_ASSET::write_state_of_world_mp(void)
 {
 static bool first_time = true;
 
-xstring data_file_name = replaceWildcards(data_location());
+xstring data_file_name_local = replaceWildcards(data_file_name);
 
 xstring epa_state_of_world_file
-= xstring(data_file_name(0, data_file_name.find("_" + xstring(proj_set_loop_num) + "_" + xstring(proj_set_sub_loop_num) + ".csv")))
+= xstring(data_file_name_local(0, data_file_name_local.find("_" + xstring(proj_set_loop_num) + "_" + xstring(proj_set_sub_loop_num) + ".csv")))
   + "_" + xstring(proj_set_loop_num) + "_" + xstring(proj_set_sub_loop_num + 1) + ".csv";
 
 // Remove any old file
@@ -4247,11 +4165,11 @@ if (!epa_state_of_world_mp_output.is_open())
 	<< "avr_contribn_pct_mp" << ","	// col 11 = avr_contribn_pct
 	<< "avr_max_pct_mp" << ","		// col 12 = avr_max_pct
 	<< "avr_obj_pct_mp" << ","		// col 13 = avr_obj_pct
-	<< "rbc_c1_pct_mp" << endl;		// col 14 = rbc_c1_pct
+	<< "rbc_c1_pct_mp" << endl;		// col 38 = rbc_c1_pct
 	}
 
 static int counter = 1;
-xstring group_mp = get_base_group_name(group, false);//WTW - Gen2 - Move Extern definitions to rates header
+xstring group_mp = get_base_group_name(group, true);
 xstring epa_file_defn = get_string_of_enum_val(this->epa_file_defn);
 xstring asset_defn = get_string_of_enum_val(this->asset_defn);
 xstring sale_class = get_string_of_enum_val(this->sale_class);
@@ -4272,7 +4190,7 @@ epa_state_of_world_mp_output
 << avr_contribn_pct << ","
 << avr_max_pct << ","
 << avr_obj_pct << ","
-<< rbc_c1_pct << endl;
+<< rbc_c1_pct << endl;  
 
 counter++;
 
@@ -4387,125 +4305,129 @@ const CashFlowCommonData EPA_ASSET::mCFStaticData_0[] =
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_eff_dur, 'E','N', '3', 'C', (size_t)&modelOffset->eff_dur),
 	CashFlowCommonData(42, "epa_pct_remaining", "epa_asset_epa_pct_remaining",  "epa_pct_remaining",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_epa_pct_remaining, 'E','N', '3', 'C', (size_t)&modelOffset->epa_pct_remaining),
-	CashFlowCommonData(43, "finalize", "epa_asset_finalize",  "finalize",  CashFlowCommonData::AVG,
+	CashFlowCommonData(43, "excess_dflt_amt", "epa_asset_excess_dflt_amt",  "excess_dflt_amt",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_excess_dflt_amt, 'E','Y', '3', 'P', (size_t)&modelOffset->excess_dflt_amt),
+	CashFlowCommonData(44, "excess_dflt_pct", "epa_asset_excess_dflt_pct",  "excess_dflt_pct",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_excess_dflt_pct, 'E','Y', '3', 'P', (size_t)&modelOffset->excess_dflt_pct),
+	CashFlowCommonData(45, "finalize", "epa_asset_finalize",  "finalize",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_finalize, 'E','N', '3', 'N', (size_t)&modelOffset->finalize),
-	CashFlowCommonData(44, "gaap_inc_bk_val", "epa_asset_gaap_inc_bk_val",  "gaap_inc_bk_val",  CashFlowCommonData::SUM,
+	CashFlowCommonData(46, "gaap_inc_bk_val", "epa_asset_gaap_inc_bk_val",  "gaap_inc_bk_val",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_gaap_inc_bk_val, 'E','N', '3', 'C', (size_t)&modelOffset->gaap_inc_bk_val),
-	CashFlowCommonData(45, "gaap_inc_unrealzd_cap_gain", "epa_asset_gaap_inc_unrealzd_cap_gain",  "gaap_inc_unrealzd_cap_gain",  CashFlowCommonData::SUM,
+	CashFlowCommonData(47, "gaap_inc_unrealzd_cap_gain", "epa_asset_gaap_inc_unrealzd_cap_gain",  "gaap_inc_unrealzd_cap_gain",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_gaap_inc_unrealzd_cap_gain, 'E','N', '3', 'C', (size_t)&modelOffset->gaap_inc_unrealzd_cap_gain),
-	CashFlowCommonData(46, "gaap_surp_bk_val", "epa_asset_gaap_surp_bk_val",  "gaap_surp_bk_val",  CashFlowCommonData::SUM,
+	CashFlowCommonData(48, "gaap_surp_bk_val", "epa_asset_gaap_surp_bk_val",  "gaap_surp_bk_val",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_gaap_surp_bk_val, 'E','N', '3', 'C', (size_t)&modelOffset->gaap_surp_bk_val),
-	CashFlowCommonData(47, "gaap_unrealzd_cap_gain_incr", "epa_asset_gaap_unrealzd_cap_gain_incr",  "gaap_unrealzd_cap_gain_incr",  CashFlowCommonData::SUM,
+	CashFlowCommonData(49, "gaap_unrealzd_cap_gain_incr", "epa_asset_gaap_unrealzd_cap_gain_incr",  "gaap_unrealzd_cap_gain_incr",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_gaap_unrealzd_cap_gain_incr, 'E','Y', '3', 'C', (size_t)&modelOffset->gaap_unrealzd_cap_gain_incr),
-	CashFlowCommonData(48, "imr_realzd_cap_gain", "epa_asset_imr_realzd_cap_gain",  "imr_realzd_cap_gain",  CashFlowCommonData::SUM,
+	CashFlowCommonData(50, "imr_realzd_cap_gain", "epa_asset_imr_realzd_cap_gain",  "imr_realzd_cap_gain",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_imr_realzd_cap_gain, 'E','Y', '3', 'C', (size_t)&modelOffset->imr_realzd_cap_gain),
-	CashFlowCommonData(49, "imr_realzd_cap_gain_from_sale", "epa_asset_imr_realzd_cap_gain_from_sale",  "imr_realzd_cap_gain_from_sale",  CashFlowCommonData::SUM,
+	CashFlowCommonData(51, "imr_realzd_cap_gain_from_sale", "epa_asset_imr_realzd_cap_gain_from_sale",  "imr_realzd_cap_gain_from_sale",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_imr_realzd_cap_gain_from_sale, 'E','Y', '3', 'C', (size_t)&modelOffset->imr_realzd_cap_gain_from_sale),
-	CashFlowCommonData(50, "imr_yrs_to_maturity", "epa_asset_imr_yrs_to_maturity",  "imr_yrs_to_maturity",  CashFlowCommonData::SUM,
+	CashFlowCommonData(52, "imr_yrs_to_maturity", "epa_asset_imr_yrs_to_maturity",  "imr_yrs_to_maturity",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_imr_yrs_to_maturity, 'E','N', '3', 'C', (size_t)&modelOffset->imr_yrs_to_maturity),
-	CashFlowCommonData(51, "initialize", "epa_asset_initialize",  "initialize",  CashFlowCommonData::AVG,
+	CashFlowCommonData(53, "initialize", "epa_asset_initialize",  "initialize",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_initialize, 'E','N', '3', 'N', (size_t)&modelOffset->initialize),
-	CashFlowCommonData(52, "int_div_and_rent", "epa_asset_int_div_and_rent",  "int_div_and_rent",  CashFlowCommonData::SUM,
+	CashFlowCommonData(54, "int_div_and_rent", "epa_asset_int_div_and_rent",  "int_div_and_rent",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_int_div_and_rent, 'E','Y', '3', 'P', (size_t)&modelOffset->int_div_and_rent),
-	CashFlowCommonData(53, "int_pmt", "epa_asset_int_pmt",  "int_pmt",  CashFlowCommonData::SUM,
+	CashFlowCommonData(55, "int_pmt", "epa_asset_int_pmt",  "int_pmt",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_int_pmt, 'E','Y', '3', 'C', (size_t)&modelOffset->int_pmt),
-	CashFlowCommonData(54, "mkt_to_bk_ratio", "epa_asset_mkt_to_bk_ratio",  "mkt_to_bk_ratio",  CashFlowCommonData::SUM,
+	CashFlowCommonData(56, "mkt_to_bk_ratio", "epa_asset_mkt_to_bk_ratio",  "mkt_to_bk_ratio",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_mkt_to_bk_ratio, 'E','N', '3', 'P', (size_t)&modelOffset->mkt_to_bk_ratio),
-	CashFlowCommonData(55, "mkt_val", "epa_asset_mkt_val",  "mkt_val",  CashFlowCommonData::SUM,
+	CashFlowCommonData(57, "mkt_val", "epa_asset_mkt_val",  "mkt_val",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_mkt_val, 'E','N', '3', 'C', (size_t)&modelOffset->mkt_val),
-	CashFlowCommonData(56, "mkt_val_bef_fund_match_sale", "epa_asset_mkt_val_bef_fund_match_sale",  "mkt_val_bef_fund_match_sale",  CashFlowCommonData::SUM,
+	CashFlowCommonData(58, "mkt_val_bef_fund_match_sale", "epa_asset_mkt_val_bef_fund_match_sale",  "mkt_val_bef_fund_match_sale",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_mkt_val_bef_fund_match_sale, 'E','N', '3', 'C', (size_t)&modelOffset->mkt_val_bef_fund_match_sale),
-	CashFlowCommonData(57, "mkt_val_bef_neg_cash_flow_sale", "epa_asset_mkt_val_bef_neg_cash_flow_sale",  "mkt_val_bef_neg_cash_flow_sale",  CashFlowCommonData::SUM,
+	CashFlowCommonData(59, "mkt_val_bef_neg_cash_flow_sale", "epa_asset_mkt_val_bef_neg_cash_flow_sale",  "mkt_val_bef_neg_cash_flow_sale",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_mkt_val_bef_neg_cash_flow_sale, 'E','N', '3', 'P', (size_t)&modelOffset->mkt_val_bef_neg_cash_flow_sale),
-	CashFlowCommonData(58, "mkt_val_bef_rebal_sale", "epa_asset_mkt_val_bef_rebal_sale",  "mkt_val_bef_rebal_sale",  CashFlowCommonData::SUM,
+	CashFlowCommonData(60, "mkt_val_bef_rebal_sale", "epa_asset_mkt_val_bef_rebal_sale",  "mkt_val_bef_rebal_sale",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_mkt_val_bef_rebal_sale, 'E','N', '3', 'P', (size_t)&modelOffset->mkt_val_bef_rebal_sale),
-	CashFlowCommonData(59, "mkt_val_bef_sale", "epa_asset_mkt_val_bef_sale",  "mkt_val_bef_sale",  CashFlowCommonData::SUM,
+	CashFlowCommonData(61, "mkt_val_bef_sale", "epa_asset_mkt_val_bef_sale",  "mkt_val_bef_sale",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_mkt_val_bef_sale, 'E','N', '3', 'P', (size_t)&modelOffset->mkt_val_bef_sale),
-	CashFlowCommonData(60, "mkt_val_for_dur_bef_neg_cash_flow_sale", "epa_asset_mkt_val_for_dur_bef_neg_cash_flow_sale",  "mkt_val_for_dur_bef_neg_cash_flow_sale",  CashFlowCommonData::SUM,
+	CashFlowCommonData(62, "mkt_val_for_dur_bef_neg_cash_flow_sale", "epa_asset_mkt_val_for_dur_bef_neg_cash_flow_sale",  "mkt_val_for_dur_bef_neg_cash_flow_sale",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_mkt_val_for_dur_bef_neg_cash_flow_sale, 'E','N', '3', 'C', (size_t)&modelOffset->mkt_val_for_dur_bef_neg_cash_flow_sale),
-	CashFlowCommonData(61, "mkt_val_for_dur_bef_rebal_sale", "epa_asset_mkt_val_for_dur_bef_rebal_sale",  "mkt_val_for_dur_bef_rebal_sale",  CashFlowCommonData::SUM,
+	CashFlowCommonData(63, "mkt_val_for_dur_bef_rebal_sale", "epa_asset_mkt_val_for_dur_bef_rebal_sale",  "mkt_val_for_dur_bef_rebal_sale",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_mkt_val_for_dur_bef_rebal_sale, 'E','N', '3', 'C', (size_t)&modelOffset->mkt_val_for_dur_bef_rebal_sale),
-	CashFlowCommonData(62, "mkt_val_for_dur_sold", "epa_asset_mkt_val_for_dur_sold",  "mkt_val_for_dur_sold",  CashFlowCommonData::SUM,
+	CashFlowCommonData(64, "mkt_val_for_dur_sold", "epa_asset_mkt_val_for_dur_sold",  "mkt_val_for_dur_sold",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_mkt_val_for_dur_sold, 'E','Y', '3', 'C', (size_t)&modelOffset->mkt_val_for_dur_sold),
-	CashFlowCommonData(63, "mkt_val_for_eff_dur", "epa_asset_mkt_val_for_eff_dur",  "mkt_val_for_eff_dur",  CashFlowCommonData::SUM,
+	CashFlowCommonData(65, "mkt_val_for_eff_dur", "epa_asset_mkt_val_for_eff_dur",  "mkt_val_for_eff_dur",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_mkt_val_for_eff_dur, 'E','N', '3', 'P', (size_t)&modelOffset->mkt_val_for_eff_dur),
-	CashFlowCommonData(64, "mkt_val_sold", "epa_asset_mkt_val_sold",  "mkt_val_sold",  CashFlowCommonData::SUM,
+	CashFlowCommonData(66, "mkt_val_sold", "epa_asset_mkt_val_sold",  "mkt_val_sold",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_mkt_val_sold, 'E','Y', '3', 'P', (size_t)&modelOffset->mkt_val_sold),
-	CashFlowCommonData(65, "mkt_val_times_dur_bef_neg_cash_flow_sale", "epa_asset_mkt_val_times_dur_bef_neg_cash_flow_sale",  "mkt_val_times_dur_bef_neg_cash_flow_sale",  CashFlowCommonData::SUM,
+	CashFlowCommonData(67, "mkt_val_times_dur_bef_neg_cash_flow_sale", "epa_asset_mkt_val_times_dur_bef_neg_cash_flow_sale",  "mkt_val_times_dur_bef_neg_cash_flow_sale",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_mkt_val_times_dur_bef_neg_cash_flow_sale, 'E','N', '3', 'P', (size_t)&modelOffset->mkt_val_times_dur_bef_neg_cash_flow_sale),
-	CashFlowCommonData(66, "mkt_val_times_dur_bef_rebal_sale", "epa_asset_mkt_val_times_dur_bef_rebal_sale",  "mkt_val_times_dur_bef_rebal_sale",  CashFlowCommonData::SUM,
+	CashFlowCommonData(68, "mkt_val_times_dur_bef_rebal_sale", "epa_asset_mkt_val_times_dur_bef_rebal_sale",  "mkt_val_times_dur_bef_rebal_sale",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_mkt_val_times_dur_bef_rebal_sale, 'E','N', '3', 'P', (size_t)&modelOffset->mkt_val_times_dur_bef_rebal_sale),
-	CashFlowCommonData(67, "mkt_val_times_eff_dur", "epa_asset_mkt_val_times_eff_dur",  "mkt_val_times_eff_dur",  CashFlowCommonData::SUM,
+	CashFlowCommonData(69, "mkt_val_times_eff_dur", "epa_asset_mkt_val_times_eff_dur",  "mkt_val_times_eff_dur",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_mkt_val_times_eff_dur, 'E','N', '3', 'P', (size_t)&modelOffset->mkt_val_times_eff_dur),
-	CashFlowCommonData(68, "notional_amt", "epa_asset_notional_amt",  "notional_amt",  CashFlowCommonData::SUM,
+	CashFlowCommonData(70, "notional_amt", "epa_asset_notional_amt",  "notional_amt",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_notional_amt, 'E','N', '3', 'C', (size_t)&modelOffset->notional_amt),
-	CashFlowCommonData(69, "notional_amt_bef_fund_match_sale", "epa_asset_notional_amt_bef_fund_match_sale",  "notional_amt_bef_fund_match_sale",  CashFlowCommonData::SUM,
+	CashFlowCommonData(71, "notional_amt_bef_fund_match_sale", "epa_asset_notional_amt_bef_fund_match_sale",  "notional_amt_bef_fund_match_sale",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_notional_amt_bef_fund_match_sale, 'E','N', '3', 'C', (size_t)&modelOffset->notional_amt_bef_fund_match_sale),
-	CashFlowCommonData(70, "notional_amt_bef_neg_cash_flow_sale", "epa_asset_notional_amt_bef_neg_cash_flow_sale",  "notional_amt_bef_neg_cash_flow_sale",  CashFlowCommonData::SUM,
+	CashFlowCommonData(72, "notional_amt_bef_neg_cash_flow_sale", "epa_asset_notional_amt_bef_neg_cash_flow_sale",  "notional_amt_bef_neg_cash_flow_sale",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_notional_amt_bef_neg_cash_flow_sale, 'E','Y', '3', 'P', (size_t)&modelOffset->notional_amt_bef_neg_cash_flow_sale),
-	CashFlowCommonData(71, "notional_amt_bef_rebal_sale", "epa_asset_notional_amt_bef_rebal_sale",  "notional_amt_bef_rebal_sale",  CashFlowCommonData::SUM,
+	CashFlowCommonData(73, "notional_amt_bef_rebal_sale", "epa_asset_notional_amt_bef_rebal_sale",  "notional_amt_bef_rebal_sale",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_notional_amt_bef_rebal_sale, 'E','Y', '3', 'P', (size_t)&modelOffset->notional_amt_bef_rebal_sale),
-	CashFlowCommonData(72, "notional_amt_bef_sale", "epa_asset_notional_amt_bef_sale",  "notional_amt_bef_sale",  CashFlowCommonData::SUM,
+	CashFlowCommonData(74, "notional_amt_bef_sale", "epa_asset_notional_amt_bef_sale",  "notional_amt_bef_sale",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_notional_amt_bef_sale, 'E','N', '3', 'P', (size_t)&modelOffset->notional_amt_bef_sale),
-	CashFlowCommonData(73, "opt_inc", "epa_asset_opt_inc",  "opt_inc",  CashFlowCommonData::SUM,
+	CashFlowCommonData(75, "opt_inc", "epa_asset_opt_inc",  "opt_inc",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_opt_inc, 'E','Y', '3', 'C', (size_t)&modelOffset->opt_inc),
-	CashFlowCommonData(74, "opt_pmt", "epa_asset_opt_pmt",  "opt_pmt",  CashFlowCommonData::SUM,
+	CashFlowCommonData(76, "opt_pmt", "epa_asset_opt_pmt",  "opt_pmt",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_opt_pmt, 'E','Y', '3', 'C', (size_t)&modelOffset->opt_pmt),
-	CashFlowCommonData(75, "rbc_c1", "epa_asset_rbc_c1",  "rbc_c1",  CashFlowCommonData::SUM,
+	CashFlowCommonData(77, "rbc_c1", "epa_asset_rbc_c1",  "rbc_c1",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_rbc_c1, 'E','N', '3', 'C', (size_t)&modelOffset->rbc_c1),
-	CashFlowCommonData(76, "rbc_c1_bef_sale", "epa_asset_rbc_c1_bef_sale",  "rbc_c1_bef_sale",  CashFlowCommonData::SUM,
+	CashFlowCommonData(78, "rbc_c1_bef_sale", "epa_asset_rbc_c1_bef_sale",  "rbc_c1_bef_sale",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_rbc_c1_bef_sale, 'E','N', '3', 'C', (size_t)&modelOffset->rbc_c1_bef_sale),
-	CashFlowCommonData(77, "realzd_cap_gain", "epa_asset_realzd_cap_gain",  "realzd_cap_gain",  CashFlowCommonData::SUM,
+	CashFlowCommonData(79, "realzd_cap_gain", "epa_asset_realzd_cap_gain",  "realzd_cap_gain",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_realzd_cap_gain, 'E','Y', '3', 'C', (size_t)&modelOffset->realzd_cap_gain),
-	CashFlowCommonData(78, "realzd_cap_gain_opt_pmt", "epa_asset_realzd_cap_gain_opt_pmt",  "realzd_cap_gain_opt_pmt",  CashFlowCommonData::SUM,
+	CashFlowCommonData(80, "realzd_cap_gain_opt_pmt", "epa_asset_realzd_cap_gain_opt_pmt",  "realzd_cap_gain_opt_pmt",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_realzd_cap_gain_opt_pmt, 'E','Y', '3', 'C', (size_t)&modelOffset->realzd_cap_gain_opt_pmt),
-	CashFlowCommonData(79, "realzd_cap_gain_sale", "epa_asset_realzd_cap_gain_sale",  "realzd_cap_gain_sale",  CashFlowCommonData::SUM,
+	CashFlowCommonData(81, "realzd_cap_gain_sale", "epa_asset_realzd_cap_gain_sale",  "realzd_cap_gain_sale",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_realzd_cap_gain_sale, 'E','Y', '3', 'C', (size_t)&modelOffset->realzd_cap_gain_sale),
-	CashFlowCommonData(80, "realzd_cap_loss_dflt", "epa_asset_realzd_cap_loss_dflt",  "realzd_cap_loss_dflt",  CashFlowCommonData::SUM,
+	CashFlowCommonData(82, "realzd_cap_loss_dflt", "epa_asset_realzd_cap_loss_dflt",  "realzd_cap_loss_dflt",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_realzd_cap_loss_dflt, 'E','Y', '3', 'C', (size_t)&modelOffset->realzd_cap_loss_dflt),
-	CashFlowCommonData(81, "remaining_pct_aft_dflt", "epa_asset_remaining_pct_aft_dflt",  "remaining_pct_aft_dflt",  CashFlowCommonData::AVG,
+	CashFlowCommonData(83, "remaining_pct_aft_dflt", "epa_asset_remaining_pct_aft_dflt",  "remaining_pct_aft_dflt",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_remaining_pct_aft_dflt, 'E','N', '3', 'C', (size_t)&modelOffset->remaining_pct_aft_dflt),
-	CashFlowCommonData(82, "sched_prin_pmt", "epa_asset_sched_prin_pmt",  "sched_prin_pmt",  CashFlowCommonData::SUM,
+	CashFlowCommonData(84, "sched_prin_pmt", "epa_asset_sched_prin_pmt",  "sched_prin_pmt",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_sched_prin_pmt, 'E','Y', '3', 'P', (size_t)&modelOffset->sched_prin_pmt),
-	CashFlowCommonData(83, "sold_pct", "epa_asset_sold_pct",  "sold_pct",  CashFlowCommonData::AVG,
+	CashFlowCommonData(85, "sold_pct", "epa_asset_sold_pct",  "sold_pct",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_sold_pct, 'E','N', '3', 'C', (size_t)&modelOffset->sold_pct),
-	CashFlowCommonData(84, "sold_pct_fund_match", "epa_asset_sold_pct_fund_match",  "sold_pct_fund_match",  CashFlowCommonData::AVG,
+	CashFlowCommonData(86, "sold_pct_fund_match", "epa_asset_sold_pct_fund_match",  "sold_pct_fund_match",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_sold_pct_fund_match, 'E','N', '3', 'C', (size_t)&modelOffset->sold_pct_fund_match),
-	CashFlowCommonData(85, "sold_pct_neg_cash_flow", "epa_asset_sold_pct_neg_cash_flow",  "sold_pct_neg_cash_flow",  CashFlowCommonData::AVG,
+	CashFlowCommonData(87, "sold_pct_neg_cash_flow", "epa_asset_sold_pct_neg_cash_flow",  "sold_pct_neg_cash_flow",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_sold_pct_neg_cash_flow, 'E','N', '3', 'C', (size_t)&modelOffset->sold_pct_neg_cash_flow),
-	CashFlowCommonData(86, "sold_pct_planned", "epa_asset_sold_pct_planned",  "sold_pct_planned",  CashFlowCommonData::AVG,
+	CashFlowCommonData(88, "sold_pct_planned", "epa_asset_sold_pct_planned",  "sold_pct_planned",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_sold_pct_planned, 'E','N', '3', 'C', (size_t)&modelOffset->sold_pct_planned),
-	CashFlowCommonData(87, "sold_pct_rebal", "epa_asset_sold_pct_rebal",  "sold_pct_rebal",  CashFlowCommonData::AVG,
+	CashFlowCommonData(89, "sold_pct_rebal", "epa_asset_sold_pct_rebal",  "sold_pct_rebal",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_sold_pct_rebal, 'E','N', '3', 'C', (size_t)&modelOffset->sold_pct_rebal),
-	CashFlowCommonData(88, "startup", "epa_asset_startup",  "startup",  CashFlowCommonData::SUM,
+	CashFlowCommonData(90, "startup", "epa_asset_startup",  "startup",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::virtual_startup, 'E','Y', '3', 'N', (size_t)&modelOffset->startup),
-	CashFlowCommonData(89, "sub_port_id", "epa_asset_sub_port_id",  "sub_port_id",  CashFlowCommonData::AVG,
+	CashFlowCommonData(91, "sub_port_id", "epa_asset_sub_port_id",  "sub_port_id",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_sub_port_id, 'E','N', '3', 'P', (size_t)&modelOffset->sub_port_id),
-	CashFlowCommonData(90, "tax_exempt_inc", "epa_asset_tax_exempt_inc",  "tax_exempt_inc",  CashFlowCommonData::SUM,
+	CashFlowCommonData(92, "tax_exempt_inc", "epa_asset_tax_exempt_inc",  "tax_exempt_inc",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_tax_exempt_inc, 'E','N', '3', 'C', (size_t)&modelOffset->tax_exempt_inc),
-	CashFlowCommonData(91, "unrealzd_cap_gain", "epa_asset_unrealzd_cap_gain",  "unrealzd_cap_gain",  CashFlowCommonData::SUM,
+	CashFlowCommonData(93, "unrealzd_cap_gain", "epa_asset_unrealzd_cap_gain",  "unrealzd_cap_gain",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_unrealzd_cap_gain, 'E','N', '3', 'C', (size_t)&modelOffset->unrealzd_cap_gain),
-	CashFlowCommonData(92, "unrealzd_cap_gain_bef_fund_match_sale", "epa_asset_unrealzd_cap_gain_bef_fund_match_sale",  "unrealzd_cap_gain_bef_fund_match_sale",  CashFlowCommonData::SUM,
+	CashFlowCommonData(94, "unrealzd_cap_gain_bef_fund_match_sale", "epa_asset_unrealzd_cap_gain_bef_fund_match_sale",  "unrealzd_cap_gain_bef_fund_match_sale",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_unrealzd_cap_gain_bef_fund_match_sale, 'E','N', '3', 'C', (size_t)&modelOffset->unrealzd_cap_gain_bef_fund_match_sale),
-	CashFlowCommonData(93, "unrealzd_cap_gain_bef_neg_cash_flow_sale", "epa_asset_unrealzd_cap_gain_bef_neg_cash_flow_sale",  "unrealzd_cap_gain_bef_neg_cash_flow_sale",  CashFlowCommonData::SUM,
+	CashFlowCommonData(95, "unrealzd_cap_gain_bef_neg_cash_flow_sale", "epa_asset_unrealzd_cap_gain_bef_neg_cash_flow_sale",  "unrealzd_cap_gain_bef_neg_cash_flow_sale",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_unrealzd_cap_gain_bef_neg_cash_flow_sale, 'E','N', '3', 'C', (size_t)&modelOffset->unrealzd_cap_gain_bef_neg_cash_flow_sale),
-	CashFlowCommonData(94, "unrealzd_cap_gain_bef_rebal_sale", "epa_asset_unrealzd_cap_gain_bef_rebal_sale",  "unrealzd_cap_gain_bef_rebal_sale",  CashFlowCommonData::SUM,
+	CashFlowCommonData(96, "unrealzd_cap_gain_bef_rebal_sale", "epa_asset_unrealzd_cap_gain_bef_rebal_sale",  "unrealzd_cap_gain_bef_rebal_sale",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_unrealzd_cap_gain_bef_rebal_sale, 'E','N', '3', 'C', (size_t)&modelOffset->unrealzd_cap_gain_bef_rebal_sale),
-	CashFlowCommonData(95, "unrealzd_cap_gain_bef_sale", "epa_asset_unrealzd_cap_gain_bef_sale",  "unrealzd_cap_gain_bef_sale",  CashFlowCommonData::SUM,
+	CashFlowCommonData(97, "unrealzd_cap_gain_bef_sale", "epa_asset_unrealzd_cap_gain_bef_sale",  "unrealzd_cap_gain_bef_sale",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_unrealzd_cap_gain_bef_sale, 'E','N', '3', 'P', (size_t)&modelOffset->unrealzd_cap_gain_bef_sale),
-	CashFlowCommonData(96, "unrealzd_cap_gain_gaap_surp", "epa_asset_unrealzd_cap_gain_gaap_surp",  "unrealzd_cap_gain_gaap_surp",  CashFlowCommonData::SUM,
+	CashFlowCommonData(98, "unrealzd_cap_gain_gaap_surp", "epa_asset_unrealzd_cap_gain_gaap_surp",  "unrealzd_cap_gain_gaap_surp",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_unrealzd_cap_gain_gaap_surp, 'E','N', '3', 'C', (size_t)&modelOffset->unrealzd_cap_gain_gaap_surp),
-	CashFlowCommonData(97, "unrealzd_cap_gain_incr", "epa_asset_unrealzd_cap_gain_incr",  "unrealzd_cap_gain_incr",  CashFlowCommonData::SUM,
+	CashFlowCommonData(99, "unrealzd_cap_gain_incr", "epa_asset_unrealzd_cap_gain_incr",  "unrealzd_cap_gain_incr",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_unrealzd_cap_gain_incr, 'E','Y', '3', 'C', (size_t)&modelOffset->unrealzd_cap_gain_incr),
-	CashFlowCommonData(98, "unrealzd_cap_gain_released_on_sale", "epa_asset_unrealzd_cap_gain_released_on_sale",  "unrealzd_cap_gain_released_on_sale",  CashFlowCommonData::SUM,
+	CashFlowCommonData(100, "unrealzd_cap_gain_released_on_sale", "epa_asset_unrealzd_cap_gain_released_on_sale",  "unrealzd_cap_gain_released_on_sale",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_unrealzd_cap_gain_released_on_sale, 'E','Y', '3', 'C', (size_t)&modelOffset->unrealzd_cap_gain_released_on_sale),
-	CashFlowCommonData(99, "unrealzd_cap_gain_to_bk_ratio", "epa_asset_unrealzd_cap_gain_to_bk_ratio",  "unrealzd_cap_gain_to_bk_ratio",  CashFlowCommonData::SUM,
+	CashFlowCommonData(101, "unrealzd_cap_gain_to_bk_ratio", "epa_asset_unrealzd_cap_gain_to_bk_ratio",  "unrealzd_cap_gain_to_bk_ratio",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_unrealzd_cap_gain_to_bk_ratio, 'E','N', '3', 'P', (size_t)&modelOffset->unrealzd_cap_gain_to_bk_ratio),
-	CashFlowCommonData(100, "weighted_avg_life", "epa_asset_weighted_avg_life",  "weighted_avg_life",  CashFlowCommonData::SUM,
+	CashFlowCommonData(102, "weighted_avg_life", "epa_asset_weighted_avg_life",  "weighted_avg_life",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_weighted_avg_life, 'E','N', '3', 'C', (size_t)&modelOffset->weighted_avg_life),
-	CashFlowCommonData(101, "yld_denom", "epa_asset_yld_denom",  "yld_denom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(103, "yld_denom", "epa_asset_yld_denom",  "yld_denom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_yld_denom, 'E','N', '3', 'C', (size_t)&modelOffset->yld_denom),
-	CashFlowCommonData(102, "yld_numer", "epa_asset_yld_numer",  "yld_numer",  CashFlowCommonData::SUM,
+	CashFlowCommonData(104, "yld_numer", "epa_asset_yld_numer",  "yld_numer",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPA_ASSET_UDF::epa_asset_yld_numer, 'E','N', '3', 'C', (size_t)&modelOffset->yld_numer)
 };
 const CashFlowCommonData* EPA_ASSET::mCFStaticData[] = {
@@ -4612,6 +4534,8 @@ const CashFlowCommonData* EPA_ASSET::mCFStaticData[] = {
 	&EPA_ASSET::mCFStaticData_0[100],
 	&EPA_ASSET::mCFStaticData_0[101],
 	&EPA_ASSET::mCFStaticData_0[102],
+	&EPA_ASSET::mCFStaticData_0[103],
+	&EPA_ASSET::mCFStaticData_0[104],
 	nullptr};
 //const CashFlowCommonData END@2
 
@@ -4653,14 +4577,6 @@ namespace {
 		,ChoicePair(StrEnum::MARKET_VALUE, "Market Value")
 	};
 	const EnumList gaap_acctng_defnEnumList(2, gaap_acctng_defnChoicePairs);
-
-	// EnumList for ia_prod_v3_rsd_2_aig                                                                                       
-	const ChoicePair ia_prod_v3_rsd_2_aigChoicePairs[] = {
-		ChoicePair(StrEnum::UNDEFINED, StrEnum::undefinedString)
-		,ChoicePair(StrEnum::YES, "Yes")
-		,ChoicePair(StrEnum::NO, "No")
-	};
-	const EnumList ia_prod_v3_rsd_2_aigEnumList(2, ia_prod_v3_rsd_2_aigChoicePairs);
 
 	// EnumList for sale_class                                                                                       
 	const ChoicePair sale_classChoicePairs[] = {
@@ -4726,16 +4642,16 @@ TableMgr<VariantTable> EPA_ASSET::mgr_;
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
 	Descriptor(5, Attribute::STRING,	"category_id", -1, (size_t)&modelOffset->category_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(6, Attribute::STR_ENUM,	"data_validation_defn", -1, (size_t)&modelOffset->data_validation_defn,
-				Descriptor::NOT_SHARED, false, false, (size_t)0, &data_validation_defnEnumList, Feature(true)),
-	Descriptor(7, Attribute::STRING,	"epa_file", -1, (size_t)&modelOffset->epa_file,
+	Descriptor(6, Attribute::STRING,	"data_file_name_input", -1, (size_t)&modelOffset->data_file_name_input,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(8, Attribute::STR_ENUM,	"epa_file_defn", -1, (size_t)&modelOffset->epa_file_defn,
+	Descriptor(7, Attribute::STR_ENUM,	"data_validation_defn", -1, (size_t)&modelOffset->data_validation_defn,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, &data_validation_defnEnumList, Feature(true)),
+	Descriptor(8, Attribute::STRING,	"epa_file", -1, (size_t)&modelOffset->epa_file,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
+	Descriptor(9, Attribute::STR_ENUM,	"epa_file_defn", -1, (size_t)&modelOffset->epa_file_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &epa_file_defnEnumList, Feature(true)),
-	Descriptor(9, Attribute::STR_ENUM,	"gaap_acctng_defn", -1, (size_t)&modelOffset->gaap_acctng_defn,
+	Descriptor(10, Attribute::STR_ENUM,	"gaap_acctng_defn", -1, (size_t)&modelOffset->gaap_acctng_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &gaap_acctng_defnEnumList, Feature(true)),
-	Descriptor(10, Attribute::STR_ENUM,	"ia_prod_v3_rsd_2_aig", -1, (size_t)&modelOffset->ia_prod_v3_rsd_2_aig,
-				Descriptor::NOT_SHARED, false, false, (size_t)0, &ia_prod_v3_rsd_2_aigEnumList, Feature(true)),
 	Descriptor(11, Attribute::DOUBLE,	"pct_to_use_mp", Descriptor::NOT_INDEXED, (size_t)&modelOffset->pct_to_use_mp,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
 	Descriptor(12, Attribute::STRING,	"planned_sale_date", -1, (size_t)&modelOffset->planned_sale_date,
@@ -4748,43 +4664,55 @@ TableMgr<VariantTable> EPA_ASSET::mgr_;
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &sale_classEnumList, Feature(true)),
 	Descriptor(16, Attribute::STRING,	"seg_id", -1, (size_t)&modelOffset->seg_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(17, Attribute::STR_ENUM,	"use_mp", -1, (size_t)&modelOffset->use_mp,
-				Descriptor::NOT_SHARED, false, false, (size_t)0, &use_mpEnumList, Feature(true)),
-	Descriptor(18, Attribute::INT,	"msnumelement", -1, (size_t)&modelOffset->msnumelement,
+	Descriptor(17, Attribute::DOUBLE,	"sold_pct_fund_match_value", Descriptor::NOT_INDEXED, (size_t)&modelOffset->sold_pct_fund_match_value,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(19, Attribute::SCALAR_INT,	"asset_fund_index", -1, (size_t)&modelOffset->asset_fund_index,
+	Descriptor(18, Attribute::DOUBLE,	"sold_pct_neg_cash_flow_value", Descriptor::NOT_INDEXED, (size_t)&modelOffset->sold_pct_neg_cash_flow_value,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
+	Descriptor(19, Attribute::DOUBLE,	"sold_pct_planned_value", Descriptor::NOT_INDEXED, (size_t)&modelOffset->sold_pct_planned_value,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
+	Descriptor(20, Attribute::DOUBLE,	"sold_pct_rebal_value", Descriptor::NOT_INDEXED, (size_t)&modelOffset->sold_pct_rebal_value,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
+	Descriptor(21, Attribute::STR_ENUM,	"use_mp", -1, (size_t)&modelOffset->use_mp,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, &use_mpEnumList, Feature(true)),
+	Descriptor(22, Attribute::INT,	"msnumelement", -1, (size_t)&modelOffset->msnumelement,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
+	Descriptor(23, Attribute::SCALAR_INT,	"asset_fund_index", -1, (size_t)&modelOffset->asset_fund_index,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&EPA_ASSET_UDF::epa_asset_asset_fund_index)),
-	Descriptor(20, Attribute::SCALAR_INT,	"commencement_period", -1, (size_t)&modelOffset->commencement_period,
+	Descriptor(24, Attribute::SCALAR_INT,	"commencement_period", -1, (size_t)&modelOffset->commencement_period,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&EPA_ASSET_UDF::epa_asset_commencement_period)),
-	Descriptor(21, Attribute::SCALAR_STRING,	"data_grp_id", -1, (size_t)&modelOffset->data_grp_id,
+	Descriptor(25, Attribute::SCALAR_STRING,	"data_file_name", -1, (size_t)&modelOffset->data_file_name,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((sF)&EPA_ASSET_UDF::epa_asset_data_file_name)),
+	Descriptor(26, Attribute::SCALAR_STRING,	"data_grp_id", -1, (size_t)&modelOffset->data_grp_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((sF)&EPA_ASSET_UDF::epa_asset_data_grp_id)),
-	Descriptor(22, Attribute::SCALAR_INT,	"gaap_inc_defn", -1, (size_t)&modelOffset->gaap_inc_defn,
+	Descriptor(27, Attribute::SCALAR_INT,	"existing_asset_indicator", -1, (size_t)&modelOffset->existing_asset_indicator,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&EPA_ASSET_UDF::epa_asset_existing_asset_indicator)),
+	Descriptor(28, Attribute::SCALAR_INT,	"gaap_inc_defn", -1, (size_t)&modelOffset->gaap_inc_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&EPA_ASSET_UDF::epa_asset_gaap_inc_defn)),
-	Descriptor(23, Attribute::SCALAR_INT,	"gaap_val_defn", -1, (size_t)&modelOffset->gaap_val_defn,
+	Descriptor(29, Attribute::SCALAR_INT,	"gaap_val_defn", -1, (size_t)&modelOffset->gaap_val_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&EPA_ASSET_UDF::epa_asset_gaap_val_defn)),
-	Descriptor(24, Attribute::SCALAR_INT,	"maturity_period", -1, (size_t)&modelOffset->maturity_period,
+	Descriptor(30, Attribute::SCALAR_INT,	"maturity_period", -1, (size_t)&modelOffset->maturity_period,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&EPA_ASSET_UDF::epa_asset_maturity_period)),
-	Descriptor(25, Attribute::SCALAR_INT,	"neg_asset_flag", -1, (size_t)&modelOffset->neg_asset_flag,
+	Descriptor(31, Attribute::SCALAR_INT,	"neg_asset_flag", -1, (size_t)&modelOffset->neg_asset_flag,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&EPA_ASSET_UDF::epa_asset_neg_asset_flag)),
-	Descriptor(26, Attribute::SCALAR_DOUBLE,	"pct_to_use", -1, (size_t)&modelOffset->pct_to_use,
+	Descriptor(32, Attribute::SCALAR_DOUBLE,	"pct_to_use", -1, (size_t)&modelOffset->pct_to_use,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((dF)&EPA_ASSET_UDF::epa_asset_pct_to_use)),
-	Descriptor(27, Attribute::SCALAR_INT,	"planned_sale_period", -1, (size_t)&modelOffset->planned_sale_period,
+	Descriptor(33, Attribute::SCALAR_INT,	"planned_sale_period", -1, (size_t)&modelOffset->planned_sale_period,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&EPA_ASSET_UDF::epa_asset_planned_sale_period)),
-	Descriptor(28, Attribute::SCALAR_STRING,	"proj_date_adj", -1, (size_t)&modelOffset->proj_date_adj,
+	Descriptor(34, Attribute::SCALAR_STRING,	"proj_date_adj", -1, (size_t)&modelOffset->proj_date_adj,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((sF)&EPA_ASSET_UDF::epa_asset_proj_date_adj)),
-	Descriptor(29, Attribute::SCALAR_INT,	"proj_date_offset", -1, (size_t)&modelOffset->proj_date_offset,
+	Descriptor(35, Attribute::SCALAR_INT,	"proj_date_offset", -1, (size_t)&modelOffset->proj_date_offset,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&EPA_ASSET_UDF::epa_asset_proj_date_offset)),
-	Descriptor(30, Attribute::SCALAR_INT,	"proj_start_date", -1, (size_t)&modelOffset->proj_start_date,
+	Descriptor(36, Attribute::SCALAR_INT,	"proj_start_date", -1, (size_t)&modelOffset->proj_start_date,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&EPA_ASSET_UDF::epa_asset_proj_start_date)),
-	Descriptor(31, Attribute::SCALAR_INT,	"proj_start_mth", -1, (size_t)&modelOffset->proj_start_mth,
+	Descriptor(37, Attribute::SCALAR_INT,	"proj_start_mth", -1, (size_t)&modelOffset->proj_start_mth,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&EPA_ASSET_UDF::epa_asset_proj_start_mth)),
-	Descriptor(32, Attribute::SCALAR_INT,	"proj_start_yr", -1, (size_t)&modelOffset->proj_start_yr,
+	Descriptor(38, Attribute::SCALAR_INT,	"proj_start_yr", -1, (size_t)&modelOffset->proj_start_yr,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&EPA_ASSET_UDF::epa_asset_proj_start_yr)),
-	Descriptor(33, Attribute::SCALAR_INT,	"sale_class_id", -1, (size_t)&modelOffset->sale_class_id,
+	Descriptor(39, Attribute::SCALAR_INT,	"sale_class_id", -1, (size_t)&modelOffset->sale_class_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&EPA_ASSET_UDF::epa_asset_sale_class_id)),
-	Descriptor(34, Attribute::SCALAR_INT,	"seg_num", -1, (size_t)&modelOffset->seg_num,
+	Descriptor(40, Attribute::SCALAR_INT,	"seg_num", -1, (size_t)&modelOffset->seg_num,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&EPA_ASSET_UDF::epa_asset_seg_num)),
-	Descriptor(35, Attribute::SCALAR_INT,	"start_period", -1, (size_t)&modelOffset->start_period,
+	Descriptor(41, Attribute::SCALAR_INT,	"start_period", -1, (size_t)&modelOffset->start_period,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&EPA_ASSET_UDF::epa_asset_start_period)),
 	};
 
@@ -4825,8 +4753,14 @@ TableMgr<VariantTable> EPA_ASSET::mgr_;
 	&EPA_ASSET::descriptor_0[33],
 	&EPA_ASSET::descriptor_0[34],
 	&EPA_ASSET::descriptor_0[35],
+	&EPA_ASSET::descriptor_0[36],
+	&EPA_ASSET::descriptor_0[37],
+	&EPA_ASSET::descriptor_0[38],
+	&EPA_ASSET::descriptor_0[39],
+	&EPA_ASSET::descriptor_0[40],
+	&EPA_ASSET::descriptor_0[41],
 	nullptr};
-	const size_t EPA_ASSET::sDescriptorCount = 36;
+	const size_t EPA_ASSET::sDescriptorCount = 42;
 
 //factory
 EPA_ASSET* EPA_ASSET::makeThis(int isSubmodel, ModelClass* owner, EPA_ASSET* peer, 
@@ -4937,16 +4871,12 @@ typedef xstring (EPA_ASSET_UDF::*sPFs) (xstring);
 
 // constructor if this model class is the base class of another model class
 EPA_ASSET::EPA_ASSET(int columnCount, Descriptor* mocd[], Product* persObj) : ModelClass(columnCount, mocd, persObj), Variable(*this)
-  , sm_bond_is(0)
-  , sm_bond_pv(0)
-  , sm_bond_ym(0)
-  , sm_mtg_is(0)
-  , sm_mtg_pv(0)
-  , sm_mtg_ym(0)
 
+	, adco(company_asset_adco)
 	, asset(company_asset)
 	, epa(company_asset_epa)
 	, epl(company_liab_epl)
+	, liab(company_liab)
 	, rates(company_rates)
 	, seg(company_seg)
 {
@@ -4962,17 +4892,13 @@ EPA_ASSET::EPA_ASSET(int columnCount, Descriptor* mocd[], Product* persObj) : Mo
 //constructor begincolumn
 EPA_ASSET::EPA_ASSET(const xstring &modelClassName,
 		int isSm, ModelClass *owner, ModelClass *peer, int mainRebase,
-		const char *name, ModelClass* arrayPersistentObj) : ModelClass(102, EPA_ASSET::descriptorTable, arrayPersistentObj), Variable(*this)
-  , sm_bond_is(0)
-  , sm_bond_pv(0)
-  , sm_bond_ym(0)
-  , sm_mtg_is(0)
-  , sm_mtg_pv(0)
-  , sm_mtg_ym(0)
+		const char *name, ModelClass* arrayPersistentObj) : ModelClass(104, EPA_ASSET::descriptorTable, arrayPersistentObj), Variable(*this)
 
+	, adco(company_asset_adco)
 	, asset(company_asset)
 	, epa(company_asset_epa)
 	, epl(company_liab_epl)
+	, liab(company_liab)
 	, rates(company_rates)
 	, seg(company_seg)
  // Tables...
@@ -4999,14 +4925,20 @@ EPA_ASSET::EPA_ASSET(const xstring &modelClassName,
        isMainModel = !isSm;
 		modelName = name;
 
-#ifdef __CREATE_COMP_COMP_CLASS_
+#ifdef __CREATE_AA_COMP_COMP_CLASS_
        company = 0;
 #endif
 #ifdef __CREATE_ASSET_ASSET_CLASS_
        company_asset = 0;
 #endif
+#ifdef __CREATE_ADCO_ASSET_CLASS_
+       company_asset_adco = 0;
+#endif
 #ifdef __CREATE_EPA_ASSET_CLASS_
        company_asset_epa = 0;
+#endif
+#ifdef __CREATE_LIAB_LIAB_CLASS_
+       company_liab = 0;
 #endif
 #ifdef __CREATE_EPL_LIAB_CLASS_
        company_liab_epl = 0;
@@ -5033,7 +4965,7 @@ EPA_ASSET::EPA_ASSET(const xstring &modelClassName,
 
 	setSlidingSpace();
 
-	for (int cf_no = 1; cf_no <= 102; cf_no++)
+	for (int cf_no = 1; cf_no <= 104; cf_no++)
 #ifdef CF_MEMORY
 		setPtr_col(cf_no, 0);
 #else
@@ -5074,14 +5006,20 @@ EPA_ASSET::EPA_ASSET(const xstring &modelClassName,
 
  void EPA_ASSET::copy_names() {
 
-#ifdef __CREATE_COMP_COMP_CLASS_
-		company = (COMP_COMP*)(findUnique("company"));
+#ifdef __CREATE_AA_COMP_COMP_CLASS_
+		company = (AA_COMP_COMP*)(findUnique("company"));
 #endif
 #ifdef __CREATE_ASSET_ASSET_CLASS_
 		company_asset = (ASSET_ASSET*)(findUnique("company|asset"));
 #endif
+#ifdef __CREATE_ADCO_ASSET_CLASS_
+		company_asset_adco = (ADCO_ASSET*)(findUnique("company|asset|adco"));
+#endif
 #ifdef __CREATE_EPA_ASSET_CLASS_
 		company_asset_epa = (EPA_ASSET*)(findUnique("company|asset|epa"));
+#endif
+#ifdef __CREATE_LIAB_LIAB_CLASS_
+		company_liab = (LIAB_LIAB*)(findUnique("company|liab"));
 #endif
 #ifdef __CREATE_EPL_LIAB_CLASS_
 		company_liab_epl = (EPL_LIAB*)(findUnique("company|liab|epl"));
@@ -5302,12 +5240,6 @@ EPA_ASSET_persistent_object::EPA_ASSET_persistent_object(const xstring &modelCla
 			EPA_ASSET(modelClassName, isSm, owner, peer, mainRebase, name, arrayPersistentObj), 
 			mReadArray(true),
 			pfl(0)
-	, sm_bond_is(EPA_ASSET::sm_bond_is)
-	, sm_bond_pv(EPA_ASSET::sm_bond_pv)
-	, sm_bond_ym(EPA_ASSET::sm_bond_ym)
-	, sm_mtg_is(EPA_ASSET::sm_mtg_is)
-	, sm_mtg_pv(EPA_ASSET::sm_mtg_pv)
-	, sm_mtg_ym(EPA_ASSET::sm_mtg_ym)
 
 	{
 
@@ -5387,7 +5319,7 @@ void EPA_ASSET::after_startup(int decrement) {
 //ms_BeforeStartup END@2
 
 HVector<ModelClass::ddfStruct> EPA_ASSET::ddfVector;
-BitArray EPA_ASSET::dataVariables(36);
+BitArray EPA_ASSET::dataVariables(42);
 bool EPA_ASSET::hasBeenWritten = false;
 
 

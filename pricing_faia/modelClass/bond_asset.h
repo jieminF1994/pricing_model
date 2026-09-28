@@ -2,6 +2,10 @@
 #define __BOND_ASSET_H_
 #pragma warning ( disable : 4819 )
 
+#if defined(GEN2_ALM_RUN)
+	#define __BOND_ASSET_H_
+#endif
+
 struct bondInitialValuesData
 	{
 	double yld_numer;
@@ -16,7 +20,7 @@ struct bondInitialValuesData
 	double refinancing_rate_opt_sprd;
 	double weighted_avg_life;
 	};
-typedef map <xstring, struct bondInitialValuesData*, less<xstring> > bondivmap;
+
 
 #include <math.h>
 #include "xstring.h"
@@ -76,7 +80,6 @@ extern MY_DLL ofstream log_strm;
 #include "StringProxy.h"			// ... contains String Proxies
 #include "StringEnumProxy.h"		// ... contains StringEnum Proxies
 #include "NumProxyNonMembers.h"		// ... min, max
-#include "StringedProxyNonMembers.h"		// ... concatenation for StringEnum
 #include "ArrayProxy.h"			// ... contains Array Proxies
 #include "ScalarProxy.h"			// ... contains Scalar Proxies
 #include "ModelGroupProxy.h"
@@ -86,6 +89,11 @@ extern MY_DLL ofstream log_strm;
 
 
 using namespace StrEnum;
+
+#ifdef __CREATE_AA_COMP_COMP_CLASS_
+class AA_COMP_COMP;
+class AA_COMP_COMP_persistent_object;
+#endif
 
 #ifdef __CREATE_ADCO_ASSET_CLASS_
 class ADCO_ASSET;
@@ -103,11 +111,6 @@ class ASSET_ASSET;
 class ASSET_ASSET_persistent_object;
 #endif
 
-#ifdef __CREATE_AUTOMATION_CLASS_
-class AUTOMATION;
-class AUTOMATION_persistent_object;
-#endif
-
 #ifdef __CREATE_A_SUBPORT_ASSET_CLASS_
 class A_SUBPORT_ASSET;
 class A_SUBPORT_ASSET_persistent_object;
@@ -120,22 +123,21 @@ typedef TMultiDComp<_2D_A_SUBPORT_ASSET, A_SUBPORT_ASSET_persistent_object> _3D_
 class BOND_ASSET;
 class BOND_ASSET_persistent_object;
 typedef TComp<BOND_ASSET, BOND_ASSET_persistent_object> _1D_BOND_ASSET;
+typedef TMultiDComp<_1D_BOND_ASSET, BOND_ASSET_persistent_object> _2D_BOND_ASSET;
 #endif
 
 #ifdef __CREATE_BOND_CF_ASSET_CLASS_
 class BOND_CF_ASSET;
 class BOND_CF_ASSET_persistent_object;
-#endif
-
-#ifdef __CREATE_COMP_COMP_CLASS_
-class COMP_COMP;
-class COMP_COMP_persistent_object;
+typedef TComp<BOND_CF_ASSET, BOND_CF_ASSET_persistent_object> _1D_BOND_CF_ASSET;
+typedef TMultiDComp<_1D_BOND_CF_ASSET, BOND_CF_ASSET_persistent_object> _2D_BOND_CF_ASSET;
 #endif
 
 #ifdef __CREATE_EIO_ASSET_CLASS_
 class EIO_ASSET;
 class EIO_ASSET_persistent_object;
 typedef TComp<EIO_ASSET, EIO_ASSET_persistent_object> _1D_EIO_ASSET;
+typedef TMultiDComp<_1D_EIO_ASSET, EIO_ASSET_persistent_object> _2D_EIO_ASSET;
 #endif
 
 #ifdef __CREATE_EPA_ASSET_CLASS_
@@ -160,6 +162,7 @@ typedef TComp<FIAAFUND_LIAB, FIAAFUND_LIAB_persistent_object> _1D_FIAAFUND_LIAB;
 class FIACARVM_LIAB;
 class FIACARVM_LIAB_persistent_object;
 typedef TComp<FIACARVM_LIAB, FIACARVM_LIAB_persistent_object> _1D_FIACARVM_LIAB;
+typedef TMultiDComp<_1D_FIACARVM_LIAB, FIACARVM_LIAB_persistent_object> _2D_FIACARVM_LIAB;
 #endif
 
 #ifdef __CREATE_FIA_LIAB_CLASS_
@@ -175,11 +178,6 @@ typedef TComp<HDG_GRP_COMP, HDG_GRP_COMP_persistent_object> _1D_HDG_GRP_COMP;
 typedef TMultiDComp<_1D_HDG_GRP_COMP, HDG_GRP_COMP_persistent_object> _2D_HDG_GRP_COMP;
 #endif
 
-#ifdef __CREATE_INTEX_ASSET_CLASS_
-class INTEX_ASSET;
-class INTEX_ASSET_persistent_object;
-#endif
-
 #ifdef __CREATE_INVSTRAT_ASSET_CLASS_
 class INVSTRAT_ASSET;
 class INVSTRAT_ASSET_persistent_object;
@@ -191,15 +189,24 @@ class LIAB_LIAB;
 class LIAB_LIAB_persistent_object;
 #endif
 
+#ifdef __CREATE_MRB_GAAP_CLASS_
+class MRB_GAAP;
+class MRB_GAAP_persistent_object;
+typedef TComp<MRB_GAAP, MRB_GAAP_persistent_object> _1D_MRB_GAAP;
+#endif
+
 #ifdef __CREATE_MTG_ASSET_CLASS_
 class MTG_ASSET;
 class MTG_ASSET_persistent_object;
 typedef TComp<MTG_ASSET, MTG_ASSET_persistent_object> _1D_MTG_ASSET;
+typedef TMultiDComp<_1D_MTG_ASSET, MTG_ASSET_persistent_object> _2D_MTG_ASSET;
 #endif
 
 #ifdef __CREATE_MTG_CF_ASSET_CLASS_
 class MTG_CF_ASSET;
 class MTG_CF_ASSET_persistent_object;
+typedef TComp<MTG_CF_ASSET, MTG_CF_ASSET_persistent_object> _1D_MTG_CF_ASSET;
+typedef TMultiDComp<_1D_MTG_CF_ASSET, MTG_CF_ASSET_persistent_object> _2D_MTG_CF_ASSET;
 #endif
 
 #ifdef __CREATE_RATES_ECONOMY_CLASS_
@@ -213,22 +220,11 @@ class SEG_COMP_persistent_object;
 typedef TComp<SEG_COMP, SEG_COMP_persistent_object> _1D_SEG_COMP;
 #endif
 
-#ifdef __CREATE_SFAS133_GAAP_CLASS_
-class SFAS133_GAAP;
-class SFAS133_GAAP_persistent_object;
-typedef TComp<SFAS133_GAAP, SFAS133_GAAP_persistent_object> _1D_SFAS133_GAAP;
-#endif
-
 #ifdef __CREATE_SFAS97RD_GAAP_CLASS_
 class SFAS97RD_GAAP;
 class SFAS97RD_GAAP_persistent_object;
 typedef TComp<SFAS97RD_GAAP, SFAS97RD_GAAP_persistent_object> _1D_SFAS97RD_GAAP;
 typedef TMultiDComp<_1D_SFAS97RD_GAAP, SFAS97RD_GAAP_persistent_object> _2D_SFAS97RD_GAAP;
-#endif
-
-#ifdef __CREATE_UTIL_RAFM_CLASS_
-class UTIL_RAFM;
-class UTIL_RAFM_persistent_object;
 #endif
 
 
@@ -333,6 +329,15 @@ SmartArray <double> sinking_fund_sch;
 
 SmartArray <double> psa_base_rate;
 
+SEG_COMP *seg_element;
+
+#if defined(ASSET_ONLY_MODEL)
+RATES_ECONOMY /*modelobject_name: BOND_RATES*/ *rates_ptr;
+#else
+RATES_ECONOMY /*modelobject_name: RATES*/ *rates_ptr;
+#endif
+
+
 	void init_(){
 		
 
@@ -392,6 +397,10 @@ rbc_c1_pct = 0.0;
 
 	}
 
+#ifdef __CREATE_ADCO_ASSET_CLASS_
+	ADCO_ASSET	*company_asset_adco;
+	ADCO_ASSET	*&adco;
+#endif
 #ifdef __CREATE_ANN_PBA_PBA_CLASS_
 	ANN_PBA_PBA	*company_seg_ann_pba;
 	ANN_PBA_PBA	*&ann_pba;
@@ -408,20 +417,8 @@ rbc_c1_pct = 0.0;
 	BOND_CF_ASSET	*company_asset_bond_bond_cf;
 	BOND_CF_ASSET	*&bond_cf;
 #endif
-#ifdef __CREATE_BOND_CF_ASSET_CLASS_
-	BOND_CF_ASSET	*company_asset_bond_bond_cf_bond_is;
-	BOND_CF_ASSET	*&bond_is;
-#endif
-#ifdef __CREATE_BOND_CF_ASSET_CLASS_
-	BOND_CF_ASSET	*company_asset_bond_bond_cf_bond_pv;
-	BOND_CF_ASSET	*&bond_pv;
-#endif
-#ifdef __CREATE_BOND_CF_ASSET_CLASS_
-	BOND_CF_ASSET	*company_asset_bond_bond_cf_bond_ym;
-	BOND_CF_ASSET	*&bond_ym;
-#endif
-#ifdef __CREATE_COMP_COMP_CLASS_
-	COMP_COMP	*company;
+#ifdef __CREATE_AA_COMP_COMP_CLASS_
+	AA_COMP_COMP	*company;
 #endif
 #ifdef __CREATE_EPL_LIAB_CLASS_
 	EPL_LIAB	*company_liab_epl;
@@ -507,6 +504,8 @@ rbc_c1_pct = 0.0;
  	ColumnAccessor < mCFStaticData_0 > dflt_pct;
  	ColumnAccessor < mCFStaticData_0 > dur_val;
  	ColumnAccessor < mCFStaticData_0 > eff_dur;
+ 	ColumnAccessor < mCFStaticData_0 > excess_dflt_amt;
+ 	ColumnAccessor < mCFStaticData_0 > excess_dflt_pct;
  	ColumnAccessor < mCFStaticData_0 > finalize;
  	ColumnAccessor < mCFStaticData_0 > gaap_inc_bk_val;
  	ColumnAccessor < mCFStaticData_0 > gaap_inc_unrealzd_cap_gain;
@@ -577,17 +576,12 @@ rbc_c1_pct = 0.0;
  	ColumnAccessor < mCFStaticData_0 > weighted_avg_life_opt_sensitivity;
  	ColumnAccessor < mCFStaticData_0 > yld_denom;
  	ColumnAccessor < mCFStaticData_0 > yld_numer;
- 	ColumnAccessor < mCFStaticData_0 > yld_numer_adj_aig;
+ 	ColumnAccessor < mCFStaticData_0 > yld_numer_adj_crbg;
 //Column Definition END@2
 
  // Temporary Table...
 BOND_CF_ASSET *sm_bond_cf;
-BOND_ASSET *sm_bond_is;
-BOND_ASSET *sm_bond_pv;
-BOND_ASSET *sm_bond_ym;
-BOND_ASSET *sm_mtg_is;
-BOND_ASSET *sm_mtg_pv;
-BOND_ASSET *sm_mtg_ym;
+_2D_BOND_CF_ASSET sm_bond_cf_var;
 int main_rebase_model; //1
 
 public :
@@ -644,6 +638,11 @@ public :
 		return amortzd_cost_period_defn_save; }
   inline void Set_amortzd_cost_period_defn_save(const xstring &v) {
 		amortzd_cost_period_defn_save.setValue(v); }
+	Attribute::Proxy <int, DESCRIPTOR_TABLE > amortzn_cost_period;
+  inline int	Get_amortzn_cost_period() {
+		return amortzn_cost_period; }
+  inline void Set_amortzn_cost_period(const int &v) {
+		amortzn_cost_period.setValue(v); }
 	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > asset_detail_rpt_cusip_id;
   inline xstring	Get_asset_detail_rpt_cusip_id() {
 		return asset_detail_rpt_cusip_id; }
@@ -710,25 +709,32 @@ public :
 	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > cost_basis_defn;
   inline xstring	Get_cost_basis_defn() {
 		return cost_basis_defn; }
+	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > data_file_name_input;
+  inline xstring	Get_data_file_name_input() {
+		return data_file_name_input; }
 	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > data_validation_defn;
   inline xstring	Get_data_validation_defn() {
 		return data_validation_defn; }
-	Attribute::Proxy <double, DESCRIPTOR_TABLE > dur_wtd_sprd_adj_aig;
-  inline double	Get_dur_wtd_sprd_adj_aig() {
-		return dur_wtd_sprd_adj_aig; }
-  inline void Set_dur_wtd_sprd_adj_aig(const double &v) {
-		dur_wtd_sprd_adj_aig.setValue(v); }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > fast_stat_calc_aig;
-  inline xstring	Get_fast_stat_calc_aig() {
-		return fast_stat_calc_aig; }
+	Attribute::Proxy <int, DESCRIPTOR_TABLE > date_lookup;
+  inline int	Get_date_lookup() {
+		return date_lookup; }
+  inline void Set_date_lookup(const int &v) {
+		date_lookup.setValue(v); }
+	Attribute::Proxy <double, DESCRIPTOR_TABLE > dur_wtd_sprd_adj_crbg;
+  inline double	Get_dur_wtd_sprd_adj_crbg() {
+		return dur_wtd_sprd_adj_crbg; }
+  inline void Set_dur_wtd_sprd_adj_crbg(const double &v) {
+		dur_wtd_sprd_adj_crbg.setValue(v); }
 	Attribute::Proxy <StringEnum, DESCRIPTOR_TABLE > gaap_acctng_defn;
   inline xstring	Get_gaap_acctng_defn() {
 		return gaap_acctng_defn; }
   inline void Set_gaap_acctng_defn(const xstring &v) {
 		gaap_acctng_defn.setValue(v); }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > ia_prod_v3_rsd_2_aig;
-  inline xstring	Get_ia_prod_v3_rsd_2_aig() {
-		return ia_prod_v3_rsd_2_aig; }
+	Attribute::Proxy <StringEnum, DESCRIPTOR_TABLE > gen2_declarations;
+  inline xstring	Get_gen2_declarations() {
+		return gen2_declarations; }
+  inline void Set_gen2_declarations(const xstring &v) {
+		gen2_declarations.setValue(v); }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_bk_val_mp;
   inline double	Get_init_bk_val_mp() {
 		return init_bk_val_mp; }
@@ -761,6 +767,11 @@ public :
 	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > mkt_val_calc_freq_yrs;
   inline int	Get_mkt_val_calc_freq_yrs() {
 		return mkt_val_calc_freq_yrs; }
+	Attribute::Proxy <int, DESCRIPTOR_TABLE > num_variations;
+  inline int	Get_num_variations() {
+		return num_variations; }
+  inline void Set_num_variations(const int &v) {
+		num_variations.setValue(v); }
 	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > opt_int_diff_defn;
   inline xstring	Get_opt_int_diff_defn() {
 		return opt_int_diff_defn; }
@@ -776,11 +787,11 @@ public :
 	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > port_defn_mp;
   inline xstring	Get_port_defn_mp() {
 		return port_defn_mp; }
-	Attribute::Proxy <double, DESCRIPTOR_TABLE > portfolio_sprd_adj_aig;
-  inline double	Get_portfolio_sprd_adj_aig() {
-		return portfolio_sprd_adj_aig; }
-  inline void Set_portfolio_sprd_adj_aig(const double &v) {
-		portfolio_sprd_adj_aig.setValue(v); }
+	Attribute::Proxy <double, DESCRIPTOR_TABLE > port_sprd_adj_crbg;
+  inline double	Get_port_sprd_adj_crbg() {
+		return port_sprd_adj_crbg; }
+  inline void Set_port_sprd_adj_crbg(const double &v) {
+		port_sprd_adj_crbg.setValue(v); }
 	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > proj_date;
   inline xstring	Get_proj_date() {
 		return proj_date; }
@@ -836,9 +847,32 @@ public :
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > sinking_fund_prin_pmt_pct;
   inline double	Get_sinking_fund_prin_pmt_pct() {
 		return sinking_fund_prin_pmt_pct; }
+	Attribute::Proxy <double, DESCRIPTOR_TABLE > sold_pct_fund_match_value;
+  inline double	Get_sold_pct_fund_match_value() {
+		return sold_pct_fund_match_value; }
+  inline void Set_sold_pct_fund_match_value(const double &v) {
+		sold_pct_fund_match_value.setValue(v); }
+	Attribute::Proxy <double, DESCRIPTOR_TABLE > sold_pct_neg_cash_flow_value;
+  inline double	Get_sold_pct_neg_cash_flow_value() {
+		return sold_pct_neg_cash_flow_value; }
+  inline void Set_sold_pct_neg_cash_flow_value(const double &v) {
+		sold_pct_neg_cash_flow_value.setValue(v); }
+	Attribute::Proxy <double, DESCRIPTOR_TABLE > sold_pct_planned_value;
+  inline double	Get_sold_pct_planned_value() {
+		return sold_pct_planned_value; }
+  inline void Set_sold_pct_planned_value(const double &v) {
+		sold_pct_planned_value.setValue(v); }
+	Attribute::Proxy <double, DESCRIPTOR_TABLE > sold_pct_rebal_value;
+  inline double	Get_sold_pct_rebal_value() {
+		return sold_pct_rebal_value; }
+  inline void Set_sold_pct_rebal_value(const double &v) {
+		sold_pct_rebal_value.setValue(v); }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > taxable_pct_mp;
   inline double	Get_taxable_pct_mp() {
 		return taxable_pct_mp; }
+	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > unique_id_mp;
+  inline xstring	Get_unique_id_mp() {
+		return unique_id_mp; }
 	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > use_mp;
   inline xstring	Get_use_mp() {
 		return use_mp; }
@@ -851,7 +885,6 @@ public :
   inline void Set_msnumelement(const int &v) {
 		msnumelement.setValue(v); }
 	Attribute::Proxy<Scalar<double>, DESCRIPTOR_TABLE > accr_int_per_par_unit;
-	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > amortzn_cost_period;
 	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > asset_detail_rpt_flag;
 	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > asset_fund_index;
 	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > call_first_period;
@@ -970,13 +1003,13 @@ void setup_purch_inv_asset(int t, int save_assets, int panum, int new_mp_num, do
 #line 1 "setup_sinking_fund_sch.bond_asset.for"
 void setup_sinking_fund_sch();
 
-// Shrink Bond Clone
-#line 1 "shrink_bond_clone.bond_asset.for"
-void shrink_bond_clone(int mp);
-
 // Solve for Coupon Rate
 #line 1 "solve_for_coupon_rate.bond_asset.for"
 double solve_for_coupon_rate(int t, double target_value);
+
+// Trigger Rebase
+#line 1 "trigger_rebase.bond_asset.for"
+void trigger_rebase(int t);
 
 // Validate Data
 #line 1 "validate_data.bond_asset.for"
@@ -1066,12 +1099,7 @@ public :
 
 	ModelClass *Save_main;
 	BOND_CF_ASSET *&sm_bond_cf; //
-	BOND_ASSET *&sm_bond_is; //
-	BOND_ASSET *&sm_bond_pv; //
-	BOND_ASSET *&sm_bond_ym; //
-	BOND_ASSET *&sm_mtg_is; //
-	BOND_ASSET *&sm_mtg_pv; //
-	BOND_ASSET *&sm_mtg_ym; //
+	_2D_BOND_CF_ASSET &sm_bond_cf_var; //
 
 	ProductFeatureList* pfl;
 

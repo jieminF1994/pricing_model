@@ -1,13 +1,12 @@
 ﻿
 //MODELCLASS BEGIN
+//MODELCLASS aa_comp_comp
 //MODELCLASS adco_asset
 //MODELCLASS ann_pba_pba
 //MODELCLASS asset_asset
-//MODELCLASS automation
 //MODELCLASS a_subport_asset
 //MODELCLASS bond_asset
 //MODELCLASS bond_cf_asset
-//MODELCLASS comp_comp
 //MODELCLASS eio_asset
 //MODELCLASS epa_asset
 //MODELCLASS epl_liab
@@ -15,16 +14,14 @@
 //MODELCLASS fiacarvm_liab
 //MODELCLASS fia_liab
 //MODELCLASS hdg_grp_comp
-//MODELCLASS intex_asset
 //MODELCLASS invstrat_asset
 //MODELCLASS liab_liab
+//MODELCLASS mrb_gaap
 //MODELCLASS mtg_asset
 //MODELCLASS mtg_cf_asset
 //MODELCLASS rates_economy
 //MODELCLASS seg_comp
-//MODELCLASS sfas133_gaap
 //MODELCLASS sfas97rd_gaap
-//MODELCLASS util_rafm
 //MODELCLASS END
 
 #if defined(MICROSOFT)
@@ -75,14 +72,13 @@ extern MemCount gMem;
 extern MY_DLL Parmfile *p;
 #include "column2.h"
 #include "ModelClass\liab_liab_udf.h"
+#include "ModelClass\aa_comp_comp.h"
 #include "ModelClass\adco_asset.h"
 #include "ModelClass\ann_pba_pba.h"
 #include "ModelClass\asset_asset.h"
-#include "ModelClass\automation.h"
 #include "ModelClass\a_subport_asset.h"
 #include "ModelClass\bond_asset.h"
 #include "ModelClass\bond_cf_asset.h"
-#include "ModelClass\comp_comp.h"
 #include "ModelClass\eio_asset.h"
 #include "ModelClass\epa_asset.h"
 #include "ModelClass\epl_liab.h"
@@ -90,15 +86,13 @@ extern MY_DLL Parmfile *p;
 #include "ModelClass\fiacarvm_liab.h"
 #include "ModelClass\fia_liab.h"
 #include "ModelClass\hdg_grp_comp.h"
-#include "ModelClass\intex_asset.h"
 #include "ModelClass\invstrat_asset.h"
+#include "ModelClass\mrb_gaap.h"
 #include "ModelClass\mtg_asset.h"
 #include "ModelClass\mtg_cf_asset.h"
 #include "ModelClass\rates_economy.h"
 #include "ModelClass\seg_comp.h"
-#include "ModelClass\sfas133_gaap.h"
 #include "ModelClass\sfas97rd_gaap.h"
-#include "ModelClass\util_rafm.h"
 #pragma optimize( "gs", on )
 
 #include "generatedCppHeader.h"
@@ -109,7 +103,7 @@ extern MY_DLL Parmfile *p;
 //Redundant includes only for snip test:
 //iomanip included for "setprecision()"
 #include <iomanip>
-#include <strstream> //WTW - Gen2
+#include <strstream>
 typedef vector<vector<string>> sowfinput;
 typedef vector<string> sowfcols;
 typedef map <xstring, long, less <xstring> > sowfmap;
@@ -120,7 +114,9 @@ typedef vector<vector<string>> deptaskinput;
 typedef vector<string> deptaskcols;
 typedef map <xstring, long, less <xstring> > deptaskmap;
 typedef deptaskmap::iterator deptaskmapiter;
-//extern MY_DLL strstream log_screen; //WTW - Gen2 - MY_DLL is not supported
+const int pv = 0;
+const int is = 1;
+const int ym = 2;
 const int EFFECTIVE_RATE = 0;
 const int EFFECTIVE_ANNUAL = 1;
 const int NOMINAL_SEMIANNUAL = 2;
@@ -138,9 +134,8 @@ const double LEAST_ANNUAL_GROWTH_RATE = -0.9999;
 const double LEAST_BOND_EQUIVALENT_RATE = 0.0001;
 const double SPOT_SHIFT_FOR_EFFECTIVE_DURATION_CALCULATION = 0.0001;
 const double ONE_MILLION = 1000000.0;
-//WTW - Gen2 - Move Extern definitions to rates header
-//const double MINIMUM_MONTHLY_YIELD_RATIO = -0.9; // annual yield = (1.0-0.9)^12 = 1.0e-12
-//const double MAXIMUM_MONTHLY_YIELD_RATIO	 = 999999999.0; // annual yield = (1.0+999999999.0)^12 = 1.0e+120
+const double MINIMUM_MONTHLY_YIELD_RATIO = -0.9; // annual yield = (1.0-0.9)^12 = 1.0e-12
+const double MAXIMUM_MONTHLY_YIELD_RATIO	 = 999999999.0; // annual yield = (1.0+999999999.0)^12 = 1.0e+120
 const int DECIMALS_TO_ROUND = 6;
 const int ROUND_NEGATIVE_TOZERO = 0;
 const int ROUND_NEAR = 1;
@@ -154,11 +149,10 @@ const int SUM_OVER_NEGATIVE = -101;
 const int TIER = -98;
 const int ANY_GROUP = -99;
 const bool DO_NOT_ISSUE_WARNINGS = false;
-//WTW - Gen2 - Move Extern definitions to rates header
-//const int CALL_CODE = 1; 
-//const int PUT_CODE = 2; 
-//const int CONTINUOUS_PAYOUT_CODE = 3;
-//const int FUTURES_CODE = 4;
+const int CALL_CODE = 1;
+const int PUT_CODE = 2;
+const int CONTINUOUS_PAYOUT_CODE = 3;
+const int FUTURES_CODE = 4;
 // Model point type
 const int NEW_PURCH = 0;
 const int INIT_MP = 1;
@@ -208,11 +202,13 @@ const int HEDGE_CASH_FLOW = 0;
 const int HEDGE_MKT_VAL = 1;
 const int HEDGE_ARRAY_SIZE = 2;
 // global calculation flags
-//extern bool pricing_flag;//WTW - Gen2 - Move Extern definitions to rates header
+extern bool pricing_flag;
 extern bool factors_flag;
 extern bool nb_flag;
 extern bool alm_flag;
 extern bool tcm_flag;
+extern bool pba_disc_rate_flag;
+extern int pba_segment_size;
 extern bool avr_flag;
 extern bool imr_flag;
 extern bool gaap_flag;
@@ -220,17 +216,12 @@ extern bool tgt_cap_flag;
 extern bool stoch_flag;
 extern bool valn_flag;
 extern bool time_step_flag;
-extern bool sfas133_valn_flag;
+extern bool mrb_valn_flag;
 extern bool sop031_valn_flag;
 extern bool sfas97rd_valn_flag;
-extern bool sfas97lp_valn_flag;
-extern bool sfas97lp_gpr_valn_flag;
 extern bool sfas91_valn_flag;
-extern bool sfas60_valn_flag;
-extern bool sfas60_gpr_valn_flag;
+extern bool gaap_ldti_valn_flag;
 extern bool sfas120_nlp_valn_flag;
-extern bool sfas120_valn_flag;
-extern bool sfas120_gpr_valn_flag;
 extern bool loc_gpr_valn_flag;
 extern bool pba_valn_flag;
 extern bool pba_scen_amt_valn_flag;
@@ -239,6 +230,7 @@ extern bool res_scen_amt_valn_flag;
 extern bool res_det_res_valn_flag;
 extern bool res_ag38_8d_valn_flag;
 extern bool std_scen_valn_flag;
+extern bool std_scen_prescribed_assump_flag;
 extern bool rbc_std_scen_valn_flag;
 extern bool rbc_std_scen_step2_valn_flag;
 extern bool res_std_scen_valn_flag;
@@ -261,33 +253,32 @@ extern double aggregate_amount_threshold;
 extern double model_point_amount_threshold;
 extern double rate_ratio_threshold;
 extern vector<string> valn_periods;
+
 // utility functions - elaborated in rates/economy externs
-//WTW - Gen2 - Move Extern definitions to rates header
-/*extern double round_result(int rounding, int negative, double x, int n);
+extern double round_result(int rounding, int negative, double x, int n);
 extern double factorial(int n);
 extern int n_choose_k(int n, int k);
 extern xstring check_date_format(const xstring &date);
+extern int month_from_day_number(int nSerialDate);
+extern int year_from_day_number(int nSerialDate);
+extern int day_from_day_number(int nSerialDate);
+extern int month_number_from_date(int year, int month); 
+extern int day_number_from_date(int nYear, int nMonth, int nDay);
 extern int get_mth_from_date(const xstring &date);
 extern int get_yr_from_date(const xstring &date);
 extern int get_day_from_date(const xstring &date);
-extern int month_from_day_number(int nSerialDate);//WTW - Gen2 - add new formula to replace unsupported MonthFromDayNumber() function
-extern int year_from_day_number(int nSerialDate);//WTW - Gen2 - add new formula to replace unsupported YearFromDayNumber() function
-extern int day_from_day_number(int nSerialDate);//WTW - Gen2 - add new formula to replace unsupported DayFromDayNumber() function
-extern int month_number_from_date(int year, int month); //WTW - Gen2 - add new formula to replace unsupported MonthNumberFromDate() function
-extern int day_number_from_date(int nYear, int nMonth, int nDay); //WTW - Gen2 - add new formula to replace unsupported DayNumberFromDate() function
 extern int get_end_of_mth_day(int yr, int mth);
 extern xstring add_mths_to_date(const xstring &date, int mths);
 extern int get_mth_from_adj_date(const xstring &date, int mths);
 extern double convert_rate_basis(double orig_rate, double orig_rate_basis, double new_rate_basis);
 extern double convert_decrem_rate_basis(double orig_rate, double orig_rate_basis, double new_rate_basis);
-extern long int determine_tbl_size(int sNumberOfDims, ...);
 extern xstring get_file_name(const xstring &source_file);
 extern xstring get_file_path(const xstring &source_file);
-extern xstring get_base_group_name(const xstring &tag, bool seriatim_flag = false);
+extern xstring get_base_group_name(const xstring &tag, bool split_flag = false);
 extern xstring get_string_of_date(double date);
 extern xstring get_string_of_enum_val(StrEnum::EnumValue type);
 extern int date_diff(xstring first_date, xstring second_date);
-extern int number_of_decimals(double xxx, int digits);//WTW - Gen2 - replace preprocessor #define with formula
+extern int number_of_decimals(double xxx,int digits);
 extern xstring write_string(double value, int string_length, int significant_digits);
 extern xstring write_array_to_string(SmartArray <double> value_array, int low, int high);
 extern void read_from_string(xstring temp_string, SmartArray <double> &temp_array);
@@ -308,25 +299,8 @@ extern double bs_opt_val_continuous_highest_gain(int call_or_put, double current
 extern double bs_opt_val_highest_gain(int call_or_put, double current_price, double observed_max, double observed_min, double strike_price, double length_of_sampling_period, int sampling_freq, double yrs_to_expiry, double risk_free_rate, double init_div_yld, double index_vol, int scen_int_freq, int scen_index_freq);
 extern double bs_opt_val_mthly_sum_cap(int crediting_mths, int known_index_vals, double sum_capped_amts,  double mthly_cap_rate, double yrs_to_expiry, double risk_free_rate, double init_div_yld, double index_vol, int scen_int_freq, int scen_index_freq);
 extern double cumul_bivariate_normal_distribn(double x, double y, double rho);
-extern double cumul_normal_distribn(double x);*/
+extern double cumul_normal_distribn(double x);
 
-// RAFM SQLite
-#ifndef _RAFMSQLITE_H_
-#define _RAFMSQLITE_H_
-
-#include <string>
-#include <vector>
-
-using namespace std;
-
-// 20210614 STW: upgrade to RAFM 2.9
-/*
-extern void openDatabase(string dbPath);
-extern void closeDatabase();
-extern string readCsvFile(string csvPath);
-extern void executeQuery(string sql, vector<string>& columns, vector<vector<string>>& results);
-*/
-#endif
 #endif
 extern int trace_wanted;
 
@@ -341,6 +315,7 @@ sowmpoutput iul_state_of_world_mp_output;
 sowmpoutput term_state_of_world_mp_output;
 sowmpoutput trad_state_of_world_mp_output;
 sowmpoutput va_state_of_world_mp_output;
+sowmpoutput va_state_of_world_wd_cohort_mp_output;
 sowmpoutput fa_state_of_world_mp_output;
 sowmpoutput fia_state_of_world_mp_output;
 sowmpoutput pa_state_of_world_mp_output;
@@ -369,7 +344,6 @@ extern const int& last_proj_task_loop;
 extern const int& proj_task_loop_num;
 extern const int& num_of_proj_task_loops;
 
-extern MY_DLL2 int use_overlay_code;
 extern MY_DLL int trace_level_wanted;
 extern MY_DLL int trace_level;
 extern MY_DLL bool bEmitTurboDebugger;
@@ -402,7 +376,6 @@ return 1.0;
 
 }
 
-
 //@@ END
 
 //@@ START - initialize
@@ -420,90 +393,9 @@ double LIAB_LIAB_UDF::liab_liab_initialize(int t) {
 if (model_point_fatal_error_issued)
 	throw FatalError("Model Point Fatal Errors have occurred. Please review your data.");
 
-if (t == 0 && independent_mp_defn == YES) 
-	{
-	if (!hedge_valn_flag)
-		log_screen << ".... Beginning Independent Model Point Processing" << MSG_USER;
-
-	#if defined(__UL_LIAB_H_)
-	running_parallel_flag = false;
-	sm_ul.runSeriatim("seriatim_run_tgt", 0, 0, true);
-	running_parallel_flag = true;
-	sm_ul.runParallel();
-	#endif
-
-	#if defined(__VUL_LIAB_H_)
-	running_parallel_flag = false;
-	sm_vul.runSeriatim("seriatim_run_tgt", 0, 0, true);
-	running_parallel_flag = true;
-	sm_vul.runParallel();
-	#endif
-
-	#if defined(__IUL_LIAB_H_)
-	running_parallel_flag = false;
-	sm_iul.runSeriatim("seriatim_run_tgt", 0, 0, true);
-	running_parallel_flag = true;
-	sm_iul.runParallel();
-	#endif
-
-	#if defined(__TERM_LIAB_H_)
-	running_parallel_flag = false;
-	sm_term.runSeriatim("seriatim_run_tgt", 0, 0, true);
-	running_parallel_flag = true;
-	sm_term.runParallel();
-	#endif
-
-	#if defined(__TRAD_LIAB_H_)
-	running_parallel_flag = false;
-	sm_trad.runSeriatim("seriatim_run_tgt", 0, 0, true);
-	running_parallel_flag = true;
-	sm_trad.runParallel();
-	#endif
-
-	#if defined(__VA_LIAB_H_)
-	running_parallel_flag = false;
-	sm_va.runSeriatim("seriatim_run_tgt", 0, 0, true);
-	running_parallel_flag = true;
-	if (!hedge_valn_shock_flag)
-		sm_va.runParallel();
-	#endif
-
-	#if defined(__FA_LIAB_H_)
-	running_parallel_flag = false;
-	sm_fa.runSeriatim("seriatim_run_tgt", 0, 0, true);
-	running_parallel_flag = true;
-	sm_fa.runParallel();
-	#endif
-
-	#if defined(__FIA_LIAB_H_)
-	running_parallel_flag = false;
-	sm_fia.runSeriatim("seriatim_run_tgt", 0, 0, true);
-	running_parallel_flag = true;
-	sm_fia.runParallel();
-	#endif
-
-	#if defined(__PA_LIAB_H_)
-	running_parallel_flag = false;
-	sm_pa.runSeriatim("seriatim_run_tgt", 0, 0, true);
-	running_parallel_flag = true;
-	sm_pa.runParallel();
-	#endif
-
-	#if defined(__LTC_LIAB_H_)
-	running_parallel_flag = false;
-	sm_ltc.runSeriatim("seriatim_run_tgt", 0, 0, true);
-	running_parallel_flag = true;
-	sm_ltc.runParallel();
-	#endif
-
-	if (!hedge_valn_flag)
-		log_screen << ".... Completed Independent Model Point Processing" << MSG_USER;
-	}
-
 return 1.0;
 
 }
-
 
 //@@ END
 
@@ -519,6 +411,12 @@ double LIAB_LIAB_UDF::virtual_startup(int t) {
 //^^^
 
 #line 1 "startup.LIAB_LIAB.for"
+#if 0 // START_HEADER
+#if defined(GEN2_ALM_RUN)
+	#define __LIAB_LIAB_H_
+#endif
+#endif // END_HEADER
+
 #if 0 // START_EXTERNS
 sowmpoutput ul_state_of_world_mp_output;
 sowmpoutput vul_state_of_world_mp_output;
@@ -526,6 +424,7 @@ sowmpoutput iul_state_of_world_mp_output;
 sowmpoutput term_state_of_world_mp_output;
 sowmpoutput trad_state_of_world_mp_output;
 sowmpoutput va_state_of_world_mp_output;
+sowmpoutput va_state_of_world_wd_cohort_mp_output;
 sowmpoutput fa_state_of_world_mp_output;
 sowmpoutput fia_state_of_world_mp_output;
 sowmpoutput pa_state_of_world_mp_output;
@@ -551,6 +450,7 @@ iul_state_of_world_mp_output.close();
 term_state_of_world_mp_output.close();
 trad_state_of_world_mp_output.close();
 va_state_of_world_mp_output.close();
+va_state_of_world_wd_cohort_mp_output.close();
 fa_state_of_world_mp_output.close();
 fia_state_of_world_mp_output.close();
 pa_state_of_world_mp_output.close();
@@ -577,7 +477,7 @@ if ((num_of_proj_task_loops == 0 || is_first_proj_task_loop)
 	sm_testliab.resize(1);
 
 	vector<string> mps_to_run;
-	split_string_usl(sm_testliab[0]->mps_selected.c_str(), mps_to_run, ",");//WTW - Gen2 - split_tring internal RAFM function
+	split_string_usl(sm_testliab[0]->mps_selected.c_str(), mps_to_run, ",");
 	int mp_count = mps_to_run.size();
 
 	if (mp_count > sm_testliab.size())
@@ -585,76 +485,9 @@ if ((num_of_proj_task_loops == 0 || is_first_proj_task_loop)
 	}
 #endif
 
-#if defined(__UL_LIAB_H_)
-if (independent_mp_defn == YES && num_of_proj_task_loops > 1 && !is_first_proj_task_loop)
-	{
-	sm_ul.getPersistentObject()->sm_ul_ireins.setModelPointFileId(sm_ul.getPersistentObject()->ms_ul_ireins_readfile, "keyfield");
-	sm_ul.getPersistentObject()->sm_ul_ireins.gotoRec(1);
-	sm_ul.getPersistentObject()->sm_ul_irider.setModelPointFileId(sm_ul.getPersistentObject()->ms_ul_irider_readfile, "keyfield");
-	sm_ul.getPersistentObject()->sm_ul_irider.gotoRec(1);
-	}
-#endif
-
-#if defined(__VUL_LIAB_H_)
-if (independent_mp_defn == YES && num_of_proj_task_loops > 1 && !is_first_proj_task_loop)
-	{
-	sm_vul.getPersistentObject()->sm_vul_ireins.setModelPointFileId(sm_vul.getPersistentObject()->ms_vul_ireins_readfile, "keyfield");
-	sm_vul.getPersistentObject()->sm_vul_ireins.gotoRec(1);
-	sm_vul.getPersistentObject()->sm_vul_irider.setModelPointFileId(sm_vul.getPersistentObject()->ms_vul_irider_readfile, "keyfield");
-	sm_vul.getPersistentObject()->sm_vul_irider.gotoRec(1);
-	}
-#endif
-
-#if defined(__IUL_LIAB_H_)
-if (independent_mp_defn == YES && num_of_proj_task_loops > 1 && !is_first_proj_task_loop)
-	{
-	sm_iul.getPersistentObject()->sm_iul_ireins.setModelPointFileId(sm_iul.getPersistentObject()->ms_iul_ireins_readfile, "keyfield");
-	sm_iul.getPersistentObject()->sm_iul_ireins.gotoRec(1);
-	sm_iul.getPersistentObject()->sm_iul_irider.setModelPointFileId(sm_iul.getPersistentObject()->ms_iul_irider_readfile, "keyfield");
-	sm_iul.getPersistentObject()->sm_iul_irider.gotoRec(1);
-	}
-#endif
-
-#if defined(__TERM_LIAB_H_)
-if (independent_mp_defn == YES && num_of_proj_task_loops > 1 && !is_first_proj_task_loop)
-	{
-	sm_term.getPersistentObject()->sm_term_ireins.setModelPointFileId(sm_term.getPersistentObject()->ms_term_ireins_readfile, "keyfield");
-	sm_term.getPersistentObject()->sm_term_ireins.gotoRec(1);
-	sm_term.getPersistentObject()->sm_term_irider.setModelPointFileId(sm_term.getPersistentObject()->ms_term_irider_readfile, "keyfield");
-	sm_term.getPersistentObject()->sm_term_irider.gotoRec(1);
-	}
-#endif
-
-#if defined(__TRAD_LIAB_H_)
-if (independent_mp_defn == YES && num_of_proj_task_loops > 1 && !is_first_proj_task_loop)
-	{
-	sm_trad.getPersistentObject()->sm_trad_ireins.setModelPointFileId(sm_trad.getPersistentObject()->ms_trad_ireins_readfile, "keyfield");
-	sm_trad.getPersistentObject()->sm_trad_ireins.gotoRec(1);
-	sm_trad.getPersistentObject()->sm_trad_irider.setModelPointFileId(sm_trad.getPersistentObject()->ms_trad_irider_readfile, "keyfield");
-	sm_trad.getPersistentObject()->sm_trad_irider.gotoRec(1);
-	}
-#endif
-
-#if defined(__PA_LIAB_H_)
-if (independent_mp_defn == YES && num_of_proj_task_loops > 1 && !is_first_proj_task_loop)
-	{
-	sm_pa.getPersistentObject()->sm_pa_benefits.setModelPointFileId(sm_pa.getPersistentObject()->ms_pa_benefits_readfile, "keyfield");
-	sm_pa.getPersistentObject()->sm_pa_benefits.gotoRec(1);
-	}
-#endif
-
-#if defined(__LTC_LIAB_H_)
-if (independent_mp_defn == YES && num_of_proj_task_loops > 1 && !is_first_proj_task_loop)
-	{
-	sm_ltc.getPersistentObject()->sm_ltc_ireins.setModelPointFileId(sm_ltc.getPersistentObject()->ms_ltc_ireins_readfile, "keyfield");
-	sm_ltc.getPersistentObject()->sm_ltc_ireins.gotoRec(1);
-	}
-#endif
-
 return 1.0;
 
 }
-
 
 //@@ END
 
@@ -671,7 +504,6 @@ return add_mths_to_date(proj_date, valn_period);
 
 }
 
-
 //@@ END
 
 //@@ START - proj_start_date
@@ -683,10 +515,9 @@ int LIAB_LIAB_UDF::liab_liab_proj_start_date() {
 
 
 #line 1 "proj_start_date.LIAB_LIAB.for"
-return MonthNumberFromDate(proj_start_yr, proj_start_mth);
+return day_number_from_date(proj_start_yr, proj_start_mth, 1);
 
 }
-
 
 //@@ END
 
@@ -708,7 +539,6 @@ return proj_mth + 1;
 
 }
 
-
 //@@ END
 
 //@@ START - proj_start_yr
@@ -729,7 +559,6 @@ return get_yr_from_date(proj_date_adj);
 
 }
 
-
 //@@ END
 
 
@@ -742,6 +571,7 @@ iul_state_of_world_mp_output.close();
 term_state_of_world_mp_output.close();
 trad_state_of_world_mp_output.close();
 va_state_of_world_mp_output.close();
+va_state_of_world_wd_cohort_mp_output.close();
 fa_state_of_world_mp_output.close();
 fia_state_of_world_mp_output.close();
 pa_state_of_world_mp_output.close();
@@ -807,14 +637,6 @@ const CashFlowCommonData* LIAB_LIAB::mCFStaticData[] = {
 namespace {
 	typedef EnumList::ChoicePair ChoicePair;
 
-	// EnumList for independent_mp_defn                                                                                       
-	const ChoicePair independent_mp_defnChoicePairs[] = {
-		ChoicePair(StrEnum::UNDEFINED, StrEnum::undefinedString)
-		,ChoicePair(StrEnum::YES, "Yes")
-		,ChoicePair(StrEnum::NO, "No")
-	};
-	const EnumList independent_mp_defnEnumList(2, independent_mp_defnChoicePairs);
-
 }	// namespace
 
 //... shared and not shared space: TODO later
@@ -849,23 +671,21 @@ void LIAB_LIAB::createAllShare() {
 TableMgr<VariantTable> LIAB_LIAB::mgr_;
 
 	Attribute::Descriptor LIAB_LIAB::descriptor_0[] = {
-	Descriptor(0, Attribute::STR_ENUM,	"independent_mp_defn", -1, (size_t)&modelOffset->independent_mp_defn,
-				Descriptor::NOT_SHARED, false, false, (size_t)0, &independent_mp_defnEnumList, Feature(true)),
-	Descriptor(1, Attribute::STRING,	"proj_date", -1, (size_t)&modelOffset->proj_date,
+	Descriptor(0, Attribute::STRING,	"proj_date", -1, (size_t)&modelOffset->proj_date,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(2, Attribute::STRING,	"ms_epl_readfile", -1, (size_t)&modelOffset->ms_epl_readfile,
+	Descriptor(1, Attribute::STRING,	"ms_epl_readfile", -1, (size_t)&modelOffset->ms_epl_readfile,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(3, Attribute::STRING,	"ms_fia_readfile", -1, (size_t)&modelOffset->ms_fia_readfile,
+	Descriptor(2, Attribute::STRING,	"ms_fia_readfile", -1, (size_t)&modelOffset->ms_fia_readfile,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(4, Attribute::INT,	"msnumelement", -1, (size_t)&modelOffset->msnumelement,
+	Descriptor(3, Attribute::INT,	"msnumelement", -1, (size_t)&modelOffset->msnumelement,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(5, Attribute::SCALAR_STRING,	"proj_date_adj", -1, (size_t)&modelOffset->proj_date_adj,
+	Descriptor(4, Attribute::SCALAR_STRING,	"proj_date_adj", -1, (size_t)&modelOffset->proj_date_adj,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((sF)&LIAB_LIAB_UDF::liab_liab_proj_date_adj)),
-	Descriptor(6, Attribute::SCALAR_INT,	"proj_start_date", -1, (size_t)&modelOffset->proj_start_date,
+	Descriptor(5, Attribute::SCALAR_INT,	"proj_start_date", -1, (size_t)&modelOffset->proj_start_date,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&LIAB_LIAB_UDF::liab_liab_proj_start_date)),
-	Descriptor(7, Attribute::SCALAR_INT,	"proj_start_mth", -1, (size_t)&modelOffset->proj_start_mth,
+	Descriptor(6, Attribute::SCALAR_INT,	"proj_start_mth", -1, (size_t)&modelOffset->proj_start_mth,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&LIAB_LIAB_UDF::liab_liab_proj_start_mth)),
-	Descriptor(8, Attribute::SCALAR_INT,	"proj_start_yr", -1, (size_t)&modelOffset->proj_start_yr,
+	Descriptor(7, Attribute::SCALAR_INT,	"proj_start_yr", -1, (size_t)&modelOffset->proj_start_yr,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&LIAB_LIAB_UDF::liab_liab_proj_start_yr)),
 	};
 
@@ -878,9 +698,8 @@ TableMgr<VariantTable> LIAB_LIAB::mgr_;
 	&LIAB_LIAB::descriptor_0[5],
 	&LIAB_LIAB::descriptor_0[6],
 	&LIAB_LIAB::descriptor_0[7],
-	&LIAB_LIAB::descriptor_0[8],
 	nullptr};
-	const size_t LIAB_LIAB::sDescriptorCount = 9;
+	const size_t LIAB_LIAB::sDescriptorCount = 8;
 
 //factory
 LIAB_LIAB* LIAB_LIAB::makeThis(int isSubmodel, ModelClass* owner, LIAB_LIAB* peer, 
@@ -999,12 +818,6 @@ typedef xstring (LIAB_LIAB_UDF::*sPFs) (xstring);
 
 // constructor if this model class is the base class of another model class
 LIAB_LIAB::LIAB_LIAB(int columnCount, Descriptor* mocd[], Product* persObj) : ModelClass(columnCount, mocd, persObj), Variable(*this)
-  , sm_bond_is(0)
-  , sm_bond_pv(0)
-  , sm_bond_ym(0)
-  , sm_mtg_is(0)
-  , sm_mtg_pv(0)
-  , sm_mtg_ym(0)
 
   , sm_epl(0, 0, 0)
   , sm_fia(0, 0, 0)
@@ -1014,30 +827,24 @@ LIAB_LIAB::LIAB_LIAB(int columnCount, Descriptor* mocd[], Product* persObj) : Mo
 	, asset_sub_port(company_asset_asset_sub_port)
 	, bond(company_asset_bond)
 	, bond_cf(company_asset_bond_bond_cf)
-	, bond_is(company_asset_bond_bond_cf_bond_is)
-	, bond_pv(company_asset_bond_bond_cf_bond_pv)
-	, bond_ym(company_asset_bond_bond_cf_bond_ym)
+	, bond_cf_var(company_asset_bond_bond_cf_var)
 	, eio(company_asset_eio)
 	, epa(company_asset_epa)
 	, epl(company_liab_epl)
 	, fia(company_liab_fia)
 	, fia_account(company_liab_fia_fia_account)
 	, fia_ann_pba(company_liab_fia_fia_ann_pba)
-	, fia_automation(company_liab_fia_fia_automation)
 	, fia_carvm_stat(company_liab_fia_carvm_stat)
 	, fia_carvm_tax(company_liab_fia_carvm_tax)
+	, fia_mrb(company_liab_fia_fia_mrb)
 	, fia_rates(company_liab_fia_fia_rates)
-	, fia_sfas133(company_liab_fia_fia_sfas133)
 	, fia_sfas97rd(company_liab_fia_fia_sfas97rd)
 	, hedge_grp(company_seg_hedge_grp)
-	, intex(company_asset_intex)
 	, inv_strategy(company_inv_strategy)
 	, liab(company_liab)
 	, mtg(company_asset_mtg)
 	, mtg_cf(company_asset_mtg_mtg_cf)
-	, mtg_is(company_asset_mtg_mtg_cf_mtg_is)
-	, mtg_pv(company_asset_mtg_mtg_cf_mtg_pv)
-	, mtg_ym(company_asset_mtg_mtg_cf_mtg_ym)
+	, mtg_cf_var(company_asset_mtg_mtg_cf_var)
 	, rates(company_rates)
 	, seg(company_seg)
 	, sfas97rd(company_seg_sfas97rd)
@@ -1056,12 +863,6 @@ LIAB_LIAB::LIAB_LIAB(int columnCount, Descriptor* mocd[], Product* persObj) : Mo
 LIAB_LIAB::LIAB_LIAB(const xstring &modelClassName,
 		int isSm, ModelClass *owner, ModelClass *peer, int mainRebase,
 		const char *name, ModelClass* arrayPersistentObj) : ModelClass(3, LIAB_LIAB::descriptorTable, arrayPersistentObj), Variable(*this)
-  , sm_bond_is(0)
-  , sm_bond_pv(0)
-  , sm_bond_ym(0)
-  , sm_mtg_is(0)
-  , sm_mtg_pv(0)
-  , sm_mtg_ym(0)
 
   , sm_epl(0, 0, 0)
   , sm_fia(0, 0, 0)
@@ -1071,30 +872,24 @@ LIAB_LIAB::LIAB_LIAB(const xstring &modelClassName,
 	, asset_sub_port(company_asset_asset_sub_port)
 	, bond(company_asset_bond)
 	, bond_cf(company_asset_bond_bond_cf)
-	, bond_is(company_asset_bond_bond_cf_bond_is)
-	, bond_pv(company_asset_bond_bond_cf_bond_pv)
-	, bond_ym(company_asset_bond_bond_cf_bond_ym)
+	, bond_cf_var(company_asset_bond_bond_cf_var)
 	, eio(company_asset_eio)
 	, epa(company_asset_epa)
 	, epl(company_liab_epl)
 	, fia(company_liab_fia)
 	, fia_account(company_liab_fia_fia_account)
 	, fia_ann_pba(company_liab_fia_fia_ann_pba)
-	, fia_automation(company_liab_fia_fia_automation)
 	, fia_carvm_stat(company_liab_fia_carvm_stat)
 	, fia_carvm_tax(company_liab_fia_carvm_tax)
+	, fia_mrb(company_liab_fia_fia_mrb)
 	, fia_rates(company_liab_fia_fia_rates)
-	, fia_sfas133(company_liab_fia_fia_sfas133)
 	, fia_sfas97rd(company_liab_fia_fia_sfas97rd)
 	, hedge_grp(company_seg_hedge_grp)
-	, intex(company_asset_intex)
 	, inv_strategy(company_inv_strategy)
 	, liab(company_liab)
 	, mtg(company_asset_mtg)
 	, mtg_cf(company_asset_mtg_mtg_cf)
-	, mtg_is(company_asset_mtg_mtg_cf_mtg_is)
-	, mtg_pv(company_asset_mtg_mtg_cf_mtg_pv)
-	, mtg_ym(company_asset_mtg_mtg_cf_mtg_ym)
+	, mtg_cf_var(company_asset_mtg_mtg_cf_var)
 	, rates(company_rates)
 	, seg(company_seg)
 	, sfas97rd(company_seg_sfas97rd)
@@ -1125,7 +920,7 @@ LIAB_LIAB::LIAB_LIAB(const xstring &modelClassName,
        isMainModel = !isSm;
 		modelName = name;
 
-#ifdef __CREATE_COMP_COMP_CLASS_
+#ifdef __CREATE_AA_COMP_COMP_CLASS_
        company = 0;
 #endif
 #ifdef __CREATE_ASSET_ASSET_CLASS_
@@ -1144,22 +939,13 @@ LIAB_LIAB::LIAB_LIAB(const xstring &modelClassName,
        company_asset_bond_bond_cf = 0;
 #endif
 #ifdef __CREATE_BOND_CF_ASSET_CLASS_
-       company_asset_bond_bond_cf_bond_is = 0;
-#endif
-#ifdef __CREATE_BOND_CF_ASSET_CLASS_
-       company_asset_bond_bond_cf_bond_pv = 0;
-#endif
-#ifdef __CREATE_BOND_CF_ASSET_CLASS_
-       company_asset_bond_bond_cf_bond_ym = 0;
+       company_asset_bond_bond_cf_var = 0;
 #endif
 #ifdef __CREATE_EIO_ASSET_CLASS_
        company_asset_eio = 0;
 #endif
 #ifdef __CREATE_EPA_ASSET_CLASS_
        company_asset_epa = 0;
-#endif
-#ifdef __CREATE_INTEX_ASSET_CLASS_
-       company_asset_intex = 0;
 #endif
 #ifdef __CREATE_MTG_ASSET_CLASS_
        company_asset_mtg = 0;
@@ -1168,13 +954,7 @@ LIAB_LIAB::LIAB_LIAB(const xstring &modelClassName,
        company_asset_mtg_mtg_cf = 0;
 #endif
 #ifdef __CREATE_MTG_CF_ASSET_CLASS_
-       company_asset_mtg_mtg_cf_mtg_is = 0;
-#endif
-#ifdef __CREATE_MTG_CF_ASSET_CLASS_
-       company_asset_mtg_mtg_cf_mtg_pv = 0;
-#endif
-#ifdef __CREATE_MTG_CF_ASSET_CLASS_
-       company_asset_mtg_mtg_cf_mtg_ym = 0;
+       company_asset_mtg_mtg_cf_var = 0;
 #endif
 #ifdef __CREATE_INVSTRAT_ASSET_CLASS_
        company_inv_strategy = 0;
@@ -1200,14 +980,11 @@ LIAB_LIAB::LIAB_LIAB(const xstring &modelClassName,
 #ifdef __CREATE_ANN_PBA_PBA_CLASS_
        company_liab_fia_fia_ann_pba = 0;
 #endif
-#ifdef __CREATE_AUTOMATION_CLASS_
-       company_liab_fia_fia_automation = 0;
+#ifdef __CREATE_MRB_GAAP_CLASS_
+       company_liab_fia_fia_mrb = 0;
 #endif
 #ifdef __CREATE_RATES_ECONOMY_CLASS_
        company_liab_fia_fia_rates = 0;
-#endif
-#ifdef __CREATE_SFAS133_GAAP_CLASS_
-       company_liab_fia_fia_sfas133 = 0;
 #endif
 #ifdef __CREATE_SFAS97RD_GAAP_CLASS_
        company_liab_fia_fia_sfas97rd = 0;
@@ -1226,9 +1003,6 @@ LIAB_LIAB::LIAB_LIAB(const xstring &modelClassName,
 #endif
 #ifdef __CREATE_SFAS97RD_GAAP_CLASS_
        company_seg_sfas97rd = 0;
-#endif
-#ifdef __CREATE_UTIL_RAFM_CLASS_
-       util = 0;
 #endif
 
 #ifdef VOCAL1
@@ -1287,8 +1061,8 @@ LIAB_LIAB::LIAB_LIAB(const xstring &modelClassName,
 
  void LIAB_LIAB::copy_names() {
 
-#ifdef __CREATE_COMP_COMP_CLASS_
-		company = (COMP_COMP*)(findUnique("company"));
+#ifdef __CREATE_AA_COMP_COMP_CLASS_
+		company = (AA_COMP_COMP*)(findUnique("company"));
 #endif
 #ifdef __CREATE_ASSET_ASSET_CLASS_
 		company_asset = (ASSET_ASSET*)(findUnique("company|asset"));
@@ -1306,22 +1080,13 @@ LIAB_LIAB::LIAB_LIAB(const xstring &modelClassName,
 		company_asset_bond_bond_cf = (BOND_CF_ASSET*)(findUnique("company|asset|bond|bond_cf"));
 #endif
 #ifdef __CREATE_BOND_CF_ASSET_CLASS_
-		company_asset_bond_bond_cf_bond_is = (BOND_CF_ASSET*)(findUnique("company|asset|bond|bond_cf|bond_is"));
-#endif
-#ifdef __CREATE_BOND_CF_ASSET_CLASS_
-		company_asset_bond_bond_cf_bond_pv = (BOND_CF_ASSET*)(findUnique("company|asset|bond|bond_cf|bond_pv"));
-#endif
-#ifdef __CREATE_BOND_CF_ASSET_CLASS_
-		company_asset_bond_bond_cf_bond_ym = (BOND_CF_ASSET*)(findUnique("company|asset|bond|bond_cf|bond_ym"));
+		company_asset_bond_bond_cf_var = (BOND_CF_ASSET*)(findUnique("company|asset|bond|bond_cf_var"));
 #endif
 #ifdef __CREATE_EIO_ASSET_CLASS_
 		company_asset_eio = (EIO_ASSET*)(findUnique("company|asset|eio"));
 #endif
 #ifdef __CREATE_EPA_ASSET_CLASS_
 		company_asset_epa = (EPA_ASSET*)(findUnique("company|asset|epa"));
-#endif
-#ifdef __CREATE_INTEX_ASSET_CLASS_
-		company_asset_intex = (INTEX_ASSET*)(findUnique("company|asset|intex"));
 #endif
 #ifdef __CREATE_MTG_ASSET_CLASS_
 		company_asset_mtg = (MTG_ASSET*)(findUnique("company|asset|mtg"));
@@ -1330,13 +1095,7 @@ LIAB_LIAB::LIAB_LIAB(const xstring &modelClassName,
 		company_asset_mtg_mtg_cf = (MTG_CF_ASSET*)(findUnique("company|asset|mtg|mtg_cf"));
 #endif
 #ifdef __CREATE_MTG_CF_ASSET_CLASS_
-		company_asset_mtg_mtg_cf_mtg_is = (MTG_CF_ASSET*)(findUnique("company|asset|mtg|mtg_cf|mtg_is"));
-#endif
-#ifdef __CREATE_MTG_CF_ASSET_CLASS_
-		company_asset_mtg_mtg_cf_mtg_pv = (MTG_CF_ASSET*)(findUnique("company|asset|mtg|mtg_cf|mtg_pv"));
-#endif
-#ifdef __CREATE_MTG_CF_ASSET_CLASS_
-		company_asset_mtg_mtg_cf_mtg_ym = (MTG_CF_ASSET*)(findUnique("company|asset|mtg|mtg_cf|mtg_ym"));
+		company_asset_mtg_mtg_cf_var = (MTG_CF_ASSET*)(findUnique("company|asset|mtg|mtg_cf_var"));
 #endif
 #ifdef __CREATE_INVSTRAT_ASSET_CLASS_
 		company_inv_strategy = (INVSTRAT_ASSET*)(findUnique("company|inv_strategy"));
@@ -1362,14 +1121,11 @@ LIAB_LIAB::LIAB_LIAB(const xstring &modelClassName,
 #ifdef __CREATE_ANN_PBA_PBA_CLASS_
 		company_liab_fia_fia_ann_pba = (ANN_PBA_PBA*)(findUnique("company|liab|fia|fia_ann_pba"));
 #endif
-#ifdef __CREATE_AUTOMATION_CLASS_
-		company_liab_fia_fia_automation = (AUTOMATION*)(findUnique("company|liab|fia|fia_automation"));
+#ifdef __CREATE_MRB_GAAP_CLASS_
+		company_liab_fia_fia_mrb = (MRB_GAAP*)(findUnique("company|liab|fia|fia_mrb"));
 #endif
 #ifdef __CREATE_RATES_ECONOMY_CLASS_
 		company_liab_fia_fia_rates = (RATES_ECONOMY*)(findUnique("company|liab|fia|fia_rates"));
-#endif
-#ifdef __CREATE_SFAS133_GAAP_CLASS_
-		company_liab_fia_fia_sfas133 = (SFAS133_GAAP*)(findUnique("company|liab|fia|fia_sfas133"));
 #endif
 #ifdef __CREATE_SFAS97RD_GAAP_CLASS_
 		company_liab_fia_fia_sfas97rd = (SFAS97RD_GAAP*)(findUnique("company|liab|fia|fia_sfas97rd"));
@@ -1388,9 +1144,6 @@ LIAB_LIAB::LIAB_LIAB(const xstring &modelClassName,
 #endif
 #ifdef __CREATE_SFAS97RD_GAAP_CLASS_
 		company_seg_sfas97rd = (SFAS97RD_GAAP*)(findUnique("company|seg|sfas97rd"));
-#endif
-#ifdef __CREATE_UTIL_RAFM_CLASS_
-		util = (UTIL_RAFM*)(findUnique("util"));
 #endif
  }
 //copy_names END@2
@@ -1602,12 +1355,6 @@ LIAB_LIAB_persistent_object::LIAB_LIAB_persistent_object(const xstring &modelCla
 			LIAB_LIAB(modelClassName, isSm, owner, peer, mainRebase, name, arrayPersistentObj), 
 			mReadArray(true),
 			pfl(0)
-	, sm_bond_is(LIAB_LIAB::sm_bond_is)
-	, sm_bond_pv(LIAB_LIAB::sm_bond_pv)
-	, sm_bond_ym(LIAB_LIAB::sm_bond_ym)
-	, sm_mtg_is(LIAB_LIAB::sm_mtg_is)
-	, sm_mtg_pv(LIAB_LIAB::sm_mtg_pv)
-	, sm_mtg_ym(LIAB_LIAB::sm_mtg_ym)
 
 	, sm_epl(LIAB_LIAB::sm_epl)
 	, sm_fia(LIAB_LIAB::sm_fia)
@@ -1698,13 +1445,6 @@ void LIAB_LIAB::after_startup(int decrement) {
 // Call startup for submodels
 	   sm_fia.doBeforeStartupProcessing(decrement);
 
-   if (sm_epl.isDataDrivenHolder() && sm_epl.ms_ReadArray()) {
-		if (iterationLoopRun) // don't read array next time
-			sm_epl.ms_ReadArray(false);
-		if(sm_epl.gotoRec(1))
-			sm_epl.readFileWithStartup();
-	}
-   else
 	   sm_epl.doBeforeStartupProcessing(decrement);
 
 }
@@ -1725,14 +1465,14 @@ void LIAB_LIAB::after_startup(int decrement) {
 
 	}
 	if (modelNameNosub() == "company|liab" && sm_epl.ms_ReadArray()) {
-		if (!sm_epl.isDataDrivenHolder() && iterationLoopRun) // don't read array next time
+		if (iterationLoopRun) // don't read array next time
 			sm_epl.ms_ReadArray(false);
   		sm_epl.setModelPointFileId(ms_epl_readfile);
 
 		sm_epl.setSearchFields(sm_epl.getPersistentObject()->SearchFields);
 
   		sm_epl.resize(0);
-  		if(!sm_epl.isDataDrivenHolder() && sm_epl.gotoRec(1))
+  		if(sm_epl.gotoRec(1))
   			sm_epl.readFile();
 
 	}
@@ -1740,7 +1480,7 @@ void LIAB_LIAB::after_startup(int decrement) {
 //ms_BeforeStartup END@2
 
 HVector<ModelClass::ddfStruct> LIAB_LIAB::ddfVector;
-BitArray LIAB_LIAB::dataVariables(9);
+BitArray LIAB_LIAB::dataVariables(8);
 bool LIAB_LIAB::hasBeenWritten = false;
 
 
@@ -1754,6 +1494,4 @@ void LIAB_LIAB::writeClassInfoIfRequired() const {
 }
 #endif
 
-Descriptor* Attribute::Proxy<StrEnum::StringEnum, LIAB_LIAB::descriptor_0>::dT = LIAB_LIAB::descriptor_0;
-Descriptor* Attribute::ProxyReadOnly<StrEnum::StringEnum, LIAB_LIAB::descriptor_0>::dT = LIAB_LIAB::descriptor_0;
 

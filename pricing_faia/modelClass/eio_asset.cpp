@@ -1,13 +1,12 @@
 ﻿
 //MODELCLASS BEGIN
+//MODELCLASS aa_comp_comp
 //MODELCLASS adco_asset
 //MODELCLASS ann_pba_pba
 //MODELCLASS asset_asset
-//MODELCLASS automation
 //MODELCLASS a_subport_asset
 //MODELCLASS bond_asset
 //MODELCLASS bond_cf_asset
-//MODELCLASS comp_comp
 //MODELCLASS eio_asset
 //MODELCLASS epa_asset
 //MODELCLASS epl_liab
@@ -15,16 +14,14 @@
 //MODELCLASS fiacarvm_liab
 //MODELCLASS fia_liab
 //MODELCLASS hdg_grp_comp
-//MODELCLASS intex_asset
 //MODELCLASS invstrat_asset
 //MODELCLASS liab_liab
+//MODELCLASS mrb_gaap
 //MODELCLASS mtg_asset
 //MODELCLASS mtg_cf_asset
 //MODELCLASS rates_economy
 //MODELCLASS seg_comp
-//MODELCLASS sfas133_gaap
 //MODELCLASS sfas97rd_gaap
-//MODELCLASS util_rafm
 //MODELCLASS END
 
 #if defined(MICROSOFT)
@@ -75,30 +72,27 @@ extern MemCount gMem;
 extern MY_DLL Parmfile *p;
 #include "column2.h"
 #include "ModelClass\eio_asset_udf.h"
+#include "ModelClass\aa_comp_comp.h"
 #include "ModelClass\adco_asset.h"
 #include "ModelClass\ann_pba_pba.h"
 #include "ModelClass\asset_asset.h"
-#include "ModelClass\automation.h"
 #include "ModelClass\a_subport_asset.h"
 #include "ModelClass\bond_asset.h"
 #include "ModelClass\bond_cf_asset.h"
-#include "ModelClass\comp_comp.h"
 #include "ModelClass\epa_asset.h"
 #include "ModelClass\epl_liab.h"
 #include "ModelClass\fiaafund_liab.h"
 #include "ModelClass\fiacarvm_liab.h"
 #include "ModelClass\fia_liab.h"
 #include "ModelClass\hdg_grp_comp.h"
-#include "ModelClass\intex_asset.h"
 #include "ModelClass\invstrat_asset.h"
 #include "ModelClass\liab_liab.h"
+#include "ModelClass\mrb_gaap.h"
 #include "ModelClass\mtg_asset.h"
 #include "ModelClass\mtg_cf_asset.h"
 #include "ModelClass\rates_economy.h"
 #include "ModelClass\seg_comp.h"
-#include "ModelClass\sfas133_gaap.h"
 #include "ModelClass\sfas97rd_gaap.h"
-#include "ModelClass\util_rafm.h"
 #pragma optimize( "gs", on )
 
 #include "generatedCppHeader.h"
@@ -109,7 +103,7 @@ extern MY_DLL Parmfile *p;
 //Redundant includes only for snip test:
 //iomanip included for "setprecision()"
 #include <iomanip>
-#include <strstream> //WTW - Gen2
+#include <strstream>
 typedef vector<vector<string>> sowfinput;
 typedef vector<string> sowfcols;
 typedef map <xstring, long, less <xstring> > sowfmap;
@@ -120,7 +114,9 @@ typedef vector<vector<string>> deptaskinput;
 typedef vector<string> deptaskcols;
 typedef map <xstring, long, less <xstring> > deptaskmap;
 typedef deptaskmap::iterator deptaskmapiter;
-//extern MY_DLL strstream log_screen; //WTW - Gen2 - MY_DLL is not supported
+const int pv = 0;
+const int is = 1;
+const int ym = 2;
 const int EFFECTIVE_RATE = 0;
 const int EFFECTIVE_ANNUAL = 1;
 const int NOMINAL_SEMIANNUAL = 2;
@@ -138,9 +134,8 @@ const double LEAST_ANNUAL_GROWTH_RATE = -0.9999;
 const double LEAST_BOND_EQUIVALENT_RATE = 0.0001;
 const double SPOT_SHIFT_FOR_EFFECTIVE_DURATION_CALCULATION = 0.0001;
 const double ONE_MILLION = 1000000.0;
-//WTW - Gen2 - Move Extern definitions to rates header
-//const double MINIMUM_MONTHLY_YIELD_RATIO = -0.9; // annual yield = (1.0-0.9)^12 = 1.0e-12
-//const double MAXIMUM_MONTHLY_YIELD_RATIO	 = 999999999.0; // annual yield = (1.0+999999999.0)^12 = 1.0e+120
+const double MINIMUM_MONTHLY_YIELD_RATIO = -0.9; // annual yield = (1.0-0.9)^12 = 1.0e-12
+const double MAXIMUM_MONTHLY_YIELD_RATIO	 = 999999999.0; // annual yield = (1.0+999999999.0)^12 = 1.0e+120
 const int DECIMALS_TO_ROUND = 6;
 const int ROUND_NEGATIVE_TOZERO = 0;
 const int ROUND_NEAR = 1;
@@ -154,11 +149,10 @@ const int SUM_OVER_NEGATIVE = -101;
 const int TIER = -98;
 const int ANY_GROUP = -99;
 const bool DO_NOT_ISSUE_WARNINGS = false;
-//WTW - Gen2 - Move Extern definitions to rates header
-//const int CALL_CODE = 1; 
-//const int PUT_CODE = 2; 
-//const int CONTINUOUS_PAYOUT_CODE = 3;
-//const int FUTURES_CODE = 4;
+const int CALL_CODE = 1;
+const int PUT_CODE = 2;
+const int CONTINUOUS_PAYOUT_CODE = 3;
+const int FUTURES_CODE = 4;
 // Model point type
 const int NEW_PURCH = 0;
 const int INIT_MP = 1;
@@ -208,11 +202,13 @@ const int HEDGE_CASH_FLOW = 0;
 const int HEDGE_MKT_VAL = 1;
 const int HEDGE_ARRAY_SIZE = 2;
 // global calculation flags
-//extern bool pricing_flag;//WTW - Gen2 - Move Extern definitions to rates header
+extern bool pricing_flag;
 extern bool factors_flag;
 extern bool nb_flag;
 extern bool alm_flag;
 extern bool tcm_flag;
+extern bool pba_disc_rate_flag;
+extern int pba_segment_size;
 extern bool avr_flag;
 extern bool imr_flag;
 extern bool gaap_flag;
@@ -220,17 +216,12 @@ extern bool tgt_cap_flag;
 extern bool stoch_flag;
 extern bool valn_flag;
 extern bool time_step_flag;
-extern bool sfas133_valn_flag;
+extern bool mrb_valn_flag;
 extern bool sop031_valn_flag;
 extern bool sfas97rd_valn_flag;
-extern bool sfas97lp_valn_flag;
-extern bool sfas97lp_gpr_valn_flag;
 extern bool sfas91_valn_flag;
-extern bool sfas60_valn_flag;
-extern bool sfas60_gpr_valn_flag;
+extern bool gaap_ldti_valn_flag;
 extern bool sfas120_nlp_valn_flag;
-extern bool sfas120_valn_flag;
-extern bool sfas120_gpr_valn_flag;
 extern bool loc_gpr_valn_flag;
 extern bool pba_valn_flag;
 extern bool pba_scen_amt_valn_flag;
@@ -239,6 +230,7 @@ extern bool res_scen_amt_valn_flag;
 extern bool res_det_res_valn_flag;
 extern bool res_ag38_8d_valn_flag;
 extern bool std_scen_valn_flag;
+extern bool std_scen_prescribed_assump_flag;
 extern bool rbc_std_scen_valn_flag;
 extern bool rbc_std_scen_step2_valn_flag;
 extern bool res_std_scen_valn_flag;
@@ -261,33 +253,32 @@ extern double aggregate_amount_threshold;
 extern double model_point_amount_threshold;
 extern double rate_ratio_threshold;
 extern vector<string> valn_periods;
+
 // utility functions - elaborated in rates/economy externs
-//WTW - Gen2 - Move Extern definitions to rates header
-/*extern double round_result(int rounding, int negative, double x, int n);
+extern double round_result(int rounding, int negative, double x, int n);
 extern double factorial(int n);
 extern int n_choose_k(int n, int k);
 extern xstring check_date_format(const xstring &date);
+extern int month_from_day_number(int nSerialDate);
+extern int year_from_day_number(int nSerialDate);
+extern int day_from_day_number(int nSerialDate);
+extern int month_number_from_date(int year, int month); 
+extern int day_number_from_date(int nYear, int nMonth, int nDay);
 extern int get_mth_from_date(const xstring &date);
 extern int get_yr_from_date(const xstring &date);
 extern int get_day_from_date(const xstring &date);
-extern int month_from_day_number(int nSerialDate);//WTW - Gen2 - add new formula to replace unsupported MonthFromDayNumber() function
-extern int year_from_day_number(int nSerialDate);//WTW - Gen2 - add new formula to replace unsupported YearFromDayNumber() function
-extern int day_from_day_number(int nSerialDate);//WTW - Gen2 - add new formula to replace unsupported DayFromDayNumber() function
-extern int month_number_from_date(int year, int month); //WTW - Gen2 - add new formula to replace unsupported MonthNumberFromDate() function
-extern int day_number_from_date(int nYear, int nMonth, int nDay); //WTW - Gen2 - add new formula to replace unsupported DayNumberFromDate() function
 extern int get_end_of_mth_day(int yr, int mth);
 extern xstring add_mths_to_date(const xstring &date, int mths);
 extern int get_mth_from_adj_date(const xstring &date, int mths);
 extern double convert_rate_basis(double orig_rate, double orig_rate_basis, double new_rate_basis);
 extern double convert_decrem_rate_basis(double orig_rate, double orig_rate_basis, double new_rate_basis);
-extern long int determine_tbl_size(int sNumberOfDims, ...);
 extern xstring get_file_name(const xstring &source_file);
 extern xstring get_file_path(const xstring &source_file);
-extern xstring get_base_group_name(const xstring &tag, bool seriatim_flag = false);
+extern xstring get_base_group_name(const xstring &tag, bool split_flag = false);
 extern xstring get_string_of_date(double date);
 extern xstring get_string_of_enum_val(StrEnum::EnumValue type);
 extern int date_diff(xstring first_date, xstring second_date);
-extern int number_of_decimals(double xxx, int digits);//WTW - Gen2 - replace preprocessor #define with formula
+extern int number_of_decimals(double xxx,int digits);
 extern xstring write_string(double value, int string_length, int significant_digits);
 extern xstring write_array_to_string(SmartArray <double> value_array, int low, int high);
 extern void read_from_string(xstring temp_string, SmartArray <double> &temp_array);
@@ -308,25 +299,8 @@ extern double bs_opt_val_continuous_highest_gain(int call_or_put, double current
 extern double bs_opt_val_highest_gain(int call_or_put, double current_price, double observed_max, double observed_min, double strike_price, double length_of_sampling_period, int sampling_freq, double yrs_to_expiry, double risk_free_rate, double init_div_yld, double index_vol, int scen_int_freq, int scen_index_freq);
 extern double bs_opt_val_mthly_sum_cap(int crediting_mths, int known_index_vals, double sum_capped_amts,  double mthly_cap_rate, double yrs_to_expiry, double risk_free_rate, double init_div_yld, double index_vol, int scen_int_freq, int scen_index_freq);
 extern double cumul_bivariate_normal_distribn(double x, double y, double rho);
-extern double cumul_normal_distribn(double x);*/
+extern double cumul_normal_distribn(double x);
 
-// RAFM SQLite
-#ifndef _RAFMSQLITE_H_
-#define _RAFMSQLITE_H_
-
-#include <string>
-#include <vector>
-
-using namespace std;
-
-// 20210614 STW: upgrade to RAFM 2.9
-/*
-extern void openDatabase(string dbPath);
-extern void closeDatabase();
-extern string readCsvFile(string csvPath);
-extern void executeQuery(string sql, vector<string>& columns, vector<vector<string>>& results);
-*/
-#endif
 #endif
 extern int trace_wanted;
 
@@ -338,7 +312,6 @@ extern MY_DLL Message_handler *eh;
 int num_eios_to_run;
 int num_eio = 0;
 sowfinput eio_mp_input;
-sowfcols eio_mp_input_cols;
 extern sowmpoutput eio_state_of_world_mp_output;
 extern int PVCounter;
 extern ofstream& PVCFile;
@@ -346,8 +319,8 @@ extern ostringstream PVCText;
 extern int PVCLen;
 extern int PVCSigDig;
 
-static eioivmap eio_initial_values_map;
-static eioivmap::iterator eio_initial_values_map_iter;
+static map <xstring, struct eioInitialValuesData*, less<xstring> > eio_initial_values_map;
+static map <xstring, struct eioInitialValuesData*, less<xstring> >::iterator eio_initial_values_map_iter;
 extern bool is_asset_initialize;
 
 extern MY_DLL long scenario_number;
@@ -361,7 +334,6 @@ extern const int& last_proj_task_loop;
 extern const int& proj_task_loop_num;
 extern const int& num_of_proj_task_loops;
 
-extern MY_DLL2 int use_overlay_code;
 extern MY_DLL int trace_level_wanted;
 extern MY_DLL int trace_level;
 extern MY_DLL bool bEmitTurboDebugger;
@@ -405,7 +377,6 @@ return cost_basis_bef_expiry
 
 }
 
-
 //@@ END
 
 //@@ START - asset_detail_pv_flag
@@ -431,7 +402,6 @@ if (t >= asset_detail_rpt_start_period
 return 0;
 
 }
-
 
 //@@ END
 
@@ -462,7 +432,6 @@ return 0.0;
 
 }
 
-
 //@@ END
 
 //@@ START - avr_basic_contribn
@@ -487,7 +456,6 @@ return avr_basic_contribn_bef_sale(t)
 	   * (1.0 - sold_pct(t));
 
 }
-
 
 //@@ END
 
@@ -514,7 +482,6 @@ return bk_val_bef_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - avr_max
@@ -540,7 +507,6 @@ return avr_max_bef_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - avr_max_bef_sale
@@ -562,7 +528,6 @@ return bk_val_bef_sale(t)
 	   * avr_max_pct;
 
 }
-
 
 //@@ END
 
@@ -589,7 +554,6 @@ return avr_obj_bef_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - avr_obj_bef_sale
@@ -615,7 +579,6 @@ return bk_val_bef_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - avr_realzd_cap_gain
@@ -639,7 +602,6 @@ if (t <= commencement_period || t > maturity_period)
 return realzd_cap_gain(t);
 
 }
-
 
 //@@ END
 
@@ -665,7 +627,6 @@ return realzd_cap_gain_sale(t);
 
 }
 
-
 //@@ END
 
 //@@ START - avr_unrealzd_cap_gain
@@ -690,7 +651,6 @@ return unrealzd_cap_gain(t);
 
 }
 
-
 //@@ END
 
 //@@ START - avr_unrealzd_cap_gain_bef_sale
@@ -711,7 +671,6 @@ if (t <= commencement_period || t > maturity_period)
 return unrealzd_cap_gain_bef_sale(t);
 
 }
-
 
 //@@ END
 
@@ -736,7 +695,6 @@ if (t <= commencement_period || t > maturity_period)
 return unrealzd_cap_gain_released_on_sale(t);
 
 }
-
 
 //@@ END
 
@@ -766,7 +724,6 @@ return 0.0;
 
 }
 
-
 //@@ END
 
 //@@ START - bk_val_bef_fund_match_sale
@@ -794,7 +751,6 @@ if (t < maturity_period)
 return 0.0;
 
 }
-
 
 //@@ END
 
@@ -824,7 +780,6 @@ return 0.0;
 
 }
 
-
 //@@ END
 
 //@@ START - bk_val_bef_rebal_sale
@@ -853,7 +808,6 @@ return 0.0;
 
 }
 
-
 //@@ END
 
 //@@ START - bk_val_bef_sale
@@ -881,7 +835,6 @@ if (t == 0 && existing_asset_indicator)
 		{
 		if (cost_basis_defn != MARKET_VALUE)
 			{
-			makeRunLogYellow();
 			log_screen.setf(ios::fixed, ios::floatfield);
 			log_screen << "Warning: Inconsistent index option input for " << asset_id
 					   << ". The book value accounting definition is Cost Basis."
@@ -964,7 +917,6 @@ return min(bk_val(t - 1),
 
 }
 
-
 //@@ END
 
 //@@ START - bk_val_plus_accr_int
@@ -988,7 +940,6 @@ if (t < commencement_period || t > maturity_period)
 return bk_val(t);
 
 }
-
 
 //@@ END
 
@@ -1014,7 +965,6 @@ return bk_val_bef_neg_cash_flow_sale (t);
 
 }
 
-
 //@@ END
 
 //@@ START - bk_val_plus_accr_int_bef_rebal_sale
@@ -1038,7 +988,6 @@ if (t < commencement_period || t > maturity_period)
 return bk_val_bef_rebal_sale(t);
 
 }
-
 
 //@@ END
 
@@ -1070,7 +1019,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - cal_mth
@@ -1096,7 +1044,6 @@ return proj_start_mth + t - 1
 
 }
 
-
 //@@ END
 
 //@@ START - cal_yr
@@ -1121,7 +1068,6 @@ return proj_start_yr + cal_yr_relative(t) - 1;
 
 }
 
-
 //@@ END
 
 //@@ START - cal_yr_relative
@@ -1142,7 +1088,6 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 return 1 + floor((proj_start_mth + t - 2) / 12.0);
 
 }
-
 
 //@@ END
 
@@ -1168,7 +1113,6 @@ return realzd_cap_gain(t)
 	   + unrealzd_cap_gain_incr(t);
 
 }
-
 
 //@@ END
 
@@ -1199,7 +1143,6 @@ return (mkt_val_bef_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - cash_flow
@@ -1220,7 +1163,6 @@ if (t <= commencement_period || t > maturity_period)
 return opt_pmt(t);
 
 }
-
 
 //@@ END
 
@@ -1252,7 +1194,6 @@ if (t < maturity_period)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -1286,7 +1227,6 @@ return 0.0;
 
 }
 
-
 //@@ END
 
 //@@ START - cost_basis_bef_sale
@@ -1313,7 +1253,6 @@ if (existing_asset_indicator && t == 0)
 		{
 		if (data_validation_defn == YES)
 			{
-			makeRunLogYellow();
 			log_screen.setf(ios::fixed, ios::floatfield);
 			log_screen << "Warning: Inconsistent eio input"
 					   << " for " << asset_id
@@ -1357,7 +1296,6 @@ return mkt_val_bef_expiry;
 
 }
 
-
 //@@ END
 
 //@@ START - cost_basis_incr_appreciation
@@ -1390,7 +1328,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - cost_basis_purch
@@ -1421,7 +1358,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - cost_basis_sold
@@ -1450,7 +1386,6 @@ return cost_basis_bef_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - date
@@ -1473,10 +1408,9 @@ int year = cal_yr(t);
 int month = cal_mth(t);
 int day = 1;
 
-return DayNumberFromDate(year, month, day);
+return day_number_from_date(year, month, day);
 
 }
-
 
 //@@ END
 
@@ -1499,7 +1433,6 @@ return 0.0; //Index Options do not have a duration measure value
 
 }
 
-
 //@@ END
 
 //@@ START - finalize
@@ -1515,19 +1448,16 @@ double EIO_ASSET_UDF::eio_asset_finalize(int t) {
 
 #line 1 "finalize.EIO_ASSET.for"
 if (time_step_flag && !valn_flag
-	&& proj_set_sub_loop_num < valn_periods.size())
+	&& proj_set_sub_loop_num < valn_periods.size()
+	&& t < maturity_period)
 	write_state_of_world_mp();
 
 if (isMainModel && num_eio == num_eios_to_run)
-	{
-	if (PVCFile != NULL)
-		PVCFile.close();
-	}	
+	PVCFile.close();	
 
 return 1.0;
 
 }
-
 
 //@@ END
 
@@ -1559,7 +1489,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - gaap_inc_unrealzd_cap_gain
@@ -1583,7 +1512,6 @@ if (t < commencement_period || t > maturity_period)
 return gaap_inc_bk_val(t) - cost_basis(t);
 
 }
-
 
 //@@ END
 
@@ -1615,7 +1543,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - gaap_unrealzd_cap_gain_incr
@@ -1641,7 +1568,6 @@ return gaap_inc_unrealzd_cap_gain(t)
 
 }
 
-
 //@@ END
 
 //@@ START - index_units_owned
@@ -1666,7 +1592,6 @@ return index_units_owned_bef_sale(t)
 	   * (1.0 - sold_pct(t));
 
 }
-
 
 //@@ END
 
@@ -1704,7 +1629,6 @@ return index_units_owned(t - 1);
 
 }
 
-
 //@@ END
 
 //@@ START - index_val
@@ -1733,14 +1657,14 @@ if (!existing_asset_indicator && t == commencement_period)
 	
 	// The code below sets the index value based on the value provided in the history
 	// First, get original projection date index value
-	double index_val = rates->get_index_val(- valn_period, asset_index);
+	double index_val = rates_ptr->get_index_val(- valn_period, asset_index);
 
 	// Then, grow the index value to the commencement period
 	for (int i = - valn_period + 1; i <= commencement_period; i++)
 		{
 		index_val 
 		= index_val 
-		  * pow(1.0 + rates->get_index_rate(i,
+		  * pow(1.0 + rates_ptr->get_index_rate(i,
 											asset_index,
 											GET_GROWTH_RATE,
 											EFFECTIVE_ANNUAL)
@@ -1753,7 +1677,7 @@ if (!existing_asset_indicator && t == commencement_period)
 
 if (t > 0)
 	return index_val(t - 1)
-	       * pow(1.0 + rates->get_index_rate(t,
+	       * pow(1.0 + rates_ptr->get_index_rate(t,
 						asset_index,
 						GET_GROWTH_RATE,
 						EFFECTIVE_ANNUAL)
@@ -1765,7 +1689,7 @@ double hist_index_val = init_index_val;
 
 for (int i = -1; i >= t; i--)
 	{
-	double rate = pow(1.0 + rates->get_index_rate(i + 1,
+	double rate = pow(1.0 + rates_ptr->get_index_rate(i + 1,
 					asset_index,
 					GET_GROWTH_RATE,
 					EFFECTIVE_ANNUAL)
@@ -1778,7 +1702,6 @@ for (int i = -1; i >= t; i--)
 return hist_index_val;
 
 }
-
 
 //@@ END
 
@@ -1801,7 +1724,6 @@ return index_val(t);
 
 }
 
-
 //@@ END
 
 //@@ START - initialize
@@ -1816,13 +1738,16 @@ double EIO_ASSET_UDF::eio_asset_initialize(int t) {
 //^^^
 
 #line 1 "initialize.EIO_ASSET.for"
+if (is_asset_initialize)
+	return 1;
+
 if (isMainModel)
 	{
 	static int loaded_proj_task_loop = -999;
 
 	if (loaded_proj_task_loop != proj_task_loop_num)
 		{
-		rates->initialize(t);
+		rates_ptr->initialize(t);
 		
 		loaded_proj_task_loop = proj_task_loop_num;
 
@@ -1876,23 +1801,18 @@ else
 
 	initial_values = new struct eioInitialValuesData;
 
-	initial_values->spot_sprd_adj = spot_sprd_adj(0);
-	initial_values->volatility_sprd_adj = volatility_sprd_adj(0);
-
-	initial_values->yld_numer = yld_numer(0);
-	initial_values->mkt_val_bef_sale = mkt_val_bef_sale(0);
+	asset->sm_eio[getElementNumber(0)].resize(2);
+	asset->eio_initialize_values(getElementNumber(0));
+	asset->sm_eio[getElementNumber(0)].resize(1);
 
 	eio_initial_values_map[index_val] = initial_values;
 
 	is_asset_initialize = 0;
-
-	resetValues();
 	}
 
 return 1.0;
 
 }
-
 
 //@@ END
 
@@ -2008,7 +1928,6 @@ return lookback_index_value_local_final;
 
 }
 
-
 //@@ END
 
 //@@ START - mkt_to_bk_ratio
@@ -2038,7 +1957,6 @@ return mkt_val_bef_sale(t) / bk_val_bef_sale(t);
 
 }
 
-
 //@@ END
 
 //@@ START - mkt_val
@@ -2062,7 +1980,7 @@ if (t < commencement_period || t > maturity_period)
 if (isMainModel && t > 0
 	&& mths_to_next_mkt_val_calc(t) != 0)
 	return NO_AVG;	
-
+	
 if (t < maturity_period)
 	return mkt_val_bef_neg_cash_flow_sale(t)
 		   * (1 - sold_pct_neg_cash_flow(t));
@@ -2070,7 +1988,6 @@ if (t < maturity_period)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -2101,7 +2018,6 @@ return mkt_val_bef_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - mkt_val_bef_neg_cash_flow_sale
@@ -2128,7 +2044,6 @@ return mkt_val_bef_rebal_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - mkt_val_bef_rebal_sale
@@ -2154,7 +2069,6 @@ return mkt_val_bef_fund_match_sale(t)
 	   * (1.0 - sold_pct_fund_match(t));
 
 }
-
 
 //@@ END
 
@@ -2214,7 +2128,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - mkt_val_purch
@@ -2245,7 +2158,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - mkt_val_sold
@@ -2273,7 +2185,6 @@ return mkt_val_bef_sale(t)
 	   * sold_pct(t);
 
 }
-
 
 //@@ END
 
@@ -2320,7 +2231,7 @@ if (t == 0)
 				- proj_start_mth +  1);
 	}
 
-if (t == last_model_period)	
+if (t == projection_period_to)	
 	return 0;  
 
 if (mths_to_next_mkt_val_calc(t - 1) > 0)	
@@ -2349,7 +2260,6 @@ if (mths_to_next_mkt_val_calc(t - 1) == 0
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -2384,7 +2294,6 @@ return notional_amt_bef_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - notional_amt_bef_fund_match_sale
@@ -2410,7 +2319,6 @@ return notional_amt_bef_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - notional_amt_bef_neg_cash_flow_sale
@@ -2433,7 +2341,6 @@ return notional_amt_bef_rebal_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - notional_amt_bef_rebal_sale
@@ -2455,7 +2362,6 @@ return notional_amt_bef_fund_match_sale(t)
        * (1.0 - sold_pct_fund_match(t));
 
 }
-
 
 //@@ END
 
@@ -2484,7 +2390,6 @@ if (!existing_asset_indicator && t == commencement_period)
 return notional_amt(t - 1);
 
 }
-
 
 //@@ END
 
@@ -2516,7 +2421,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - notional_amt_sold
@@ -2545,7 +2449,6 @@ return notional_amt_bef_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - opt_pmt
@@ -2562,16 +2465,23 @@ double EIO_ASSET_UDF::eio_asset_opt_pmt(int t) {
 #line 1 "opt_pmt.EIO_ASSET.for"
 if (t == maturity_period)
 	{
-	if (opt_defn == FUTURES)
-		return (mkt_val_bef_expiry - index_units_owned(t) * opt_strike_price);
+	double hedge_payoff_mult = 1.0;  
 
-	return mkt_val_bef_expiry;
+	//CONSIDER ADDING FOR VA AND LIFE (IUL) AS APPLICABLE
+	#if defined(__ANN_PBA_PBA_H_)
+	if (pba_scen_amt_valn_flag && asset_fund_index == HEDGING_FUND_INDEX)
+		hedge_payoff_mult = 1.0 - seg_element->sm_ann_pba[0]->hedge_payoff_margin;
+	#endif
+
+	if (opt_defn == FUTURES)
+		return (mkt_val_bef_expiry - index_units_owned(t) * opt_strike_price) * hedge_payoff_mult;
+
+	return mkt_val_bef_expiry * hedge_payoff_mult;
 	}
 
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -2597,7 +2507,6 @@ if (t < maturity_period)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -2645,7 +2554,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - opt_val_asset_up_1
@@ -2670,7 +2578,6 @@ if (t < maturity_period)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -2718,7 +2625,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - opt_val_baseline
@@ -2743,7 +2649,6 @@ if (t < maturity_period)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -2789,7 +2694,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - opt_val_int_down_1
@@ -2814,7 +2718,6 @@ if (t < maturity_period)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -2862,7 +2765,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - opt_val_int_key_rate_10_down_1
@@ -2887,7 +2789,6 @@ if (t < maturity_period)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -2935,7 +2836,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - opt_val_int_key_rate_10_up_1
@@ -2960,7 +2860,6 @@ if (t < maturity_period)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -3008,7 +2907,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - opt_val_int_key_rate_1_down_1
@@ -3033,7 +2931,6 @@ if (t < maturity_period)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -3081,7 +2978,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - opt_val_int_key_rate_1_up_1
@@ -3106,7 +3002,6 @@ if (t < maturity_period)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -3154,7 +3049,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - opt_val_int_key_rate_2_down_1
@@ -3179,7 +3073,6 @@ if (t < maturity_period)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -3227,7 +3120,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - opt_val_int_key_rate_2_up_1
@@ -3252,7 +3144,6 @@ if (t < maturity_period)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -3300,7 +3191,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - opt_val_int_key_rate_3_down_1
@@ -3325,7 +3215,6 @@ if (t < maturity_period)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -3373,7 +3262,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - opt_val_int_key_rate_3_up_1
@@ -3398,7 +3286,6 @@ if (t < maturity_period)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -3446,7 +3333,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - opt_val_int_key_rate_4_down_1
@@ -3471,7 +3357,6 @@ if (t < maturity_period)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -3519,7 +3404,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - opt_val_int_key_rate_4_up_1
@@ -3544,7 +3428,6 @@ if (t < maturity_period)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -3592,7 +3475,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - opt_val_int_key_rate_5_down_1
@@ -3617,7 +3499,6 @@ if (t < maturity_period)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -3665,7 +3546,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - opt_val_int_key_rate_5_up_1
@@ -3690,7 +3570,6 @@ if (t < maturity_period)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -3738,7 +3617,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - opt_val_int_key_rate_6_down_1
@@ -3763,7 +3641,6 @@ if (t < maturity_period)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -3811,7 +3688,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - opt_val_int_key_rate_6_up_1
@@ -3836,7 +3712,6 @@ if (t < maturity_period)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -3884,7 +3759,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - opt_val_int_key_rate_7_down_1
@@ -3909,7 +3783,6 @@ if (t < maturity_period)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -3957,7 +3830,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - opt_val_int_key_rate_7_up_1
@@ -3982,7 +3854,6 @@ if (t < maturity_period)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -4030,7 +3901,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - opt_val_int_key_rate_8_down_1
@@ -4055,7 +3925,6 @@ if (t < maturity_period)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -4103,7 +3972,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - opt_val_int_key_rate_8_up_1
@@ -4128,7 +3996,6 @@ if (t < maturity_period)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -4176,7 +4043,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - opt_val_int_key_rate_9_down_1
@@ -4201,7 +4067,6 @@ if (t < maturity_period)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -4249,7 +4114,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - opt_val_int_key_rate_9_up_1
@@ -4274,7 +4138,6 @@ if (t < maturity_period)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -4322,7 +4185,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - opt_val_int_up_1
@@ -4347,7 +4209,6 @@ if (t < maturity_period)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -4395,7 +4256,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - opt_val_vol_down_1
@@ -4420,7 +4280,6 @@ if (t < maturity_period)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -4468,7 +4327,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - opt_val_vol_term_1_down_1
@@ -4493,7 +4351,6 @@ if (t < maturity_period)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -4541,7 +4398,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - opt_val_vol_term_1_up_1
@@ -4566,7 +4422,6 @@ if (t < maturity_period)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -4614,7 +4469,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - opt_val_vol_term_2_down_1
@@ -4639,7 +4493,6 @@ if (t < maturity_period)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -4687,7 +4540,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - opt_val_vol_term_2_up_1
@@ -4712,7 +4564,6 @@ if (t < maturity_period)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -4760,7 +4611,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - opt_val_vol_term_3_down_1
@@ -4785,7 +4635,6 @@ if (t < maturity_period)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -4833,7 +4682,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - opt_val_vol_term_3_up_1
@@ -4858,7 +4706,6 @@ if (t < maturity_period)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -4906,7 +4753,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - opt_val_vol_up_1
@@ -4931,7 +4777,6 @@ if (t < maturity_period)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -4979,7 +4824,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - rbc_c1
@@ -5005,7 +4849,6 @@ return rbc_c1_bef_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - rbc_c1_bef_sale
@@ -5029,7 +4872,6 @@ if (t < commencement_period || t > maturity_period)
 return rbc_c1_pct * bk_val_bef_sale(t);
 
 }
-
 
 //@@ END
 
@@ -5055,7 +4897,6 @@ return realzd_cap_gain_opt_pmt(t);
 
 }
 
-
 //@@ END
 
 //@@ START - realzd_cap_gain_opt_pmt
@@ -5077,7 +4918,6 @@ if (t == maturity_period)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -5107,7 +4947,6 @@ return cap_gain_from_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - sold_pct
@@ -5125,13 +4964,15 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 //^^^
 
 #line 1 "sold_pct.EIO_ASSET.for"
+if (sold_pct_value > model_point_amount_threshold)
+	return sold_pct_value;
+
 return max(0, 1.0 - (1.0 - sold_pct_planned(t))
 					* (1.0 - sold_pct_fund_match(t))
 					* (1.0 - sold_pct_rebal(t))
 					* (1.0 - sold_pct_neg_cash_flow(t)));
 
 }
-
 
 //@@ END
 
@@ -5150,11 +4991,9 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 //^^^
 
 #line 1 "sold_pct_fund_match.EIO_ASSET.for"
-//this column value is set using SetValue from inside the asset sales routines
-return NO_AVG;
+return sold_pct_fund_match_value;
 
 }
-
 
 //@@ END
 
@@ -5173,11 +5012,9 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 //^^^
 
 #line 1 "sold_pct_neg_cash_flow.EIO_ASSET.for"
-//this column value is set using SetValue from inside the asset sales routines
-return NO_AVG;
+return sold_pct_neg_cash_flow_value;
 
 }
-
 
 //@@ END
 
@@ -5196,11 +5033,9 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 //^^^
 
 #line 1 "sold_pct_planned.EIO_ASSET.for"
-//this column value is set using SetValue from inside the asset sales routines
-return NO_AVG;
+return sold_pct_planned_value;
 
 }
-
 
 //@@ END
 
@@ -5219,11 +5054,9 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 //^^^
 
 #line 1 "sold_pct_rebal.EIO_ASSET.for"
-//this column value is set using SetValue from inside the asset sales routines
-return NO_AVG;
+return sold_pct_rebal_value;
 
 }
-
 
 //@@ END
 
@@ -5385,13 +5218,13 @@ for (loop4 = 0;
 	else
 		{
 		guess_spread
-		= max(-rates->get_int_rate(t,
+		= max(-rates_ptr->get_int_rate(t,
                         "Govt",
 						GET_SPOT_RATE,
 						(maturity_period - t),
 						0.0 /* fwd term */,
 						NOMINAL_SEMIANNUAL,
-						int_rate_shift_defn,0),//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+						int_rate_shift_defn),
 			  high_spread - (1.0 - (pow(adjustment_factor, loop4 + 1)))
 							* (NOMINAL_SEMIANNUAL
 							   + high_spread));
@@ -5488,7 +5321,6 @@ if (decrease_spread > 1 && increase_spread > 1)
 	{
 	if (data_validation_defn == YES)
 		{
-		makeRunLogYellow();
 		log_screen.setf(ios::fixed);
 		log_screen << "Warning: Cannot solve for spot spread"
 				 << " for index opton Id=" << asset_id
@@ -5742,7 +5574,6 @@ return adjustment_spot_spread_local;
 
 }
 
-
 //@@ END
 
 //@@ START - startup
@@ -5758,6 +5589,10 @@ double EIO_ASSET_UDF::virtual_startup(int t) {
 
 #line 1 "startup.EIO_ASSET.for"
 #if 0 // START_HEADER
+#if defined(GEN2_ALM_RUN)
+	#define __EIO_ASSET_H_
+#endif
+
 struct eioInitialValuesData
 	{
 	double spot_sprd_adj;
@@ -5765,14 +5600,13 @@ struct eioInitialValuesData
 	double yld_numer;
 	double mkt_val_bef_sale;
 	};
-typedef map <xstring, struct eioInitialValuesData*, less<xstring> > eioivmap;
+
 #endif // END_HEADER
 
 #if 0 // START_EXTERNS
 int num_eios_to_run;
 int num_eio = 0;
 sowfinput eio_mp_input;
-sowfcols eio_mp_input_cols;
 extern sowmpoutput eio_state_of_world_mp_output;
 extern int PVCounter;
 extern ofstream& PVCFile;
@@ -5780,8 +5614,8 @@ extern ostringstream PVCText;
 extern int PVCLen;
 extern int PVCSigDig;
 
-static eioivmap eio_initial_values_map;
-static eioivmap::iterator eio_initial_values_map_iter;
+static map <xstring, struct eioInitialValuesData*, less<xstring> > eio_initial_values_map;
+static map <xstring, struct eioInitialValuesData*, less<xstring> >::iterator eio_initial_values_map_iter;
 extern bool is_asset_initialize;
 #endif // END_EXTERNS
 
@@ -5823,6 +5657,15 @@ double avr_contribn_pct;
 double avr_max_pct;
 double avr_obj_pct;
 double rbc_c1_pct;
+
+SEG_COMP *seg_element;
+
+#if defined(ASSET_ONLY_MODEL)
+RATES_ECONOMY /*modelobject_name: EIO_RATES*/ *rates_ptr;
+#else
+RATES_ECONOMY /*modelobject_name: RATES*/ *rates_ptr;
+#endif
+
 #endif // END_CLASS
 
 #if 0 // START_CONSTRUCTOR
@@ -5863,17 +5706,17 @@ rbc_c1_pct = 0.0;
 #endif // END_CONSTRUCTOR
 
 #if 0 // START_TERMINATOR
-if (PVCFile != NULL)
-	PVCFile.close();
+PVCFile.close();
 #endif // END_TERMINATOR
+
+gen2_declarations;
 
 purch_asset_id = "NONE";
 purchased_bom_flag = false;
 
 if (use_mp == NO)
 	{
-	skipModelPoint();
-	return 1.0;
+	throw NonFatalError("Model Point Use Definition is set to No for EIO asset_id: " + xstring(asset_id));
 	}
 
 // Setup submodel data
@@ -5893,23 +5736,18 @@ if (isMainModel)
 		}
 
 	#if defined(ASSET_ONLY_MODEL)
-	rates = sm_eio_rates;
+	rates_ptr = sm_eio_rates;
 	#endif
 	}
 else
 	{
-	#if defined(ASSET_ONLY_MODEL)
-	if (sm_eio_rates && !sm_eio_rates->isShrunk)
-		sm_eio_rates->shrink();
-	#endif
-
-	rates = asset->rates;
+	rates_ptr = rates;
 	}
 
 if (!isMainModel
     && !investing_flag
 	&& asset->num_eios_init > - 1
-	&& getElementNumber() >= asset->num_eios_init)
+	&& getElementNumber(0) >= asset->num_eios_init)
 	return 1.0;
 
 if (investing_flag)
@@ -5936,7 +5774,6 @@ if (num_of_proj_task_loops == 0
 return 1.0;
 
 }
-
 
 //@@ END
 
@@ -5991,7 +5828,6 @@ return sub_port_id(t - 1);
 
 }
 
-
 //@@ END
 
 //@@ START - unrealzd_cap_gain
@@ -6019,7 +5855,6 @@ if (t < maturity_period)
 return 0.0;
 
 }
-
 
 //@@ END
 
@@ -6049,7 +5884,6 @@ return 0.0;
 
 }
 
-
 //@@ END
 
 //@@ START - unrealzd_cap_gain_bef_neg_cash_flow_sale
@@ -6077,7 +5911,6 @@ if (t < maturity_period)
 return 0.0;
 
 }
-
 
 //@@ END
 
@@ -6107,7 +5940,6 @@ return 0.0;
 
 }
 
-
 //@@ END
 
 //@@ START - unrealzd_cap_gain_bef_sale
@@ -6134,7 +5966,6 @@ return bk_val_bef_expiry
 
 }
 
-
 //@@ END
 
 //@@ START - unrealzd_cap_gain_gaap_surp
@@ -6158,7 +5989,6 @@ if (t < commencement_period || t > maturity_period)
 return gaap_surp_bk_val(t) - cost_basis(t);
 
 }
-
 
 //@@ END
 
@@ -6184,7 +6014,6 @@ return (bk_val_bef_sale(t) - cost_basis_bef_sale(t))
 	   - (bk_val(t - 1) - cost_basis(t - 1));
 
 }
-
 
 //@@ END
 
@@ -6214,7 +6043,6 @@ return unrealzd_cap_gain_bef_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - unrealzd_cap_gain_to_bk_ratio
@@ -6239,7 +6067,6 @@ return unrealzd_cap_gain_bef_sale(t)
        / bk_val_bef_sale(t);
 
 }
-
 
 //@@ END
 
@@ -6403,7 +6230,6 @@ for (loop1 = 0; loop1 < maximum_iterations && guess_value < target_value; loop1+
 
 if (guess_value < target_value)
 	{
-	makeRunLogYellow();
 	log_screen.setf(ios::fixed);
 	log_screen << "Warning: Cannot solve for volatility spread"
 			 << " for index opton Id=" << asset_id
@@ -6645,7 +6471,6 @@ return adjustment_volatility_spread_local;
 
 }
 
-
 //@@ END
 
 //@@ START - yld_denom
@@ -6678,7 +6503,6 @@ if (t < maturity_period)
 return bk_val(t - 1);
 
 }
-
 
 //@@ END
 
@@ -6714,7 +6538,6 @@ return accr_inc(t);
 
 }
 
-
 //@@ END
 
 //@@ START - asset_detail_rpt_flag
@@ -6734,7 +6557,6 @@ return NO;
 
 }
 
-
 //@@ END
 
 //@@ START - asset_fund_index
@@ -6753,7 +6575,6 @@ if (port_defn == HEDGING)
 	return HEDGING_FUND_INDEX;
 
 // else set to "Investment" default value
-makeRunLogYellow();
 log_screen << "Warning: Invalid portfolio definition (" << port_defn
 		   <<") for index option ID = " << asset_id
 		   << "." << MSG_ERROR;
@@ -6764,7 +6585,6 @@ port_defn = INVESTMENT;
 return INVESTMENT_FUND_INDEX;
 
 }
-
 
 //@@ END
 
@@ -6801,10 +6621,9 @@ if (bk_val_defn == HISTORIC_LOWEST_COST_AND_MARKET
 	return min(bk_val(maturity_period - 1), val);
 	}
 
-return NO_AVG;
+return 0.0;
 
 }
-
 
 //@@ END
 
@@ -6827,7 +6646,6 @@ return 0;
 
 }
 
-
 //@@ END
 
 //@@ START - cost_basis_bef_expiry
@@ -6846,10 +6664,27 @@ if (cost_basis_defn == MARKET_VALUE
 	|| cost_basis_defn == STRAIGHT_LINE_AMORTIZATION)
 	return mkt_val_bef_expiry;
 
-return NO_AVG;
+return 0.0;
 
 }
 
+//@@ END
+
+//@@ START - data_file_name
+// Data File Name                                                                                             
+// Calculated Variable:DATA_FILE_NAME
+//========================================================
+xstring EIO_ASSET_UDF::eio_asset_data_file_name() {
+//^^^
+
+
+#line 1 "data_file_name.EIO_ASSET.for"
+if (time_step_flag)
+	return replaceWildcards("<*data*>" + data_file_name_input + "_" + xstring(proj_set_loop_num) + "_" + xstring(proj_set_sub_loop_num) + ".csv");
+else
+	return replaceWildcards("<*data*>" + data_file_name_input + ".csv");
+
+}
 
 //@@ END
 
@@ -6862,10 +6697,9 @@ xstring EIO_ASSET_UDF::eio_asset_data_grp_id() {
 
 
 #line 1 "data_grp_id.EIO_ASSET.for"
-return get_base_group_name(group, false);//WTW - Gen2 - Move Extern definitions to rates header
+return get_base_group_name(group, true);
 
 }
-
 
 //@@ END
 
@@ -6881,7 +6715,7 @@ int EIO_ASSET_UDF::eio_asset_existing_asset_indicator() {
 if (purch_asset_mp_num == -1)
 	{
 	// Existing asset was purchased during a previous scenario time step
-	if (time_step_flag && !valn_flag && valn_period != 0)
+	if (time_step_flag && valn_period != 0)
 		return PRIOR_PURCH;	
 	
 	// Existing at original projection date
@@ -6892,7 +6726,6 @@ if (purch_asset_mp_num == -1)
 return NEW_PURCH;
 
 }
-
 
 //@@ END
 
@@ -6919,7 +6752,6 @@ return COST_BASIS;
 
 }
 
-
 //@@ END
 
 //@@ START - gaap_val_defn
@@ -6944,7 +6776,6 @@ if (sale_class == HELD_TO_MATURITY)
 return COST_BASIS;
 
 }
-
 
 //@@ END
 
@@ -6985,7 +6816,6 @@ return 0.0;
 
 }
 
-
 //@@ END
 
 //@@ START - lookback_mths
@@ -7005,7 +6835,6 @@ return preliminary_lookback_months
 	   - (preliminary_lookback_months % lookback_sampling_mths);
 
 }
-
 
 //@@ END
 
@@ -7033,7 +6862,6 @@ if (lookback_sampling_interval == MONTHLY)
 return 1;
 
 }
-
 
 //@@ END
 
@@ -7066,7 +6894,6 @@ return commencement_period
 	   + min(ytm, MAXIMUM_YEARS_FOR_MONTHS_CALCULATIONS) * 12 + 1;
 
 }
-
 
 //@@ END
 
@@ -7134,7 +6961,6 @@ return calculated_market_value;
 
 }
 
-
 //@@ END
 
 //@@ START - mkt_val_bef_expiry
@@ -7170,7 +6996,6 @@ return mkt_val_calc(maturity_period,
 
 }
 
-
 //@@ END
 
 //@@ START - neg_asset_flag
@@ -7197,7 +7022,6 @@ return -1;
 
 }
 
-
 //@@ END
 
 //@@ START - notional_amt_at_issue
@@ -7210,12 +7034,11 @@ double EIO_ASSET_UDF::eio_asset_notional_amt_at_issue() {
 
 #line 1 "notional_amt_at_issue.EIO_ASSET.for"
 if (existing_asset_indicator)
-	return NO_AVG;
+	return 0.0;
 
 return purch_amt * neg_asset_flag;
 
 }
-
 
 //@@ END
 
@@ -7230,19 +7053,21 @@ double EIO_ASSET_UDF::eio_asset_pct_to_use() {
 #line 1 "pct_to_use.EIO_ASSET.for"
 if (!isMainModel)
 	{
-	// Existing at original projection date
-	if (existing_asset_indicator == INIT_MP)
-		return seg->existing_asset_pct_to_use * neg_asset_flag;
+	if (asset_fund_index != HEDGING_FUND_INDEX)//Hedges are not supposed to be reduced by initial asset percent
+		{
+		// Existing at original projection date
+		if (existing_asset_indicator == INIT_MP)
+			return seg_element->existing_asset_pct_to_use * neg_asset_flag;
 	
-	// Existing asset was purchased during previous scenario time step
-	if (existing_asset_indicator == PRIOR_PURCH)
-		return neg_asset_flag;
+		// Existing asset was purchased during previous scenario time step
+		if (existing_asset_indicator == PRIOR_PURCH)
+			return seg_element->initial_asset_pct_to_use_time_step * neg_asset_flag;
+		}
 	}
 
 return neg_asset_flag;
 
 }
-
 
 //@@ END
 
@@ -7264,7 +7089,6 @@ return MAXIMUM_YEARS_FOR_MONTHS_CALCULATIONS * 12;
 
 }
 
-
 //@@ END
 
 //@@ START - proj_date_adj
@@ -7280,7 +7104,6 @@ return add_mths_to_date(proj_date, valn_period);
 
 }
 
-
 //@@ END
 
 //@@ START - proj_start_date
@@ -7292,10 +7115,9 @@ int EIO_ASSET_UDF::eio_asset_proj_start_date() {
 
 
 #line 1 "proj_start_date.EIO_ASSET.for"
-return MonthNumberFromDate(proj_start_yr, proj_start_mth);
+return day_number_from_date(proj_start_yr, proj_start_mth, 1);
 
 }
-
 
 //@@ END
 
@@ -7317,7 +7139,6 @@ return proj_mth + 1;
 
 }
 
-
 //@@ END
 
 //@@ START - proj_start_yr
@@ -7337,7 +7158,6 @@ if (proj_mth == 12)
 return get_yr_from_date(proj_date_adj);
 
 }
-
 
 //@@ END
 
@@ -7366,7 +7186,6 @@ return 0;
 
 }
 
-
 //@@ END
 
 //@@ START - seg_num
@@ -7381,10 +7200,9 @@ int EIO_ASSET_UDF::eio_asset_seg_num() {
 if (isMainModel)
 	return 0;
 
-return seg->getElementNumber();
+return seg_element->getElementNumber();
 
 }
-
 
 //@@ END
 
@@ -7400,7 +7218,6 @@ int EIO_ASSET_UDF::eio_asset_start_period() {
 return max(0, commencement_period);
 
 }
-
 
 //@@ END
 
@@ -7423,19 +7240,18 @@ return;
 #line 1 "calc_num_records_to_run.EIO_ASSET.for"                                                                                   
 int EIO_ASSET::calc_num_records_to_run(void)
 {
-xstring data_file_name = replaceWildcards(data_location());
-string table_name = readCsvFile(data_file_name.getStdStr());
-xstring sql = (xstring)"SELECT * FROM " + table_name;
-executeQuery(sql.getStdStr(), eio_mp_input_cols, eio_mp_input);
-closeDatabase();
+xstring data_file_name_local = replaceWildcards(data_file_name);
 
-if (!eio_mp_input_cols.size())
+OutputFileReader ofr;
+eio_mp_input = ofr.readFile(data_file_name_local.getStdStr(), {"use_mp"});
+
+if (!eio_mp_input.size())
 	return 0;
 
 int num_records_to_run = 0;
 for (int row = 0; row < eio_mp_input.size(); row++)
 	{
-	if (eio_mp_input[row][3] == "Yes")
+	if (eio_mp_input[row][0] == "Yes")
 		num_records_to_run++;
 	}
 
@@ -7454,7 +7270,7 @@ if (time_step_flag && valn_period != 0)
 	{
 	for (int i = 1; i <= valn_period; i++)
 		{
-		rate = pow(1.0 + rates->get_index_rate(i - valn_period,
+		rate = pow(1.0 + rates_ptr->get_index_rate(i - valn_period,
 						asset_index,
 						GET_GROWTH_RATE,
 						EFFECTIVE_ANNUAL)
@@ -7471,7 +7287,7 @@ if (t > 0)
 	{
 	for (int i = 1; i <= t; i++)
 		{
-		rate = pow(1.0 + rates->get_index_rate(i,
+		rate = pow(1.0 + rates_ptr->get_index_rate(i,
 						asset_index,
 						GET_GROWTH_RATE,
 						EFFECTIVE_ANNUAL)
@@ -7484,7 +7300,7 @@ if (t > 0)
 // else if t < 0, must base calculation on prior value
 for (int i = -1; i >= t; i--)
 	{
-	rate = pow(1.0 + rates->get_index_rate(i + 1,
+	rate = pow(1.0 + rates_ptr->get_index_rate(i + 1,
 					asset_index,
 					GET_GROWTH_RATE,
 					EFFECTIVE_ANNUAL)
@@ -7510,32 +7326,34 @@ double index_vol_opt_strike_price  = 0;
 double index_vol_payout_index_max  = 0;
 double index_vol_atm = 0;
 double index_vol_otm = 0;
+double index_vol_otm_max = 0;
 double risk_free_rate = 0;
 double market_value_of_base_option = 0;
 double market_value_of_maximum_payout_strike_option = 0;
-double volatility_skew = 0;
+double moneyness = 0.0;
+double moneyness_max = 0.0;
 
 if (opt_defn == FUTURES)
 	{
 	init_div_yld
-	= rates->get_index_rate(t, 
+	= rates_ptr->get_index_rate(t, 
 							asset_index,
 							GET_DIVIDEND_YIELD,
 							EFFECTIVE_ANNUAL)
 		* div_yld_scen_mult + div_yld_addn;
 
 	risk_free_rate
-	= rates->get_int_rate(t,
+	= rates_ptr->get_int_rate(t,
 						  category_id,
 						  GET_SPOT_RATE,
 						  term_to_expiry,
 						  0.0,
 						  NOMINAL_SEMIANNUAL,
-						  int_rate_shift_defn,0)//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+						  int_rate_shift_defn)
 		+ extra_spot_spread;
 
 	if (index_val_shift_defn == PRICE_SHIFT)
-		index_val_shift = rates->index_val_shifts[asset_index];
+		index_val_shift = rates_ptr->index_val_shifts[asset_index];
 
 	calculated_market_value
 	= index_units_owned
@@ -7550,7 +7368,7 @@ else
 
 	// Apply the shifts
 	if (index_val_shift_defn == PRICE_SHIFT)
-		index_val_shift = rates->index_val_shifts[asset_index];
+		index_val_shift = rates_ptr->index_val_shifts[asset_index];
 
 	index_val *= (1.0 + index_val_shift);
 
@@ -7564,14 +7382,14 @@ else
 		sampling_frequency = 12 / lookback_sampling_mths;
 
 		init_div_yld
-		= rates->get_index_rate(t, 
+		= rates_ptr->get_index_rate(t, 
 					asset_index,
 					GET_DIVIDEND_YIELD,
 					EFFECTIVE_ANNUAL)
 		  * div_yld_scen_mult + div_yld_addn;
 
 		index_vol_atm
-		= rates->get_index_vol(t, 
+		= rates_ptr->get_index_vol(t, 
 					asset_index,
 					1.0, /*moneyness */
 					term_to_expiry,
@@ -7579,20 +7397,30 @@ else
 					index_vol_shift_defn) 
 		  + extra_vol_spread;
 	
+		moneyness = opt_strike_price / index_val;
+		moneyness_max = payout_index_max / index_val;
+
 		index_vol_otm
-		= rates->get_index_vol(t, 
+		= rates_ptr->get_index_vol(t, 
 					asset_index,
-					1.05,/*moneyness */
+					moneyness,
 					term_to_expiry,
 					EFFECTIVE_ANNUAL,
 					index_vol_shift_defn) 
 		  + extra_vol_spread;
 	
-		volatility_skew = (index_vol_atm - index_vol_otm) / (1.05 - 1.00)/ 100.;
+		index_vol_otm_max
+			= rates_ptr->get_index_vol(t, 
+					asset_index,
+					moneyness_max,
+					term_to_expiry,
+					EFFECTIVE_ANNUAL,
+					index_vol_shift_defn) 
+		  + extra_vol_spread;
 	
-		index_vol_opt_strike_price = max(0.05, index_vol_atm - volatility_skew * (opt_strike_price - index_val) / index_val  * 100.0);
+		index_vol_opt_strike_price = max(0.05, index_vol_otm);
 	
-		index_vol_payout_index_max = max(0.05, index_vol_atm - volatility_skew * (payout_index_max - index_val) / index_val  * 100.0);
+		index_vol_payout_index_max = max(0.05, index_vol_otm_max);
 	
 		index_vol_payout_index_max = min( 9.9, index_vol_payout_index_max);
 	
@@ -7609,27 +7437,16 @@ else
 			}
 
 		risk_free_rate
-		= rates->get_int_rate(t,
+		= rates_ptr->get_int_rate(t,
 					category_id,
 					GET_SPOT_RATE,
 					term_to_expiry,
 					0.0,
 					NOMINAL_SEMIANNUAL,
-					int_rate_shift_defn,0)//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+					int_rate_shift_defn)
 		  + extra_spot_spread;
 		} 
-/*if (term_to_expiry > 0.0) log_screen<<"t= "<<t
-<<" index_units_owned= "<<index_units_owned
-<<" bs_opt_val= "<<bs_opt_val(opt_strike_price,
-					term_to_expiry,
-					index_val,
-					index_vol_opt_strike_price,
-					risk_free_rate,
-					init_div_yld,
-					call_or_put_option_code,
-					CONTINUOUS_PAYOUT_CODE)
-<<" index_val-payout_index_max= "<<index_val - payout_index_max
-<<MSG_USER;*/
+
 	if (term_to_expiry > 0.0 && lookback_defn == NONE)
 		market_value_of_base_option
 		= index_units_owned
@@ -7860,35 +7677,70 @@ if (num_of_proj_task_loops == 0
 	|| is_first_proj_task_loop
 	|| restore_variables_ind == 1)
 	{
-	asset_id = asset_id_mp;
-	seg_id = seg_id_mp;
-	hdg_grp_code = hdg_grp_code_mp;
-	asset_index = asset_index_mp;
-	category_id = category_id_mp;
-	port_defn = port_defn_mp;
-	sale_class = sale_class_mp;
-	maturity_date = maturity_date_mp;
-	planned_sale_date = planned_sale_date_mp;
-	init_cost_basis = init_cost_basis_mp;
-	init_bk_val = init_bk_val_mp;
-	init_mkt_val = init_mkt_val_mp;
-	init_index_units_owned = init_index_units_owned_mp;
-	init_index_val = init_index_val_mp;
-	opt_strike_price = opt_strike_price_mp;
-	index_val_at_issue = index_val_at_issue_mp;
-	payout_index_max = payout_index_max_mp;
-	opt_defn = opt_defn_mp;
-	index_scen_mult = index_scen_mult_mp;
-	index_scen_addn = index_scen_addn_mp;
-	div_yld_scen_mult = div_yld_scen_mult_mp;
-	div_yld_addn = div_yld_addn_mp;
-	lookback_defn = lookback_defn_mp;
-	lookback_sampling_interval = lookback_sampling_interval_mp;
-	lookback_yrs = lookback_yrs_mp;
-	avr_contribn_pct = avr_contribn_pct_mp;
-	avr_max_pct = avr_max_pct_mp;
-	avr_obj_pct = avr_obj_pct_mp;
-	rbc_c1_pct = rbc_c1_pct_mp;
+	if (getElementNumber(1) > 0)
+		{
+		asset_id = asset->sm_eio[getElementNumber(0)][0]->asset_id_mp;
+		seg_id = asset->sm_eio[getElementNumber(0)][0]->seg_id_mp;
+		hdg_grp_code = asset->sm_eio[getElementNumber(0)][0]->hdg_grp_code_mp;
+		asset_index = asset->sm_eio[getElementNumber(0)][0]->asset_index_mp;
+		category_id = asset->sm_eio[getElementNumber(0)][0]->category_id_mp;
+		port_defn = asset->sm_eio[getElementNumber(0)][0]->port_defn_mp;
+		sale_class = asset->sm_eio[getElementNumber(0)][0]->sale_class_mp;
+		maturity_date = asset->sm_eio[getElementNumber(0)][0]->maturity_date_mp;
+		planned_sale_date = asset->sm_eio[getElementNumber(0)][0]->planned_sale_date_mp;
+		init_cost_basis = asset->sm_eio[getElementNumber(0)][0]->init_cost_basis_mp;
+		init_bk_val = asset->sm_eio[getElementNumber(0)][0]->init_bk_val_mp;
+		init_mkt_val = asset->sm_eio[getElementNumber(0)][0]->init_mkt_val_mp;
+		init_index_units_owned = asset->sm_eio[getElementNumber(0)][0]->init_index_units_owned_mp;
+		init_index_val = asset->sm_eio[getElementNumber(0)][0]->init_index_val_mp;
+		opt_strike_price = asset->sm_eio[getElementNumber(0)][0]->opt_strike_price_mp;
+		index_val_at_issue = asset->sm_eio[getElementNumber(0)][0]->index_val_at_issue_mp;
+		payout_index_max = asset->sm_eio[getElementNumber(0)][0]->payout_index_max_mp;
+		opt_defn = asset->sm_eio[getElementNumber(0)][0]->opt_defn_mp;
+		index_scen_mult = asset->sm_eio[getElementNumber(0)][0]->index_scen_mult_mp;
+		index_scen_addn = asset->sm_eio[getElementNumber(0)][0]->index_scen_addn_mp;
+		div_yld_scen_mult = asset->sm_eio[getElementNumber(0)][0]->div_yld_scen_mult_mp;
+		div_yld_addn = asset->sm_eio[getElementNumber(0)][0]->div_yld_addn_mp;
+		lookback_defn = asset->sm_eio[getElementNumber(0)][0]->lookback_defn_mp;
+		lookback_sampling_interval = asset->sm_eio[getElementNumber(0)][0]->lookback_sampling_interval_mp;
+		lookback_yrs = asset->sm_eio[getElementNumber(0)][0]->lookback_yrs_mp;
+		avr_contribn_pct = asset->sm_eio[getElementNumber(0)][0]->avr_contribn_pct_mp;
+		avr_max_pct = asset->sm_eio[getElementNumber(0)][0]->avr_max_pct_mp;
+		avr_obj_pct = asset->sm_eio[getElementNumber(0)][0]->avr_obj_pct_mp;
+		rbc_c1_pct = asset->sm_eio[getElementNumber(0)][0]->rbc_c1_pct_mp;
+		}
+	else
+		{
+		asset_id = asset_id_mp;
+		seg_id = seg_id_mp;
+		hdg_grp_code = hdg_grp_code_mp;
+		asset_index = asset_index_mp;
+		category_id = category_id_mp;
+		port_defn = port_defn_mp;
+		sale_class = sale_class_mp;
+		maturity_date = maturity_date_mp;
+		planned_sale_date = planned_sale_date_mp;
+		init_cost_basis = init_cost_basis_mp;
+		init_bk_val = init_bk_val_mp;
+		init_mkt_val = init_mkt_val_mp;
+		init_index_units_owned = init_index_units_owned_mp;
+		init_index_val = init_index_val_mp;
+		opt_strike_price = opt_strike_price_mp;
+		index_val_at_issue = index_val_at_issue_mp;
+		payout_index_max = payout_index_max_mp;
+		opt_defn = opt_defn_mp;
+		index_scen_mult = index_scen_mult_mp;
+		index_scen_addn = index_scen_addn_mp;
+		div_yld_scen_mult = div_yld_scen_mult_mp;
+		div_yld_addn = div_yld_addn_mp;
+		lookback_defn = lookback_defn_mp;
+		lookback_sampling_interval = lookback_sampling_interval_mp;
+		lookback_yrs = lookback_yrs_mp;
+		avr_contribn_pct = avr_contribn_pct_mp;
+		avr_max_pct = avr_max_pct_mp;
+		avr_obj_pct = avr_obj_pct_mp;
+		rbc_c1_pct = rbc_c1_pct_mp;
+		}
 
 	if (port_defn != INVESTMENT && port_defn != HEDGING)
 		{
@@ -7930,12 +7782,11 @@ else
 purch_asset_sub_port = inv_purchase_sub_port;
 purch_amt = purch_asset_amt;
 
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 category_id = company->sm_inv_strategy[seg_num]->purch_eio_category_id;
 
-// read the grid for asset category data
-ms_rereadGrid();
-
 // Setup port_defn
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 port_defn = company->sm_inv_strategy[seg_num]->purch_eio_port_defn;
 
 if (port_defn != INVESTMENT
@@ -7958,6 +7809,7 @@ else
 asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 
 // Setup maturity_date
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 double ytm = company->sm_inv_strategy[seg_num]->purch_eio_yrs_to_maturity;
 int mat_period;
 
@@ -7973,15 +7825,25 @@ else
 maturity_date = add_mths_to_date(proj_date_adj, mat_period); 
 
 hdg_grp_code = hedge_group_code;
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 sale_class = company->sm_inv_strategy[seg_num]->purch_eio_sale_class;
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 asset_index = company->sm_inv_strategy[seg_num]->purch_eio_asset_index;
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 opt_defn = company->sm_inv_strategy[seg_num]->purch_eio_opt_defn;
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 div_yld_scen_mult = company->sm_inv_strategy[seg_num]->purch_eio_div_yld_scen_mult;
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 div_yld_addn = company->sm_inv_strategy[seg_num]->purch_eio_div_yld_addn;
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 index_scen_mult = company->sm_inv_strategy[seg_num]->purch_eio_index_scen_mult;
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 index_scen_addn = company->sm_inv_strategy[seg_num]->purch_eio_index_scen_addn;
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 lookback_defn = company->sm_inv_strategy[seg_num]->purch_eio_lookback_defn;
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 lookback_yrs = company->sm_inv_strategy[seg_num]->purch_eio_lookback_yrs;
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 lookback_sampling_interval = company->sm_inv_strategy[seg_num]->purch_eio_lookback_sampling_interval;
 
 if (opt_defn == FUTURES)
@@ -7991,20 +7853,20 @@ if (opt_defn == FUTURES)
 	double term_to_expiry = (mat_period - commencement_period) / 12.0;
 
 	double init_div_yld
-	= rates->get_index_rate(t, 
+	= rates_ptr->get_index_rate(t, 
 							asset_index,
 							GET_DIVIDEND_YIELD,
 							EFFECTIVE_ANNUAL)
 	  * div_yld_scen_mult + div_yld_addn;
 
 	double risk_free_rate
-	= rates->get_int_rate(t,
+	= rates_ptr->get_int_rate(t,
 						  category_id,
 						  GET_SPOT_RATE,
 						  term_to_expiry,
 						  0.0,
 						  NOMINAL_SEMIANNUAL,
-						  NO_SHIFT,0);//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+						  NO_SHIFT);
 
 	opt_strike_price = index_val(commencement_period) * exp((risk_free_rate - init_div_yld) * term_to_expiry);
 	}
@@ -8012,14 +7874,20 @@ else
 	{
 	if (long_strike < 0) // calculate long strike from index value and strike multiple
 		{
-		opt_strike_price = index_val(commencement_period) 
-		                   * company->sm_inv_strategy[seg_num]->purch_eio_opt_strike_price;
+		company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
+		double purch_eio_opt_strike_price_local = company->sm_inv_strategy[seg_num]->purch_eio_opt_strike_price;
 
-		if (company->sm_inv_strategy[seg_num]->purch_eio_payout_index_max == 999.99)
+		opt_strike_price = index_val(commencement_period) 
+		                   * purch_eio_opt_strike_price_local;
+
+		company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
+		double purch_eio_payout_index_max_local = company->sm_inv_strategy[seg_num]->purch_eio_payout_index_max;
+
+		if (purch_eio_payout_index_max_local == 999.99)
 			payout_index_max = GREATEST_MAXIMUM_PAYOUT_INDEX_VALUE + .999;
 		else
 			payout_index_max = index_val(commencement_period)
-							   * company->sm_inv_strategy[seg_num]->purch_eio_payout_index_max;
+							   * purch_eio_payout_index_max_local;
 		}
 	else // strikes provided through hedge group
 		{
@@ -8028,9 +7896,13 @@ else
 		}
 	}
 
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 avr_contribn_pct = company->sm_inv_strategy[seg_num]->purch_eio_avr_contribn_pct;
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 avr_max_pct = company->sm_inv_strategy[seg_num]->purch_eio_avr_max_pct;
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 avr_obj_pct = company->sm_inv_strategy[seg_num]->purch_eio_avr_obj_pct;
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 rbc_c1_pct = company->sm_inv_strategy[seg_num]->purch_eio_rbc_c1_pct;
 
 // Setup index val at issue
@@ -8068,12 +7940,11 @@ else
 purch_asset_sub_port = company->sm_inv_strategy[seg_num]->purch_assets_asset_sub_port_num[panum];
 purch_amt = purch_asset_amt;
 
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 category_id = company->sm_inv_strategy[seg_num]->purch_eio_category_id;
 
-// read the grid for asset category data
-ms_rereadGrid();
-
 // Setup port_defn
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 port_defn = company->sm_inv_strategy[seg_num]->purch_eio_port_defn;
 
 if (port_defn != INVESTMENT
@@ -8091,6 +7962,7 @@ if (port_defn != INVESTMENT
 asset_id = purch_asset_id;
 
 // Setup maturity_date
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 double ytm = company->sm_inv_strategy[seg_num]->purch_eio_yrs_to_maturity;
 int mat_period;
 
@@ -8105,15 +7977,25 @@ else
 
 maturity_date = add_mths_to_date(proj_date_adj, mat_period); 
 
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 sale_class = company->sm_inv_strategy[seg_num]->purch_eio_sale_class;
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 asset_index = company->sm_inv_strategy[seg_num]->purch_eio_asset_index;
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 opt_defn = company->sm_inv_strategy[seg_num]->purch_eio_opt_defn;
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 div_yld_scen_mult = company->sm_inv_strategy[seg_num]->purch_eio_div_yld_scen_mult;
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 div_yld_addn = company->sm_inv_strategy[seg_num]->purch_eio_div_yld_addn;
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 index_scen_mult = company->sm_inv_strategy[seg_num]->purch_eio_index_scen_mult;
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 index_scen_addn = company->sm_inv_strategy[seg_num]->purch_eio_index_scen_addn;
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 lookback_defn = company->sm_inv_strategy[seg_num]->purch_eio_lookback_defn;
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 lookback_yrs = company->sm_inv_strategy[seg_num]->purch_eio_lookback_yrs;
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 lookback_sampling_interval = company->sm_inv_strategy[seg_num]->purch_eio_lookback_sampling_interval;
 
 if (opt_defn == FUTURES)
@@ -8123,39 +8005,49 @@ if (opt_defn == FUTURES)
 	double term_to_expiry = (mat_period - commencement_period) / 12.0;
 
 	double init_div_yld
-	= rates->get_index_rate(t, 
+	= rates_ptr->get_index_rate(t, 
 							asset_index,
 							GET_DIVIDEND_YIELD,
 							EFFECTIVE_ANNUAL)
 	  * div_yld_scen_mult + div_yld_addn;
 
 	double risk_free_rate
-	= rates->get_int_rate(t,
+	= rates_ptr->get_int_rate(t,
 						  category_id,
 						  GET_SPOT_RATE,
 						  term_to_expiry,
 						  0.0,
 						  NOMINAL_SEMIANNUAL,
-						  NO_SHIFT,0);//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+						  NO_SHIFT);
 
 	opt_strike_price = index_val(commencement_period)
 	                   * exp((risk_free_rate - init_div_yld) * term_to_expiry);
 	}
 else
 	{
-	if (company->sm_inv_strategy[seg_num]->purch_eio_payout_index_max == 999.99)
+	company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
+	double purch_eio_payout_index_max_local = company->sm_inv_strategy[seg_num]->purch_eio_payout_index_max;
+
+	company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
+	double purch_eio_opt_strike_price_local = company->sm_inv_strategy[seg_num]->purch_eio_opt_strike_price;
+
+	if (purch_eio_payout_index_max_local == 999.99)
 		payout_index_max = GREATEST_MAXIMUM_PAYOUT_INDEX_VALUE + .999;
 	else
 		payout_index_max = index_val(commencement_period)
-		                   * company->sm_inv_strategy[seg_num]->purch_eio_payout_index_max;
+		                   * purch_eio_payout_index_max_local;
 
 	opt_strike_price = index_val(commencement_period)
-	                   * company->sm_inv_strategy[seg_num]->purch_eio_opt_strike_price;
+	                   * purch_eio_opt_strike_price_local;
 	}
 
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 avr_contribn_pct = company->sm_inv_strategy[seg_num]->purch_eio_avr_contribn_pct;
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 avr_max_pct = company->sm_inv_strategy[seg_num]->purch_eio_avr_max_pct;
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 avr_obj_pct = company->sm_inv_strategy[seg_num]->purch_eio_avr_obj_pct;
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 rbc_c1_pct = company->sm_inv_strategy[seg_num]->purch_eio_rbc_c1_pct;
 
 // Setup index val at issue
@@ -8181,7 +8073,6 @@ if (existing_asset_indicator)
 			{
 			if (data_validation_defn == YES)
 				{
-				makeRunLogYellow();
 				log_screen.setf(ios::fixed, ios::floatfield);
 				log_screen << "Warning: Existing eio " << asset_id
 						   << " has matured before model start date."
@@ -8193,8 +8084,7 @@ if (existing_asset_indicator)
 			asset->init_cash_bal_map[index_val] = init_bk_val;
 			}
 	
-		skipModelPoint();
-		return;
+		throw NonFatalError("");
 		}
 
 	double init_notional_amt
@@ -8203,16 +8093,13 @@ if (existing_asset_indicator)
 	if (init_bk_val < rate_ratio_threshold 
 		&& init_notional_amt < rate_ratio_threshold 
 		&& data_validation_defn == YES)
-		{
-		makeRunLogYellow();
-	
+		{	
 		log_screen << "Warning: Existing index option has no value."
 				   << " Asset has been discarded."
 				   << " Id = " << asset_id
 				   << MSG_USER;                     
 	
-		skipModelPoint();
-		return;
+		throw NonFatalError("");
 		}
 
 	if (init_cost_basis < rate_ratio_threshold)
@@ -8230,10 +8117,10 @@ void EIO_ASSET::write_state_of_world_mp(void)
 {
 static bool first_time = true;
 
-xstring data_file_name = replaceWildcards(data_location());
+xstring data_file_name_local = replaceWildcards(data_file_name);
 
 xstring eio_state_of_world_file
-= xstring(data_file_name(0, data_file_name.find("_" + xstring(proj_set_loop_num) + "_" + xstring(proj_set_sub_loop_num) + ".csv")))
+= xstring(data_file_name_local(0, data_file_name_local.find("_" + xstring(proj_set_loop_num) + "_" + xstring(proj_set_sub_loop_num) + ".csv")))
   + "_" + xstring(proj_set_loop_num) + "_" + xstring(proj_set_sub_loop_num + 1) + ".csv";
 
 // Remove any old file
@@ -8287,11 +8174,12 @@ if (!eio_state_of_world_mp_output.is_open())
 	<< "avr_contribn_pct_mp" << ","				// col 27 = avr_contribn_pct
 	<< "avr_max_pct_mp" << ","					// col 28 = avr_max_pct
 	<< "avr_obj_pct_mp" << ","					// col 29 = avr_obj_pct
-	<< "rbc_c1_pct_mp" << endl;					// col 30 = rbc_c1_pct
+	<< "rbc_c1_pct_mp" << ","					// col 30 = rbc_c1_pct
+	<< "unique_id_mp" << endl;					// col 31 = unique_id_mp
 	}
 
 static int counter = 1;
-xstring group_mp = get_base_group_name(group, false);//WTW - Gen2 - Move Extern definitions to rates header
+xstring group_mp = get_base_group_name(group, true);
 xstring port_defn = get_string_of_enum_val(this->port_defn);
 xstring sale_class = get_string_of_enum_val(this->sale_class);
 double cost_basis = this->cost_basis(last_proj_period);
@@ -8334,7 +8222,8 @@ eio_state_of_world_mp_output
 << avr_contribn_pct << ","
 << avr_max_pct << ","
 << avr_obj_pct << ","
-<< rbc_c1_pct << endl;
+<< rbc_c1_pct << ","   
+<< getElementNumber(0) << endl;   
 
 counter++;
 
@@ -8346,8 +8235,7 @@ return;
 void EIO_ASSET::Terminator()
 {
 
-if (PVCFile != NULL)
-	PVCFile.close();
+PVCFile.close();
 
 }
 
@@ -8901,6 +8789,13 @@ namespace {
 	};
 	const EnumList data_validation_defnEnumList(2, data_validation_defnChoicePairs);
 
+	// EnumList for gen2_declarations                                                                                       
+	const ChoicePair gen2_declarationsChoicePairs[] = {
+		ChoicePair(StrEnum::UNDEFINED, StrEnum::undefinedString)
+		,ChoicePair(StrEnum::PRICE_SHIFT, "Price Shift")
+	};
+	const EnumList gen2_declarationsEnumList(1, gen2_declarationsChoicePairs);
+
 	// EnumList for lookback_defn_mp                                                                                       
 	const ChoicePair lookback_defn_mpChoicePairs[] = {
 		ChoicePair(StrEnum::UNDEFINED, StrEnum::undefinedString)
@@ -9033,119 +8928,137 @@ TableMgr<VariantTable> EIO_ASSET::mgr_;
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
 	Descriptor(15, Attribute::STR_ENUM,	"cost_basis_defn", -1, (size_t)&modelOffset->cost_basis_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &cost_basis_defnEnumList, Feature(true)),
-	Descriptor(16, Attribute::STR_ENUM,	"data_validation_defn", -1, (size_t)&modelOffset->data_validation_defn,
+	Descriptor(16, Attribute::STRING,	"data_file_name_input", -1, (size_t)&modelOffset->data_file_name_input,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
+	Descriptor(17, Attribute::STR_ENUM,	"data_validation_defn", -1, (size_t)&modelOffset->data_validation_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &data_validation_defnEnumList, Feature(true)),
-	Descriptor(17, Attribute::DOUBLE,	"div_yld_addn_mp", Descriptor::NOT_INDEXED, (size_t)&modelOffset->div_yld_addn_mp,
+	Descriptor(18, Attribute::DOUBLE,	"div_yld_addn_mp", Descriptor::NOT_INDEXED, (size_t)&modelOffset->div_yld_addn_mp,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(18, Attribute::DOUBLE,	"div_yld_scen_mult_mp", Descriptor::NOT_INDEXED, (size_t)&modelOffset->div_yld_scen_mult_mp,
+	Descriptor(19, Attribute::DOUBLE,	"div_yld_scen_mult_mp", Descriptor::NOT_INDEXED, (size_t)&modelOffset->div_yld_scen_mult_mp,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(19, Attribute::STRING,	"hdg_grp_code_mp", -1, (size_t)&modelOffset->hdg_grp_code_mp,
+	Descriptor(20, Attribute::STR_ENUM,	"gen2_declarations", -1, (size_t)&modelOffset->gen2_declarations,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, &gen2_declarationsEnumList, Feature(true)),
+	Descriptor(21, Attribute::STRING,	"hdg_grp_code_mp", -1, (size_t)&modelOffset->hdg_grp_code_mp,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(20, Attribute::DOUBLE,	"index_scen_addn_mp", Descriptor::NOT_INDEXED, (size_t)&modelOffset->index_scen_addn_mp,
+	Descriptor(22, Attribute::DOUBLE,	"index_scen_addn_mp", Descriptor::NOT_INDEXED, (size_t)&modelOffset->index_scen_addn_mp,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(21, Attribute::DOUBLE,	"index_scen_mult_mp", Descriptor::NOT_INDEXED, (size_t)&modelOffset->index_scen_mult_mp,
+	Descriptor(23, Attribute::DOUBLE,	"index_scen_mult_mp", Descriptor::NOT_INDEXED, (size_t)&modelOffset->index_scen_mult_mp,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(22, Attribute::DOUBLE,	"index_val_at_issue_mp", Descriptor::NOT_INDEXED, (size_t)&modelOffset->index_val_at_issue_mp,
+	Descriptor(24, Attribute::DOUBLE,	"index_val_at_issue_mp", Descriptor::NOT_INDEXED, (size_t)&modelOffset->index_val_at_issue_mp,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(23, Attribute::DOUBLE,	"init_bk_val_mp", Descriptor::NOT_INDEXED, (size_t)&modelOffset->init_bk_val_mp,
+	Descriptor(25, Attribute::DOUBLE,	"init_bk_val_mp", Descriptor::NOT_INDEXED, (size_t)&modelOffset->init_bk_val_mp,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(24, Attribute::DOUBLE,	"init_cost_basis_mp", Descriptor::NOT_INDEXED, (size_t)&modelOffset->init_cost_basis_mp,
+	Descriptor(26, Attribute::DOUBLE,	"init_cost_basis_mp", Descriptor::NOT_INDEXED, (size_t)&modelOffset->init_cost_basis_mp,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(25, Attribute::DOUBLE,	"init_index_units_owned_mp", Descriptor::NOT_INDEXED, (size_t)&modelOffset->init_index_units_owned_mp,
+	Descriptor(27, Attribute::DOUBLE,	"init_index_units_owned_mp", Descriptor::NOT_INDEXED, (size_t)&modelOffset->init_index_units_owned_mp,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(26, Attribute::DOUBLE,	"init_index_val_mp", Descriptor::NOT_INDEXED, (size_t)&modelOffset->init_index_val_mp,
+	Descriptor(28, Attribute::DOUBLE,	"init_index_val_mp", Descriptor::NOT_INDEXED, (size_t)&modelOffset->init_index_val_mp,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(27, Attribute::DOUBLE,	"init_mkt_val_mp", Descriptor::NOT_INDEXED, (size_t)&modelOffset->init_mkt_val_mp,
+	Descriptor(29, Attribute::DOUBLE,	"init_mkt_val_mp", Descriptor::NOT_INDEXED, (size_t)&modelOffset->init_mkt_val_mp,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(28, Attribute::STR_ENUM,	"lookback_defn_mp", -1, (size_t)&modelOffset->lookback_defn_mp,
+	Descriptor(30, Attribute::STR_ENUM,	"lookback_defn_mp", -1, (size_t)&modelOffset->lookback_defn_mp,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &lookback_defn_mpEnumList, Feature(true)),
-	Descriptor(29, Attribute::STR_ENUM,	"lookback_sampling_interval_mp", -1, (size_t)&modelOffset->lookback_sampling_interval_mp,
+	Descriptor(31, Attribute::STR_ENUM,	"lookback_sampling_interval_mp", -1, (size_t)&modelOffset->lookback_sampling_interval_mp,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &lookback_sampling_interval_mpEnumList, Feature(true)),
-	Descriptor(30, Attribute::DOUBLE,	"lookback_yrs_mp", Descriptor::NOT_INDEXED, (size_t)&modelOffset->lookback_yrs_mp,
+	Descriptor(32, Attribute::DOUBLE,	"lookback_yrs_mp", Descriptor::NOT_INDEXED, (size_t)&modelOffset->lookback_yrs_mp,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(31, Attribute::STRING,	"maturity_date_mp", -1, (size_t)&modelOffset->maturity_date_mp,
+	Descriptor(33, Attribute::STRING,	"maturity_date_mp", -1, (size_t)&modelOffset->maturity_date_mp,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(32, Attribute::STR_ENUM,	"mkt_val_calc_freq", -1, (size_t)&modelOffset->mkt_val_calc_freq,
+	Descriptor(34, Attribute::STR_ENUM,	"mkt_val_calc_freq", -1, (size_t)&modelOffset->mkt_val_calc_freq,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &mkt_val_calc_freqEnumList, Feature(true)),
-	Descriptor(33, Attribute::INT,	"mkt_val_calc_freq_yrs", -1, (size_t)&modelOffset->mkt_val_calc_freq_yrs,
+	Descriptor(35, Attribute::INT,	"mkt_val_calc_freq_yrs", -1, (size_t)&modelOffset->mkt_val_calc_freq_yrs,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(34, Attribute::STR_ENUM,	"opt_defn_mp", -1, (size_t)&modelOffset->opt_defn_mp,
+	Descriptor(36, Attribute::STR_ENUM,	"opt_defn_mp", -1, (size_t)&modelOffset->opt_defn_mp,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &opt_defn_mpEnumList, Feature(true)),
-	Descriptor(35, Attribute::DOUBLE,	"opt_strike_price_mp", Descriptor::NOT_INDEXED, (size_t)&modelOffset->opt_strike_price_mp,
+	Descriptor(37, Attribute::DOUBLE,	"opt_strike_price_mp", Descriptor::NOT_INDEXED, (size_t)&modelOffset->opt_strike_price_mp,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(36, Attribute::DOUBLE,	"payout_index_max_mp", Descriptor::NOT_INDEXED, (size_t)&modelOffset->payout_index_max_mp,
+	Descriptor(38, Attribute::DOUBLE,	"payout_index_max_mp", Descriptor::NOT_INDEXED, (size_t)&modelOffset->payout_index_max_mp,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(37, Attribute::STRING,	"planned_sale_date_mp", -1, (size_t)&modelOffset->planned_sale_date_mp,
+	Descriptor(39, Attribute::STRING,	"planned_sale_date_mp", -1, (size_t)&modelOffset->planned_sale_date_mp,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(38, Attribute::STR_ENUM,	"port_defn_mp", -1, (size_t)&modelOffset->port_defn_mp,
+	Descriptor(40, Attribute::STR_ENUM,	"port_defn_mp", -1, (size_t)&modelOffset->port_defn_mp,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &port_defn_mpEnumList, Feature(true)),
-	Descriptor(39, Attribute::STRING,	"proj_date", -1, (size_t)&modelOffset->proj_date,
+	Descriptor(41, Attribute::STRING,	"proj_date", -1, (size_t)&modelOffset->proj_date,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(40, Attribute::STRING,	"purch_asset_id", -1, (size_t)&modelOffset->purch_asset_id,
+	Descriptor(42, Attribute::STRING,	"purch_asset_id", -1, (size_t)&modelOffset->purch_asset_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(41, Attribute::INT,	"purch_asset_sub_port", -1, (size_t)&modelOffset->purch_asset_sub_port,
+	Descriptor(43, Attribute::INT,	"purch_asset_sub_port", -1, (size_t)&modelOffset->purch_asset_sub_port,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(42, Attribute::DOUBLE,	"rbc_c1_pct_mp", Descriptor::NOT_INDEXED, (size_t)&modelOffset->rbc_c1_pct_mp,
+	Descriptor(44, Attribute::DOUBLE,	"rbc_c1_pct_mp", Descriptor::NOT_INDEXED, (size_t)&modelOffset->rbc_c1_pct_mp,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(43, Attribute::STR_ENUM,	"sale_class_mp", -1, (size_t)&modelOffset->sale_class_mp,
+	Descriptor(45, Attribute::STR_ENUM,	"sale_class_mp", -1, (size_t)&modelOffset->sale_class_mp,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &sale_class_mpEnumList, Feature(true)),
-	Descriptor(44, Attribute::STRING,	"seg_id_mp", -1, (size_t)&modelOffset->seg_id_mp,
+	Descriptor(46, Attribute::STRING,	"seg_id_mp", -1, (size_t)&modelOffset->seg_id_mp,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(45, Attribute::STR_ENUM,	"use_mp", -1, (size_t)&modelOffset->use_mp,
+	Descriptor(47, Attribute::DOUBLE,	"sold_pct_fund_match_value", Descriptor::NOT_INDEXED, (size_t)&modelOffset->sold_pct_fund_match_value,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
+	Descriptor(48, Attribute::DOUBLE,	"sold_pct_neg_cash_flow_value", Descriptor::NOT_INDEXED, (size_t)&modelOffset->sold_pct_neg_cash_flow_value,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
+	Descriptor(49, Attribute::DOUBLE,	"sold_pct_planned_value", Descriptor::NOT_INDEXED, (size_t)&modelOffset->sold_pct_planned_value,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
+	Descriptor(50, Attribute::DOUBLE,	"sold_pct_rebal_value", Descriptor::NOT_INDEXED, (size_t)&modelOffset->sold_pct_rebal_value,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
+	Descriptor(51, Attribute::DOUBLE,	"sold_pct_value", Descriptor::NOT_INDEXED, (size_t)&modelOffset->sold_pct_value,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
+	Descriptor(52, Attribute::STRING,	"unique_id_mp", -1, (size_t)&modelOffset->unique_id_mp,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
+	Descriptor(53, Attribute::STR_ENUM,	"use_mp", -1, (size_t)&modelOffset->use_mp,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &use_mpEnumList, Feature(true)),
-	Descriptor(46, Attribute::INT,	"msnumelement", -1, (size_t)&modelOffset->msnumelement,
+	Descriptor(54, Attribute::INT,	"msnumelement", -1, (size_t)&modelOffset->msnumelement,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(47, Attribute::SCALAR_INT,	"asset_detail_rpt_flag", -1, (size_t)&modelOffset->asset_detail_rpt_flag,
+	Descriptor(55, Attribute::SCALAR_INT,	"asset_detail_rpt_flag", -1, (size_t)&modelOffset->asset_detail_rpt_flag,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&EIO_ASSET_UDF::eio_asset_asset_detail_rpt_flag)),
-	Descriptor(48, Attribute::SCALAR_INT,	"asset_fund_index", -1, (size_t)&modelOffset->asset_fund_index,
+	Descriptor(56, Attribute::SCALAR_INT,	"asset_fund_index", -1, (size_t)&modelOffset->asset_fund_index,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&EIO_ASSET_UDF::eio_asset_asset_fund_index)),
-	Descriptor(49, Attribute::SCALAR_DOUBLE,	"bk_val_bef_expiry", -1, (size_t)&modelOffset->bk_val_bef_expiry,
+	Descriptor(57, Attribute::SCALAR_DOUBLE,	"bk_val_bef_expiry", -1, (size_t)&modelOffset->bk_val_bef_expiry,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((dF)&EIO_ASSET_UDF::eio_asset_bk_val_bef_expiry)),
-	Descriptor(50, Attribute::SCALAR_INT,	"commencement_period", -1, (size_t)&modelOffset->commencement_period,
+	Descriptor(58, Attribute::SCALAR_INT,	"commencement_period", -1, (size_t)&modelOffset->commencement_period,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&EIO_ASSET_UDF::eio_asset_commencement_period)),
-	Descriptor(51, Attribute::SCALAR_DOUBLE,	"cost_basis_bef_expiry", -1, (size_t)&modelOffset->cost_basis_bef_expiry,
+	Descriptor(59, Attribute::SCALAR_DOUBLE,	"cost_basis_bef_expiry", -1, (size_t)&modelOffset->cost_basis_bef_expiry,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((dF)&EIO_ASSET_UDF::eio_asset_cost_basis_bef_expiry)),
-	Descriptor(52, Attribute::SCALAR_STRING,	"data_grp_id", -1, (size_t)&modelOffset->data_grp_id,
+	Descriptor(60, Attribute::SCALAR_STRING,	"data_file_name", -1, (size_t)&modelOffset->data_file_name,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((sF)&EIO_ASSET_UDF::eio_asset_data_file_name)),
+	Descriptor(61, Attribute::SCALAR_STRING,	"data_grp_id", -1, (size_t)&modelOffset->data_grp_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((sF)&EIO_ASSET_UDF::eio_asset_data_grp_id)),
-	Descriptor(53, Attribute::SCALAR_INT,	"existing_asset_indicator", -1, (size_t)&modelOffset->existing_asset_indicator,
+	Descriptor(62, Attribute::SCALAR_INT,	"existing_asset_indicator", -1, (size_t)&modelOffset->existing_asset_indicator,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&EIO_ASSET_UDF::eio_asset_existing_asset_indicator)),
-	Descriptor(54, Attribute::SCALAR_INT,	"gaap_inc_defn", -1, (size_t)&modelOffset->gaap_inc_defn,
+	Descriptor(63, Attribute::SCALAR_INT,	"gaap_inc_defn", -1, (size_t)&modelOffset->gaap_inc_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&EIO_ASSET_UDF::eio_asset_gaap_inc_defn)),
-	Descriptor(55, Attribute::SCALAR_INT,	"gaap_val_defn", -1, (size_t)&modelOffset->gaap_val_defn,
+	Descriptor(64, Attribute::SCALAR_INT,	"gaap_val_defn", -1, (size_t)&modelOffset->gaap_val_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&EIO_ASSET_UDF::eio_asset_gaap_val_defn)),
-	Descriptor(56, Attribute::SCALAR_DOUBLE,	"init_mkt_val_calc", -1, (size_t)&modelOffset->init_mkt_val_calc,
+	Descriptor(65, Attribute::SCALAR_DOUBLE,	"init_mkt_val_calc", -1, (size_t)&modelOffset->init_mkt_val_calc,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((dF)&EIO_ASSET_UDF::eio_asset_init_mkt_val_calc)),
-	Descriptor(57, Attribute::SCALAR_INT,	"lookback_mths", -1, (size_t)&modelOffset->lookback_mths,
+	Descriptor(66, Attribute::SCALAR_INT,	"lookback_mths", -1, (size_t)&modelOffset->lookback_mths,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&EIO_ASSET_UDF::eio_asset_lookback_mths)),
-	Descriptor(58, Attribute::SCALAR_INT,	"lookback_sampling_mths", -1, (size_t)&modelOffset->lookback_sampling_mths,
+	Descriptor(67, Attribute::SCALAR_INT,	"lookback_sampling_mths", -1, (size_t)&modelOffset->lookback_sampling_mths,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&EIO_ASSET_UDF::eio_asset_lookback_sampling_mths)),
-	Descriptor(59, Attribute::SCALAR_INT,	"maturity_period", -1, (size_t)&modelOffset->maturity_period,
+	Descriptor(68, Attribute::SCALAR_INT,	"maturity_period", -1, (size_t)&modelOffset->maturity_period,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&EIO_ASSET_UDF::eio_asset_maturity_period)),
-	Descriptor(60, Attribute::SCALAR_DOUBLE,	"mkt_val_at_issue", -1, (size_t)&modelOffset->mkt_val_at_issue,
+	Descriptor(69, Attribute::SCALAR_DOUBLE,	"mkt_val_at_issue", -1, (size_t)&modelOffset->mkt_val_at_issue,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((dF)&EIO_ASSET_UDF::eio_asset_mkt_val_at_issue)),
-	Descriptor(61, Attribute::SCALAR_DOUBLE,	"mkt_val_bef_expiry", -1, (size_t)&modelOffset->mkt_val_bef_expiry,
+	Descriptor(70, Attribute::SCALAR_DOUBLE,	"mkt_val_bef_expiry", -1, (size_t)&modelOffset->mkt_val_bef_expiry,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((dF)&EIO_ASSET_UDF::eio_asset_mkt_val_bef_expiry)),
-	Descriptor(62, Attribute::SCALAR_DOUBLE,	"neg_asset_flag", -1, (size_t)&modelOffset->neg_asset_flag,
+	Descriptor(71, Attribute::SCALAR_DOUBLE,	"neg_asset_flag", -1, (size_t)&modelOffset->neg_asset_flag,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((dF)&EIO_ASSET_UDF::eio_asset_neg_asset_flag)),
-	Descriptor(63, Attribute::SCALAR_DOUBLE,	"notional_amt_at_issue", -1, (size_t)&modelOffset->notional_amt_at_issue,
+	Descriptor(72, Attribute::SCALAR_DOUBLE,	"notional_amt_at_issue", -1, (size_t)&modelOffset->notional_amt_at_issue,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((dF)&EIO_ASSET_UDF::eio_asset_notional_amt_at_issue)),
-	Descriptor(64, Attribute::SCALAR_DOUBLE,	"pct_to_use", -1, (size_t)&modelOffset->pct_to_use,
+	Descriptor(73, Attribute::SCALAR_DOUBLE,	"pct_to_use", -1, (size_t)&modelOffset->pct_to_use,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((dF)&EIO_ASSET_UDF::eio_asset_pct_to_use)),
-	Descriptor(65, Attribute::SCALAR_INT,	"planned_sale_period", -1, (size_t)&modelOffset->planned_sale_period,
+	Descriptor(74, Attribute::SCALAR_INT,	"planned_sale_period", -1, (size_t)&modelOffset->planned_sale_period,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&EIO_ASSET_UDF::eio_asset_planned_sale_period)),
-	Descriptor(66, Attribute::SCALAR_STRING,	"proj_date_adj", -1, (size_t)&modelOffset->proj_date_adj,
+	Descriptor(75, Attribute::SCALAR_STRING,	"proj_date_adj", -1, (size_t)&modelOffset->proj_date_adj,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((sF)&EIO_ASSET_UDF::eio_asset_proj_date_adj)),
-	Descriptor(67, Attribute::SCALAR_INT,	"proj_start_date", -1, (size_t)&modelOffset->proj_start_date,
+	Descriptor(76, Attribute::SCALAR_INT,	"proj_start_date", -1, (size_t)&modelOffset->proj_start_date,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&EIO_ASSET_UDF::eio_asset_proj_start_date)),
-	Descriptor(68, Attribute::SCALAR_INT,	"proj_start_mth", -1, (size_t)&modelOffset->proj_start_mth,
+	Descriptor(77, Attribute::SCALAR_INT,	"proj_start_mth", -1, (size_t)&modelOffset->proj_start_mth,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&EIO_ASSET_UDF::eio_asset_proj_start_mth)),
-	Descriptor(69, Attribute::SCALAR_INT,	"proj_start_yr", -1, (size_t)&modelOffset->proj_start_yr,
+	Descriptor(78, Attribute::SCALAR_INT,	"proj_start_yr", -1, (size_t)&modelOffset->proj_start_yr,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&EIO_ASSET_UDF::eio_asset_proj_start_yr)),
-	Descriptor(70, Attribute::SCALAR_INT,	"sale_class_id", -1, (size_t)&modelOffset->sale_class_id,
+	Descriptor(79, Attribute::SCALAR_INT,	"sale_class_id", -1, (size_t)&modelOffset->sale_class_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&EIO_ASSET_UDF::eio_asset_sale_class_id)),
-	Descriptor(71, Attribute::SCALAR_INT,	"seg_num", -1, (size_t)&modelOffset->seg_num,
+	Descriptor(80, Attribute::SCALAR_INT,	"seg_num", -1, (size_t)&modelOffset->seg_num,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&EIO_ASSET_UDF::eio_asset_seg_num)),
-	Descriptor(72, Attribute::SCALAR_INT,	"start_period", -1, (size_t)&modelOffset->start_period,
+	Descriptor(81, Attribute::SCALAR_INT,	"start_period", -1, (size_t)&modelOffset->start_period,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&EIO_ASSET_UDF::eio_asset_start_period)),
 	};
 
@@ -9223,8 +9136,17 @@ TableMgr<VariantTable> EIO_ASSET::mgr_;
 	&EIO_ASSET::descriptor_0[70],
 	&EIO_ASSET::descriptor_0[71],
 	&EIO_ASSET::descriptor_0[72],
+	&EIO_ASSET::descriptor_0[73],
+	&EIO_ASSET::descriptor_0[74],
+	&EIO_ASSET::descriptor_0[75],
+	&EIO_ASSET::descriptor_0[76],
+	&EIO_ASSET::descriptor_0[77],
+	&EIO_ASSET::descriptor_0[78],
+	&EIO_ASSET::descriptor_0[79],
+	&EIO_ASSET::descriptor_0[80],
+	&EIO_ASSET::descriptor_0[81],
 	nullptr};
-	const size_t EIO_ASSET::sDescriptorCount = 73;
+	const size_t EIO_ASSET::sDescriptorCount = 82;
 
 //factory
 EIO_ASSET* EIO_ASSET::makeThis(int isSubmodel, ModelClass* owner, EIO_ASSET* peer, 
@@ -9335,17 +9257,13 @@ typedef xstring (EIO_ASSET_UDF::*sPFs) (xstring);
 
 // constructor if this model class is the base class of another model class
 EIO_ASSET::EIO_ASSET(int columnCount, Descriptor* mocd[], Product* persObj) : ModelClass(columnCount, mocd, persObj), Variable(*this)
-  , sm_bond_is(0)
-  , sm_bond_pv(0)
-  , sm_bond_ym(0)
-  , sm_mtg_is(0)
-  , sm_mtg_pv(0)
-  , sm_mtg_ym(0)
 
+	, adco(company_asset_adco)
 	, asset(company_asset)
 	, eio(company_asset_eio)
 	, epl(company_liab_epl)
-	, mtg_ym(company_asset_mtg_mtg_cf_mtg_ym)
+	, hedge_grp(company_seg_hedge_grp)
+	, liab(company_liab)
 	, rates(company_rates)
 	, seg(company_seg)
 {
@@ -9363,17 +9281,13 @@ EIO_ASSET::EIO_ASSET(int columnCount, Descriptor* mocd[], Product* persObj) : Mo
 EIO_ASSET::EIO_ASSET(const xstring &modelClassName,
 		int isSm, ModelClass *owner, ModelClass *peer, int mainRebase,
 		const char *name, ModelClass* arrayPersistentObj) : ModelClass(156, EIO_ASSET::descriptorTable, arrayPersistentObj), Variable(*this)
-  , sm_bond_is(0)
-  , sm_bond_pv(0)
-  , sm_bond_ym(0)
-  , sm_mtg_is(0)
-  , sm_mtg_pv(0)
-  , sm_mtg_ym(0)
 
+	, adco(company_asset_adco)
 	, asset(company_asset)
 	, eio(company_asset_eio)
 	, epl(company_liab_epl)
-	, mtg_ym(company_asset_mtg_mtg_cf_mtg_ym)
+	, hedge_grp(company_seg_hedge_grp)
+	, liab(company_liab)
 	, rates(company_rates)
 	, seg(company_seg)
  // Tables...
@@ -9401,17 +9315,20 @@ EIO_ASSET::EIO_ASSET(const xstring &modelClassName,
        isMainModel = !isSm;
 		modelName = name;
 
-#ifdef __CREATE_COMP_COMP_CLASS_
+#ifdef __CREATE_AA_COMP_COMP_CLASS_
        company = 0;
 #endif
 #ifdef __CREATE_ASSET_ASSET_CLASS_
        company_asset = 0;
 #endif
+#ifdef __CREATE_ADCO_ASSET_CLASS_
+       company_asset_adco = 0;
+#endif
 #ifdef __CREATE_EIO_ASSET_CLASS_
        company_asset_eio = 0;
 #endif
-#ifdef __CREATE_MTG_CF_ASSET_CLASS_
-       company_asset_mtg_mtg_cf_mtg_ym = 0;
+#ifdef __CREATE_LIAB_LIAB_CLASS_
+       company_liab = 0;
 #endif
 #ifdef __CREATE_EPL_LIAB_CLASS_
        company_liab_epl = 0;
@@ -9421,6 +9338,9 @@ EIO_ASSET::EIO_ASSET(const xstring &modelClassName,
 #endif
 #ifdef __CREATE_SEG_COMP_CLASS_
        company_seg = 0;
+#endif
+#ifdef __CREATE_HDG_GRP_COMP_CLASS_
+       company_seg_hedge_grp = 0;
 #endif
 
 #ifdef VOCAL1
@@ -9479,17 +9399,20 @@ EIO_ASSET::EIO_ASSET(const xstring &modelClassName,
 
  void EIO_ASSET::copy_names() {
 
-#ifdef __CREATE_COMP_COMP_CLASS_
-		company = (COMP_COMP*)(findUnique("company"));
+#ifdef __CREATE_AA_COMP_COMP_CLASS_
+		company = (AA_COMP_COMP*)(findUnique("company"));
 #endif
 #ifdef __CREATE_ASSET_ASSET_CLASS_
 		company_asset = (ASSET_ASSET*)(findUnique("company|asset"));
 #endif
+#ifdef __CREATE_ADCO_ASSET_CLASS_
+		company_asset_adco = (ADCO_ASSET*)(findUnique("company|asset|adco"));
+#endif
 #ifdef __CREATE_EIO_ASSET_CLASS_
 		company_asset_eio = (EIO_ASSET*)(findUnique("company|asset|eio"));
 #endif
-#ifdef __CREATE_MTG_CF_ASSET_CLASS_
-		company_asset_mtg_mtg_cf_mtg_ym = (MTG_CF_ASSET*)(findUnique("company|asset|mtg|mtg_cf|mtg_ym"));
+#ifdef __CREATE_LIAB_LIAB_CLASS_
+		company_liab = (LIAB_LIAB*)(findUnique("company|liab"));
 #endif
 #ifdef __CREATE_EPL_LIAB_CLASS_
 		company_liab_epl = (EPL_LIAB*)(findUnique("company|liab|epl"));
@@ -9499,6 +9422,9 @@ EIO_ASSET::EIO_ASSET(const xstring &modelClassName,
 #endif
 #ifdef __CREATE_SEG_COMP_CLASS_
 		company_seg = (SEG_COMP*)(findUnique("company|seg"));
+#endif
+#ifdef __CREATE_HDG_GRP_COMP_CLASS_
+		company_seg_hedge_grp = (HDG_GRP_COMP*)(findUnique("company|seg|hedge_grp"));
 #endif
  }
 //copy_names END@2
@@ -9710,12 +9636,6 @@ EIO_ASSET_persistent_object::EIO_ASSET_persistent_object(const xstring &modelCla
 			EIO_ASSET(modelClassName, isSm, owner, peer, mainRebase, name, arrayPersistentObj), 
 			mReadArray(true),
 			pfl(0)
-	, sm_bond_is(EIO_ASSET::sm_bond_is)
-	, sm_bond_pv(EIO_ASSET::sm_bond_pv)
-	, sm_bond_ym(EIO_ASSET::sm_bond_ym)
-	, sm_mtg_is(EIO_ASSET::sm_mtg_is)
-	, sm_mtg_pv(EIO_ASSET::sm_mtg_pv)
-	, sm_mtg_ym(EIO_ASSET::sm_mtg_ym)
 
 	{
 
@@ -9795,7 +9715,7 @@ void EIO_ASSET::after_startup(int decrement) {
 //ms_BeforeStartup END@2
 
 HVector<ModelClass::ddfStruct> EIO_ASSET::ddfVector;
-BitArray EIO_ASSET::dataVariables(73);
+BitArray EIO_ASSET::dataVariables(82);
 bool EIO_ASSET::hasBeenWritten = false;
 
 

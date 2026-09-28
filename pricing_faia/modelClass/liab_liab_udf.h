@@ -21,25 +21,18 @@ LIAB_LIAB_UDF(int columnCount, Descriptor* mocd[], Product* persObj)
 
 // Finalize 
 double liab_liab_finalize(int t);
-
 // Initialize 
 double liab_liab_initialize(int t);
-
 // Startup 
 virtual double virtual_startup(int t);
-
 // Projection Date Adjusted 
 xstring  liab_liab_proj_date_adj();
-
 // Projection Start Date 
 int  liab_liab_proj_start_date();
-
 // Projection Start Mth 
 int  liab_liab_proj_start_mth();
-
 // Projection Start Yr 
 int  liab_liab_proj_start_yr();
-
 
 };
 #endif

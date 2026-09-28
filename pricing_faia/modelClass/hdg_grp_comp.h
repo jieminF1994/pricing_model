@@ -2,6 +2,8 @@
 #define __HDG_GRP_COMP_H_
 #pragma warning ( disable : 4819 )
 
+#define __HDG_GRP_COMP_H_
+
 #include <math.h>
 #include "xstring.h"
 #include "Locator.h"
@@ -60,7 +62,6 @@ extern MY_DLL ofstream log_strm;
 #include "StringProxy.h"			// ... contains String Proxies
 #include "StringEnumProxy.h"		// ... contains StringEnum Proxies
 #include "NumProxyNonMembers.h"		// ... min, max
-#include "StringedProxyNonMembers.h"		// ... concatenation for StringEnum
 #include "ArrayProxy.h"			// ... contains Array Proxies
 #include "ScalarProxy.h"			// ... contains Scalar Proxies
 #include "ModelGroupProxy.h"
@@ -70,6 +71,11 @@ extern MY_DLL ofstream log_strm;
 
 
 using namespace StrEnum;
+
+#ifdef __CREATE_AA_COMP_COMP_CLASS_
+class AA_COMP_COMP;
+class AA_COMP_COMP_persistent_object;
+#endif
 
 #ifdef __CREATE_ADCO_ASSET_CLASS_
 class ADCO_ASSET;
@@ -87,11 +93,6 @@ class ASSET_ASSET;
 class ASSET_ASSET_persistent_object;
 #endif
 
-#ifdef __CREATE_AUTOMATION_CLASS_
-class AUTOMATION;
-class AUTOMATION_persistent_object;
-#endif
-
 #ifdef __CREATE_A_SUBPORT_ASSET_CLASS_
 class A_SUBPORT_ASSET;
 class A_SUBPORT_ASSET_persistent_object;
@@ -104,22 +105,21 @@ typedef TMultiDComp<_2D_A_SUBPORT_ASSET, A_SUBPORT_ASSET_persistent_object> _3D_
 class BOND_ASSET;
 class BOND_ASSET_persistent_object;
 typedef TComp<BOND_ASSET, BOND_ASSET_persistent_object> _1D_BOND_ASSET;
+typedef TMultiDComp<_1D_BOND_ASSET, BOND_ASSET_persistent_object> _2D_BOND_ASSET;
 #endif
 
 #ifdef __CREATE_BOND_CF_ASSET_CLASS_
 class BOND_CF_ASSET;
 class BOND_CF_ASSET_persistent_object;
-#endif
-
-#ifdef __CREATE_COMP_COMP_CLASS_
-class COMP_COMP;
-class COMP_COMP_persistent_object;
+typedef TComp<BOND_CF_ASSET, BOND_CF_ASSET_persistent_object> _1D_BOND_CF_ASSET;
+typedef TMultiDComp<_1D_BOND_CF_ASSET, BOND_CF_ASSET_persistent_object> _2D_BOND_CF_ASSET;
 #endif
 
 #ifdef __CREATE_EIO_ASSET_CLASS_
 class EIO_ASSET;
 class EIO_ASSET_persistent_object;
 typedef TComp<EIO_ASSET, EIO_ASSET_persistent_object> _1D_EIO_ASSET;
+typedef TMultiDComp<_1D_EIO_ASSET, EIO_ASSET_persistent_object> _2D_EIO_ASSET;
 #endif
 
 #ifdef __CREATE_EPA_ASSET_CLASS_
@@ -144,6 +144,7 @@ typedef TComp<FIAAFUND_LIAB, FIAAFUND_LIAB_persistent_object> _1D_FIAAFUND_LIAB;
 class FIACARVM_LIAB;
 class FIACARVM_LIAB_persistent_object;
 typedef TComp<FIACARVM_LIAB, FIACARVM_LIAB_persistent_object> _1D_FIACARVM_LIAB;
+typedef TMultiDComp<_1D_FIACARVM_LIAB, FIACARVM_LIAB_persistent_object> _2D_FIACARVM_LIAB;
 #endif
 
 #ifdef __CREATE_FIA_LIAB_CLASS_
@@ -159,11 +160,6 @@ typedef TComp<HDG_GRP_COMP, HDG_GRP_COMP_persistent_object> _1D_HDG_GRP_COMP;
 typedef TMultiDComp<_1D_HDG_GRP_COMP, HDG_GRP_COMP_persistent_object> _2D_HDG_GRP_COMP;
 #endif
 
-#ifdef __CREATE_INTEX_ASSET_CLASS_
-class INTEX_ASSET;
-class INTEX_ASSET_persistent_object;
-#endif
-
 #ifdef __CREATE_INVSTRAT_ASSET_CLASS_
 class INVSTRAT_ASSET;
 class INVSTRAT_ASSET_persistent_object;
@@ -175,15 +171,24 @@ class LIAB_LIAB;
 class LIAB_LIAB_persistent_object;
 #endif
 
+#ifdef __CREATE_MRB_GAAP_CLASS_
+class MRB_GAAP;
+class MRB_GAAP_persistent_object;
+typedef TComp<MRB_GAAP, MRB_GAAP_persistent_object> _1D_MRB_GAAP;
+#endif
+
 #ifdef __CREATE_MTG_ASSET_CLASS_
 class MTG_ASSET;
 class MTG_ASSET_persistent_object;
 typedef TComp<MTG_ASSET, MTG_ASSET_persistent_object> _1D_MTG_ASSET;
+typedef TMultiDComp<_1D_MTG_ASSET, MTG_ASSET_persistent_object> _2D_MTG_ASSET;
 #endif
 
 #ifdef __CREATE_MTG_CF_ASSET_CLASS_
 class MTG_CF_ASSET;
 class MTG_CF_ASSET_persistent_object;
+typedef TComp<MTG_CF_ASSET, MTG_CF_ASSET_persistent_object> _1D_MTG_CF_ASSET;
+typedef TMultiDComp<_1D_MTG_CF_ASSET, MTG_CF_ASSET_persistent_object> _2D_MTG_CF_ASSET;
 #endif
 
 #ifdef __CREATE_RATES_ECONOMY_CLASS_
@@ -197,22 +202,11 @@ class SEG_COMP_persistent_object;
 typedef TComp<SEG_COMP, SEG_COMP_persistent_object> _1D_SEG_COMP;
 #endif
 
-#ifdef __CREATE_SFAS133_GAAP_CLASS_
-class SFAS133_GAAP;
-class SFAS133_GAAP_persistent_object;
-typedef TComp<SFAS133_GAAP, SFAS133_GAAP_persistent_object> _1D_SFAS133_GAAP;
-#endif
-
 #ifdef __CREATE_SFAS97RD_GAAP_CLASS_
 class SFAS97RD_GAAP;
 class SFAS97RD_GAAP_persistent_object;
 typedef TComp<SFAS97RD_GAAP, SFAS97RD_GAAP_persistent_object> _1D_SFAS97RD_GAAP;
 typedef TMultiDComp<_1D_SFAS97RD_GAAP, SFAS97RD_GAAP_persistent_object> _2D_SFAS97RD_GAAP;
-#endif
-
-#ifdef __CREATE_UTIL_RAFM_CLASS_
-class UTIL_RAFM;
-class UTIL_RAFM_persistent_object;
 #endif
 
 
@@ -255,18 +249,20 @@ public :
 	static BitArray dataVariables; 
 	static bool hasBeenWritten;
 
-typedef map <int, long, less <int> > mpmap;
-mpmap fia_mp_map;
-mpmap iul_mp_map;
-mpmap va_mp_map;
-mpmap eio_mp_map_active;
-mpmap ird_mp_map_active;
+map <int, long, less <int> > fia_mp_map;
+map <int, long, less <int> > iul_mp_map;
+map <int, long, less <int> > va_mp_map;
+map <int, long, less <int> > eio_mp_map_active;
+map <int, long, less <int> > ird_mp_map_active;
 map <xstring, double> liab_greeks;
 map <xstring, double> asset_greeks;
 map <xstring, double> asset_greeks_needed;
 
 int hedge_group_count;
 SmartArray < SmartArray <double> >  hedge_valn_array;
+
+SEG_COMP * seg_element;
+vector <string> eqt_price_shock_tbl;
 
 	void init_(){
 		
@@ -279,6 +275,10 @@ hedge_group_count = 0;
 
 	}
 
+#ifdef __CREATE_ADCO_ASSET_CLASS_
+	ADCO_ASSET	*company_asset_adco;
+	ADCO_ASSET	*&adco;
+#endif
 #ifdef __CREATE_ANN_PBA_PBA_CLASS_
 	ANN_PBA_PBA	*company_seg_ann_pba;
 	ANN_PBA_PBA	*&ann_pba;
@@ -287,8 +287,8 @@ hedge_group_count = 0;
 	ASSET_ASSET	*company_asset;
 	ASSET_ASSET	*&asset;
 #endif
-#ifdef __CREATE_COMP_COMP_CLASS_
-	COMP_COMP	*company;
+#ifdef __CREATE_AA_COMP_COMP_CLASS_
+	AA_COMP_COMP	*company;
 #endif
 #ifdef __CREATE_EPL_LIAB_CLASS_
 	EPL_LIAB	*company_liab_epl;
@@ -470,12 +470,6 @@ hedge_group_count = 0;
 //Column Definition END@2
 
  // Temporary Table...
-HDG_GRP_COMP *sm_bond_is;
-HDG_GRP_COMP *sm_bond_pv;
-HDG_GRP_COMP *sm_bond_ym;
-HDG_GRP_COMP *sm_mtg_is;
-HDG_GRP_COMP *sm_mtg_pv;
-HDG_GRP_COMP *sm_mtg_ym;
 int main_rebase_model; //1
 
 public :
@@ -518,6 +512,9 @@ public :
 	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > eqt_price_shock_id;
   inline xstring	Get_eqt_price_shock_id() {
 		return eqt_price_shock_id; }
+	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > eqt_price_shock_selected;
+  inline xstring	Get_eqt_price_shock_selected() {
+		return eqt_price_shock_selected; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > eqt_vol_shock;
   inline double	Get_eqt_vol_shock() {
 		return eqt_vol_shock; }
@@ -527,6 +524,9 @@ public :
 	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > eqt_vol_shock_id;
   inline xstring	Get_eqt_vol_shock_id() {
 		return eqt_vol_shock_id; }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gen2_declarations;
+  inline xstring	Get_gen2_declarations() {
+		return gen2_declarations; }
 	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > hedge_disc_rate_comp_id;
   inline xstring	Get_hedge_disc_rate_comp_id() {
 		return hedge_disc_rate_comp_id; }
@@ -720,9 +720,6 @@ public :
 		return hedge_grp_yld_curve_id; }
   inline void Set_hedge_grp_yld_curve_id(const xstring &v) {
 		hedge_grp_yld_curve_id.setValue(v); }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > independent_mp_defn;
-  inline xstring	Get_independent_mp_defn() {
-		return independent_mp_defn; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > int_rate_shock;
   inline double	Get_int_rate_shock() {
 		return int_rate_shock; }
@@ -760,6 +757,9 @@ public :
 		return shock_id; }
   inline void Set_shock_id(const xstring &v) {
 		shock_id.setValue(v); }
+	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > shock_id_selected;
+  inline xstring	Get_shock_id_selected() {
+		return shock_id_selected; }
 	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > valn_hedge_final_results;
   inline xstring	Get_valn_hedge_final_results() {
 		return valn_hedge_final_results; }
@@ -843,11 +843,11 @@ void rho_hedge_strat(int t);
 
 // Sum Over Assets
 #line 1 "sum_over_assets.hdg_grp_comp.for"
-double sum_over_assets(const xstring &colname, int t, int greek_type, int sum_over_timing);
+double sum_over_assets(const xstring &/* CiProxyFormula */colname, const int /* CiProxyTime */ t, int greek_type, int sum_over_timing);
 
 // Sum Over Liabilities
 #line 1 "sum_over_liabilities.hdg_grp_comp.for"
-double sum_over_liabilities(const xstring &colname, int t, int sum_timing);
+double sum_over_liabilities(const xstring &/* CiProxyFormula */colname, const int /* CiProxyTime */ t, int sum_timing);
 
 // Vega Hedge Strategy
 #line 1 "vega_hedge_strat.hdg_grp_comp.for"
@@ -928,12 +928,6 @@ public :
 	void write(const xstring& key, long include_submodels = write_submodels);
 
 	ModelClass *Save_main;
-	HDG_GRP_COMP *&sm_bond_is; //
-	HDG_GRP_COMP *&sm_bond_pv; //
-	HDG_GRP_COMP *&sm_bond_ym; //
-	HDG_GRP_COMP *&sm_mtg_is; //
-	HDG_GRP_COMP *&sm_mtg_pv; //
-	HDG_GRP_COMP *&sm_mtg_ym; //
 
 	ProductFeatureList* pfl;
 

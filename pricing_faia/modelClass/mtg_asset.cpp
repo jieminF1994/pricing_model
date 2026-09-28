@@ -1,13 +1,12 @@
 ﻿
 //MODELCLASS BEGIN
+//MODELCLASS aa_comp_comp
 //MODELCLASS adco_asset
 //MODELCLASS ann_pba_pba
 //MODELCLASS asset_asset
-//MODELCLASS automation
 //MODELCLASS a_subport_asset
 //MODELCLASS bond_asset
 //MODELCLASS bond_cf_asset
-//MODELCLASS comp_comp
 //MODELCLASS eio_asset
 //MODELCLASS epa_asset
 //MODELCLASS epl_liab
@@ -15,16 +14,14 @@
 //MODELCLASS fiacarvm_liab
 //MODELCLASS fia_liab
 //MODELCLASS hdg_grp_comp
-//MODELCLASS intex_asset
 //MODELCLASS invstrat_asset
 //MODELCLASS liab_liab
+//MODELCLASS mrb_gaap
 //MODELCLASS mtg_asset
 //MODELCLASS mtg_cf_asset
 //MODELCLASS rates_economy
 //MODELCLASS seg_comp
-//MODELCLASS sfas133_gaap
 //MODELCLASS sfas97rd_gaap
-//MODELCLASS util_rafm
 //MODELCLASS END
 
 #if defined(MICROSOFT)
@@ -75,14 +72,13 @@ extern MemCount gMem;
 extern MY_DLL Parmfile *p;
 #include "column2.h"
 #include "ModelClass\mtg_asset_udf.h"
+#include "ModelClass\aa_comp_comp.h"
 #include "ModelClass\adco_asset.h"
 #include "ModelClass\ann_pba_pba.h"
 #include "ModelClass\asset_asset.h"
-#include "ModelClass\automation.h"
 #include "ModelClass\a_subport_asset.h"
 #include "ModelClass\bond_asset.h"
 #include "ModelClass\bond_cf_asset.h"
-#include "ModelClass\comp_comp.h"
 #include "ModelClass\eio_asset.h"
 #include "ModelClass\epa_asset.h"
 #include "ModelClass\epl_liab.h"
@@ -90,15 +86,13 @@ extern MY_DLL Parmfile *p;
 #include "ModelClass\fiacarvm_liab.h"
 #include "ModelClass\fia_liab.h"
 #include "ModelClass\hdg_grp_comp.h"
-#include "ModelClass\intex_asset.h"
 #include "ModelClass\invstrat_asset.h"
 #include "ModelClass\liab_liab.h"
+#include "ModelClass\mrb_gaap.h"
 #include "ModelClass\mtg_cf_asset.h"
 #include "ModelClass\rates_economy.h"
 #include "ModelClass\seg_comp.h"
-#include "ModelClass\sfas133_gaap.h"
 #include "ModelClass\sfas97rd_gaap.h"
-#include "ModelClass\util_rafm.h"
 #pragma optimize( "gs", on )
 
 #include "generatedCppHeader.h"
@@ -109,7 +103,7 @@ extern MY_DLL Parmfile *p;
 //Redundant includes only for snip test:
 //iomanip included for "setprecision()"
 #include <iomanip>
-#include <strstream> //WTW - Gen2
+#include <strstream>
 typedef vector<vector<string>> sowfinput;
 typedef vector<string> sowfcols;
 typedef map <xstring, long, less <xstring> > sowfmap;
@@ -120,7 +114,9 @@ typedef vector<vector<string>> deptaskinput;
 typedef vector<string> deptaskcols;
 typedef map <xstring, long, less <xstring> > deptaskmap;
 typedef deptaskmap::iterator deptaskmapiter;
-//extern MY_DLL strstream log_screen; //WTW - Gen2 - MY_DLL is not supported
+const int pv = 0;
+const int is = 1;
+const int ym = 2;
 const int EFFECTIVE_RATE = 0;
 const int EFFECTIVE_ANNUAL = 1;
 const int NOMINAL_SEMIANNUAL = 2;
@@ -138,9 +134,8 @@ const double LEAST_ANNUAL_GROWTH_RATE = -0.9999;
 const double LEAST_BOND_EQUIVALENT_RATE = 0.0001;
 const double SPOT_SHIFT_FOR_EFFECTIVE_DURATION_CALCULATION = 0.0001;
 const double ONE_MILLION = 1000000.0;
-//WTW - Gen2 - Move Extern definitions to rates header
-//const double MINIMUM_MONTHLY_YIELD_RATIO = -0.9; // annual yield = (1.0-0.9)^12 = 1.0e-12
-//const double MAXIMUM_MONTHLY_YIELD_RATIO	 = 999999999.0; // annual yield = (1.0+999999999.0)^12 = 1.0e+120
+const double MINIMUM_MONTHLY_YIELD_RATIO = -0.9; // annual yield = (1.0-0.9)^12 = 1.0e-12
+const double MAXIMUM_MONTHLY_YIELD_RATIO	 = 999999999.0; // annual yield = (1.0+999999999.0)^12 = 1.0e+120
 const int DECIMALS_TO_ROUND = 6;
 const int ROUND_NEGATIVE_TOZERO = 0;
 const int ROUND_NEAR = 1;
@@ -154,11 +149,10 @@ const int SUM_OVER_NEGATIVE = -101;
 const int TIER = -98;
 const int ANY_GROUP = -99;
 const bool DO_NOT_ISSUE_WARNINGS = false;
-//WTW - Gen2 - Move Extern definitions to rates header
-//const int CALL_CODE = 1; 
-//const int PUT_CODE = 2; 
-//const int CONTINUOUS_PAYOUT_CODE = 3;
-//const int FUTURES_CODE = 4;
+const int CALL_CODE = 1;
+const int PUT_CODE = 2;
+const int CONTINUOUS_PAYOUT_CODE = 3;
+const int FUTURES_CODE = 4;
 // Model point type
 const int NEW_PURCH = 0;
 const int INIT_MP = 1;
@@ -208,11 +202,13 @@ const int HEDGE_CASH_FLOW = 0;
 const int HEDGE_MKT_VAL = 1;
 const int HEDGE_ARRAY_SIZE = 2;
 // global calculation flags
-//extern bool pricing_flag;//WTW - Gen2 - Move Extern definitions to rates header
+extern bool pricing_flag;
 extern bool factors_flag;
 extern bool nb_flag;
 extern bool alm_flag;
 extern bool tcm_flag;
+extern bool pba_disc_rate_flag;
+extern int pba_segment_size;
 extern bool avr_flag;
 extern bool imr_flag;
 extern bool gaap_flag;
@@ -220,17 +216,12 @@ extern bool tgt_cap_flag;
 extern bool stoch_flag;
 extern bool valn_flag;
 extern bool time_step_flag;
-extern bool sfas133_valn_flag;
+extern bool mrb_valn_flag;
 extern bool sop031_valn_flag;
 extern bool sfas97rd_valn_flag;
-extern bool sfas97lp_valn_flag;
-extern bool sfas97lp_gpr_valn_flag;
 extern bool sfas91_valn_flag;
-extern bool sfas60_valn_flag;
-extern bool sfas60_gpr_valn_flag;
+extern bool gaap_ldti_valn_flag;
 extern bool sfas120_nlp_valn_flag;
-extern bool sfas120_valn_flag;
-extern bool sfas120_gpr_valn_flag;
 extern bool loc_gpr_valn_flag;
 extern bool pba_valn_flag;
 extern bool pba_scen_amt_valn_flag;
@@ -239,6 +230,7 @@ extern bool res_scen_amt_valn_flag;
 extern bool res_det_res_valn_flag;
 extern bool res_ag38_8d_valn_flag;
 extern bool std_scen_valn_flag;
+extern bool std_scen_prescribed_assump_flag;
 extern bool rbc_std_scen_valn_flag;
 extern bool rbc_std_scen_step2_valn_flag;
 extern bool res_std_scen_valn_flag;
@@ -261,33 +253,32 @@ extern double aggregate_amount_threshold;
 extern double model_point_amount_threshold;
 extern double rate_ratio_threshold;
 extern vector<string> valn_periods;
+
 // utility functions - elaborated in rates/economy externs
-//WTW - Gen2 - Move Extern definitions to rates header
-/*extern double round_result(int rounding, int negative, double x, int n);
+extern double round_result(int rounding, int negative, double x, int n);
 extern double factorial(int n);
 extern int n_choose_k(int n, int k);
 extern xstring check_date_format(const xstring &date);
+extern int month_from_day_number(int nSerialDate);
+extern int year_from_day_number(int nSerialDate);
+extern int day_from_day_number(int nSerialDate);
+extern int month_number_from_date(int year, int month); 
+extern int day_number_from_date(int nYear, int nMonth, int nDay);
 extern int get_mth_from_date(const xstring &date);
 extern int get_yr_from_date(const xstring &date);
 extern int get_day_from_date(const xstring &date);
-extern int month_from_day_number(int nSerialDate);//WTW - Gen2 - add new formula to replace unsupported MonthFromDayNumber() function
-extern int year_from_day_number(int nSerialDate);//WTW - Gen2 - add new formula to replace unsupported YearFromDayNumber() function
-extern int day_from_day_number(int nSerialDate);//WTW - Gen2 - add new formula to replace unsupported DayFromDayNumber() function
-extern int month_number_from_date(int year, int month); //WTW - Gen2 - add new formula to replace unsupported MonthNumberFromDate() function
-extern int day_number_from_date(int nYear, int nMonth, int nDay); //WTW - Gen2 - add new formula to replace unsupported DayNumberFromDate() function
 extern int get_end_of_mth_day(int yr, int mth);
 extern xstring add_mths_to_date(const xstring &date, int mths);
 extern int get_mth_from_adj_date(const xstring &date, int mths);
 extern double convert_rate_basis(double orig_rate, double orig_rate_basis, double new_rate_basis);
 extern double convert_decrem_rate_basis(double orig_rate, double orig_rate_basis, double new_rate_basis);
-extern long int determine_tbl_size(int sNumberOfDims, ...);
 extern xstring get_file_name(const xstring &source_file);
 extern xstring get_file_path(const xstring &source_file);
-extern xstring get_base_group_name(const xstring &tag, bool seriatim_flag = false);
+extern xstring get_base_group_name(const xstring &tag, bool split_flag = false);
 extern xstring get_string_of_date(double date);
 extern xstring get_string_of_enum_val(StrEnum::EnumValue type);
 extern int date_diff(xstring first_date, xstring second_date);
-extern int number_of_decimals(double xxx, int digits);//WTW - Gen2 - replace preprocessor #define with formula
+extern int number_of_decimals(double xxx,int digits);
 extern xstring write_string(double value, int string_length, int significant_digits);
 extern xstring write_array_to_string(SmartArray <double> value_array, int low, int high);
 extern void read_from_string(xstring temp_string, SmartArray <double> &temp_array);
@@ -308,25 +299,8 @@ extern double bs_opt_val_continuous_highest_gain(int call_or_put, double current
 extern double bs_opt_val_highest_gain(int call_or_put, double current_price, double observed_max, double observed_min, double strike_price, double length_of_sampling_period, int sampling_freq, double yrs_to_expiry, double risk_free_rate, double init_div_yld, double index_vol, int scen_int_freq, int scen_index_freq);
 extern double bs_opt_val_mthly_sum_cap(int crediting_mths, int known_index_vals, double sum_capped_amts,  double mthly_cap_rate, double yrs_to_expiry, double risk_free_rate, double init_div_yld, double index_vol, int scen_int_freq, int scen_index_freq);
 extern double cumul_bivariate_normal_distribn(double x, double y, double rho);
-extern double cumul_normal_distribn(double x);*/
+extern double cumul_normal_distribn(double x);
 
-// RAFM SQLite
-#ifndef _RAFMSQLITE_H_
-#define _RAFMSQLITE_H_
-
-#include <string>
-#include <vector>
-
-using namespace std;
-
-// 20210614 STW: upgrade to RAFM 2.9
-/*
-extern void openDatabase(string dbPath);
-extern void closeDatabase();
-extern string readCsvFile(string csvPath);
-extern void executeQuery(string sql, vector<string>& columns, vector<vector<string>>& results);
-*/
-#endif
 #endif
 extern int trace_wanted;
 
@@ -338,9 +312,7 @@ extern MY_DLL Message_handler *eh;
 int num_mtgs_to_run;
 int num_mtg = 0;
 sowfinput mtg_mp_input;
-sowfcols mtg_mp_input_cols;
 sowfinput mtg_sch_input;
-sowfcols mtg_sch_input_cols;
 sowfoutput mtg_sch_output;
 sowfmap mtg_sch_input_pos;
 sowfmapiter mtg_sch_input_pos_iter;
@@ -348,8 +320,8 @@ sowfmap mtg_sch_input_size;
 sowfmapiter mtg_sch_input_size_iter;
 
 extern sowmpoutput mtg_state_of_world_mp_output;
-static mtgivmap mtg_initial_values_map;
-static mtgivmap::iterator mtg_initial_values_map_iter;
+static map <xstring, struct mtgInitialValuesData*, less<xstring> > mtg_initial_values_map;
+static map <xstring, struct mtgInitialValuesData*, less<xstring> >::iterator mtg_initial_values_map_iter;
 extern int PVCounter;
 extern ofstream& PVCFile;
 extern ostringstream PVCText;
@@ -400,7 +372,6 @@ extern const int& last_proj_task_loop;
 extern const int& proj_task_loop_num;
 extern const int& num_of_proj_task_loops;
 
-extern MY_DLL2 int use_overlay_code;
 extern MY_DLL int trace_level_wanted;
 extern MY_DLL int trace_level;
 extern MY_DLL bool bEmitTurboDebugger;
@@ -477,7 +448,6 @@ return accr_inc_bef_sched_pmt
 
 }
 
-
 //@@ END
 
 //@@ START - accr_int
@@ -506,7 +476,6 @@ return mtg_cf->accr_int(t);
 
 }
 
-
 //@@ END
 
 //@@ START - accr_int_aft_dflt
@@ -534,7 +503,6 @@ return mtg_cf->accr_int_aft_dflt(t);
 
 }
 
-
 //@@ END
 
 //@@ START - accr_int_aft_prepmt
@@ -558,7 +526,6 @@ if (t <= commencement_period || t > maturity_period)
 return mtg_cf->accr_int_aft_prepmt(t);
 
 }
-
 
 //@@ END
 
@@ -585,7 +552,6 @@ return accr_int_bef_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - accr_int_bef_neg_cash_flow_sale
@@ -611,7 +577,6 @@ return accr_int_bef_rebal_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - accr_int_bef_prepmt
@@ -635,7 +600,6 @@ if (t <= commencement_period || t > maturity_period)
 return mtg_cf->accr_int_bef_prepmt(t);
 
 }
-
 
 //@@ END
 
@@ -662,7 +626,6 @@ return accr_int_bef_fund_match_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - accr_int_bef_sale
@@ -688,7 +651,6 @@ return mtg_cf->accr_int_bef_sale(t);
 
 }
 
-
 //@@ END
 
 //@@ START - accr_int_dflt
@@ -713,7 +675,6 @@ return dflt_amt(t)
     - cost_basis_dflt(t);
 
 }
-
 
 //@@ END
 
@@ -742,7 +703,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - accr_int_rent
@@ -766,7 +726,6 @@ if (t < commencement_period || t >= maturity_period)
 return accr_int(t);
 
 }
-
 
 //@@ END
 
@@ -793,7 +752,6 @@ return accr_int_bef_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - asset_detail_pv_flag
@@ -819,7 +777,6 @@ if (t >= asset_detail_rpt_start_period
 return 0;
 
 }
-
 
 //@@ END
 
@@ -853,7 +810,6 @@ return 0.0;
 
 }
 
-
 //@@ END
 
 //@@ START - avr_basic_contribn
@@ -878,7 +834,6 @@ return avr_basic_contribn_bef_sale(t)
 	   * (1.0 - sold_pct(t));
 
 }
-
 
 //@@ END
 
@@ -905,7 +860,6 @@ return bk_val_bef_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - avr_max
@@ -931,7 +885,6 @@ return avr_max_bef_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - avr_max_bef_sale
@@ -953,7 +906,6 @@ return bk_val_bef_sale(t)
 	   * avr_max_pct;
 
 }
-
 
 //@@ END
 
@@ -980,7 +932,6 @@ return avr_obj_bef_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - avr_obj_bef_sale
@@ -1006,7 +957,6 @@ return bk_val_bef_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - avr_realzd_cap_gain
@@ -1031,7 +981,6 @@ return - dflt_amt(t)
 	   - write_down(t);
 
 }
-
 
 //@@ END
 
@@ -1073,7 +1022,6 @@ return max(0.0,
 
 }
 
-
 //@@ END
 
 //@@ START - base_inc_bef_prepmt
@@ -1103,7 +1051,6 @@ return 0.0;
 
 }
 
-
 //@@ END
 
 //@@ START - bk_val
@@ -1129,7 +1076,6 @@ return bk_val_bef_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - bk_val_aft_dflt
@@ -1154,7 +1100,6 @@ return bk_val(t - 1)
        * sm_mtg_cf->remaining_pct_aft_dflt(t);
 
 }
-
 
 //@@ END
 
@@ -1184,7 +1129,6 @@ return bk_val_bef_prepmt(t)
 
 }
 
-
 //@@ END
 
 //@@ START - bk_val_bef_fund_match_sale
@@ -1210,7 +1154,6 @@ return bk_val_bef_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - bk_val_bef_neg_cash_flow_sale
@@ -1235,7 +1178,6 @@ return bk_val_bef_rebal_sale(t)
        * (1.0 - sold_pct_rebal(t));
 
 }
-
 
 //@@ END
 
@@ -1264,7 +1206,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - bk_val_bef_rebal_sale
@@ -1289,7 +1230,6 @@ return bk_val_bef_fund_match_sale(t)
        * (1.0 - sold_pct_fund_match(t));
 
 }
-
 
 //@@ END
 
@@ -1345,7 +1285,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - bk_val_plus_accr_int_bef_rebal_sale
@@ -1371,7 +1310,6 @@ return bk_val_bef_rebal_sale (t)
 
 }
 
-
 //@@ END
 
 //@@ START - bk_val_purch
@@ -1395,7 +1333,6 @@ if (t == commencement_period)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -1422,7 +1359,6 @@ return proj_start_mth + t - 1
 
 }
 
-
 //@@ END
 
 //@@ START - cal_yr
@@ -1447,7 +1383,6 @@ return proj_start_yr + cal_yr_relative(t) - 1;
 
 }
 
-
 //@@ END
 
 //@@ START - cal_yr_relative
@@ -1468,7 +1403,6 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 return 1 + floor((proj_start_mth + t - 2) / 12.0);
 
 }
-
 
 //@@ END
 
@@ -1498,7 +1432,6 @@ return mtg_cf->sched_prin_pmt(t)
 
 }
 
-
 //@@ END
 
 //@@ START - cap_gain_adj_restructure_prin_pmt
@@ -1527,7 +1460,6 @@ return mtg_cf->sched_prin_pmt(t)
 
 }
 
-
 //@@ END
 
 //@@ START - cap_gain_bef_sale
@@ -1552,7 +1484,6 @@ return realzd_cap_gain(t)
        + unrealzd_cap_gain_incr(t);
 
 }
-
 
 //@@ END
 
@@ -1579,7 +1510,6 @@ return (mkt_val_bef_sale(t)
 	   * sold_pct(t);
 
 }
-
 
 //@@ END
 
@@ -1620,7 +1550,6 @@ return mtg_cf->sched_prin_pmt(t)
 
 }
 
-
 //@@ END
 
 //@@ START - cost_basis
@@ -1645,7 +1574,6 @@ return cost_basis_bef_sale(t)
        * (1.0 - sold_pct(t));
 
 }
-
 
 //@@ END
 
@@ -1686,7 +1614,6 @@ return cost_basis_bef_prepmt(t)
 
 }
 
-
 //@@ END
 
 //@@ START - cost_basis_aft_dflt
@@ -1712,7 +1639,6 @@ return cost_basis(t - 1)
 
 }
 
-
 //@@ END
 
 //@@ START - cost_basis_aft_prepmt
@@ -1737,7 +1663,6 @@ return cost_basis_bef_prepmt(t)
 	   * (1.0 - mtg_cf->prepmt_pct_mthly(t));
 
 }
-
 
 //@@ END
 
@@ -1783,7 +1708,6 @@ if (cost_basis_defn == AMORTIZED_COST)
 			return NO_AVG;
 		else
 			{
-			makeRunLogYellow();
 			log_screen.setf(ios::fixed, ios::floatfield);
 			log_screen << setprecision(6);
 			log_screen << "Warning: Problem with mortgage amortization to "
@@ -1793,7 +1717,7 @@ if (cost_basis_defn == AMORTIZED_COST)
 					<< MSG_ERROR;
 			log_screen << " ... At maturity, cost basis " << local_cost_basis << " has not amortized "
 					<< "to zero in iteration " << proj_task_loop_num << " "
-					<< "for scenario set " << replaceWildcards(rates->scen_id) << " " 
+					<< "for scenario set " << replaceWildcards(rates_ptr->scen_id) << " " 
 					<< "Please contact client services." << MSG_ERROR;
 			log_screen << setprecision(6);
 			log_screen.unsetf(ios::fixed);
@@ -1815,7 +1739,6 @@ if (cost_basis_defn == AMORTIZED_COST)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -1863,7 +1786,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - cost_basis_dflt
@@ -1898,7 +1820,6 @@ return cost_basis(t - 1)
 
 }
 
-
 //@@ END
 
 //@@ START - cost_basis_incr_appreciation
@@ -1919,7 +1840,6 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -1950,7 +1870,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - cost_basis_sched_prin_pmt
@@ -1977,7 +1896,6 @@ if (cost_basis_defn == AMORTIZED_COST)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -2007,7 +1925,6 @@ return cost_basis_bef_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - date
@@ -2030,10 +1947,9 @@ int year = cal_yr(t);
 int month = cal_mth(t);
 int day = 1;
 
-return DayNumberFromDate(year, month, day);
+return day_number_from_date(year, month, day);
 
 }
-
 
 //@@ END
 
@@ -2064,7 +1980,6 @@ if (decr_rate(t) < 1.0 - rate_ratio_threshold)
 return 1.0;
 
 }
-
 
 //@@ END
 
@@ -2104,7 +2019,6 @@ if (!is_asset_initialize)
 return decr_rate;
 
 }
-
 
 //@@ END
 
@@ -2151,7 +2065,6 @@ return (cost_basis(t - 1) + accr_int(t - 1))
 
 }
 
-
 //@@ END
 
 //@@ START - dflt_pct
@@ -2181,7 +2094,6 @@ return decr_pct(t)
 
 }
 
-
 //@@ END
 
 //@@ START - dflt_rate
@@ -2201,11 +2113,15 @@ if (intex_asset || t <= commencement_period || t > maturity_period)
 
 double annual_default_percentage = 0;
 
+category_id = category_id;
+double dflt_rate_scen_mult_local = dflt_rate_scen_mult;
+
 double annual_default_percentage_preliminary
-	= rates->get_dflt_rate(t,
+	= rates_ptr->get_dflt_rate(t,
 	                category_id,
+					weighted_avg_life(start_period), //PBA excess defaults are based on WAL of asset on valuation date
 					EFFECTIVE_ANNUAL)
-	   * dflt_rate_scen_mult;
+	   * dflt_rate_scen_mult_local;
 
 	annual_default_percentage
 	= (max(min(round_result(ROUND_NEAR, ROUND_NEGATIVE_TOZERO,
@@ -2242,7 +2158,6 @@ return annual_default_percentage;
 
 }
 
-
 //@@ END
 
 //@@ START - dur_val
@@ -2266,7 +2181,6 @@ if (t < commencement_period || t > maturity_period)
 return eff_dur(t);
 
 }
-
 
 //@@ END
 
@@ -2294,7 +2208,11 @@ if (isMainModel && t > 0
 
 if (t == 0 && existing_asset_indicator
 	&& !is_asset_initialize)
+	{
+	mkt_val_bef_sale(0);
+	mkt_val_shifted(0);
 	return initial_values->eff_dur;
+	}
 
 if (intex_asset)
 	return intex_eff_dur[t];
@@ -2350,6 +2268,68 @@ return calculated_effective_duration;
 
 }
 
+//@@ END
+
+//@@ START - excess_dflt_amt
+// Excess Defaults for PBA                                                                                             
+// Column:EXCESS_DFLT_AMT
+//========================================================
+double MTG_ASSET_UDF::mtg_asset_excess_dflt_amt(int t) {
+//^^^
+
+
+
+//^^^
+
+#line 1 "excess_dflt_amt.MTG_ASSET.for"
+if (t <= commencement_period || t > maturity_period)
+	return NO_AVG;
+
+return (cost_basis(t - 1) +  accr_int(t - 1))
+	   * excess_dflt_pct(t);
+
+}
+
+//@@ END
+
+//@@ START - excess_dflt_pct
+// Excess Default Pct                                                                                             
+// Column:EXCESS_DFLT_PCT
+//========================================================
+double MTG_ASSET_UDF::mtg_asset_excess_dflt_pct(int t) {
+//^^^
+
+
+
+//^^^
+
+#line 1 "excess_dflt_pct.MTG_ASSET.for"
+if (t <= commencement_period || t > maturity_period || seg_element->pba_disc_rate_seg_flag)
+	return NO_AVG;
+
+double dflt_sprd_related_factor_local = 0.0;
+double dflt_max_net_sprd_adj_factor_local = 0.0;	
+
+//EXCESS DEFAULTS FOR VM22
+#if defined(__ANN_PBA_PBA_H_)
+if (pba_scen_amt_valn_flag)
+	{
+	seg_element->sm_ann_pba[0]->wal_lookup = weighted_avg_life(start_period);
+	seg_element->sm_ann_pba[0]->category_id = category_id;
+	dflt_sprd_related_factor_local = seg_element->sm_ann_pba[0]->dflt_sprd_related_factor;
+
+	if (existing_asset_indicator == INIT_MP)
+		seg_element->sm_ann_pba[0]->existing_asset_lookup = "Init MP";
+
+	seg_element->sm_ann_pba[0]->seg_id_lookup = seg_id;
+	seg_element->sm_ann_pba[0]->existing_asset_lookup = seg_element->sm_ann_pba[0]->existing_asset_lookup ;
+	dflt_max_net_sprd_adj_factor_local = seg_element->sm_ann_pba[0]->dflt_max_net_sprd_adj_factor;
+	}
+#endif
+
+return (dflt_sprd_related_factor_local + dflt_max_net_sprd_adj_factor_local) / 12.0;
+
+}
 
 //@@ END
 
@@ -2366,7 +2346,9 @@ double MTG_ASSET_UDF::mtg_asset_finalize(int t) {
 
 #line 1 "finalize.MTG_ASSET.for"
 if (time_step_flag && !valn_flag
-	&& proj_set_sub_loop_num < valn_periods.size())
+	&& fabs(notional_amt(t)) >= ASSET_ACTIVE_THRESHOLD //bug fix
+	&& proj_set_sub_loop_num < valn_periods.size()
+	&& t < maturity_period)
 	write_state_of_world_mp();
 
 if (isMainModel && num_mtg == num_mtgs_to_run)
@@ -2376,14 +2358,12 @@ if (isMainModel && num_mtg == num_mtgs_to_run)
 		adco->finalize(t);
 	#endif
 
-	if (PVCFile != NULL)
-		PVCFile.close();
+	PVCFile.close();
 	}	
 
 return 1.0;
 
 }
-
 
 //@@ END
 
@@ -2394,7 +2374,7 @@ return 1.0;
 double MTG_ASSET_UDF::mtg_asset_foreclosure_accr_int_net_write_down(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(63,"foreclosure_accr_int_net_write_down",t);
+	return rebase_value(65,"foreclosure_accr_int_net_write_down",t);
 }
 
 
@@ -2411,7 +2391,6 @@ return (accr_int(t - 1)
 
 }
 
-
 //@@ END
 
 //@@ START - foreclosure_bk_val_net_write_down
@@ -2421,7 +2400,7 @@ return (accr_int(t - 1)
 double MTG_ASSET_UDF::mtg_asset_foreclosure_bk_val_net_write_down(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(64,"foreclosure_bk_val_net_write_down",t);
+	return rebase_value(66,"foreclosure_bk_val_net_write_down",t);
 }
 
 
@@ -2438,7 +2417,6 @@ return (bk_val(t - 1)
 
 }
 
-
 //@@ END
 
 //@@ START - foreclosure_cost_basis_net_write_down
@@ -2448,7 +2426,7 @@ return (bk_val(t - 1)
 double MTG_ASSET_UDF::mtg_asset_foreclosure_cost_basis_net_write_down(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(65,"foreclosure_cost_basis_net_write_down",t);
+	return rebase_value(67,"foreclosure_cost_basis_net_write_down",t);
 }
 
 
@@ -2465,7 +2443,6 @@ return (cost_basis(t - 1)
 
 }
 
-
 //@@ END
 
 //@@ START - foreclosure_pct
@@ -2475,7 +2452,7 @@ return (cost_basis(t - 1)
 double MTG_ASSET_UDF::mtg_asset_foreclosure_pct(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(66,"foreclosure_pct",t);
+	return rebase_value(68,"foreclosure_pct",t);
 }
 
 
@@ -2496,7 +2473,6 @@ return decr_pct(t)
 
 }
 
-
 //@@ END
 
 //@@ START - foreclosure_prin_net_write_down
@@ -2506,7 +2482,7 @@ return decr_pct(t)
 double MTG_ASSET_UDF::mtg_asset_foreclosure_prin_net_write_down(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(67,"foreclosure_prin_net_write_down",t);
+	return rebase_value(69,"foreclosure_prin_net_write_down",t);
 }
 
 
@@ -2523,7 +2499,6 @@ return (mtg_cf->par_val(t - 1)
 
 }
 
-
 //@@ END
 
 //@@ START - foreclosure_rate
@@ -2533,7 +2508,7 @@ return (mtg_cf->par_val(t - 1)
 double MTG_ASSET_UDF::mtg_asset_foreclosure_rate(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(68,"foreclosure_rate",t);
+	return rebase_value(70,"foreclosure_rate",t);
 }
 
 
@@ -2544,14 +2519,24 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 if (intex_asset || t <= commencement_period || t > maturity_period)
 	return NO_AVG;
 
+category_id = category_id;
+double foreclosure_rate_mult_bef_maturity_local = foreclosure_rate_mult_bef_maturity;
+category_id = category_id;
+double foreclosure_rate_mult_since_issue_local = foreclosure_rate_mult_since_issue;
+category_id = category_id;
+double foreclosure_rate_pct_local = foreclosure_rate_pct;
+category_id = category_id;
+double foreclosure_rate_scen_mult_local = foreclosure_rate_scen_mult;
+
 double foreclosure_rate_prelim
-= (rates->get_dflt_rate(t,
+= (rates_ptr->get_dflt_rate(t,
                         category_id,
+					    weighted_avg_life(start_period), //PBA excess defaults are based on WAL of asset on valuation date
                         EFFECTIVE_ANNUAL)
-   * foreclosure_rate_scen_mult
-   + foreclosure_rate_pct)
-  * foreclosure_rate_mult_since_issue // Lookup key is mths_since_issue(t)
-  * foreclosure_rate_mult_bef_maturity; // Lookup key is mths_bef_maturity(t)
+   * foreclosure_rate_scen_mult_local
+   + foreclosure_rate_pct_local)
+  * foreclosure_rate_mult_since_issue_local // Lookup key is mths_since_issue(t)
+  * foreclosure_rate_mult_bef_maturity_local; // Lookup key is mths_bef_maturity(t)
 
 double foreclosure_rate
 = (max(min(round_result(ROUND_NEAR, ROUND_NEGATIVE_TOZERO,
@@ -2565,7 +2550,6 @@ return foreclosure_rate;
 
 }
 
-
 //@@ END
 
 //@@ START - gaap_inc_bk_val
@@ -2575,7 +2559,7 @@ return foreclosure_rate;
 double MTG_ASSET_UDF::mtg_asset_gaap_inc_bk_val(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(69,"gaap_inc_bk_val",t);
+	return rebase_value(71,"gaap_inc_bk_val",t);
 }
 
 
@@ -2594,7 +2578,6 @@ return mkt_val(t);
 
 }
 
-
 //@@ END
 
 //@@ START - gaap_inc_unrealzd_cap_gain
@@ -2604,7 +2587,7 @@ return mkt_val(t);
 double MTG_ASSET_UDF::mtg_asset_gaap_inc_unrealzd_cap_gain(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(70,"gaap_inc_unrealzd_cap_gain",t);
+	return rebase_value(72,"gaap_inc_unrealzd_cap_gain",t);
 }
 
 
@@ -2619,7 +2602,6 @@ return gaap_inc_bk_val(t) - cost_basis(t);
 
 }
 
-
 //@@ END
 
 //@@ START - gaap_surp_bk_val
@@ -2629,7 +2611,7 @@ return gaap_inc_bk_val(t) - cost_basis(t);
 double MTG_ASSET_UDF::mtg_asset_gaap_surp_bk_val(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(71,"gaap_surp_bk_val",t);
+	return rebase_value(73,"gaap_surp_bk_val",t);
 }
 
 
@@ -2648,7 +2630,6 @@ return mkt_val(t);
 
 }
 
-
 //@@ END
 
 //@@ START - gaap_unrealzd_cap_gain_incr
@@ -2658,7 +2639,7 @@ return mkt_val(t);
 double MTG_ASSET_UDF::mtg_asset_gaap_unrealzd_cap_gain_incr(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(72,"gaap_unrealzd_cap_gain_incr",t);
+	return rebase_value(74,"gaap_unrealzd_cap_gain_incr",t);
 }
 
 
@@ -2674,7 +2655,6 @@ return gaap_inc_unrealzd_cap_gain(t)
 
 }
 
-
 //@@ END
 
 //@@ START - imr_realzd_cap_gain
@@ -2684,7 +2664,7 @@ return gaap_inc_unrealzd_cap_gain(t)
 double MTG_ASSET_UDF::mtg_asset_imr_realzd_cap_gain(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(73,"imr_realzd_cap_gain",t);
+	return rebase_value(75,"imr_realzd_cap_gain",t);
 }
 
 
@@ -2699,7 +2679,6 @@ return realzd_cap_gain_prepmt(t);
 
 }
 
-
 //@@ END
 
 //@@ START - imr_realzd_cap_gain_from_sale
@@ -2709,7 +2688,7 @@ return realzd_cap_gain_prepmt(t);
 double MTG_ASSET_UDF::mtg_asset_imr_realzd_cap_gain_from_sale(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(74,"imr_realzd_cap_gain_from_sale",t);
+	return rebase_value(76,"imr_realzd_cap_gain_from_sale",t);
 }
 
 
@@ -2724,17 +2703,16 @@ return realzd_cap_gain_sale(t);
 
 }
 
-
 //@@ END
 
 //@@ START - imr_realzd_cap_gain_rml
-// Interest Maintenance Reserve Realized Capital Gain for Residential Mortgage                                                                                             
+// Interest Maintenance Reserve Realized Capital Gain                                                                                             
 // Column:IMR_REALZD_CAP_GAIN_RML
 //========================================================
 double MTG_ASSET_UDF::mtg_asset_imr_realzd_cap_gain_rml(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(75,"imr_realzd_cap_gain_rml",t);
+	return rebase_value(77,"imr_realzd_cap_gain_rml",t);
 }
 
 
@@ -2745,7 +2723,7 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 if (t <= commencement_period || t > maturity_period)
 	return NO_AVG;
 
-// added by HYH 09/03/2021
+//CRBG logic
 if (category_id != "RML") 
 	return 0.0;
 
@@ -2753,17 +2731,16 @@ return realzd_cap_gain_prepmt(t);
 
 }
 
-
 //@@ END
 
 //@@ START - imr_realzd_cap_gain_rml_from_sale
-// Interest Maintenance Reserve Realized Capital Gains from Sales for Residential Mortgage                                                                                             
+// Interest Maintenance Reserve Realized Capital Gains from Sales                                                                                             
 // Column:IMR_REALZD_CAP_GAIN_RML_FROM_SALE
 //========================================================
 double MTG_ASSET_UDF::mtg_asset_imr_realzd_cap_gain_rml_from_sale(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(76,"imr_realzd_cap_gain_rml_from_sale",t);
+	return rebase_value(78,"imr_realzd_cap_gain_rml_from_sale",t);
 }
 
 
@@ -2774,14 +2751,13 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 if (t < commencement_period || t > maturity_period)
 	return NO_AVG;
 
-// added by HYH 09/03/2021
+//CRBG logic
 if (category_id != "RML") 
 	return 0.0;
 
 return realzd_cap_gain_sale(t);
 
 }
-
 
 //@@ END
 
@@ -2792,7 +2768,7 @@ return realzd_cap_gain_sale(t);
 double MTG_ASSET_UDF::mtg_asset_imr_yrs_to_maturity(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(77,"imr_yrs_to_maturity",t);
+	return rebase_value(79,"imr_yrs_to_maturity",t);
 }
 
 
@@ -2820,7 +2796,6 @@ return xint(cal_mth(t) - 1 + maturity_period - t) / 12.0;
 
 }
 
-
 //@@ END
 
 //@@ START - initialize
@@ -2835,9 +2810,6 @@ double MTG_ASSET_UDF::mtg_asset_initialize(int t) {
 //^^^
 
 #line 1 "initialize.MTG_ASSET.for"
-if (!isMainModel)
-	shrink_mtg_clone(getElementNumber());
-
 // Create psa_base_rate
 setup_psa_base_rate();
 
@@ -2853,7 +2825,7 @@ if (isMainModel)
 
 	if (loaded_proj_task_loop != proj_task_loop_num)
 		{
-		rates->initialize(t);
+		rates_ptr->initialize(t);
 		
 		loaded_proj_task_loop = proj_task_loop_num;
 				
@@ -2886,7 +2858,7 @@ if (isMainModel)
 	
 		if (!PVCFile)
 			throw FatalError("Error: Cannot open mtg->asset_detail_rpt_id."	
-							 "Present value detail reporting has been cancelled."
+							 "Present value detail reporting has been cancelled." 
 							 "Check that the directory has been created and that you have permission to write it");
 		else
 			PVCFile << endl
@@ -2916,8 +2888,14 @@ if (use_intex_databases_for_mtg
 
 			intex_proj_flag = true;
 			
+			if (getElementNumber(1) == 0)
+				asset->sm_mtg[getElementNumber(0)].resize(2);
+			
 			for (int tt = 0; tt <= last_proj_period; tt++)
 				intex_tgt(tt);
+
+			if (getElementNumber(1) == 0)
+				asset->sm_mtg[getElementNumber(0)].resize(1);
 
 			intex_proj_flag = false;
 
@@ -2929,9 +2907,8 @@ if (use_intex_databases_for_mtg
 
 			is_asset_initialize = 0;
 			}
-		
-		resetValues();
-		sm_mtg_cf->resetValues();
+				
+		trigger_rebase(0);
 
 		// Set scalars to saved values
 		maturity_period = maturity_period_saved;	
@@ -2963,31 +2940,39 @@ else
 		asset_detail_pv_output();
 		}
 
-
 	initial_values = new struct mtgInitialValuesData;
 
-	// net_yld must be called first
-	//   because the prepayment interest differenital may be set to Net Yield
-	net_yld(0);
-	mkt_val(0);
-	eff_dur(0);
+	//if (getElementNumber(1) == 0)
+	//	{
+		asset->sm_mtg[getElementNumber(0)].resize(2);
+		asset->mtg_initialize_values(0, getElementNumber(0), 2);
+		asset->sm_mtg[getElementNumber(0)].resize(1);
 
-	initial_values->yld_numer = yld_numer(0);
-	initial_values->dflt_amt = dflt_amt(0);
-	initial_values->mkt_val_bef_sale = mkt_val_bef_sale(0);
-	initial_values->eff_dur = eff_dur(0);
-	initial_values->mkt_sprd = mkt_sprd(0);
-	initial_values->mths_to_next_reset = mtg->mths_to_next_reset(0);
-	initial_values->net_yld = net_yld(0);
+		mtg_initial_values_map[index_val] = initial_values;
+	//	}
+/*	else
+		{
+		// net_yld must be called first
+		//   because the prepayment interest differenital may be set to Net Yield
+		net_yld(0);
+		mkt_val(0);
+		eff_dur(0);
 
-	if (!intex_asset)
-		initial_values->pmt_rate = mtg_cf->pmt_rate(0);
-	else
-		initial_values->pmt_rate = 0.0;
+		initial_values->yld_numer = yld_numer(0);
+		initial_values->dflt_amt = dflt_amt(0);
+		initial_values->mkt_val_bef_sale = mkt_val_bef_sale(0);
+		initial_values->eff_dur = eff_dur(0);
+		initial_values->mkt_sprd = mkt_sprd(0);
+		initial_values->mths_to_next_reset = mtg->mths_to_next_reset(0);
+		initial_values->net_yld = net_yld(0);
 
-	initial_values->weighted_avg_life = weighted_avg_life(0);
+		if (!intex_asset)
+			initial_values->pmt_rate = mtg_cf->pmt_rate(0);
+		else
+			initial_values->pmt_rate = 0.0;
 
-	mtg_initial_values_map[index_val] = initial_values;
+		initial_values->weighted_avg_life = weighted_avg_life(0);
+		}*/
 
 	if (asset_detail_pv_flag(0))
 		{
@@ -3001,14 +2986,11 @@ else
 
 	is_asset_initialize = 0;
 
-	resetValues();
-	mtg_cf->resetValues();
 	}
 
 return 1.0;
 
 }
-
 
 //@@ END
 
@@ -3027,12 +3009,9 @@ double MTG_ASSET_UDF::mtg_asset_int_div_and_rent(int t) {
 if (t <= commencement_period || t > maturity_period)
 	return NO_AVG;
 
-return int_pmt(t)
-	   + opt_inc(t)
-	   + accr_int_sold(t);
+return int_pmt(t);
 
 }
-
 
 //@@ END
 
@@ -3043,7 +3022,7 @@ return int_pmt(t)
 double MTG_ASSET_UDF::mtg_asset_int_pmt(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(80,"int_pmt",t);
+	return rebase_value(82,"int_pmt",t);
 }
 
 
@@ -3065,7 +3044,6 @@ return mtg_cf->int_pmt(t)
 	   + mtg_cf->balloon_pmt_inc(t);
 
 }
-
 
 //@@ END
 
@@ -3091,7 +3069,6 @@ return -accr_int_bef_sale(t);
 
 }
 
-
 //@@ END
 
 //@@ START - intex_pct_remaining
@@ -3113,7 +3090,6 @@ return intex_pct_remaining(t - 1)
 	   * (1.0 - sold_pct(t));
 
 }
-
 
 //@@ END
 
@@ -3191,7 +3167,7 @@ if (t == 0)
 	int maturity_period = this->maturity_period;
 
 	// force call market value projection to get balance array setup
-	intex->resetValues();
+	intex->rebaseModel(0);
 	intex->shift_defn = "No Shift";
 	intex->proj_defn = MARKET_VALUE;
 	intex->mkt_val_cash_flow_proj(0, "Actual", 
@@ -3226,55 +3202,59 @@ if (t == 0)
 	}
 
 // run model
-if (t == 0)
-	{
-	intex_net_yld[t] = net_yld(t);
-	intex_accr_int[t] = accr_int_bef_sale(t);
-	intex_cost_basis[t] = cost_basis_bef_sale(t);
-	intex_bk_val[t] = bk_val_bef_sale(t);
-	intex_mkt_val[t] = mkt_val_bef_sale(t);
-	intex_eff_dur[t] = eff_dur(t);
-	intex_notional_amt[t] = notional_amt_bef_sale(t);
-	intex_weighted_avg_life[t] = weighted_avg_life(t);
-	intex_yrs_to_maturity[t] = intex->get_tranche_maturity_period / 12.0;
-	}
+if (getElementNumber(1) == 0)
+	asset->mtg_initialize_values(t, getElementNumber(0), 1);
 else
-	{	
-	if (notional_amt(t - 1) > 0)
+	{
+	if (t == 0)
 		{
 		intex_net_yld[t] = net_yld(t);
 		intex_accr_int[t] = accr_int_bef_sale(t);
 		intex_cost_basis[t] = cost_basis_bef_sale(t);
 		intex_bk_val[t] = bk_val_bef_sale(t);
-
-		if (fabs(notional_amt_bef_sale(t)) >= ASSET_ACTIVE_THRESHOLD)
-			{
-			intex_mkt_val[t] = mkt_val_bef_sale(t);
-			intex_eff_dur[t] = eff_dur(t);
-			intex_weighted_avg_life[t] = weighted_avg_life(t);
-			}
-
+		intex_mkt_val[t] = mkt_val_bef_sale(t);
+		intex_eff_dur[t] = eff_dur(t);
 		intex_notional_amt[t] = notional_amt_bef_sale(t);
-		intex_dflt_amt[t] = dflt_amt(t);
-		intex_int_pmt[t] = int_pmt(t);
-		intex_sched_prin_pmt[t] = sched_prin_pmt(t);
-		intex_opt_pmt[t] = opt_pmt(t);
-		intex_amortzn_of_disc[t] = cost_basis_bef_prepmt(t)
-		                           - cost_basis_aft_dflt(t)
-		                           + cost_basis_sched_prin_pmt(t)
-		                           + cost_basis_bef_sale(t)
-		                           - cost_basis_aft_prepmt(t);
-		intex_realzd_cap_gain_prepmt[t] = realzd_cap_gain_prepmt(t);
-		intex_realzd_cap_loss_dflt[t] = realzd_cap_loss_dflt(t);
-		intex_unrealzd_cap_loss_from_dflt[t] = unrealzd_cap_loss_from_dflt(t);
-		intex_cost_basis_dflt[t] = cost_basis_dflt(t);
-		intex_yrs_to_maturity[t] = (intex->get_tranche_maturity_period - t) / 12.0;
+		intex_weighted_avg_life[t] = weighted_avg_life(t);
+		intex_yrs_to_maturity[t] = intex->get_tranche_maturity_period / 12.0;
+		}
+	else
+		{	
+		if (notional_amt(t - 1) > 0)
+			{
+			intex_net_yld[t] = net_yld(t);
+			intex_accr_int[t] = accr_int_bef_sale(t);
+			intex_cost_basis[t] = cost_basis_bef_sale(t);
+			intex_bk_val[t] = bk_val_bef_sale(t);
+
+			if (fabs(notional_amt_bef_sale(t)) >= ASSET_ACTIVE_THRESHOLD)
+				{
+				intex_mkt_val[t] = mkt_val_bef_sale(t);
+				intex_eff_dur[t] = eff_dur(t);
+				intex_weighted_avg_life[t] = weighted_avg_life(t);
+				}
+
+			intex_notional_amt[t] = notional_amt_bef_sale(t);
+			intex_dflt_amt[t] = dflt_amt(t);
+			intex_int_pmt[t] = int_pmt(t);
+			intex_sched_prin_pmt[t] = sched_prin_pmt(t);
+			intex_opt_pmt[t] = opt_pmt(t);
+			intex_amortzn_of_disc[t] = cost_basis_bef_prepmt(t)
+									   - cost_basis_aft_dflt(t)
+									   + cost_basis_sched_prin_pmt(t)
+									   + cost_basis_bef_sale(t)
+									   - cost_basis_aft_prepmt(t);
+			intex_realzd_cap_gain_prepmt[t] = realzd_cap_gain_prepmt(t);
+			intex_realzd_cap_loss_dflt[t] = realzd_cap_loss_dflt(t);
+			intex_unrealzd_cap_loss_from_dflt[t] = unrealzd_cap_loss_from_dflt(t);
+			intex_cost_basis_dflt[t] = cost_basis_dflt(t);
+			intex_yrs_to_maturity[t] = (intex->get_tranche_maturity_period - t) / 12.0;
+			}
 		}
 	}
-
-if (t == min(calculated_t_high, last_model_period))
+if (t == min(calculated_t_high, projection_period_to))
 	{
-	intex->resetValues();
+	intex->rebaseModel(0);
 	intex->finalize(t);
 	}
 #endif
@@ -3282,7 +3262,6 @@ if (t == min(calculated_t_high, last_model_period))
 return 1;
 
 }
-
 
 //@@ END
 
@@ -3293,7 +3272,7 @@ return 1;
 double MTG_ASSET_UDF::mtg_asset_mkt_risk_sprd(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(84,"mkt_risk_sprd",t);
+	return rebase_value(86,"mkt_risk_sprd",t);
 }
 
 
@@ -3308,19 +3287,18 @@ if (mtg_cf->par_val_bef_sale(t) <= 0.0)
 	return NO_AVG;
 
 double risk_sprd
-= rates->get_int_rate(t,
+= rates_ptr->get_int_rate(t,
                 category_id,
 				GET_SPOT_SPREAD,
 				weighted_avg_life(t),
 				0.0,
 				NOMINAL_SEMIANNUAL,
-				NO_SHIFT,portfolio_sprd_adj_aig);//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+				NO_SHIFT, port_sprd_adj_crbg);//CRBG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
 
 return risk_sprd
 		+ mkt_sprd(t);
 
 }
-
 
 //@@ END
 
@@ -3331,7 +3309,7 @@ return risk_sprd
 double MTG_ASSET_UDF::mtg_asset_mkt_sprd(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(85,"mkt_sprd",t);
+	return rebase_value(87,"mkt_sprd",t);
 }
 
 
@@ -3376,13 +3354,13 @@ if (t == 0 && existing_asset_indicator)
 				modelName);
 
 		double risk_sprd
-		= rates->get_int_rate(t,
+		= rates_ptr->get_int_rate(t,
 		            category_id,
 					GET_SPOT_SPREAD,
 					weighted_avg_life(t),
 					0.0,
 					NOMINAL_SEMIANNUAL,
-					NO_SHIFT,portfolio_sprd_adj_aig);//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+					NO_SHIFT, port_sprd_adj_crbg);//CRBG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
 
 		if (asset_detail_pv_flag(t)
 				&& asset_detail_rpt_pv_defn == YES)
@@ -3395,7 +3373,7 @@ if (t == 0 && existing_asset_indicator)
 			}	    			    											
 
 		calculated_market_spread
-		= mtg_pv->solve_for_sprd_newton_raphson(t, 
+		= sm_mtg_cf_var[0][pv]->solve_for_sprd_newton_raphson(t, 
 					risk_sprd, 
 					init_mkt_val
 					* neg_asset_flag);
@@ -3434,7 +3412,6 @@ return 0.0;
 
 }
 
-
 //@@ END
 
 //@@ START - mkt_to_bk_ratio
@@ -3464,7 +3441,6 @@ return mkt_val_bef_sale(t) / bk_val_bef_sale(t);
 
 }
 
-
 //@@ END
 
 //@@ START - mkt_val
@@ -3474,7 +3450,7 @@ return mkt_val_bef_sale(t) / bk_val_bef_sale(t);
 double MTG_ASSET_UDF::mtg_asset_mkt_val(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(87,"mkt_val",t);
+	return rebase_value(89,"mkt_val",t);
 }
 
 
@@ -3494,7 +3470,6 @@ return mkt_val_bef_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - mkt_val_bef_fund_match_sale
@@ -3504,7 +3479,7 @@ return mkt_val_bef_sale(t)
 double MTG_ASSET_UDF::mtg_asset_mkt_val_bef_fund_match_sale(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(88,"mkt_val_bef_fund_match_sale",t);
+	return rebase_value(90,"mkt_val_bef_fund_match_sale",t);
 }
 
 
@@ -3523,7 +3498,6 @@ return mkt_val_bef_sale(t)
        * (1.0 - sold_pct_planned(t));
 
 }
-
 
 //@@ END
 
@@ -3551,7 +3525,6 @@ return mkt_val_bef_rebal_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - mkt_val_bef_rebal_sale
@@ -3578,7 +3551,6 @@ return mkt_val_bef_fund_match_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - mkt_val_bef_sale
@@ -3588,7 +3560,7 @@ return mkt_val_bef_fund_match_sale(t)
 double MTG_ASSET_UDF::mtg_asset_mkt_val_bef_sale(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(91,"mkt_val_bef_sale",t);
+	return rebase_value(93,"mkt_val_bef_sale",t);
 }
 
 
@@ -3640,25 +3612,25 @@ rebase_cash_flow(t,
 			PRESENT_VALUE, "mtg->mkt_val_bef_sale", modelName);
 
 if (mkt_val_defn == TO_NEXT_RATE_RESET)
-	mtg_pv->pv_calc_parameters(t,
+	sm_mtg_cf_var[0][pv]->pv_calc_parameters(t,
 				MARKET_VALUE, mths_to_next_reset(t));
 else // TO_MATURITY
-	mtg_pv->pv_calc_parameters(t,
+	sm_mtg_cf_var[0][pv]->pv_calc_parameters(t,
 				MARKET_VALUE, xint(maturity_period - t));
 
-if (mtg_pv->prepmt_appl == YES
+if (sm_mtg_cf_var[0][pv]->prepmt_appl == YES
 	&& mtg->prepmt_penalty_defn == CASH_FLOW_MAINTENANCE)
 	{
 	// force recalulation of yield maintenance cash flow
-	mtg_ym->rebase_period = mtg_pv->rebase_period - 1;
+	sm_mtg_cf_var[0][ym]->rebase_time = sm_mtg_cf_var[0][pv]->rebase_time - 1; 
 	}
 
-if (mtg_pv->pv_tbl_defn == INITIALIZE_TABLES
-		&& mtg_pv->prepmt_appl == YES)
+if (sm_mtg_cf_var[0][pv]->pv_tbl_defn == INITIALIZE_TABLES
+		&& sm_mtg_cf_var[0][pv]->prepmt_appl == YES)
 	{
 	pv_interest_savings_after_prepayments[0]
-	= mtg_pv->pv_int_savings_pv_for_mkt_val_calc
-	= mtg_pv->int_savings_pv_aft_prepmt(t);
+	= sm_mtg_cf_var[0][pv]->pv_int_savings_pv_for_mkt_val_calc
+	= sm_mtg_cf_var[0][pv]->int_savings_pv_aft_prepmt(t);
 	}
 
 double spread_to_spot = mkt_sprd(t);
@@ -3675,13 +3647,13 @@ double temp1 = 0;
 double temp2 = 0;
 
 double calculated_market_value
-= mtg_pv->pv_calc(t, 
+= sm_mtg_cf_var[0][pv]->pv_calc(t, 
 			spread_to_spot,
 			temp1, // calculated_derivative
 			temp2  // calculated_modified_duration
 			);
 
-mtg_pv->pv_calc_parameters(t, CASH_FLOWS);
+sm_mtg_cf_var[0][pv]->pv_calc_parameters(t, CASH_FLOWS);
 
 if (asset_detail_pv_flag(t))
 	{
@@ -3708,7 +3680,6 @@ return calculated_market_value;
 
 }
 
-
 //@@ END
 
 //@@ START - mkt_val_for_dur_bef_neg_cash_flow_sale
@@ -3718,7 +3689,7 @@ return calculated_market_value;
 double MTG_ASSET_UDF::mtg_asset_mkt_val_for_dur_bef_neg_cash_flow_sale(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(92,"mkt_val_for_dur_bef_neg_cash_flow_sale",t);
+	return rebase_value(94,"mkt_val_for_dur_bef_neg_cash_flow_sale",t);
 }
 
 
@@ -3736,18 +3707,9 @@ if (isMainModel && t > 0
 if (neg_asset_flag < 0)
 	return NO_AVG;
 
-// 20210607 STW: import IA Prod v3.0 RSD v2 change and wrap it with a flag. The code has not been tested yet.
-if(ia_prod_v3_rsd_2_aig == YES)
-{
-	return mkt_val_bef_neg_cash_flow_sale(t) + accr_int_bef_neg_cash_flow_sale(t); // added by HYH on 5/24/2021;
-}
-else
-{
-	return mkt_val_bef_neg_cash_flow_sale(t);
-}
+return mkt_val_bef_neg_cash_flow_sale(t);
 
 }
-
 
 //@@ END
 
@@ -3758,7 +3720,7 @@ else
 double MTG_ASSET_UDF::mtg_asset_mkt_val_for_dur_bef_rebal_sale(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(93,"mkt_val_for_dur_bef_rebal_sale",t);
+	return rebase_value(95,"mkt_val_for_dur_bef_rebal_sale",t);
 }
 
 
@@ -3776,18 +3738,9 @@ if (isMainModel && t > 0
 if (neg_asset_flag < 0)
 	return NO_AVG;
 
-// 20210607 STW: import IA Prod v3.0 RSD v2 change and wrap it with a flag. The code has not been tested yet.
-if(ia_prod_v3_rsd_2_aig == YES)
-{
-	return mkt_val_bef_rebal_sale(t) + accr_int_bef_rebal_sale(t); // added by HYH on 5/24/2021;
-}
-else
-{
-	return mkt_val_bef_rebal_sale(t);
-}
+return mkt_val_bef_rebal_sale(t);
 
 }
-
 
 //@@ END
 
@@ -3798,7 +3751,7 @@ else
 double MTG_ASSET_UDF::mtg_asset_mkt_val_for_dur_sold(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(94,"mkt_val_for_dur_sold",t);
+	return rebase_value(96,"mkt_val_for_dur_sold",t);
 }
 
 
@@ -3817,7 +3770,6 @@ return mkt_val_bef_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - mkt_val_for_eff_dur
@@ -3827,7 +3779,7 @@ return mkt_val_bef_sale(t)
 double MTG_ASSET_UDF::mtg_asset_mkt_val_for_eff_dur(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(95,"mkt_val_for_eff_dur",t);
+	return rebase_value(97,"mkt_val_for_eff_dur",t);
 }
 
 
@@ -3842,18 +3794,9 @@ if (isMainModel && t > 0
 	&& mths_to_next_mkt_val_calc(t) != 0)
 	return NO_AVG;	
 
-// 20210607 STW: import IA Prod v3.0 RSD v2 change and wrap it with a flag. The code has not been tested yet.
-if(ia_prod_v3_rsd_2_aig == YES)
-{
-	return mkt_val(t) + accr_int(t); // added by HYH on 5/24/2021;
-}
-else
-{
-	return mkt_val(t);
-}
+return mkt_val(t);
 
 }
-
 
 //@@ END
 
@@ -3879,7 +3822,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - mkt_val_shifted
@@ -3889,7 +3831,7 @@ return NO_AVG;
 double MTG_ASSET_UDF::mtg_asset_mkt_val_shifted(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(97,"mkt_val_shifted",t);
+	return rebase_value(99,"mkt_val_shifted",t);
 }
 
 
@@ -3924,21 +3866,21 @@ rebase_cash_flow(t,
 			PRESENT_VALUE, "mtg->mkt_val_shifted", modelName);
 
 if (mkt_val_defn == TO_NEXT_RATE_RESET)
-	mtg_pv->pv_calc_parameters(t,
+	sm_mtg_cf_var[0][pv]->pv_calc_parameters(t,
 				MARKET_VALUE_SHIFTED, mths_to_next_reset(t));
 else // TO_MATURITY
-	mtg_pv->pv_calc_parameters(t,
+	sm_mtg_cf_var[0][pv]->pv_calc_parameters(t,
 				MARKET_VALUE_SHIFTED, xint(maturity_period - t));
 
 double wal = 0;
 
 // force recalulation of cash flow
 
-if (mtg_pv->prepmt_appl == YES
+if (sm_mtg_cf_var[0][pv]->prepmt_appl == YES
 	&& mtg->prepmt_penalty_defn == CASH_FLOW_MAINTENANCE)
-	mtg_ym->rebase_period = mtg_pv->rebase_period - 1;
+	sm_mtg_cf_var[0][ym]->rebase_time = sm_mtg_cf_var[0][pv]->rebase_time - 1;
 
-wal = mtg_pv->weighted_avg_life_calc(t);
+wal = sm_mtg_cf_var[0][pv]->weighted_avg_life_calc(t);
 
 double spread_to_spot = mkt_sprd(t);
 
@@ -3954,13 +3896,13 @@ double temp1=0;
 double temp2=0;
 
 double calculated_market_value
-= mtg_pv->pv_calc(t,
+= sm_mtg_cf_var[0][pv]->pv_calc(t,
 			spread_to_spot,
 			temp1, // calculated_derivative
 			temp2  // calculated_modified_duration
 			);
 
-mtg_pv->pv_calc_parameters(t, CASH_FLOWS);
+sm_mtg_cf_var[0][pv]->pv_calc_parameters(t, CASH_FLOWS);
 
 if (asset_detail_pv_flag(t))
 	{
@@ -3987,7 +3929,6 @@ return calculated_market_value;
 
 }
 
-
 //@@ END
 
 //@@ START - mkt_val_sold
@@ -3997,7 +3938,7 @@ return calculated_market_value;
 double MTG_ASSET_UDF::mtg_asset_mkt_val_sold(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(98,"mkt_val_sold",t);
+	return rebase_value(100,"mkt_val_sold",t);
 }
 
 
@@ -4015,7 +3956,6 @@ return mkt_val_bef_sale(t)
 	   * sold_pct(t);
 
 }
-
 
 //@@ END
 
@@ -4046,7 +3986,6 @@ return mkt_val_for_dur_bef_neg_cash_flow_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - mkt_val_times_dur_bef_rebal_sale
@@ -4076,7 +4015,6 @@ return mkt_val_for_dur_bef_rebal_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - mkt_val_times_eff_dur
@@ -4086,7 +4024,7 @@ return mkt_val_for_dur_bef_rebal_sale(t)
 double MTG_ASSET_UDF::mtg_asset_mkt_val_times_eff_dur(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(101,"mkt_val_times_eff_dur",t);
+	return rebase_value(103,"mkt_val_times_eff_dur",t);
 }
 
 
@@ -4106,7 +4044,6 @@ return mkt_val_for_eff_dur(t)
 
 }
 
-
 //@@ END
 
 //@@ START - mths_bef_maturity
@@ -4122,13 +4059,13 @@ double MTG_ASSET_UDF::mtg_asset_mths_bef_maturity(int t) {
 
 #line 1 "mths_bef_maturity.MTG_ASSET.for"
 // This column can be used as a lookup key, such as for linking to an external source
+category_id = category_id;
 if (dflt_rate_bef_maturity_defn == FIRST_BALLOON_PAYMENT_DATE)
 	return min(balloon_pmt_period, maturity_period) - t;
 
 return maturity_period - t;
 
 }
-
 
 //@@ END
 
@@ -4149,7 +4086,6 @@ return init_mths_since_issue + t;
 
 }
 
-
 //@@ END
 
 //@@ START - mths_to_next_mkt_val_calc
@@ -4159,7 +4095,7 @@ return init_mths_since_issue + t;
 double MTG_ASSET_UDF::mtg_asset_mths_to_next_mkt_val_calc(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(104,"mths_to_next_mkt_val_calc",t);
+	return rebase_value(106,"mths_to_next_mkt_val_calc",t);
 }
 
 
@@ -4195,7 +4131,7 @@ if (t == 0)
 				- proj_start_mth +  1);
 	}
 
-if (t == last_model_period)	
+if (t == projection_period_to)	
 	return 0;  
 
 if (mths_to_next_mkt_val_calc(t - 1) > 0)	
@@ -4225,7 +4161,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - net_yld
@@ -4235,7 +4170,7 @@ return NO_AVG;
 double MTG_ASSET_UDF::mtg_asset_net_yld(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(105,"net_yld",t);
+	return rebase_value(107,"net_yld",t);
 }
 
 
@@ -4279,7 +4214,7 @@ if ((existing_asset_indicator && t == 0)
 		rebase_cash_flow(t,
 					PRESENT_VALUE, "mtg->net_yld", modelName);
 
-		mtg_pv->pv_calc_parameters(t,
+		sm_mtg_cf_var[0][pv]->pv_calc_parameters(t,
 					NET_YIELD, xint(amortzn_period));
 
 		guess_yield = (mtg_cf->par_val_bef_sale(t)
@@ -4395,17 +4330,17 @@ if (asset_detail_pv_flag(t))
 rebase_cash_flow(t,
 			PRESENT_VALUE, "mtg->net_yld", modelName);
 
-mtg_pv->pv_calc_parameters(t,
+sm_mtg_cf_var[0][pv]->pv_calc_parameters(t,
 			NET_YIELD, xint(amortzn_period));
 
 local_net_yield
-= convert_rate_basis(mtg_pv->solve_for_sprd_newton_raphson(t, 
+= convert_rate_basis(sm_mtg_cf_var[0][pv]->solve_for_sprd_newton_raphson(t, 
 								guess_yield,
 								target_value),
 			NOMINAL_SEMIANNUAL,
             12);
 
-mtg_pv->pv_calc_parameters(t, CASH_FLOWS);
+sm_mtg_cf_var[0][pv]->pv_calc_parameters(t, CASH_FLOWS);
 
 if (asset_detail_pv_flag(t))
 	{
@@ -4431,7 +4366,6 @@ return local_net_yield;
 
 }
 
-
 //@@ END
 
 //@@ START - notional_amt
@@ -4441,7 +4375,7 @@ return local_net_yield;
 double MTG_ASSET_UDF::mtg_asset_notional_amt(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(106,"notional_amt",t);
+	return rebase_value(108,"notional_amt",t);
 }
 
 
@@ -4464,7 +4398,6 @@ return mtg_cf->par_val(t);
 
 }
 
-
 //@@ END
 
 //@@ START - notional_amt_bef_fund_match_sale
@@ -4474,7 +4407,7 @@ return mtg_cf->par_val(t);
 double MTG_ASSET_UDF::mtg_asset_notional_amt_bef_fund_match_sale(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(107,"notional_amt_bef_fund_match_sale",t);
+	return rebase_value(109,"notional_amt_bef_fund_match_sale",t);
 }
 
 
@@ -4489,7 +4422,6 @@ return notional_amt_bef_sale(t)
        * (1.0 - sold_pct_planned(t));
 
 }
-
 
 //@@ END
 
@@ -4513,7 +4445,6 @@ return notional_amt_bef_rebal_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - notional_amt_bef_rebal_sale
@@ -4535,7 +4466,6 @@ return notional_amt_bef_fund_match_sale(t)
        * (1.0 - sold_pct_fund_match(t));
 
 }
-
 
 //@@ END
 
@@ -4562,7 +4492,6 @@ return mtg_cf->par_val_bef_sale(t);
 
 }
 
-
 //@@ END
 
 //@@ START - opt_inc
@@ -4572,7 +4501,7 @@ return mtg_cf->par_val_bef_sale(t);
 double MTG_ASSET_UDF::mtg_asset_opt_inc(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(111,"opt_inc",t);
+	return rebase_value(113,"opt_inc",t);
 }
 
 
@@ -4590,7 +4519,6 @@ return mtg_cf->prepmt_inc(t);
 
 }
 
-
 //@@ END
 
 //@@ START - opt_pmt
@@ -4600,7 +4528,7 @@ return mtg_cf->prepmt_inc(t);
 double MTG_ASSET_UDF::mtg_asset_opt_pmt(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(112,"opt_pmt",t);
+	return rebase_value(114,"opt_pmt",t);
 }
 
 
@@ -4619,7 +4547,6 @@ return mtg_cf->prepmt_amt(t);
 
 }
 
-
 //@@ END
 
 //@@ START - rbc_c1
@@ -4629,7 +4556,7 @@ return mtg_cf->prepmt_amt(t);
 double MTG_ASSET_UDF::mtg_asset_rbc_c1(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(113,"rbc_c1",t);
+	return rebase_value(115,"rbc_c1",t);
 }
 
 
@@ -4645,7 +4572,6 @@ return rbc_c1_bef_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - rbc_c1_bef_sale
@@ -4655,7 +4581,7 @@ return rbc_c1_bef_sale(t)
 double MTG_ASSET_UDF::mtg_asset_rbc_c1_bef_sale(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(114,"rbc_c1_bef_sale",t);
+	return rebase_value(116,"rbc_c1_bef_sale",t);
 }
 
 
@@ -4671,7 +4597,6 @@ return rbc_c1_pct
 
 }
 
-
 //@@ END
 
 //@@ START - realzd_cap_gain
@@ -4681,7 +4606,7 @@ return rbc_c1_pct
 double MTG_ASSET_UDF::mtg_asset_realzd_cap_gain(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(115,"realzd_cap_gain",t);
+	return rebase_value(117,"realzd_cap_gain",t);
 }
 
 
@@ -4704,7 +4629,6 @@ return sched_prin_pmt(t)
 
 }
 
-
 //@@ END
 
 //@@ START - realzd_cap_gain_opt_pmt
@@ -4714,7 +4638,7 @@ return sched_prin_pmt(t)
 double MTG_ASSET_UDF::mtg_asset_realzd_cap_gain_opt_pmt(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(116,"realzd_cap_gain_opt_pmt",t);
+	return rebase_value(118,"realzd_cap_gain_opt_pmt",t);
 }
 
 
@@ -4731,7 +4655,6 @@ return realzd_cap_gain_prepmt(t)
 
 }
 
-
 //@@ END
 
 //@@ START - realzd_cap_gain_prepmt
@@ -4741,7 +4664,7 @@ return realzd_cap_gain_prepmt(t)
 double MTG_ASSET_UDF::mtg_asset_realzd_cap_gain_prepmt(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(117,"realzd_cap_gain_prepmt",t);
+	return rebase_value(119,"realzd_cap_gain_prepmt",t);
 }
 
 
@@ -4762,7 +4685,6 @@ return mtg_cf->prepmt_amt(t)
 
 }
 
-
 //@@ END
 
 //@@ START - realzd_cap_gain_sale
@@ -4772,7 +4694,7 @@ return mtg_cf->prepmt_amt(t)
 double MTG_ASSET_UDF::mtg_asset_realzd_cap_gain_sale(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(118,"realzd_cap_gain_sale",t);
+	return rebase_value(120,"realzd_cap_gain_sale",t);
 }
 
 
@@ -4791,7 +4713,6 @@ return cap_gain_from_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - realzd_cap_loss_dflt
@@ -4801,7 +4722,7 @@ return cap_gain_from_sale(t)
 double MTG_ASSET_UDF::mtg_asset_realzd_cap_loss_dflt(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(119,"realzd_cap_loss_dflt",t);
+	return rebase_value(121,"realzd_cap_loss_dflt",t);
 }
 
 
@@ -4821,7 +4742,6 @@ return (cost_basis(t - 1) + accr_int(t - 1))
 
 }
 
-
 //@@ END
 
 //@@ START - realzd_cap_loss_foreclosure
@@ -4831,7 +4751,7 @@ return (cost_basis(t - 1) + accr_int(t - 1))
 double MTG_ASSET_UDF::mtg_asset_realzd_cap_loss_foreclosure(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(120,"realzd_cap_loss_foreclosure",t);
+	return rebase_value(122,"realzd_cap_loss_foreclosure",t);
 }
 
 
@@ -4848,7 +4768,6 @@ return (cost_basis(t - 1) + accr_int(t - 1))
 
 }
 
-
 //@@ END
 
 //@@ START - realzd_cap_loss_restructure
@@ -4858,7 +4777,7 @@ return (cost_basis(t - 1) + accr_int(t - 1))
 double MTG_ASSET_UDF::mtg_asset_realzd_cap_loss_restructure(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(121,"realzd_cap_loss_restructure",t);
+	return rebase_value(123,"realzd_cap_loss_restructure",t);
 }
 
 
@@ -4875,7 +4794,6 @@ return (cost_basis(t - 1) + accr_int(t - 1))
 
 }
 
-
 //@@ END
 
 //@@ START - refinance_accr_int
@@ -4885,7 +4803,7 @@ return (cost_basis(t - 1) + accr_int(t - 1))
 double MTG_ASSET_UDF::mtg_asset_refinance_accr_int(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(122,"refinance_accr_int",t);
+	return rebase_value(124,"refinance_accr_int",t);
 }
 
 
@@ -4901,7 +4819,6 @@ return accr_int(t - 1)
 
 }
 
-
 //@@ END
 
 //@@ START - refinance_bk_val
@@ -4911,7 +4828,7 @@ return accr_int(t - 1)
 double MTG_ASSET_UDF::mtg_asset_refinance_bk_val(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(123,"refinance_bk_val",t);
+	return rebase_value(125,"refinance_bk_val",t);
 }
 
 
@@ -4927,7 +4844,6 @@ return bk_val(t - 1)
 
 }
 
-
 //@@ END
 
 //@@ START - refinance_cost_basis
@@ -4937,7 +4853,7 @@ return bk_val(t - 1)
 double MTG_ASSET_UDF::mtg_asset_refinance_cost_basis(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(124,"refinance_cost_basis",t);
+	return rebase_value(126,"refinance_cost_basis",t);
 }
 
 
@@ -4953,7 +4869,6 @@ return cost_basis(t - 1)
 
 }
 
-
 //@@ END
 
 //@@ START - refinance_pct
@@ -4963,7 +4878,7 @@ return cost_basis(t - 1)
 double MTG_ASSET_UDF::mtg_asset_refinance_pct(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(125,"refinance_pct",t);
+	return rebase_value(127,"refinance_pct",t);
 }
 
 
@@ -4984,7 +4899,6 @@ return decr_pct(t)
 
 }
 
-
 //@@ END
 
 //@@ START - refinance_prin
@@ -4994,7 +4908,7 @@ return decr_pct(t)
 double MTG_ASSET_UDF::mtg_asset_refinance_prin(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(126,"refinance_prin",t);
+	return rebase_value(128,"refinance_prin",t);
 }
 
 
@@ -5010,7 +4924,6 @@ return mtg_cf->par_val(t - 1)
 
 }
 
-
 //@@ END
 
 //@@ START - refinance_rate
@@ -5020,7 +4933,7 @@ return mtg_cf->par_val(t - 1)
 double MTG_ASSET_UDF::mtg_asset_refinance_rate(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(127,"refinance_rate",t);
+	return rebase_value(129,"refinance_rate",t);
 }
 
 
@@ -5031,14 +4944,24 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 if (intex_asset || t <= commencement_period || t > maturity_period)
 	return NO_AVG;
 
+category_id = category_id;
+double refinance_rate_scen_mult_local = refinance_rate_scen_mult;
+category_id = category_id;
+double refinance_rate_pct_local = refinance_rate_pct;
+category_id = category_id;
+double refinance_rate_mult_since_issue_local = refinance_rate_mult_since_issue;
+category_id = category_id;
+double refinance_rate_mult_bef_maturity_local = refinance_rate_mult_bef_maturity;
+
 double refinance_rate_prelim
-= (rates->get_dflt_rate(t,
+= (rates_ptr->get_dflt_rate(t,
                         category_id,
+					    weighted_avg_life(start_period), //PBA excess defaults are based on WAL of asset on valuation date
                         EFFECTIVE_ANNUAL)
-   * refinance_rate_scen_mult
-   + refinance_rate_pct)
-  * refinance_rate_mult_since_issue // Lookup key is mths_since_issue(t)
-  * refinance_rate_mult_bef_maturity; // Lookup key is mths_bef_maturity(t)
+   * refinance_rate_scen_mult_local
+   + refinance_rate_pct_local)
+  * refinance_rate_mult_since_issue_local // Lookup key is mths_since_issue(t)
+  * refinance_rate_mult_bef_maturity_local; // Lookup key is mths_bef_maturity(t)
 
 double refinance_rate
 = (max(min(round_result(ROUND_NEAR, ROUND_NEGATIVE_TOZERO,
@@ -5052,7 +4975,6 @@ return refinance_rate;
 
 }
 
-
 //@@ END
 
 //@@ START - restructure_accr_int_net_write_down
@@ -5062,7 +4984,7 @@ return refinance_rate;
 double MTG_ASSET_UDF::mtg_asset_restructure_accr_int_net_write_down(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(128,"restructure_accr_int_net_write_down",t);
+	return rebase_value(130,"restructure_accr_int_net_write_down",t);
 }
 
 
@@ -5079,7 +5001,6 @@ return (accr_int(t - 1)
 
 }
 
-
 //@@ END
 
 //@@ START - restructure_bk_val_net_write_down
@@ -5089,7 +5010,7 @@ return (accr_int(t - 1)
 double MTG_ASSET_UDF::mtg_asset_restructure_bk_val_net_write_down(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(129,"restructure_bk_val_net_write_down",t);
+	return rebase_value(131,"restructure_bk_val_net_write_down",t);
 }
 
 
@@ -5106,7 +5027,6 @@ return (bk_val(t - 1)
 
 }
 
-
 //@@ END
 
 //@@ START - restructure_cost_basis_net_write_down
@@ -5116,7 +5036,7 @@ return (bk_val(t - 1)
 double MTG_ASSET_UDF::mtg_asset_restructure_cost_basis_net_write_down(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(130,"restructure_cost_basis_net_write_down",t);
+	return rebase_value(132,"restructure_cost_basis_net_write_down",t);
 }
 
 
@@ -5133,7 +5053,6 @@ return (cost_basis(t - 1)
 
 }
 
-
 //@@ END
 
 //@@ START - restructure_pct
@@ -5143,7 +5062,7 @@ return (cost_basis(t - 1)
 double MTG_ASSET_UDF::mtg_asset_restructure_pct(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(131,"restructure_pct",t);
+	return rebase_value(133,"restructure_pct",t);
 }
 
 
@@ -5164,7 +5083,6 @@ return decr_pct(t)
 
 }
 
-
 //@@ END
 
 //@@ START - restructure_prin_net_write_down
@@ -5174,7 +5092,7 @@ return decr_pct(t)
 double MTG_ASSET_UDF::mtg_asset_restructure_prin_net_write_down(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(132,"restructure_prin_net_write_down",t);
+	return rebase_value(134,"restructure_prin_net_write_down",t);
 }
 
 
@@ -5190,7 +5108,6 @@ return (mtg_cf->par_val(t - 1)
 	   * (1.0 - restructure_write_down_pct_calc);
 
 }
-
 
 //@@ END
 
@@ -5209,14 +5126,24 @@ double MTG_ASSET_UDF::mtg_asset_restructure_rate(int t) {
 if (intex_asset || t <= commencement_period || t > maturity_period)
 	return NO_AVG;
 
+category_id = category_id;
+double restructure_rate_scen_mult_local = restructure_rate_scen_mult;
+category_id = category_id;
+double restructure_rate_pct_local = restructure_rate_pct;
+category_id = category_id;
+double restructure_rate_mult_since_issue_local = restructure_rate_mult_since_issue;
+category_id = category_id;
+double restructure_rate_mult_bef_maturity_local = restructure_rate_mult_bef_maturity;
+
 double restructure_pct_prelim
-= (rates->get_dflt_rate(t,
+= (rates_ptr->get_dflt_rate(t,
                         category_id,
+					    weighted_avg_life(start_period), //PBA excess defaults are based on WAL of asset on valuation date
                         EFFECTIVE_ANNUAL)
-   * restructure_rate_scen_mult
-   + restructure_rate_pct)
-  * restructure_rate_mult_since_issue // Lookup key is mths_since_issue(t)
-  * restructure_rate_mult_bef_maturity; // Lookup key is mths_bef_maturity(t)
+   * restructure_rate_scen_mult_local
+   + restructure_rate_pct_local)
+  * restructure_rate_mult_since_issue_local // Lookup key is mths_since_issue(t)
+  * restructure_rate_mult_bef_maturity_local; // Lookup key is mths_bef_maturity(t)
 
 double restructure_pct
 = (max(min(round_result(ROUND_NEAR, ROUND_NEGATIVE_TOZERO,
@@ -5230,7 +5157,6 @@ return restructure_pct;
 
 }
 
-
 //@@ END
 
 //@@ START - sched_prin_pmt
@@ -5240,7 +5166,7 @@ return restructure_pct;
 double MTG_ASSET_UDF::mtg_asset_sched_prin_pmt(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(134,"sched_prin_pmt",t);
+	return rebase_value(136,"sched_prin_pmt",t);
 }
 
 
@@ -5259,7 +5185,6 @@ return mtg_cf->sched_prin_pmt(t);
 
 }
 
-
 //@@ END
 
 //@@ START - sold_pct
@@ -5269,7 +5194,7 @@ return mtg_cf->sched_prin_pmt(t);
 double MTG_ASSET_UDF::mtg_asset_sold_pct(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(135,"sold_pct",t);
+	return rebase_value(137,"sold_pct",t);
 }
 
 
@@ -5284,7 +5209,6 @@ return max(0, 1.0 - (1.0 - sold_pct_planned(t))
 
 }
 
-
 //@@ END
 
 //@@ START - sold_pct_fund_match
@@ -5294,7 +5218,7 @@ return max(0, 1.0 - (1.0 - sold_pct_planned(t))
 double MTG_ASSET_UDF::mtg_asset_sold_pct_fund_match(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(136,"sold_pct_fund_match",t);
+	return rebase_value(138,"sold_pct_fund_match",t);
 }
 
 
@@ -5302,11 +5226,9 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 //^^^
 
 #line 1 "sold_pct_fund_match.MTG_ASSET.for"
-//this column value is set using SetValue from inside the asset sales routines
-return NO_AVG;
+return sold_pct_fund_match_value;
 
 }
-
 
 //@@ END
 
@@ -5317,7 +5239,7 @@ return NO_AVG;
 double MTG_ASSET_UDF::mtg_asset_sold_pct_neg_cash_flow(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(137,"sold_pct_neg_cash_flow",t);
+	return rebase_value(139,"sold_pct_neg_cash_flow",t);
 }
 
 
@@ -5325,11 +5247,9 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 //^^^
 
 #line 1 "sold_pct_neg_cash_flow.MTG_ASSET.for"
-//this column value is set using SetValue from inside the asset sales routines
-return NO_AVG;
+return sold_pct_neg_cash_flow_value;
 
 }
-
 
 //@@ END
 
@@ -5340,7 +5260,7 @@ return NO_AVG;
 double MTG_ASSET_UDF::mtg_asset_sold_pct_planned(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(138,"sold_pct_planned",t);
+	return rebase_value(140,"sold_pct_planned",t);
 }
 
 
@@ -5348,11 +5268,9 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 //^^^
 
 #line 1 "sold_pct_planned.MTG_ASSET.for"
-//this column value is set using SetValue from inside the asset sales routines
-return NO_AVG;
+return sold_pct_planned_value;
 
 }
-
 
 //@@ END
 
@@ -5363,7 +5281,7 @@ return NO_AVG;
 double MTG_ASSET_UDF::mtg_asset_sold_pct_rebal(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(139,"sold_pct_rebal",t);
+	return rebase_value(141,"sold_pct_rebal",t);
 }
 
 
@@ -5371,11 +5289,9 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 //^^^
 
 #line 1 "sold_pct_rebal.MTG_ASSET.for"
-//this column value is set using SetValue from inside the asset sales routines
-return NO_AVG;
+return sold_pct_rebal_value;
 
 }
-
 
 //@@ END
 
@@ -5392,6 +5308,10 @@ double MTG_ASSET_UDF::virtual_startup(int t) {
 
 #line 1 "startup.MTG_ASSET.for"
 #if 0 // START_HEADER
+#if defined(GEN2_ALM_RUN)
+	#define __MTG_ASSET_H_
+#endif
+
 struct mtgInitialValuesData
 	{
 	double yld_numer;
@@ -5404,16 +5324,14 @@ struct mtgInitialValuesData
 	double pmt_rate;
 	double weighted_avg_life;
 	};
-typedef map <xstring, struct mtgInitialValuesData*, less<xstring> > mtgivmap;
+
 #endif // END_HEADER
 
 #if 0 // START_EXTERNS
 int num_mtgs_to_run;
 int num_mtg = 0;
 sowfinput mtg_mp_input;
-sowfcols mtg_mp_input_cols;
 sowfinput mtg_sch_input;
-sowfcols mtg_sch_input_cols;
 sowfoutput mtg_sch_output;
 sowfmap mtg_sch_input_pos;
 sowfmapiter mtg_sch_input_pos_iter;
@@ -5421,8 +5339,8 @@ sowfmap mtg_sch_input_size;
 sowfmapiter mtg_sch_input_size_iter;
 
 extern sowmpoutput mtg_state_of_world_mp_output;
-static mtgivmap mtg_initial_values_map;
-static mtgivmap::iterator mtg_initial_values_map_iter;
+static map <xstring, struct mtgInitialValuesData*, less<xstring> > mtg_initial_values_map;
+static map <xstring, struct mtgInitialValuesData*, less<xstring> >::iterator mtg_initial_values_map_iter;
 extern int PVCounter;
 extern ofstream& PVCFile;
 extern ostringstream PVCText;
@@ -5540,6 +5458,16 @@ SmartArray <double> intex_unrealzd_cap_loss_from_dflt;
 SmartArray <double> intex_cost_basis_dflt;
 
 SmartArray <double> psa_base_rate;
+
+SEG_COMP *seg_element;
+
+#if defined(ASSET_ONLY_MODEL)
+RATES_ECONOMY /*modelobject_name: MTG_RATES*/ *rates_ptr;
+#else
+RATES_ECONOMY /*modelobject_name: RATES*/ *rates_ptr;
+
+#endif
+
 #endif // END_CLASS
 
 #if 0 // START_CONSTRUCTOR
@@ -5597,16 +5525,14 @@ adj_addn_init = 0.0;
 #endif // END_CONSTRUCTOR
 
 #if 0 // START_TERMINATOR
-if (PVCFile != NULL)
-	PVCFile.close();
+PVCFile.close();
 #endif // END_TERMINATOR
 
 intex_asset = false;
 
 if (use_mp == NO)
 	{
-	skipModelPoint();
-	return 1.0;
+	throw NonFatalError("Model Point Use Definition is set to No for MTG asset_id: " + xstring(asset_id));
 	}
 
 if (isMainModel)
@@ -5625,10 +5551,10 @@ if (isMainModel)
 		}
 
 	#if defined(ASSET_ONLY_MODEL)
-	rates = sm_mtg_rates;
+	rates_ptr = sm_mtg_rates;
 
-	sm_mtg_cf->rates = rates;
-	last_proj_period = last_model_period;
+	sm_mtg_cf->rates_ptr = rates_ptr;
+	last_proj_period = projection_period_to;
 	
 	#if defined(__ADCO_ASSET_H_)
 	if (sm_mtg_adco)
@@ -5662,42 +5588,17 @@ if (isMainModel)
 	}
 else
 	{
-	#if defined(ASSET_ONLY_MODEL)
-	if (sm_mtg_rates && !sm_mtg_rates->isShrunk)
-		sm_mtg_rates->shrink();
-
-	#if defined(__ADCO_ASSET_H_)
-	if (sm_mtg_adco && !sm_mtg_adco->isShrunk)
-		sm_mtg_adco->shrink();
-	#endif	
-
-	#if defined(__INTEX_ASSET_H_)
-	if (sm_mtg_intex && !sm_mtg_intex->isShrunk)
-		sm_mtg_intex->shrink();
-	#endif
-	#endif
-
-	rates = asset->rates;
-	sm_mtg_cf->rates = rates;
+	rates_ptr = rates;
+	sm_mtg_cf->rates_ptr = rates_ptr;
 	}
 
 if (!isMainModel
 	&& !investing_flag
 	&& asset->num_mtgs_init > -1
-	&& getElementNumber() >= asset->num_mtgs_init)
+	&& getElementNumber(0) >= asset->num_mtgs_init)
 	{
-	shrink_mtg_clone(getElementNumber());
 	return 1;
 	}
-
-// Grow clones here so that their t_high and t_low values
-// are set correctly before they are shrunk in initialize.
-if (mtg_pv->isShrunk)
-	mtg_pv->grow();
-if (mtg_is->isShrunk)
-	mtg_is->grow();
-if (mtg_ym->isShrunk)
-	mtg_ym->grow();
 
 // initialize the calculated t_low and t_high
 calculated_t_low = model_t_low;
@@ -5728,8 +5629,7 @@ if (use_intex_databases_for_mtg
 		{
 		if (!asset->valid_t_low_t_high(calculated_t_low, calculated_t_high))
 			{
-			skipModelPoint();
-			return 1;
+			throw NonFatalError("Invalid t_low or t_high for MTG asset_id: " + xstring(asset_id));
 			}
 		}
 
@@ -5740,6 +5640,29 @@ if (use_intex_databases_for_mtg
 calculated_t_low = model_t_low;
 calculated_t_high = model_t_high;
 
+//Array structured as rebase_period x variations x t
+sm_mtg_cf_var.resize(1); //only size initial rebase
+sm_mtg_cf_var[0].resize(num_variations);
+
+for (int i = 0; i < num_variations; i++)
+	{
+	sm_mtg_cf_var[0][i]->t_high = calculated_t_high;
+	sm_mtg_cf_var[0][i]->rebase_time = -1;
+	
+	sm_mtg_cf_var[0][i]->rates_ptr = rates_ptr;	
+	
+	#if defined(__INTEX_ASSET_H_)
+	if (mtg->intex)
+		sm_mtg_cf_var[0][i]->intex = intex;
+	#endif
+	
+	#if defined(__ADCO_ASSET_H_)
+	if (mtg->adco)
+		sm_mtg_cf_var[0][i]->adco = adco;
+	#endif
+
+	}
+
 // Data Validation
 if (num_of_proj_task_loops == 0 
 	|| is_first_proj_task_loop
@@ -5749,7 +5672,6 @@ if (num_of_proj_task_loops == 0
 return 1;
 
 }
-
 
 //@@ END
 
@@ -5776,9 +5698,7 @@ if (t <= maturity_period)
 		{
 		dur_for_transfer = (maturity_period - t) / 12.0;
 		}
-	else if ((t > 0 && mths_to_next_mkt_val_calc(t) > 0)
-			//20220613 STW: add a condition for model efficiency improvement
-			|| fast_stat_calc_aig == YES)
+	else if ((t > 0 && mths_to_next_mkt_val_calc(t) > 0) || company->calc_eff_dur_crbg == NO)
 		dur_for_transfer = 0; // don't want to force a market value calculation
 	else if (asset->asset_sub_port_assign_dur_defn == EFFECTIVE_DURATION)
 		dur_for_transfer = eff_dur(t);
@@ -5811,7 +5731,6 @@ return asset->asset_sub_port_assign(t, 0, "Mortgage",
 
 }
 
-
 //@@ END
 
 //@@ START - unrealzd_cap_gain
@@ -5821,7 +5740,7 @@ return asset->asset_sub_port_assign(t, 0, "Mortgage",
 double MTG_ASSET_UDF::mtg_asset_unrealzd_cap_gain(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(142,"unrealzd_cap_gain",t);
+	return rebase_value(144,"unrealzd_cap_gain",t);
 }
 
 
@@ -5837,7 +5756,6 @@ return unrealzd_cap_gain_bef_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - unrealzd_cap_gain_bef_fund_match_sale
@@ -5847,7 +5765,7 @@ return unrealzd_cap_gain_bef_sale(t)
 double MTG_ASSET_UDF::mtg_asset_unrealzd_cap_gain_bef_fund_match_sale(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(143,"unrealzd_cap_gain_bef_fund_match_sale",t);
+	return rebase_value(145,"unrealzd_cap_gain_bef_fund_match_sale",t);
 }
 
 
@@ -5863,7 +5781,6 @@ return unrealzd_cap_gain_bef_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - unrealzd_cap_gain_bef_neg_cash_flow_sale
@@ -5873,7 +5790,7 @@ return unrealzd_cap_gain_bef_sale(t)
 double MTG_ASSET_UDF::mtg_asset_unrealzd_cap_gain_bef_neg_cash_flow_sale(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(144,"unrealzd_cap_gain_bef_neg_cash_flow_sale",t);
+	return rebase_value(146,"unrealzd_cap_gain_bef_neg_cash_flow_sale",t);
 }
 
 
@@ -5889,7 +5806,6 @@ return unrealzd_cap_gain_bef_rebal_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - unrealzd_cap_gain_bef_rebal_sale
@@ -5899,7 +5815,7 @@ return unrealzd_cap_gain_bef_rebal_sale(t)
 double MTG_ASSET_UDF::mtg_asset_unrealzd_cap_gain_bef_rebal_sale(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(145,"unrealzd_cap_gain_bef_rebal_sale",t);
+	return rebase_value(147,"unrealzd_cap_gain_bef_rebal_sale",t);
 }
 
 
@@ -5915,7 +5831,6 @@ return unrealzd_cap_gain_bef_fund_match_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - unrealzd_cap_gain_bef_sale
@@ -5925,7 +5840,7 @@ return unrealzd_cap_gain_bef_fund_match_sale(t)
 double MTG_ASSET_UDF::mtg_asset_unrealzd_cap_gain_bef_sale(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(146,"unrealzd_cap_gain_bef_sale",t);
+	return rebase_value(148,"unrealzd_cap_gain_bef_sale",t);
 }
 
 
@@ -5941,7 +5856,6 @@ return bk_val_bef_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - unrealzd_cap_gain_gaap_surp
@@ -5951,7 +5865,7 @@ return bk_val_bef_sale(t)
 double MTG_ASSET_UDF::mtg_asset_unrealzd_cap_gain_gaap_surp(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(147,"unrealzd_cap_gain_gaap_surp",t);
+	return rebase_value(149,"unrealzd_cap_gain_gaap_surp",t);
 }
 
 
@@ -5966,7 +5880,6 @@ return gaap_surp_bk_val(t) - cost_basis(t);
 
 }
 
-
 //@@ END
 
 //@@ START - unrealzd_cap_gain_incr
@@ -5976,7 +5889,7 @@ return gaap_surp_bk_val(t) - cost_basis(t);
 double MTG_ASSET_UDF::mtg_asset_unrealzd_cap_gain_incr(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(148,"unrealzd_cap_gain_incr",t);
+	return rebase_value(150,"unrealzd_cap_gain_incr",t);
 }
 
 
@@ -6008,7 +5921,6 @@ return (bk_val_bef_prepmt(t) - cost_basis_bef_prepmt(t))
 
 }
 
-
 //@@ END
 
 //@@ START - unrealzd_cap_gain_released_on_sale
@@ -6033,7 +5945,6 @@ return unrealzd_cap_gain_bef_sale(t)
 	   * sold_pct(t);
 
 }
-
 
 //@@ END
 
@@ -6060,7 +5971,6 @@ return unrealzd_cap_gain_bef_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - unrealzd_cap_loss_from_dflt
@@ -6070,7 +5980,7 @@ return unrealzd_cap_gain_bef_sale(t)
 double MTG_ASSET_UDF::mtg_asset_unrealzd_cap_loss_from_dflt(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(151,"unrealzd_cap_loss_from_dflt",t);
+	return rebase_value(153,"unrealzd_cap_loss_from_dflt",t);
 }
 
 
@@ -6090,7 +6000,6 @@ return (bk_val(t - 1) - cost_basis(t - 1))
 
 }
 
-
 //@@ END
 
 //@@ START - weighted_avg_life
@@ -6100,7 +6009,7 @@ return (bk_val(t - 1) - cost_basis(t - 1))
 double MTG_ASSET_UDF::mtg_asset_weighted_avg_life(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(152,"weighted_avg_life",t);
+	return rebase_value(154,"weighted_avg_life",t);
 }
 
 
@@ -6118,10 +6027,9 @@ if (t == 0 && existing_asset_indicator
 if (intex_asset)
 	return intex_weighted_avg_life[t];
 
-if (mtg_pv->pv_defn != MARKET_VALUE_SHIFTED)
+if (sm_mtg_cf_var[0][pv]->pv_defn != MARKET_VALUE_SHIFTED)
 	{
-	if (mtg_pv->isShrunk
-		|| mtg_pv->rebase_period < t
+	if (sm_mtg_cf_var[0][pv]->rebase_time < t
 		|| (!existing_asset_indicator && t == commencement_period))
 		{
 		rebase_cash_flow(t,
@@ -6129,25 +6037,24 @@ if (mtg_pv->pv_defn != MARKET_VALUE_SHIFTED)
 					"mtg->weighted_avg_life",
 					modelName);
 
-		if (mtg_pv->prepmt_appl == YES
-			&& mtg_pv->pv_defn != MARKET_VALUE_SHIFTED)
+		if (sm_mtg_cf_var[0][pv]->prepmt_appl == YES
+			&& sm_mtg_cf_var[0][pv]->pv_defn != MARKET_VALUE_SHIFTED)
 			pv_interest_savings_after_prepayments[0]
-			= mtg_pv->int_savings_pv_aft_prepmt(t);
+			= sm_mtg_cf_var[0][pv]->int_savings_pv_aft_prepmt(t);
 		}
 
-	if (mtg_pv->pv_defn == MARKET_VALUE
+	if (sm_mtg_cf_var[0][pv]->pv_defn == MARKET_VALUE
 		&& mkt_val_defn == TO_NEXT_RATE_RESET)
-		mtg_pv->pv_calc_parameters(t,
+		sm_mtg_cf_var[0][pv]->pv_calc_parameters(t,
 					MARKET_VALUE, mths_to_next_reset(t));
 	else // TO_MATURITY
-		mtg_pv->pv_calc_parameters(t,
+		sm_mtg_cf_var[0][pv]->pv_calc_parameters(t,
 					MARKET_VALUE, xint(maturity_period - t));
 	}
 
-return mtg_pv->weighted_avg_life_calc(t);
+return sm_mtg_cf_var[0][pv]->weighted_avg_life_calc(t);
 
 }
-
 
 //@@ END
 
@@ -6158,7 +6065,7 @@ return mtg_pv->weighted_avg_life_calc(t);
 double MTG_ASSET_UDF::mtg_asset_write_down(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(153,"write_down",t);
+	return rebase_value(155,"write_down",t);
 }
 
 
@@ -6177,7 +6084,6 @@ return realzd_cap_loss_foreclosure(t)
 
 }
 
-
 //@@ END
 
 //@@ START - yld_denom
@@ -6187,7 +6093,7 @@ return realzd_cap_loss_foreclosure(t)
 double MTG_ASSET_UDF::mtg_asset_yld_denom(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(154,"yld_denom",t);
+	return rebase_value(156,"yld_denom",t);
 }
 
 
@@ -6258,7 +6164,6 @@ return bk_val(t - 1) + accr_int(t - 1);
 
 }
 
-
 //@@ END
 
 //@@ START - yld_numer
@@ -6268,7 +6173,7 @@ return bk_val(t - 1) + accr_int(t - 1);
 double MTG_ASSET_UDF::mtg_asset_yld_numer(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(155,"yld_numer",t);
+	return rebase_value(157,"yld_numer",t);
 }
 
 
@@ -6276,7 +6181,6 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 //^^^
 
 #line 1 "yld_numer.MTG_ASSET.for"
-//20220519 STW: Restored to original US library code, with no duration weighted adj
 if (t < commencement_period || t > maturity_period)
 	return NO_AVG;
 
@@ -6295,30 +6199,30 @@ if (intex_proj_flag && t == 0)
 if (existing_asset_indicator && t == 0)
 	return yld_numer(t + 1);
 
-return accr_inc(t);  
+//force call
+//yld_numer_adj_crbg(t);
 
+return accr_inc(t);
 
 }
-
 
 //@@ END
 
-//@@ START - yld_numer_adj_aig
-// Yield Numerator Capital with duration weighted adjustment                                                                                             
-// Column:YLD_NUMER_ADJ_AIG
+//@@ START - yld_numer_adj_crbg
+// Yield Numerator                                                                                             
+// Column:YLD_NUMER_ADJ_CRBG
 //========================================================
-double MTG_ASSET_UDF::mtg_asset_yld_numer_adj_aig(int t) {
+double MTG_ASSET_UDF::mtg_asset_yld_numer_adj_crbg(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(156,"yld_numer_adj_aig",t);
+	return rebase_value(158,"yld_numer_adj_crbg",t);
 }
 
 
 
 //^^^
 
-#line 1 "yld_numer_adj_aig.MTG_ASSET.for"
-//20220519 STW: Revised to be Yield Numerator Capital with duration weighted adjustment
+#line 1 "yld_numer_adj_crbg.MTG_ASSET.for"
 if (t < commencement_period || t > maturity_period)
 	return NO_AVG;
 
@@ -6335,28 +6239,21 @@ if (intex_proj_flag && t == 0)
 		     * net_yld(t) / 12.0);
 
 if (existing_asset_indicator && t == 0)
-	return yld_numer_adj_aig(t + 1);
+	return yld_numer_adj_crbg(t + 1);
 
-// 20210607 STW: import IA Prod v3.0 RSD v2 change and wrap it with a flag. The code has not been tested yet.
-if(ia_prod_v3_rsd_2_aig == YES)
-{
-	//HYH 5/26/2021, per email from Josh @ WTW on 5/26/2021
-	double pmt_rate_bey = convert_rate_basis(mtg_cf->pmt_rate(t), NOMINAL_MONTHLY, NOMINAL_SEMIANNUAL);
-	double duration_weighted_sprd_mthly = convert_rate_basis(pmt_rate_bey + dur_wtd_sprd_adj_aig, NOMINAL_SEMIANNUAL, ACTUAL_MONTHLY) - mtg_cf->pmt_rate(t) / 12;
+if (pba_valn_flag) 
+	return accr_inc(t);
 
-	return accr_inc(t)
-			+ (duration_weighted_sprd_mthly * mtg_cf->par_val(t-1)); //AIG - ADD SPREAD TO EARNED AMOUNT HERE WHICH FLOWS INTO TOTAL NER ON SEGMENT LEVEL
-}
-else
-{
-	double duration_weighted_sprd_mthly = convert_rate_basis(dur_wtd_sprd_adj_aig, NOMINAL_SEMIANNUAL, ACTUAL_MONTHLY);
+double pmt_rate_bey = convert_rate_basis(mtg_cf->pmt_rate(t), NOMINAL_MONTHLY, NOMINAL_SEMIANNUAL);
 
-	return accr_inc(t)
-			+ (duration_weighted_sprd_mthly * yld_denom(t)); //AIG - ADD SPREAD TO EARNED AMOUNT HERE WHICH FLOWS INTO TOTAL NER ON SEGMENT LEVEL
-}
+double duration_weighted_sprd_mthly = convert_rate_basis(pmt_rate_bey + dur_wtd_sprd_adj_crbg, NOMINAL_SEMIANNUAL, ACTUAL_MONTHLY)
+										- mtg_cf->pmt_rate(t) / 12;
+
+double addl_accr_inc = duration_weighted_sprd_mthly * mtg_cf->par_val(t - 1);
+
+return accr_inc(t) + addl_accr_inc;
 
 }
-
 
 //@@ END
 
@@ -6370,13 +6267,12 @@ double MTG_ASSET_UDF::mtg_asset_accr_int_per_par_unit() {
 
 #line 1 "accr_int_per_par_unit.MTG_ASSET.for"
 if (existing_asset_indicator)
-	return NO_AVG;
+	return 0.0;
 
 return (pow(1.0 + pmt_rate_at_issue / pmt_freq,
 			yrs_since_last_pmt * pmt_freq) - 1.0);
 
 }
-
 
 //@@ END
 
@@ -6407,7 +6303,6 @@ return maturity_period;
 
 }
 
-
 //@@ END
 
 //@@ START - amortzn_period
@@ -6430,7 +6325,6 @@ return 0;
 
 }
 
-
 //@@ END
 
 //@@ START - asset_detail_rpt_flag
@@ -6450,7 +6344,6 @@ return NO;
 
 }
 
-
 //@@ END
 
 //@@ START - asset_fund_index
@@ -6466,7 +6359,6 @@ if (port_defn == INVESTMENT)
 	return INVESTMENT_FUND_INDEX;
 
 // else set to "Investment" default value
-makeRunLogYellow();
 log_screen << "Warning: Invalid portfolio definition (" << port_defn
 		   <<") for mortgage ID = " << asset_id
 		   << "." << MSG_ERROR;
@@ -6477,7 +6369,6 @@ port_defn = INVESTMENT;
 return INVESTMENT_FUND_INDEX;
 
 }
-
 
 //@@ END
 
@@ -6505,7 +6396,6 @@ return NO;
 
 }
 
-
 //@@ END
 
 //@@ START - balloon_pmt_period
@@ -6520,7 +6410,6 @@ int MTG_ASSET_UDF::mtg_asset_balloon_pmt_period() {
 return date_diff(balloon_date, proj_date_adj);
 
 }
-
 
 //@@ END
 
@@ -6540,6 +6429,23 @@ return 0;
 
 }
 
+//@@ END
+
+//@@ START - data_file_name
+// Data File Name                                                                                             
+// Calculated Variable:DATA_FILE_NAME
+//========================================================
+xstring MTG_ASSET_UDF::mtg_asset_data_file_name() {
+//^^^
+
+
+#line 1 "data_file_name.MTG_ASSET.for"
+if (time_step_flag)
+	return replaceWildcards("<*data*>" + data_file_name_input + "_" + xstring(proj_set_loop_num) + "_" + xstring(proj_set_sub_loop_num) + ".csv");
+else
+	return replaceWildcards("<*data*>" + data_file_name_input + ".csv");
+
+}
 
 //@@ END
 
@@ -6552,10 +6458,9 @@ xstring MTG_ASSET_UDF::mtg_asset_data_grp_id() {
 
 
 #line 1 "data_grp_id.MTG_ASSET.for"
-return get_base_group_name(group, false);//WTW - Gen2 - Move Extern definitions to rates header
+return get_base_group_name(group, true);
 
 }
-
 
 //@@ END
 
@@ -6571,7 +6476,7 @@ int MTG_ASSET_UDF::mtg_asset_existing_asset_indicator() {
 if (purch_asset_mp_num == -1)
 	{
 	// Existing asset was purchased during a previous scenario time step
-	if (time_step_flag && !valn_flag && valn_period != 0
+	if (time_step_flag && valn_period != 0
 		&& date_diff(issue_date, proj_date) > 0)
 		return PRIOR_PURCH;	
 	
@@ -6583,7 +6488,6 @@ if (purch_asset_mp_num == -1)
 return NEW_PURCH;
 
 }
-
 
 //@@ END
 
@@ -6603,7 +6507,6 @@ return company->sm_inv_strategy[seg_num]->foreclosure_asset_id;
 
 }
 
-
 //@@ END
 
 //@@ START - foreclosure_write_down_pct_calc
@@ -6615,10 +6518,10 @@ double MTG_ASSET_UDF::mtg_asset_foreclosure_write_down_pct_calc() {
 
 
 #line 1 "foreclosure_write_down_pct_calc.MTG_ASSET.for"
+category_id = category_id;
 return max(0.0, min(1.0, foreclosure_write_down_pct));
 
 }
-
 
 //@@ END
 
@@ -6645,7 +6548,6 @@ return COST_BASIS;
 
 }
 
-
 //@@ END
 
 //@@ START - gaap_val_defn
@@ -6670,7 +6572,6 @@ if (sale_class == HELD_TO_MATURITY)
 return COST_BASIS;
 
 }
-
 
 //@@ END
 
@@ -6712,7 +6613,6 @@ return - commencement_period;
 
 }
 
-
 //@@ END
 
 //@@ START - maturity_mths_from_next_reset
@@ -6732,7 +6632,6 @@ return min(get_yr_from_date(maturity_date) - get_yr_from_date(adj_next_reset_dat
 		   + get_mth_from_date(maturity_date) - get_mth_from_date(adj_next_reset_date);
 
 }
-
 
 //@@ END
 
@@ -6786,7 +6685,6 @@ return commencement_period
 
 }
 
-
 //@@ END
 
 //@@ START - mkt_val_per_unit_par
@@ -6799,7 +6697,7 @@ double MTG_ASSET_UDF::mtg_asset_mkt_val_per_unit_par() {
 
 #line 1 "mkt_val_per_unit_par.MTG_ASSET.for"
 if (existing_asset_indicator)
-	return NO_AVG;
+	return 0.0;
 
 if (asset_detail_pv_flag(commencement_period))
 	{
@@ -6822,36 +6720,36 @@ rebase_cash_flow(commencement_period,
 		PRESENT_VALUE, "mtg->mkt_val_per_unit_par", modelName);
 
 if (mkt_val_defn == TO_NEXT_RATE_RESET)
-	mtg_pv->pv_calc_parameters(commencement_period,
+	sm_mtg_cf_var[0][pv]->pv_calc_parameters(commencement_period,
 				MARKET_VALUE, mths_to_next_reset(commencement_period));
 else // TO_MATURITY
-	mtg_pv->pv_calc_parameters(commencement_period,
+	sm_mtg_cf_var[0][pv]->pv_calc_parameters(commencement_period,
 				MARKET_VALUE, xint(maturity_period - commencement_period));
 
-if (mtg_pv->prepmt_appl == YES
+if (sm_mtg_cf_var[0][pv]->prepmt_appl == YES
 	&& mtg->prepmt_penalty_defn == CASH_FLOW_MAINTENANCE)
 	{
 	// force recalulation of yield maintenance cash flow
-	mtg_ym->rebase_period = mtg_pv->rebase_period - 1;
+	sm_mtg_cf_var[0][ym]->rebase_time = sm_mtg_cf_var[0][pv]->rebase_time - 1;
 	}
 
-if (mtg_pv->pv_tbl_defn == INITIALIZE_TABLES
-	&& mtg_pv->prepmt_appl == YES
-	&& mtg_pv->pv_defn != MARKET_VALUE_SHIFTED)
+if (sm_mtg_cf_var[0][pv]->pv_tbl_defn == INITIALIZE_TABLES
+	&& sm_mtg_cf_var[0][pv]->prepmt_appl == YES
+	&& sm_mtg_cf_var[0][pv]->pv_defn != MARKET_VALUE_SHIFTED)
 	pv_interest_savings_after_prepayments[0]
-	= mtg_pv->int_savings_pv_aft_prepmt(commencement_period);
+	= sm_mtg_cf_var[0][pv]->int_savings_pv_aft_prepmt(commencement_period);
 
 // don't replace wal with weighted_avg_life(commencement_period) in call to get_category_rate
-double wal = mtg_pv->weighted_avg_life_calc(commencement_period);
+double wal = sm_mtg_cf_var[0][pv]->weighted_avg_life_calc(commencement_period);
 
 double category_risk_spread_unshifted
-= rates->get_int_rate(commencement_period,
+= rates_ptr->get_int_rate(commencement_period,
             category_id,
 			GET_SPOT_SPREAD,
 			wal,
 			0.0,
 			NOMINAL_SEMIANNUAL,
-			NO_SHIFT,portfolio_sprd_adj_aig);//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+			NO_SHIFT, port_sprd_adj_crbg);//CRBG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
 
 if (asset_detail_pv_flag(commencement_period)
 	&& asset_detail_rpt_pv_defn == YES)
@@ -6865,14 +6763,14 @@ double temp1 = 0;
 double temp2 = 0;
 
 double base_price
-= mtg_pv->pv_calc(commencement_period, 
+= sm_mtg_cf_var[0][pv]->pv_calc(commencement_period, 
 			0.0,
 			temp1, // calculated_derivative
 			temp2  // calculated_modified_duration
 			);
 
 // do not replace with call to mtg_pv->pv_calc_parameters
-mtg_pv->pv_tbl_defn = "No Tables";
+sm_mtg_cf_var[0][pv]->pv_tbl_defn = "No Tables";
 pv_months = 0;
 
 if (asset_detail_pv_flag(commencement_period))
@@ -6903,7 +6801,6 @@ return price_per_unit_of_par;
 
 }
 
-
 //@@ END
 
 //@@ START - neg_asset_flag
@@ -6930,7 +6827,6 @@ return -1;
 
 }
 
-
 //@@ END
 
 //@@ START - par_val_at_issue
@@ -6950,7 +6846,6 @@ if (existing_asset_indicator)
 	if (local_par_val_at_issue > 0
 		&& local_par_val_at_issue < mtg_cf->par_val_bef_sale(0))
 		{
-		makeRunLogYellow();
 		log_screen.setf(ios::fixed, ios::floatfield);
 		log_screen << "Warning: Par value at issue (" << setprecision(6) << local_par_val_at_issue
 				<< ") is less than the par value at the projection start"
@@ -6972,7 +6867,6 @@ return mtg_cf->par_val_bef_sale(commencement_period);
 
 }
 
-
 //@@ END
 
 //@@ START - pct_to_use
@@ -6986,19 +6880,21 @@ double MTG_ASSET_UDF::mtg_asset_pct_to_use() {
 #line 1 "pct_to_use.MTG_ASSET.for"
 if (!isMainModel)
 	{
-	// Existing at original projection date
-	if (existing_asset_indicator == INIT_MP)
-		return seg->existing_asset_pct_to_use * neg_asset_flag;
+	if (asset_fund_index != HEDGING_FUND_INDEX)//Hedges are not supposed to be reduced by initial asset percent
+		{
+		// Existing at original projection date
+		if (existing_asset_indicator == INIT_MP)
+			return seg_element->existing_asset_pct_to_use * neg_asset_flag;
 	
-	// Existing asset was purchased during previous scenario time step
-	if (existing_asset_indicator == PRIOR_PURCH)
-		return neg_asset_flag;
+		// Existing asset was purchased during previous scenario time step
+		if (existing_asset_indicator == PRIOR_PURCH)
+			return seg_element->initial_asset_pct_to_use_time_step * neg_asset_flag;
+		}
 	}
 
 return neg_asset_flag;
 
 }
-
 
 //@@ END
 
@@ -7019,7 +6915,6 @@ if (existing_asset_indicator)
 return MAXIMUM_YEARS_FOR_MONTHS_CALCULATIONS * 12;
 
 }
-
 
 //@@ END
 
@@ -7046,7 +6941,6 @@ return 1;
 
 }
 
-
 //@@ END
 
 //@@ START - pmt_mths
@@ -7061,7 +6955,6 @@ int MTG_ASSET_UDF::mtg_asset_pmt_mths() {
 return 12 / pmt_freq;
 
 }
-
 
 //@@ END
 
@@ -7079,6 +6972,10 @@ if (existing_asset_indicator)
 
 double pmt_rate_local = 0.0;
 
+// Lookup key is purch_asset_id
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
+double purch_mtg_rate_diff_local = company->sm_inv_strategy[seg_num]->purch_mtg_rate_diff;
+
 if (pmt_rate_defn == REFINANCING_RATE)
 	{
 	double refinancing_rate
@@ -7095,7 +6992,7 @@ if (pmt_rate_defn == REFINANCING_RATE)
 		  convert_rate_basis(refinancing_rate,
 							 NOMINAL_SEMIANNUAL,
 							 pmt_freq)
-		  - company->sm_inv_strategy[seg_num]->purch_mtg_rate_diff)
+		  - purch_mtg_rate_diff_local)
 	  - servicing_fee;
 		
 	if (pmt_rate_local < - rate_ratio_threshold)
@@ -7114,13 +7011,13 @@ if (pmt_rate_defn == REFINANCING_RATE)
 
 pmt_rate_local 
 = max(0.0, 
-	  rates->get_int_rate(commencement_period,
+	  rates_ptr->get_int_rate(commencement_period,
 						  adj_reset_category_id,
 						  GET_YIELD_RATE,
 						  adj_reset_scen_yr,
 						  0.0,
 						  pmt_freq,
-						  NO_SHIFT,portfolio_sprd_adj_aig)//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+						  NO_SHIFT, port_sprd_adj_crbg)//CRBG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
 	  * adj_reset_scen_mult
 	  + adj_addn_init)
   - servicing_fee;
@@ -7137,7 +7034,6 @@ if (pmt_rate_local < - rate_ratio_threshold)
 return pmt_rate_local;
 
 }
-
 
 //@@ END
 
@@ -7185,7 +7081,6 @@ return FIXED_RATE;
 
 }
 
-
 //@@ END
 
 //@@ START - pmt_rate_defn_string
@@ -7204,7 +7099,6 @@ return get_string_of_enum_val(FIXED_RATE);
 
 
 }
-
 
 //@@ END
 
@@ -7258,7 +7152,6 @@ return maturity_period;
 
 }
 
-
 //@@ END
 
 //@@ START - prepmt_first_period
@@ -7283,7 +7176,6 @@ return initial_prepayment_period;
 
 }
 
-
 //@@ END
 
 //@@ START - prepmt_par_first_period
@@ -7304,12 +7196,12 @@ if (existing_asset_indicator)
 	{
 	if (prepmt_penalty_defn == PENALTY_PERCENT)
 		{
-		// 20191021 STW: fix compiler error while converting from RAFM 2.6 to RAFM 2.8
-		int preliminary_first_par_prepayment_period;
-		for(preliminary_first_par_prepayment_period = 0;
-			preliminary_first_par_prepayment_period + 1 < maturity_period
-			&& prepmt_penalty_sch[preliminary_first_par_prepayment_period] > 0.0;
-			preliminary_first_par_prepayment_period++){}	
+		int preliminary_first_par_prepayment_period = 0;
+
+		for (preliminary_first_par_prepayment_period = 0;
+			 preliminary_first_par_prepayment_period + 1 < maturity_period
+				&& prepmt_penalty_sch[preliminary_first_par_prepayment_period] > 0.0;
+			 preliminary_first_par_prepayment_period++){}	
 
 		return preliminary_first_par_prepayment_period;
 		}
@@ -7332,12 +7224,12 @@ else
 
 if (prepmt_penalty_defn == PENALTY_PERCENT)
 	{
-	// 20191021 STW: fix compiler error while converting from RAFM 2.6 to RAFM 2.8
-	int preliminary_first_par_prepayment_period;
-	for(preliminary_first_par_prepayment_period = commencement_period + 1;
-		preliminary_first_par_prepayment_period + 1 < maturity_period
-		&& prepmt_penalty_sch[preliminary_first_par_prepayment_period - commencement_period] > 0.0;
-		preliminary_first_par_prepayment_period++){}
+	int preliminary_first_par_prepayment_period = commencement_period + 1;
+
+	for (preliminary_first_par_prepayment_period = commencement_period + 1;
+		 preliminary_first_par_prepayment_period + 1 < maturity_period
+			&& prepmt_penalty_sch[preliminary_first_par_prepayment_period - commencement_period] > 0.0;
+		 preliminary_first_par_prepayment_period++){}
 
 	return max(initial_prepayment_period, preliminary_first_par_prepayment_period);
 	}
@@ -7360,7 +7252,6 @@ if (prepmt_penalty_defn == RELATED_TO_PAYMENT_RATE)
 return maturity_period;
 
 }
-
 
 //@@ END
 
@@ -7412,7 +7303,6 @@ return max(first_zero_prepayment_premium_related_to_payment_rate_period
 		   - initial_prepayment_period, 1);
 
 }
-
 
 //@@ END
 
@@ -7467,7 +7357,6 @@ return 0.0;
 
 }
 
-
 //@@ END
 
 //@@ START - proj_date_adj
@@ -7483,7 +7372,6 @@ return add_mths_to_date(proj_date, valn_period);
 
 }
 
-
 //@@ END
 
 //@@ START - proj_start_date
@@ -7495,10 +7383,9 @@ int MTG_ASSET_UDF::mtg_asset_proj_start_date() {
 
 
 #line 1 "proj_start_date.MTG_ASSET.for"
-return MonthNumberFromDate(proj_start_yr, proj_start_mth);
+return day_number_from_date(proj_start_yr, proj_start_mth, 1);
 
 }
-
 
 //@@ END
 
@@ -7520,7 +7407,6 @@ return proj_mth + 1;
 
 }
 
-
 //@@ END
 
 //@@ START - proj_start_yr
@@ -7541,7 +7427,6 @@ return get_yr_from_date(proj_date_adj);
 
 }
 
-
 //@@ END
 
 //@@ START - refinance_asset_id
@@ -7560,7 +7445,6 @@ return company->sm_inv_strategy[seg_num]->refinance_asset_id;
 
 }
 
-
 //@@ END
 
 //@@ START - refinancing_rate_defn_calc
@@ -7572,10 +7456,10 @@ int MTG_ASSET_UDF::mtg_asset_refinancing_rate_defn_calc() {
 
 
 #line 1 "refinancing_rate_defn_calc.MTG_ASSET.for"
+category_id = category_id;
 return refinancing_rate_defn;
 
 }
-
 
 //@@ END
 
@@ -7595,7 +7479,6 @@ return company->sm_inv_strategy[seg_num]->restructure_asset_id;
 
 }
 
-
 //@@ END
 
 //@@ START - restructure_write_down_pct_calc
@@ -7607,10 +7490,10 @@ double MTG_ASSET_UDF::mtg_asset_restructure_write_down_pct_calc() {
 
 
 #line 1 "restructure_write_down_pct_calc.MTG_ASSET.for"
+category_id = category_id;
 return max(0.0, min(1.0, restructure_write_down_pct));
 
 }
-
 
 //@@ END
 
@@ -7639,7 +7522,6 @@ return 0;
 
 }
 
-
 //@@ END
 
 //@@ START - sch_array_size
@@ -7655,7 +7537,6 @@ return maturity_period - start_period + 1;
 
 }
 
-
 //@@ END
 
 //@@ START - seg_num
@@ -7670,10 +7551,9 @@ int MTG_ASSET_UDF::mtg_asset_seg_num() {
 if (isMainModel)
 	return 0;
 
-return seg->getElementNumber();
+return seg_element->getElementNumber();
 
 }
-
 
 //@@ END
 
@@ -7689,7 +7569,6 @@ int MTG_ASSET_UDF::mtg_asset_start_period() {
 return max(0, commencement_period);
 
 }
-
 
 //@@ END
 
@@ -7743,7 +7622,7 @@ if (prepmt_model_defn == ANDREW_DAVIDSON)
 			}
 		}
 
-	adco->resetValues();
+	adco->rebaseModel(0);
 	
 	// For existing asset testing, lookup key is asset_id
 	// For purchase asset testing, lookup key is purch_asset_id
@@ -7795,7 +7674,6 @@ return 0;
 
 }
 
-
 //@@ END
 
 //@@ START - use_intex_databases_for_mtg
@@ -7813,7 +7691,6 @@ if (intex_defn == YES && port_defn == INVESTMENT)
 return 0;
 
 }
-
 
 //@@ END
 
@@ -7841,7 +7718,6 @@ return 0;
 
 }
 
-
 //@@ END
 
 //@@ START - yrs_since_last_pmt
@@ -7862,7 +7738,6 @@ return (1.0 / pmt_freq)
 			   % pmt_mths) / 12.0);
 
 }
-
 
 //@@ END
 
@@ -7900,19 +7775,18 @@ return;
 #line 1 "calc_num_records_to_run.MTG_ASSET.for"                                                                                   
 int MTG_ASSET::calc_num_records_to_run(void)
 {
-xstring data_file_name = replaceWildcards(data_location());
-string table_name = readCsvFile(data_file_name.getStdStr());
-xstring sql = (xstring)"SELECT * FROM " + table_name;
-executeQuery(sql.getStdStr(), mtg_mp_input_cols, mtg_mp_input);
-closeDatabase();
+xstring data_file_name_local = replaceWildcards(data_file_name);
 
-if (!mtg_mp_input_cols.size())
+OutputFileReader ofr;
+mtg_mp_input = ofr.readFile(data_file_name_local.getStdStr(), {"use_mp"});
+
+if (!mtg_mp_input.size())
 	return 0;
 
 int num_records_to_run = 0;
 for (int row = 0; row < mtg_mp_input.size(); row++)
 	{
-	if (mtg_mp_input[row][3] == "Yes")
+	if (mtg_mp_input[row][0] == "Yes")
 		num_records_to_run++;
 	}
 
@@ -7926,29 +7800,36 @@ double MTG_ASSET::category_refinancing_rate(int t, int cal_yr, int cal_mth, int 
 {
 double local_refinancing_rate = 0.0;
 
+category_id = category_id;
+double refinancing_rate_scen_addn_local = refinancing_rate_scen_addn;
+category_id = category_id;
+double refinancing_rate_scen_mult_local = refinancing_rate_scen_mult;
+category_id = category_id;
+int refinancing_rate_scen_yr_local = refinancing_rate_scen_yr;
+
 if (refinancing_rate_defn_calc == REFINANCING_RATE)
 	local_refinancing_rate
-	= max(rates->get_int_rate(t,
+	= max(rates_ptr->get_int_rate(t,
 	            "Govt",
 				GET_YIELD_RATE,
-				refinancing_rate_scen_yr,
+				refinancing_rate_scen_yr_local,
 				0.0,
 				NOMINAL_SEMIANNUAL, 
-				shift_defn,0)//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
-		  * refinancing_rate_scen_mult
-		  + refinancing_rate_scen_addn,
+				shift_defn)
+		  * refinancing_rate_scen_mult_local
+		  + refinancing_rate_scen_addn_local,
 		  0.0);
 
 if (refinancing_rate_defn_calc == CATEGORY_YIELD_TO_MATURITY)
 	local_refinancing_rate
-	= rates->get_int_rate(t,
+	= rates_ptr->get_int_rate(t,
 	            category_id,
 				GET_YIELD_RATE,
 				months_to_maturity / 12.0
 					- years_from_payment_to_end_of_payment_month_passed,
                 0.0,
 				NOMINAL_SEMIANNUAL, 
-				shift_defn,portfolio_sprd_adj_aig);//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+				shift_defn, port_sprd_adj_crbg);//CRBG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
 
 if (return_rate_basis != NOMINAL_SEMIANNUAL)
 	local_refinancing_rate
@@ -8036,8 +7917,7 @@ else // sch_type == "BALLOON"
 	SCHEDFile << "</table>" << endl;
 	}
 
-if (SCHEDFile != NULL)
-	SCHEDFile.close();
+SCHEDFile.close();
 
 // return file name
 return sched_file_name;
@@ -8124,17 +8004,19 @@ if (first_time)
 	first_time = false;
 
 	// Create file_name
-	xstring data_file_name = replaceWildcards(data_location());
+	xstring data_file_name_local = replaceWildcards(data_file_name);
+	xstring sch_file_name = data_file_name_local(data_file_name_local.find_last_of("/\\") + 1);
 
-	xstring sch_file = xstring(data_file_name(0, data_file_name.find("_" + xstring(proj_set_loop_num) + "_" + xstring(proj_set_sub_loop_num) + ".csv")))
-					   + "_sch_" + xstring(proj_set_loop_num) + "_" + xstring(proj_set_sub_loop_num) + ".csv";
+	//Schedule filename must include <*data*> wildcard for referenced files to work during grid processing
+	xstring sch_file
+	= replaceWildcards("<*data*>" + xstring(sch_file_name(0 , sch_file_name.find("_" + xstring(proj_set_loop_num) + "_" + xstring(proj_set_sub_loop_num) + ".csv")))
+	  + "_sch_" + xstring(proj_set_loop_num) + "_" + xstring(proj_set_sub_loop_num) + ".csv");
 
-	string table_name = readCsvFile(sch_file.getStdStr());
-	xstring sql = (xstring)"SELECT * FROM " + table_name;
-	executeQuery(sql.getStdStr(), mtg_sch_input_cols, mtg_sch_input);
-	closeDatabase();
+	OutputFileReader ofr;
+	mtg_sch_input = ofr.readFile(sch_file.getStdStr(), 
+					 {"asset_id", "date", "prepmt_penalty_pct", "balloon_prin_pmt_pct"});
 
-	if (!mtg_sch_input_cols.size())
+	if (!mtg_sch_input.size())
 		throw FatalError("Could not read Mortgage Schedule File: " 
 			              + sch_file + " "
 			              + "Please check your data.");
@@ -8162,9 +8044,25 @@ if ((mtg_sch_input_pos_iter
      = mtg_sch_input_pos.find(asset_id)) != mtg_sch_input_pos.end())
 	sch_start_row = mtg_sch_input_pos_iter->second;
 
+int cal_year = 0;
+int cal_month = 0;
+
+if(start_period == 0)
+	{ 
+	cal_year = get_yr_from_date(proj_date_adj);
+	cal_month = get_mth_from_date(proj_date_adj);
+	}
+else
+	{
+	cal_year = proj_start_yr + 1 + floor((proj_start_mth + start_period - 2) / 12.0) - 1;
+	cal_month = proj_start_mth + start_period - 1 - 12 * floor((proj_start_mth + start_period - 2) / 12.0);
+	}
+
+date_lookup = day_number_from_date(cal_year, cal_month, 1);
+
 // Check to make sure schedule file starts with right date
 xstring sch_start_date = mtg_sch_input[sch_start_row][1].c_str();
-if (date_diff(get_string_of_date(date(start_period)), sch_start_date) != 0)
+if (date_diff(get_string_of_date(date_lookup), sch_start_date) != 0)
 	throw FatalError("Mortgage Schedule File: start date for model point " 
 		              + asset_id + " does not equal current projection start date. "
 		              + "Please check your data.");
@@ -8199,9 +8097,25 @@ double balloon_prin_pmt_pct = 0.0;
 int sch_row = sch_start_row;
 xstring sch_date = sch_start_date;
 
+cal_year = 0;
+cal_month = 0;
+
 for (int month = start_period; month <= maturity_period; month++)
 	{
-	xstring curr_date = get_string_of_date(date(month));
+	if(month == 0)
+		{ 
+		cal_year = get_yr_from_date(proj_date_adj);
+		cal_month = get_mth_from_date(proj_date_adj);
+		}
+	else
+		{
+		cal_year = proj_start_yr + 1 + floor((proj_start_mth + month - 2) / 12.0) - 1;
+		cal_month = proj_start_mth + month - 1 - 12 * floor((proj_start_mth + month - 2) / 12.0);
+		}
+
+	date_lookup = day_number_from_date(cal_year, cal_month, 1);
+
+	xstring curr_date = get_string_of_date(date_lookup);
 
 	// Read data only if it has changed
 	if (date_diff(curr_date, sch_date) == 0 && sch_row < sch_size)
@@ -8232,46 +8146,15 @@ return;
 #line 1 "rebase_cash_flow.MTG_ASSET.for"                                                                                   
 void MTG_ASSET::rebase_cash_flow(int t, int command, const xstring &caller, const xstring &model_name)
 {
-// Only shrink and grow for portfolio runs.
 if (!isMainModel)
 	{
-	if (pv_model_point != getElementNumber()
-		|| pv_asset_defn != MORTGAGE_CODE)
-		{
-		if (pv_asset_defn == MORTGAGE_CODE)
-			shrink_mtg_clone(pv_model_point);
-	
-		else if (pv_asset_defn == BOND_CODE)
-			{
-			#ifdef __BOND_ASSET_H_
-			if (asset->sm_bond.size() > 0)
-				asset->sm_bond[0]->shrink_bond_clone(pv_model_point);
-			#else
-			; // Place-holder
-			#endif
-			}
-	
-		else if (pv_asset_defn == SEC_CODE)
-			{
-			#ifdef __SEC_ASSET_H_
-			if (asset->sm_sec.size() > 0)
-				asset->sm_sec[0]->shrink_sec_clone(pv_model_point);
-			#else
-			; // Place-holder
-			#endif
-			}
-		}
-	
 	pv_asset_defn = MORTGAGE_CODE;
-	pv_model_point = getElementNumber();
+	pv_model_point = getElementNumber(0);
 	}
 
 if (command == PRESENT_VALUE)
 	{
-	if (mtg_pv->isShrunk)
-		mtg_pv->grow();
-
-	mtg_pv->rebaseModel(t);
+	trigger_rebase(t);
 	if (mtg->asset_detail_pv_flag(t))
 		asset_detail_log_rebase_reset(t,
 				"mtg_pv->rebaseModel",
@@ -8280,10 +8163,7 @@ if (command == PRESENT_VALUE)
 
 else if (command == INTEREST_SAVINGS)
 	{
-	if (mtg_is->isShrunk)
-		mtg_is->grow();
-
-	mtg_is->rebaseModel(t);
+	trigger_rebase(t);
 	if (mtg->asset_detail_pv_flag(t))
 		asset_detail_log_rebase_reset(t,
 				"mtg_is->rebaseModel",
@@ -8292,10 +8172,7 @@ else if (command == INTEREST_SAVINGS)
 
 else if (command == YIELD_MAINTENANCE)
 	{
-	if (mtg_ym->isShrunk)
-		mtg_ym->grow();
-
-	mtg_ym->rebaseModel(t);
+	trigger_rebase(t);
 	if (mtg->asset_detail_pv_flag(t))
 		asset_detail_log_rebase_reset(t,
 				"mtg_ym->rebaseModel",
@@ -8323,15 +8200,32 @@ if (balloon_sch.size() < sch_array_size)
 	balloon_sch.resize(sch_array_size);
 
 double cumul_future_pct = 0.0;
+int cal_year = 0;
+int cal_month = 0;
 
 for (int month = start_period; month <= maturity_period; month++)
 	{
 	double balloon_pct = 0.0;
 	if (existing_asset_indicator == INIT_MP)
-		balloon_pct = balloon_prin_pmt_pct.AtTime(month);
+		{
+		if(month == 0)
+			{ 
+			cal_year = get_yr_from_date(proj_date_adj);
+			cal_month = get_mth_from_date(proj_date_adj);
+			}
+		else
+			{
+			cal_year = proj_start_yr + 1 + floor((proj_start_mth + month - 2) / 12.0) - 1;
+			cal_month = proj_start_mth + month - 1 - 12 * floor((proj_start_mth + month - 2) / 12.0);
+			}
+		date_lookup = day_number_from_date(cal_year, cal_month, 1);
+		asset_id = asset_id;
+		balloon_pct = balloon_prin_pmt_pct;
+		}
 	else // existing_asset_indicator == NEW_PURCH
 		{
 		company->sm_inv_strategy[seg_num]->mths_since_issue = month - start_period;
+		company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 		balloon_pct = company->sm_inv_strategy[seg_num]->purch_mtg_balloon_prin_pmt_pct;
 		}
 		
@@ -8367,48 +8261,92 @@ if (num_of_proj_task_loops == 0
 	|| is_first_proj_task_loop
 	|| restore_variables_ind == 1)
 	{
-	asset_id = asset_id_mp;
-	seg_id = seg_id_mp;
-	category_id = category_id_mp;
-	port_defn = port_defn_mp;
-	sale_class = sale_class_mp;
-	issue_date = issue_date_mp;
-	maturity_date = maturity_date_mp;
-	amortzn_start_cy = amortzn_start_cy_mp;
-	planned_sale_date = planned_sale_date_mp;
-	init_par_val = init_par_val_mp;
-	init_cost_basis = init_cost_basis_mp;
-	init_bk_val = init_bk_val_mp;
-	init_mkt_val = init_mkt_val_mp;
-	pmt_mode = pmt_mode_mp;
-	init_pmt_rate = init_pmt_rate_mp;
-	servicing_fee = servicing_fee_mp;
-	prin_val_at_issue = prin_val_at_issue_mp;
-	prepmt_opt_first_date = prepmt_opt_first_date_mp;
-	prepmt_penalty_defn = prepmt_penalty_defn_mp;
-
-	// Change selection to specified period 
-	if (balloon_defn_mp == YES_ON_SINGLE_DATE)
-		balloon_defn = YES_ON_SINGLE_PERIOD;
+	if (getElementNumber(1) > 0)
+		{
+		asset_id = asset->sm_mtg[getElementNumber(0)][0]->asset_id;
+		seg_id = asset->sm_mtg[getElementNumber(0)][0]->seg_id;
+		category_id = asset->sm_mtg[getElementNumber(0)][0]->category_id;
+		port_defn = asset->sm_mtg[getElementNumber(0)][0]->port_defn;
+		sale_class = asset->sm_mtg[getElementNumber(0)][0]->sale_class;
+		issue_date = asset->sm_mtg[getElementNumber(0)][0]->issue_date;
+		maturity_date = asset->sm_mtg[getElementNumber(0)][0]->maturity_date;
+		amortzn_start_cy = asset->sm_mtg[getElementNumber(0)][0]->amortzn_start_cy;
+		planned_sale_date = asset->sm_mtg[getElementNumber(0)][0]->planned_sale_date;
+		init_par_val = asset->sm_mtg[getElementNumber(0)][0]->init_par_val;
+		init_cost_basis = asset->sm_mtg[getElementNumber(0)][0]->init_cost_basis;
+		init_bk_val = asset->sm_mtg[getElementNumber(0)][0]->init_bk_val;
+		init_mkt_val = asset->sm_mtg[getElementNumber(0)][0]->init_mkt_val;
+		pmt_mode = asset->sm_mtg[getElementNumber(0)][0]->pmt_mode;
+		init_pmt_rate = asset->sm_mtg[getElementNumber(0)][0]->init_pmt_rate;
+		servicing_fee = asset->sm_mtg[getElementNumber(0)][0]->servicing_fee;
+		prin_val_at_issue = asset->sm_mtg[getElementNumber(0)][0]->prin_val_at_issue;
+		prepmt_opt_first_date = asset->sm_mtg[getElementNumber(0)][0]->prepmt_opt_first_date;
+		prepmt_penalty_defn = asset->sm_mtg[getElementNumber(0)][0]->prepmt_penalty_defn;
+		balloon_defn = asset->sm_mtg[getElementNumber(0)][0]->balloon_defn;
+		balloon_date = asset->sm_mtg[getElementNumber(0)][0]->balloon_date;
+		yld_maint_addn = asset->sm_mtg[getElementNumber(0)][0]->yld_maint_addn;
+		adj_reset_category_id = asset->sm_mtg[getElementNumber(0)][0]->adj_reset_category_id;
+		adj_reset_scen_yr = asset->sm_mtg[getElementNumber(0)][0]->adj_reset_scen_yr;
+		adj_reset_scen_mult = asset->sm_mtg[getElementNumber(0)][0]->adj_reset_scen_mult;
+		adj_reset_renewal_addn = asset->sm_mtg[getElementNumber(0)][0]->adj_reset_renewal_addn;
+		adj_next_reset_date = asset->sm_mtg[getElementNumber(0)][0]->adj_next_reset_date;
+		adj_reset_mths = asset->sm_mtg[getElementNumber(0)][0]->adj_reset_mths;
+		adj_max_incr_per_reset = asset->sm_mtg[getElementNumber(0)][0]->adj_max_incr_per_reset;
+		adj_max_decr_per_reset = asset->sm_mtg[getElementNumber(0)][0]->adj_max_decr_per_reset;
+		adj_min_rate = asset->sm_mtg[getElementNumber(0)][0]->adj_min_rate;
+		adj_max_rate = asset->sm_mtg[getElementNumber(0)][0]->adj_max_rate;
+		avr_contribn_pct = asset->sm_mtg[getElementNumber(0)][0]->avr_contribn_pct;
+		avr_max_pct = asset->sm_mtg[getElementNumber(0)][0]->avr_max_pct;
+		avr_obj_pct = asset->sm_mtg[getElementNumber(0)][0]->avr_obj_pct;
+		rbc_c1_pct = asset->sm_mtg[getElementNumber(0)][0]->rbc_c1_pct;
+		
+		intex_asset = asset->sm_mtg[getElementNumber(0)][0]->intex_asset;
+		}
 	else
-		balloon_defn = balloon_defn_mp;
+		{
+		asset_id = asset_id_mp;
+		seg_id = seg_id_mp;
+		category_id = category_id_mp;
+		port_defn = port_defn_mp;
+		sale_class = sale_class_mp;
+		issue_date = issue_date_mp;
+		maturity_date = maturity_date_mp;
+		amortzn_start_cy = amortzn_start_cy_mp;
+		planned_sale_date = planned_sale_date_mp;
+		init_par_val = init_par_val_mp;
+		init_cost_basis = init_cost_basis_mp;
+		init_bk_val = init_bk_val_mp;
+		init_mkt_val = init_mkt_val_mp;
+		pmt_mode = pmt_mode_mp;
+		init_pmt_rate = init_pmt_rate_mp;
+		servicing_fee = servicing_fee_mp;
+		prin_val_at_issue = prin_val_at_issue_mp;
+		prepmt_opt_first_date = prepmt_opt_first_date_mp;
+		prepmt_penalty_defn = prepmt_penalty_defn_mp;
 
-	balloon_date = balloon_date_mp;
-	yld_maint_addn = yld_maint_addn_mp;
-	adj_reset_category_id = adj_reset_category_id_mp;
-	adj_reset_scen_yr = adj_reset_scen_yr_mp;
-	adj_reset_scen_mult = adj_reset_scen_mult_mp;
-	adj_reset_renewal_addn = adj_reset_renewal_addn_mp;
-	adj_next_reset_date = adj_next_reset_date_mp;
-	adj_reset_mths = adj_reset_mths_mp;
-	adj_max_incr_per_reset = adj_max_incr_per_reset_mp;
-	adj_max_decr_per_reset = adj_max_decr_per_reset_mp;
-	adj_min_rate = adj_min_rate_mp;
-	adj_max_rate = adj_max_rate_mp;
-	avr_contribn_pct = avr_contribn_pct_mp;
-	avr_max_pct = avr_max_pct_mp;
-	avr_obj_pct = avr_obj_pct_mp;
-	rbc_c1_pct = rbc_c1_pct_mp;
+		// Change selection to specified period 
+		if (balloon_defn_mp == YES_ON_SINGLE_DATE)
+			balloon_defn = YES_ON_SINGLE_PERIOD;
+		else
+			balloon_defn = balloon_defn_mp;
+
+		balloon_date = balloon_date_mp;
+		yld_maint_addn = yld_maint_addn_mp;
+		adj_reset_category_id = adj_reset_category_id_mp;
+		adj_reset_scen_yr = adj_reset_scen_yr_mp;
+		adj_reset_scen_mult = adj_reset_scen_mult_mp;
+		adj_reset_renewal_addn = adj_reset_renewal_addn_mp;
+		adj_next_reset_date = adj_next_reset_date_mp;
+		adj_reset_mths = adj_reset_mths_mp;
+		adj_max_incr_per_reset = adj_max_incr_per_reset_mp;
+		adj_max_decr_per_reset = adj_max_decr_per_reset_mp;
+		adj_min_rate = adj_min_rate_mp;
+		adj_max_rate = adj_max_rate_mp;
+		avr_contribn_pct = avr_contribn_pct_mp;
+		avr_max_pct = avr_max_pct_mp;
+		avr_obj_pct = avr_obj_pct_mp;
+		rbc_c1_pct = rbc_c1_pct_mp;
+		}
 	}
 
 if (prepmt_penalty_defn == PENALTY_PERCENT)
@@ -8451,7 +8389,6 @@ if (is_first_proj_task_loop
 		&& (pmt_reset_first_period + adj_reset_mths) < maturity_period)
 		{
 		issue_adj_reset_mths_warning = false;
-		makeRunLogYellow();
 		log_screen << "Warning. ARM Reset Months for at least one existing mortgage"
 				   << " is incompatible with its payment frequency."
 				   << MSG_ERROR;
@@ -8478,7 +8415,6 @@ if (is_first_proj_task_loop
 
 	if (pmt_reset_first_period != mths_to_next_reset_prelim)
 		{
-		makeRunLogYellow();
 		log_screen << "Warning. ARM Next Reset Date (" << adj_next_reset_date
 				   << ") for existing mortgage '" << asset_id
 				   << "' does not fall"
@@ -8622,13 +8558,32 @@ if (existing_asset_indicator == PRIOR_PURCH)
 if (prepmt_penalty_sch.size() < sch_array_size)
 	prepmt_penalty_sch.resize(sch_array_size);
 	
+int cal_year = 0;
+int cal_month = 0;
+
 for (int month = start_period + 1; month <= maturity_period; month++)
 	{
 	if (existing_asset_indicator == INIT_MP) 
-		prepmt_penalty_sch[month - start_period] = prepmt_penalty_pct.AtTime(month);
+		{
+		if(month == 0)
+			{ 
+			cal_year = get_yr_from_date(proj_date_adj);
+			cal_month = get_mth_from_date(proj_date_adj);
+			}
+		else
+			{
+			cal_year = proj_start_yr + 1 + floor((proj_start_mth + month - 2) / 12.0) - 1;
+			cal_month = proj_start_mth + month - 1 - 12 * floor((proj_start_mth + month - 2) / 12.0);
+			}
+
+		date_lookup = day_number_from_date(cal_year, cal_month, 1);
+		asset_id = asset_id;
+		prepmt_penalty_sch[month - start_period] = prepmt_penalty_pct;
+		}
 	else // existing_asset_indicator == NEW_PURCH
 		{
 		company->sm_inv_strategy[seg_num]->mths_since_issue = month - start_period;							
+		company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 		prepmt_penalty_sch[month - start_period] = company->sm_inv_strategy[seg_num]->purch_mtg_prepmt_penalty_pct;
 		}
 	}
@@ -8666,30 +8621,56 @@ purch_asset_id = company->sm_inv_strategy[seg_num]->purch_assets_id[panum];
 company->sm_inv_strategy[seg_num]->purch_asset_id = purch_asset_id;
 asset_id = purch_asset_id;
 
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
+port_sprd_adj_crbg = company->sm_inv_strategy[seg_num]->port_sprd_adj_crbg; //CRBG - portfolio spread adjustment
+
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
+dur_wtd_sprd_adj_crbg = company->sm_inv_strategy[seg_num]->dur_wtd_sprd_adj_crbg; //CRBG - duration weighted spread adjustment
+
 // Get values from input table first in case they are used inside this function
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 category_id = company->sm_inv_strategy[seg_num]->purch_mtg_category_id;
-portfolio_sprd_adj_aig = company->sm_inv_strategy[seg_num]->portfolio_sprd_adj_aig; //AIG - portfolio spread adjustment
-dur_wtd_sprd_adj_aig = company->sm_inv_strategy[seg_num]->dur_wtd_sprd_adj_aig; //AIG - duration weighted spread adjustment
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 sale_class = company->sm_inv_strategy[seg_num]->purch_mtg_sale_class;
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 double ytm = company->sm_inv_strategy[seg_num]->purch_mtg_yrs_to_maturity;
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 double ytb = company->sm_inv_strategy[seg_num]->purch_mtg_yrs_to_balloon;
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 pmt_mode = company->sm_inv_strategy[seg_num]->purch_mtg_pmt_mode;
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 servicing_fee = company->sm_inv_strategy[seg_num]->purch_mtg_servicing_fee;
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 prepmt_penalty_defn = company->sm_inv_strategy[seg_num]->purch_mtg_prepmt_penalty_defn;
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 prepmt_protect_yrs = company->sm_inv_strategy[seg_num]->purch_mtg_prepmt_protect_yrs;
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 first_par_prepmt_yr = company->sm_inv_strategy[seg_num]->purch_mtg_first_par_prepmt_yr;
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 adj_addn_init = company->sm_inv_strategy[seg_num]->purch_mtg_adj_addn_init;
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 prepmt_penalty_mult = company->sm_inv_strategy[seg_num]->purch_mtg_prepmt_penalty_mult;
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 prepmt_penalty_addn = company->sm_inv_strategy[seg_num]->purch_mtg_prepmt_penalty_addn;
-pmt_rate_defn_purch = xstring(company->sm_inv_strategy[seg_num]->purch_mtg_rate_defn);
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
+pmt_rate_defn_purch = company->sm_inv_strategy[seg_num]->purch_mtg_rate_defn;
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 balloon_defn = company->sm_inv_strategy[seg_num]->purch_mtg_balloon_defn;
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 adj_reset_scen_mult = company->sm_inv_strategy[seg_num]->purch_mtg_adj_scen_mult;
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 adj_reset_category_id = company->sm_inv_strategy[seg_num]->purch_mtg_adj_category_id;
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 adj_reset_scen_yr = company->sm_inv_strategy[seg_num]->purch_mtg_adj_scen_yr;
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 avr_contribn_pct = company->sm_inv_strategy[seg_num]->purch_mtg_avr_contribn_pct;
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 avr_max_pct = company->sm_inv_strategy[seg_num]->purch_mtg_avr_max_pct;
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 avr_obj_pct = company->sm_inv_strategy[seg_num]->purch_mtg_avr_obj_pct;
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 rbc_c1_pct = company->sm_inv_strategy[seg_num]->purch_mtg_rbc_c1_pct;
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 yld_maint_addn = company->sm_inv_strategy[seg_num]->purch_mtg_yld_maint_addn;
 
 // Set up aset model point sequence number and model point group
@@ -8718,13 +8699,13 @@ else if (investment_purpose == RESTRUCTURE)
 else if (investment_purpose == REFINANCE)
 	purch_defn = REFINANCE;
 else
+	{
+	company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 	purch_defn = company->sm_inv_strategy[seg_num]->purch_mtg_port_defn;
+	}
 
 purch_amt = purch_asset_amt;
 purch_asset_sub_port = company->sm_inv_strategy[seg_num]->purch_assets_asset_sub_port_num[panum];
-
-// Read the variables varying by asset category
-ms_rereadGrid();
 
 if (company->sm_inv_strategy[seg_num]->purch_assets_port_defn[panum] == INVESTMENT)
 	port_defn = INVESTMENT;
@@ -8744,6 +8725,7 @@ else
 maturity_date = add_mths_to_date(proj_date_adj, add_mths);
 
 // Setup amortization start yr
+company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 add_mths = t + min(MAXIMUM_YEARS_FOR_MONTHS_CALCULATIONS,
                    company->sm_inv_strategy[seg_num]->purch_mtg_amortzn_yrs)* 12;
 
@@ -8788,6 +8770,7 @@ if (balloon_defn == YES_PER_SCHEDULE)
 // Adjustable rate variables
 if (pmt_rate_defn == FLOATING_RATE)
 	{
+	company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 	int adj_reset_mths_input = company->sm_inv_strategy[seg_num]->purch_mtg_adj_reset_mths;
 
 	if (adj_reset_mths_input <= 0)
@@ -8813,7 +8796,6 @@ if (pmt_rate_defn == FLOATING_RATE)
 			&& (pmt_reset_first_period + adj_reset_mths) < maturity_period)
 			{
 			issue_adj_reset_mths_warning = false;
-			makeRunLogYellow();
 			log_screen << "Warning: adjustable rate reset months for at least one investment mortgage"
 					<< " is incompatible with its payment frequency."
 					<< MSG_ERROR;
@@ -8827,19 +8809,24 @@ if (pmt_rate_defn == FLOATING_RATE)
 			}
 		}
 
-	adj_next_reset_date = add_mths_to_date(proj_date, pmt_reset_first_period);
+	adj_next_reset_date = add_mths_to_date(proj_date_adj, pmt_reset_first_period);
+	company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 	adj_reset_renewal_addn = company->sm_inv_strategy[seg_num]->purch_mtg_adj_addn_renewal;
 
 	// Setup adj_max_rate
 	double mortgage_interest_rate = pmt_rate_at_issue + servicing_fee;
 	
+	company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 	adj_max_rate
 	= mortgage_interest_rate
 	  + company->sm_inv_strategy[seg_num]->purch_mtg_adj_max_above_init;
 
+	company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 	adj_max_decr_per_reset = company->sm_inv_strategy[seg_num]->purch_mtg_adj_max_reset_decr;
+	company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 	adj_max_incr_per_reset = company->sm_inv_strategy[seg_num]->purch_mtg_adj_max_reset_incr;
 	
+	company->sm_inv_strategy[seg_num]->purch_asset_id = company->sm_inv_strategy[seg_num]->purch_asset_id;
 	adj_min_rate
 	= mortgage_interest_rate
 	  - company->sm_inv_strategy[seg_num]->purch_mtg_adj_max_below_init;
@@ -8860,31 +8847,28 @@ return;
 
 
 
-#line 1 "shrink_mtg_clone.MTG_ASSET.for"                                                                                   
-void MTG_ASSET::shrink_mtg_clone(int mp)
+#line 1 "trigger_rebase.MTG_ASSET.for"                                                                                   
+void MTG_ASSET::trigger_rebase(int t)
 {
-// Only shrink clones for portfolio runs.
-if (isMainModel)
-	return;
+int rebase_element = 0;
+//resize to 0
+sm_mtg_cf_var[0].resize(0);
+sm_mtg_cf_var[0].resize(num_variations);
 
-if (mp >= 0)
+for (int i = 0; i < num_variations; i++)
 	{
-	if (mp < asset->sm_mtg.size())
-		{
-		MTG_ASSET *prior_mtg_element = asset->sm_mtg[mp];
+	sm_mtg_cf_var[0][i]->rebase_time = t;
+	sm_mtg_cf_var[0][i]->rates_ptr = rates_ptr;
 
-		if(!prior_mtg_element->mtg_pv->isShrunk)
-			prior_mtg_element->mtg_pv->shrink();
-		if(!prior_mtg_element->mtg_is->isShrunk)
-			prior_mtg_element->mtg_is->shrink();
-		if(!prior_mtg_element->mtg_ym->isShrunk)
-			prior_mtg_element->mtg_ym->shrink();
-		}
-	else
-		// this should never occur
-		throw FatalError("mp (" + xstring(mp)
-						 + ") >= mtg.size (" + xstring(asset->sm_mtg.size())
-						 + " in mtg->shrink_mtg_clone.");
+	#if defined(__INTEX_ASSET_H_)
+	if (mtg->intex)
+		sm_mtg_cf_var[0][i]->intex = intex;
+	#endif
+	
+	#if defined(__ADCO_ASSET_H_)
+	if (mtg->adco)
+		sm_mtg_cf_var[0][i]->adco = adco;
+	#endif
 	}
 
 return;
@@ -8895,9 +8879,9 @@ return;
 #line 1 "validate_data.MTG_ASSET.for"                                                                                   
 void MTG_ASSET::validate_data(void) 
 {
-if (!cloning_wanted)
-	throw FatalError("You must select 'Yes' for the 'Cloning Wanted' projection task property "
-	                 "in order to include mortgages in the projection.");
+//if (!cloning_wanted)
+//	throw FatalError("You must select 'Yes' for the 'Cloning Wanted' projection task property "
+//	                 "in order to include mortgages in the projection.");
 
 if (existing_asset_indicator)
 	{
@@ -8911,8 +8895,7 @@ if (existing_asset_indicator)
 			{
 			if (!asset->valid_t_low_t_high(calculated_t_low, calculated_t_high))
 				{
-				skipModelPoint();
-				return;
+				throw NonFatalError("");
 				}
 			}
 
@@ -8927,10 +8910,7 @@ if (existing_asset_indicator)
 		if ((asset->init_cash_bal_map_iter
 				= asset->init_cash_bal_map.find(index_val))
 			== asset->init_cash_bal_map.end())
-			{
-			if (data_validation_defn == YES)
-				makeRunLogYellow();
-				
+			{				
 			log_screen.setf(ios::fixed, ios::floatfield);
 	
 			if (init_par_val == 0 && data_validation_defn == YES)
@@ -8950,8 +8930,7 @@ if (existing_asset_indicator)
 				asset->init_cash_bal_map[index_val] = init_par_val;
 				}
 	
-			skipModelPoint();
-			return;
+			throw NonFatalError("");
 			}
 		}
 	}
@@ -9078,15 +9057,17 @@ void MTG_ASSET::write_state_of_world_mp(void)
 {
 static bool first_time = true;
 
-xstring data_file_name = replaceWildcards(data_location());
+xstring data_file_name_local = replaceWildcards(data_file_name);
+xstring sch_file_name = data_file_name_local(data_file_name_local.find_last_of("/\\") + 1);
 
 xstring mtg_state_of_world_file
-= xstring(data_file_name(0, data_file_name.find("_" + xstring(proj_set_loop_num) + "_" + xstring(proj_set_sub_loop_num) + ".csv")))
+= xstring(data_file_name_local(0, data_file_name_local.find("_" + xstring(proj_set_loop_num) + "_" + xstring(proj_set_sub_loop_num) + ".csv")))
   + "_" + xstring(proj_set_loop_num) + "_" + xstring(proj_set_sub_loop_num + 1) + ".csv";
 
+//Schedule filename must include <*data*> wildcard for referenced files to work during grid processing
 xstring sch_file
-= xstring(data_file_name(0 , data_file_name.find("_" + xstring(proj_set_loop_num) + "_" + xstring(proj_set_sub_loop_num) + ".csv")))
-  + "_sch_" + xstring(proj_set_loop_num) + "_" + xstring(proj_set_sub_loop_num + 1) + ".csv";
+= replaceWildcards("<*data*>" + xstring(sch_file_name(0 , sch_file_name.find("_" + xstring(proj_set_loop_num) + "_" + xstring(proj_set_sub_loop_num) + ".csv")))
+  + "_sch_" + xstring(proj_set_loop_num) + "_" + xstring(proj_set_sub_loop_num + 1) + ".csv");
 
 // Remove any old file
 if (first_time)
@@ -9146,11 +9127,12 @@ if (!mtg_state_of_world_mp_output.is_open())
 	<< "avr_contribn_pct_mp" << ","			// col 34 = avr_contribn_pct
 	<< "avr_max_pct_mp" << ","				// col 35 = avr_max_pct
 	<< "avr_obj_pct_mp" << ","				// col 36 = avr_obj_pct
-	<< "rbc_c1_pct_mp" << endl;				// col 37 = rbc_c1_pct
+	<< "rbc_c1_pct_mp" << ","				// col 37 = rbc_c1_pct
+	<< "unique_id_mp" << endl;				// col 38 = unique_id_mp
 	}
 
 static int counter = 1;
-xstring group_mp = get_base_group_name(group, false);//WTW - Gen2 - Move Extern definitions to rates header
+xstring group_mp = get_base_group_name(group, true);
 xstring port_defn = get_string_of_enum_val(this->port_defn);
 xstring sale_class = get_string_of_enum_val(this->sale_class);
 double notional_amt = this->notional_amt(last_proj_period);
@@ -9210,7 +9192,8 @@ mtg_state_of_world_mp_output
 << avr_contribn_pct << ","
 << avr_max_pct << ","
 << avr_obj_pct << ","
-<< rbc_c1_pct << endl;
+<< rbc_c1_pct << ","   
+<< getElementNumber(0) << endl;   
 
 counter++;
 
@@ -9225,8 +9208,7 @@ return;
 void MTG_ASSET::Terminator()
 {
 
-if (PVCFile != NULL)
-	PVCFile.close();
+PVCFile.close();
 
 }
 
@@ -9379,196 +9361,200 @@ const CashFlowCommonData MTG_ASSET::mCFStaticData_0[] =
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_dur_val, 'E','N', '3', 'C', (size_t)&modelOffset->dur_val),
 	CashFlowCommonData(61, "eff_dur", "mtg_asset_eff_dur",  "eff_dur",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_eff_dur, 'E','N', '3', 'C', (size_t)&modelOffset->eff_dur),
-	CashFlowCommonData(62, "finalize", "mtg_asset_finalize",  "finalize",  CashFlowCommonData::AVG,
+	CashFlowCommonData(62, "excess_dflt_amt", "mtg_asset_excess_dflt_amt",  "excess_dflt_amt",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_excess_dflt_amt, 'E','Y', '3', 'P', (size_t)&modelOffset->excess_dflt_amt),
+	CashFlowCommonData(63, "excess_dflt_pct", "mtg_asset_excess_dflt_pct",  "excess_dflt_pct",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_excess_dflt_pct, 'E','Y', '3', 'P', (size_t)&modelOffset->excess_dflt_pct),
+	CashFlowCommonData(64, "finalize", "mtg_asset_finalize",  "finalize",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_finalize, 'E','N', '3', 'N', (size_t)&modelOffset->finalize),
-	CashFlowCommonData(63, "foreclosure_accr_int_net_write_down", "mtg_asset_foreclosure_accr_int_net_write_down",  "foreclosure_accr_int_net_write_down",  CashFlowCommonData::SUM,
+	CashFlowCommonData(65, "foreclosure_accr_int_net_write_down", "mtg_asset_foreclosure_accr_int_net_write_down",  "foreclosure_accr_int_net_write_down",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_foreclosure_accr_int_net_write_down, 'E','Y', '3', 'C', (size_t)&modelOffset->foreclosure_accr_int_net_write_down),
-	CashFlowCommonData(64, "foreclosure_bk_val_net_write_down", "mtg_asset_foreclosure_bk_val_net_write_down",  "foreclosure_bk_val_net_write_down",  CashFlowCommonData::SUM,
+	CashFlowCommonData(66, "foreclosure_bk_val_net_write_down", "mtg_asset_foreclosure_bk_val_net_write_down",  "foreclosure_bk_val_net_write_down",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_foreclosure_bk_val_net_write_down, 'E','Y', '3', 'C', (size_t)&modelOffset->foreclosure_bk_val_net_write_down),
-	CashFlowCommonData(65, "foreclosure_cost_basis_net_write_down", "mtg_asset_foreclosure_cost_basis_net_write_down",  "foreclosure_cost_basis_net_write_down",  CashFlowCommonData::SUM,
+	CashFlowCommonData(67, "foreclosure_cost_basis_net_write_down", "mtg_asset_foreclosure_cost_basis_net_write_down",  "foreclosure_cost_basis_net_write_down",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_foreclosure_cost_basis_net_write_down, 'E','Y', '3', 'C', (size_t)&modelOffset->foreclosure_cost_basis_net_write_down),
-	CashFlowCommonData(66, "foreclosure_pct", "mtg_asset_foreclosure_pct",  "foreclosure_pct",  CashFlowCommonData::AVG,
+	CashFlowCommonData(68, "foreclosure_pct", "mtg_asset_foreclosure_pct",  "foreclosure_pct",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_foreclosure_pct, 'E','N', '3', 'C', (size_t)&modelOffset->foreclosure_pct),
-	CashFlowCommonData(67, "foreclosure_prin_net_write_down", "mtg_asset_foreclosure_prin_net_write_down",  "foreclosure_prin_net_write_down",  CashFlowCommonData::SUM,
+	CashFlowCommonData(69, "foreclosure_prin_net_write_down", "mtg_asset_foreclosure_prin_net_write_down",  "foreclosure_prin_net_write_down",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_foreclosure_prin_net_write_down, 'E','Y', '3', 'C', (size_t)&modelOffset->foreclosure_prin_net_write_down),
-	CashFlowCommonData(68, "foreclosure_rate", "mtg_asset_foreclosure_rate",  "foreclosure_rate",  CashFlowCommonData::AVG,
+	CashFlowCommonData(70, "foreclosure_rate", "mtg_asset_foreclosure_rate",  "foreclosure_rate",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_foreclosure_rate, 'E','N', '3', 'C', (size_t)&modelOffset->foreclosure_rate),
-	CashFlowCommonData(69, "gaap_inc_bk_val", "mtg_asset_gaap_inc_bk_val",  "gaap_inc_bk_val",  CashFlowCommonData::SUM,
+	CashFlowCommonData(71, "gaap_inc_bk_val", "mtg_asset_gaap_inc_bk_val",  "gaap_inc_bk_val",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_gaap_inc_bk_val, 'E','N', '3', 'C', (size_t)&modelOffset->gaap_inc_bk_val),
-	CashFlowCommonData(70, "gaap_inc_unrealzd_cap_gain", "mtg_asset_gaap_inc_unrealzd_cap_gain",  "gaap_inc_unrealzd_cap_gain",  CashFlowCommonData::SUM,
+	CashFlowCommonData(72, "gaap_inc_unrealzd_cap_gain", "mtg_asset_gaap_inc_unrealzd_cap_gain",  "gaap_inc_unrealzd_cap_gain",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_gaap_inc_unrealzd_cap_gain, 'E','N', '3', 'C', (size_t)&modelOffset->gaap_inc_unrealzd_cap_gain),
-	CashFlowCommonData(71, "gaap_surp_bk_val", "mtg_asset_gaap_surp_bk_val",  "gaap_surp_bk_val",  CashFlowCommonData::SUM,
+	CashFlowCommonData(73, "gaap_surp_bk_val", "mtg_asset_gaap_surp_bk_val",  "gaap_surp_bk_val",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_gaap_surp_bk_val, 'E','N', '3', 'C', (size_t)&modelOffset->gaap_surp_bk_val),
-	CashFlowCommonData(72, "gaap_unrealzd_cap_gain_incr", "mtg_asset_gaap_unrealzd_cap_gain_incr",  "gaap_unrealzd_cap_gain_incr",  CashFlowCommonData::SUM,
+	CashFlowCommonData(74, "gaap_unrealzd_cap_gain_incr", "mtg_asset_gaap_unrealzd_cap_gain_incr",  "gaap_unrealzd_cap_gain_incr",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_gaap_unrealzd_cap_gain_incr, 'E','Y', '3', 'C', (size_t)&modelOffset->gaap_unrealzd_cap_gain_incr),
-	CashFlowCommonData(73, "imr_realzd_cap_gain", "mtg_asset_imr_realzd_cap_gain",  "imr_realzd_cap_gain",  CashFlowCommonData::SUM,
+	CashFlowCommonData(75, "imr_realzd_cap_gain", "mtg_asset_imr_realzd_cap_gain",  "imr_realzd_cap_gain",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_imr_realzd_cap_gain, 'E','Y', '3', 'C', (size_t)&modelOffset->imr_realzd_cap_gain),
-	CashFlowCommonData(74, "imr_realzd_cap_gain_from_sale", "mtg_asset_imr_realzd_cap_gain_from_sale",  "imr_realzd_cap_gain_from_sale",  CashFlowCommonData::SUM,
+	CashFlowCommonData(76, "imr_realzd_cap_gain_from_sale", "mtg_asset_imr_realzd_cap_gain_from_sale",  "imr_realzd_cap_gain_from_sale",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_imr_realzd_cap_gain_from_sale, 'E','Y', '3', 'C', (size_t)&modelOffset->imr_realzd_cap_gain_from_sale),
-	CashFlowCommonData(75, "imr_realzd_cap_gain_rml", "mtg_asset_imr_realzd_cap_gain_rml",  "imr_realzd_cap_gain_rml",  CashFlowCommonData::SUM,
+	CashFlowCommonData(77, "imr_realzd_cap_gain_rml", "mtg_asset_imr_realzd_cap_gain_rml",  "imr_realzd_cap_gain_rml",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_imr_realzd_cap_gain_rml, 'E','Y', '3', 'C', (size_t)&modelOffset->imr_realzd_cap_gain_rml),
-	CashFlowCommonData(76, "imr_realzd_cap_gain_rml_from_sale", "mtg_asset_imr_realzd_cap_gain_rml_from_sale",  "imr_realzd_cap_gain_rml_from_sale",  CashFlowCommonData::SUM,
+	CashFlowCommonData(78, "imr_realzd_cap_gain_rml_from_sale", "mtg_asset_imr_realzd_cap_gain_rml_from_sale",  "imr_realzd_cap_gain_rml_from_sale",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_imr_realzd_cap_gain_rml_from_sale, 'E','Y', '3', 'C', (size_t)&modelOffset->imr_realzd_cap_gain_rml_from_sale),
-	CashFlowCommonData(77, "imr_yrs_to_maturity", "mtg_asset_imr_yrs_to_maturity",  "imr_yrs_to_maturity",  CashFlowCommonData::AVG,
+	CashFlowCommonData(79, "imr_yrs_to_maturity", "mtg_asset_imr_yrs_to_maturity",  "imr_yrs_to_maturity",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_imr_yrs_to_maturity, 'E','N', '3', 'C', (size_t)&modelOffset->imr_yrs_to_maturity),
-	CashFlowCommonData(78, "initialize", "mtg_asset_initialize",  "initialize",  CashFlowCommonData::AVG,
+	CashFlowCommonData(80, "initialize", "mtg_asset_initialize",  "initialize",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_initialize, 'E','N', '3', 'N', (size_t)&modelOffset->initialize),
-	CashFlowCommonData(79, "int_div_and_rent", "mtg_asset_int_div_and_rent",  "int_div_and_rent",  CashFlowCommonData::SUM,
+	CashFlowCommonData(81, "int_div_and_rent", "mtg_asset_int_div_and_rent",  "int_div_and_rent",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_int_div_and_rent, 'E','Y', '3', 'P', (size_t)&modelOffset->int_div_and_rent),
-	CashFlowCommonData(80, "int_pmt", "mtg_asset_int_pmt",  "int_pmt",  CashFlowCommonData::SUM,
+	CashFlowCommonData(82, "int_pmt", "mtg_asset_int_pmt",  "int_pmt",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_int_pmt, 'E','Y', '3', 'C', (size_t)&modelOffset->int_pmt),
-	CashFlowCommonData(81, "intex_accr_int_adj", "mtg_asset_intex_accr_int_adj",  "intex_accr_int_adj",  CashFlowCommonData::SUM,
+	CashFlowCommonData(83, "intex_accr_int_adj", "mtg_asset_intex_accr_int_adj",  "intex_accr_int_adj",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_intex_accr_int_adj, 'E','N', '3', 'P', (size_t)&modelOffset->intex_accr_int_adj),
-	CashFlowCommonData(82, "intex_pct_remaining", "mtg_asset_intex_pct_remaining",  "intex_pct_remaining",  CashFlowCommonData::AVG,
+	CashFlowCommonData(84, "intex_pct_remaining", "mtg_asset_intex_pct_remaining",  "intex_pct_remaining",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_intex_pct_remaining, 'E','N', '3', 'P', (size_t)&modelOffset->intex_pct_remaining),
-	CashFlowCommonData(83, "intex_tgt", "mtg_asset_intex_tgt",  "intex_tgt",  CashFlowCommonData::AVG,
+	CashFlowCommonData(85, "intex_tgt", "mtg_asset_intex_tgt",  "intex_tgt",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_intex_tgt, 'E','Y', '3', 'P', (size_t)&modelOffset->intex_tgt),
-	CashFlowCommonData(84, "mkt_risk_sprd", "mtg_asset_mkt_risk_sprd",  "mkt_risk_sprd",  CashFlowCommonData::AVG,
+	CashFlowCommonData(86, "mkt_risk_sprd", "mtg_asset_mkt_risk_sprd",  "mkt_risk_sprd",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_mkt_risk_sprd, 'E','N', '3', 'C', (size_t)&modelOffset->mkt_risk_sprd),
-	CashFlowCommonData(85, "mkt_sprd", "mtg_asset_mkt_sprd",  "mkt_sprd",  CashFlowCommonData::AVG,
+	CashFlowCommonData(87, "mkt_sprd", "mtg_asset_mkt_sprd",  "mkt_sprd",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_mkt_sprd, 'E','N', '3', 'C', (size_t)&modelOffset->mkt_sprd),
-	CashFlowCommonData(86, "mkt_to_bk_ratio", "mtg_asset_mkt_to_bk_ratio",  "mkt_to_bk_ratio",  CashFlowCommonData::AVG,
+	CashFlowCommonData(88, "mkt_to_bk_ratio", "mtg_asset_mkt_to_bk_ratio",  "mkt_to_bk_ratio",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_mkt_to_bk_ratio, 'E','N', '3', 'P', (size_t)&modelOffset->mkt_to_bk_ratio),
-	CashFlowCommonData(87, "mkt_val", "mtg_asset_mkt_val",  "mkt_val",  CashFlowCommonData::SUM,
+	CashFlowCommonData(89, "mkt_val", "mtg_asset_mkt_val",  "mkt_val",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_mkt_val, 'E','N', '3', 'C', (size_t)&modelOffset->mkt_val),
-	CashFlowCommonData(88, "mkt_val_bef_fund_match_sale", "mtg_asset_mkt_val_bef_fund_match_sale",  "mkt_val_bef_fund_match_sale",  CashFlowCommonData::SUM,
+	CashFlowCommonData(90, "mkt_val_bef_fund_match_sale", "mtg_asset_mkt_val_bef_fund_match_sale",  "mkt_val_bef_fund_match_sale",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_mkt_val_bef_fund_match_sale, 'E','N', '3', 'C', (size_t)&modelOffset->mkt_val_bef_fund_match_sale),
-	CashFlowCommonData(89, "mkt_val_bef_neg_cash_flow_sale", "mtg_asset_mkt_val_bef_neg_cash_flow_sale",  "mkt_val_bef_neg_cash_flow_sale",  CashFlowCommonData::SUM,
+	CashFlowCommonData(91, "mkt_val_bef_neg_cash_flow_sale", "mtg_asset_mkt_val_bef_neg_cash_flow_sale",  "mkt_val_bef_neg_cash_flow_sale",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_mkt_val_bef_neg_cash_flow_sale, 'E','N', '3', 'P', (size_t)&modelOffset->mkt_val_bef_neg_cash_flow_sale),
-	CashFlowCommonData(90, "mkt_val_bef_rebal_sale", "mtg_asset_mkt_val_bef_rebal_sale",  "mkt_val_bef_rebal_sale",  CashFlowCommonData::SUM,
+	CashFlowCommonData(92, "mkt_val_bef_rebal_sale", "mtg_asset_mkt_val_bef_rebal_sale",  "mkt_val_bef_rebal_sale",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_mkt_val_bef_rebal_sale, 'E','N', '3', 'P', (size_t)&modelOffset->mkt_val_bef_rebal_sale),
-	CashFlowCommonData(91, "mkt_val_bef_sale", "mtg_asset_mkt_val_bef_sale",  "mkt_val_bef_sale",  CashFlowCommonData::SUM,
+	CashFlowCommonData(93, "mkt_val_bef_sale", "mtg_asset_mkt_val_bef_sale",  "mkt_val_bef_sale",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_mkt_val_bef_sale, 'E','N', '3', 'C', (size_t)&modelOffset->mkt_val_bef_sale),
-	CashFlowCommonData(92, "mkt_val_for_dur_bef_neg_cash_flow_sale", "mtg_asset_mkt_val_for_dur_bef_neg_cash_flow_sale",  "mkt_val_for_dur_bef_neg_cash_flow_sale",  CashFlowCommonData::SUM,
+	CashFlowCommonData(94, "mkt_val_for_dur_bef_neg_cash_flow_sale", "mtg_asset_mkt_val_for_dur_bef_neg_cash_flow_sale",  "mkt_val_for_dur_bef_neg_cash_flow_sale",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_mkt_val_for_dur_bef_neg_cash_flow_sale, 'E','N', '3', 'C', (size_t)&modelOffset->mkt_val_for_dur_bef_neg_cash_flow_sale),
-	CashFlowCommonData(93, "mkt_val_for_dur_bef_rebal_sale", "mtg_asset_mkt_val_for_dur_bef_rebal_sale",  "mkt_val_for_dur_bef_rebal_sale",  CashFlowCommonData::SUM,
+	CashFlowCommonData(95, "mkt_val_for_dur_bef_rebal_sale", "mtg_asset_mkt_val_for_dur_bef_rebal_sale",  "mkt_val_for_dur_bef_rebal_sale",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_mkt_val_for_dur_bef_rebal_sale, 'E','N', '3', 'C', (size_t)&modelOffset->mkt_val_for_dur_bef_rebal_sale),
-	CashFlowCommonData(94, "mkt_val_for_dur_sold", "mtg_asset_mkt_val_for_dur_sold",  "mkt_val_for_dur_sold",  CashFlowCommonData::SUM,
+	CashFlowCommonData(96, "mkt_val_for_dur_sold", "mtg_asset_mkt_val_for_dur_sold",  "mkt_val_for_dur_sold",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_mkt_val_for_dur_sold, 'E','N', '3', 'C', (size_t)&modelOffset->mkt_val_for_dur_sold),
-	CashFlowCommonData(95, "mkt_val_for_eff_dur", "mtg_asset_mkt_val_for_eff_dur",  "mkt_val_for_eff_dur",  CashFlowCommonData::SUM,
+	CashFlowCommonData(97, "mkt_val_for_eff_dur", "mtg_asset_mkt_val_for_eff_dur",  "mkt_val_for_eff_dur",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_mkt_val_for_eff_dur, 'E','N', '3', 'C', (size_t)&modelOffset->mkt_val_for_eff_dur),
-	CashFlowCommonData(96, "mkt_val_purch", "mtg_asset_mkt_val_purch",  "mkt_val_purch",  CashFlowCommonData::SUM,
+	CashFlowCommonData(98, "mkt_val_purch", "mtg_asset_mkt_val_purch",  "mkt_val_purch",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_mkt_val_purch, 'E','Y', '3', 'P', (size_t)&modelOffset->mkt_val_purch),
-	CashFlowCommonData(97, "mkt_val_shifted", "mtg_asset_mkt_val_shifted",  "mkt_val_shifted",  CashFlowCommonData::SUM,
+	CashFlowCommonData(99, "mkt_val_shifted", "mtg_asset_mkt_val_shifted",  "mkt_val_shifted",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_mkt_val_shifted, 'E','N', '3', 'C', (size_t)&modelOffset->mkt_val_shifted),
-	CashFlowCommonData(98, "mkt_val_sold", "mtg_asset_mkt_val_sold",  "mkt_val_sold",  CashFlowCommonData::SUM,
+	CashFlowCommonData(100, "mkt_val_sold", "mtg_asset_mkt_val_sold",  "mkt_val_sold",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_mkt_val_sold, 'E','Y', '3', 'C', (size_t)&modelOffset->mkt_val_sold),
-	CashFlowCommonData(99, "mkt_val_times_dur_bef_neg_cash_flow_sale", "mtg_asset_mkt_val_times_dur_bef_neg_cash_flow_sale",  "mkt_val_times_dur_bef_neg_cash_flow_sale",  CashFlowCommonData::SUM,
+	CashFlowCommonData(101, "mkt_val_times_dur_bef_neg_cash_flow_sale", "mtg_asset_mkt_val_times_dur_bef_neg_cash_flow_sale",  "mkt_val_times_dur_bef_neg_cash_flow_sale",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_mkt_val_times_dur_bef_neg_cash_flow_sale, 'E','N', '3', 'P', (size_t)&modelOffset->mkt_val_times_dur_bef_neg_cash_flow_sale),
-	CashFlowCommonData(100, "mkt_val_times_dur_bef_rebal_sale", "mtg_asset_mkt_val_times_dur_bef_rebal_sale",  "mkt_val_times_dur_bef_rebal_sale",  CashFlowCommonData::SUM,
+	CashFlowCommonData(102, "mkt_val_times_dur_bef_rebal_sale", "mtg_asset_mkt_val_times_dur_bef_rebal_sale",  "mkt_val_times_dur_bef_rebal_sale",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_mkt_val_times_dur_bef_rebal_sale, 'E','N', '3', 'P', (size_t)&modelOffset->mkt_val_times_dur_bef_rebal_sale),
-	CashFlowCommonData(101, "mkt_val_times_eff_dur", "mtg_asset_mkt_val_times_eff_dur",  "mkt_val_times_eff_dur",  CashFlowCommonData::SUM,
+	CashFlowCommonData(103, "mkt_val_times_eff_dur", "mtg_asset_mkt_val_times_eff_dur",  "mkt_val_times_eff_dur",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_mkt_val_times_eff_dur, 'E','N', '3', 'C', (size_t)&modelOffset->mkt_val_times_eff_dur),
-	CashFlowCommonData(102, "mths_bef_maturity", "mtg_asset_mths_bef_maturity",  "mths_bef_maturity",  CashFlowCommonData::AVG,
+	CashFlowCommonData(104, "mths_bef_maturity", "mtg_asset_mths_bef_maturity",  "mths_bef_maturity",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_mths_bef_maturity, 'E','N', '3', 'P', (size_t)&modelOffset->mths_bef_maturity),
-	CashFlowCommonData(103, "mths_since_issue", "mtg_asset_mths_since_issue",  "mths_since_issue",  CashFlowCommonData::AVG,
+	CashFlowCommonData(105, "mths_since_issue", "mtg_asset_mths_since_issue",  "mths_since_issue",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_mths_since_issue, 'E','N', '3', 'P', (size_t)&modelOffset->mths_since_issue),
-	CashFlowCommonData(104, "mths_to_next_mkt_val_calc", "mtg_asset_mths_to_next_mkt_val_calc",  "mths_to_next_mkt_val_calc",  CashFlowCommonData::AVG,
+	CashFlowCommonData(106, "mths_to_next_mkt_val_calc", "mtg_asset_mths_to_next_mkt_val_calc",  "mths_to_next_mkt_val_calc",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_mths_to_next_mkt_val_calc, 'E','N', '3', 'C', (size_t)&modelOffset->mths_to_next_mkt_val_calc),
-	CashFlowCommonData(105, "net_yld", "mtg_asset_net_yld",  "net_yld",  CashFlowCommonData::AVG,
+	CashFlowCommonData(107, "net_yld", "mtg_asset_net_yld",  "net_yld",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_net_yld, 'E','N', '3', 'C', (size_t)&modelOffset->net_yld),
-	CashFlowCommonData(106, "notional_amt", "mtg_asset_notional_amt",  "notional_amt",  CashFlowCommonData::SUM,
+	CashFlowCommonData(108, "notional_amt", "mtg_asset_notional_amt",  "notional_amt",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_notional_amt, 'E','N', '3', 'C', (size_t)&modelOffset->notional_amt),
-	CashFlowCommonData(107, "notional_amt_bef_fund_match_sale", "mtg_asset_notional_amt_bef_fund_match_sale",  "notional_amt_bef_fund_match_sale",  CashFlowCommonData::SUM,
+	CashFlowCommonData(109, "notional_amt_bef_fund_match_sale", "mtg_asset_notional_amt_bef_fund_match_sale",  "notional_amt_bef_fund_match_sale",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_notional_amt_bef_fund_match_sale, 'E','N', '3', 'C', (size_t)&modelOffset->notional_amt_bef_fund_match_sale),
-	CashFlowCommonData(108, "notional_amt_bef_neg_cash_flow_sale", "mtg_asset_notional_amt_bef_neg_cash_flow_sale",  "notional_amt_bef_neg_cash_flow_sale",  CashFlowCommonData::SUM,
+	CashFlowCommonData(110, "notional_amt_bef_neg_cash_flow_sale", "mtg_asset_notional_amt_bef_neg_cash_flow_sale",  "notional_amt_bef_neg_cash_flow_sale",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_notional_amt_bef_neg_cash_flow_sale, 'E','N', '3', 'P', (size_t)&modelOffset->notional_amt_bef_neg_cash_flow_sale),
-	CashFlowCommonData(109, "notional_amt_bef_rebal_sale", "mtg_asset_notional_amt_bef_rebal_sale",  "notional_amt_bef_rebal_sale",  CashFlowCommonData::SUM,
+	CashFlowCommonData(111, "notional_amt_bef_rebal_sale", "mtg_asset_notional_amt_bef_rebal_sale",  "notional_amt_bef_rebal_sale",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_notional_amt_bef_rebal_sale, 'E','N', '3', 'P', (size_t)&modelOffset->notional_amt_bef_rebal_sale),
-	CashFlowCommonData(110, "notional_amt_bef_sale", "mtg_asset_notional_amt_bef_sale",  "notional_amt_bef_sale",  CashFlowCommonData::SUM,
+	CashFlowCommonData(112, "notional_amt_bef_sale", "mtg_asset_notional_amt_bef_sale",  "notional_amt_bef_sale",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_notional_amt_bef_sale, 'E','N', '3', 'P', (size_t)&modelOffset->notional_amt_bef_sale),
-	CashFlowCommonData(111, "opt_inc", "mtg_asset_opt_inc",  "opt_inc",  CashFlowCommonData::SUM,
+	CashFlowCommonData(113, "opt_inc", "mtg_asset_opt_inc",  "opt_inc",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_opt_inc, 'E','Y', '3', 'C', (size_t)&modelOffset->opt_inc),
-	CashFlowCommonData(112, "opt_pmt", "mtg_asset_opt_pmt",  "opt_pmt",  CashFlowCommonData::SUM,
+	CashFlowCommonData(114, "opt_pmt", "mtg_asset_opt_pmt",  "opt_pmt",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_opt_pmt, 'E','Y', '3', 'C', (size_t)&modelOffset->opt_pmt),
-	CashFlowCommonData(113, "rbc_c1", "mtg_asset_rbc_c1",  "rbc_c1",  CashFlowCommonData::SUM,
+	CashFlowCommonData(115, "rbc_c1", "mtg_asset_rbc_c1",  "rbc_c1",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_rbc_c1, 'E','N', '3', 'C', (size_t)&modelOffset->rbc_c1),
-	CashFlowCommonData(114, "rbc_c1_bef_sale", "mtg_asset_rbc_c1_bef_sale",  "rbc_c1_bef_sale",  CashFlowCommonData::SUM,
+	CashFlowCommonData(116, "rbc_c1_bef_sale", "mtg_asset_rbc_c1_bef_sale",  "rbc_c1_bef_sale",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_rbc_c1_bef_sale, 'E','N', '3', 'C', (size_t)&modelOffset->rbc_c1_bef_sale),
-	CashFlowCommonData(115, "realzd_cap_gain", "mtg_asset_realzd_cap_gain",  "realzd_cap_gain",  CashFlowCommonData::SUM,
+	CashFlowCommonData(117, "realzd_cap_gain", "mtg_asset_realzd_cap_gain",  "realzd_cap_gain",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_realzd_cap_gain, 'E','Y', '3', 'C', (size_t)&modelOffset->realzd_cap_gain),
-	CashFlowCommonData(116, "realzd_cap_gain_opt_pmt", "mtg_asset_realzd_cap_gain_opt_pmt",  "realzd_cap_gain_opt_pmt",  CashFlowCommonData::SUM,
+	CashFlowCommonData(118, "realzd_cap_gain_opt_pmt", "mtg_asset_realzd_cap_gain_opt_pmt",  "realzd_cap_gain_opt_pmt",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_realzd_cap_gain_opt_pmt, 'E','Y', '3', 'C', (size_t)&modelOffset->realzd_cap_gain_opt_pmt),
-	CashFlowCommonData(117, "realzd_cap_gain_prepmt", "mtg_asset_realzd_cap_gain_prepmt",  "realzd_cap_gain_prepmt",  CashFlowCommonData::SUM,
+	CashFlowCommonData(119, "realzd_cap_gain_prepmt", "mtg_asset_realzd_cap_gain_prepmt",  "realzd_cap_gain_prepmt",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_realzd_cap_gain_prepmt, 'E','Y', '3', 'C', (size_t)&modelOffset->realzd_cap_gain_prepmt),
-	CashFlowCommonData(118, "realzd_cap_gain_sale", "mtg_asset_realzd_cap_gain_sale",  "realzd_cap_gain_sale",  CashFlowCommonData::SUM,
+	CashFlowCommonData(120, "realzd_cap_gain_sale", "mtg_asset_realzd_cap_gain_sale",  "realzd_cap_gain_sale",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_realzd_cap_gain_sale, 'E','Y', '3', 'C', (size_t)&modelOffset->realzd_cap_gain_sale),
-	CashFlowCommonData(119, "realzd_cap_loss_dflt", "mtg_asset_realzd_cap_loss_dflt",  "realzd_cap_loss_dflt",  CashFlowCommonData::SUM,
+	CashFlowCommonData(121, "realzd_cap_loss_dflt", "mtg_asset_realzd_cap_loss_dflt",  "realzd_cap_loss_dflt",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_realzd_cap_loss_dflt, 'E','Y', '3', 'C', (size_t)&modelOffset->realzd_cap_loss_dflt),
-	CashFlowCommonData(120, "realzd_cap_loss_foreclosure", "mtg_asset_realzd_cap_loss_foreclosure",  "realzd_cap_loss_foreclosure",  CashFlowCommonData::SUM,
+	CashFlowCommonData(122, "realzd_cap_loss_foreclosure", "mtg_asset_realzd_cap_loss_foreclosure",  "realzd_cap_loss_foreclosure",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_realzd_cap_loss_foreclosure, 'E','Y', '3', 'C', (size_t)&modelOffset->realzd_cap_loss_foreclosure),
-	CashFlowCommonData(121, "realzd_cap_loss_restructure", "mtg_asset_realzd_cap_loss_restructure",  "realzd_cap_loss_restructure",  CashFlowCommonData::SUM,
+	CashFlowCommonData(123, "realzd_cap_loss_restructure", "mtg_asset_realzd_cap_loss_restructure",  "realzd_cap_loss_restructure",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_realzd_cap_loss_restructure, 'E','Y', '3', 'C', (size_t)&modelOffset->realzd_cap_loss_restructure),
-	CashFlowCommonData(122, "refinance_accr_int", "mtg_asset_refinance_accr_int",  "refinance_accr_int",  CashFlowCommonData::SUM,
+	CashFlowCommonData(124, "refinance_accr_int", "mtg_asset_refinance_accr_int",  "refinance_accr_int",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_refinance_accr_int, 'E','N', '3', 'C', (size_t)&modelOffset->refinance_accr_int),
-	CashFlowCommonData(123, "refinance_bk_val", "mtg_asset_refinance_bk_val",  "refinance_bk_val",  CashFlowCommonData::SUM,
+	CashFlowCommonData(125, "refinance_bk_val", "mtg_asset_refinance_bk_val",  "refinance_bk_val",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_refinance_bk_val, 'E','N', '3', 'C', (size_t)&modelOffset->refinance_bk_val),
-	CashFlowCommonData(124, "refinance_cost_basis", "mtg_asset_refinance_cost_basis",  "refinance_cost_basis",  CashFlowCommonData::SUM,
+	CashFlowCommonData(126, "refinance_cost_basis", "mtg_asset_refinance_cost_basis",  "refinance_cost_basis",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_refinance_cost_basis, 'E','N', '3', 'C', (size_t)&modelOffset->refinance_cost_basis),
-	CashFlowCommonData(125, "refinance_pct", "mtg_asset_refinance_pct",  "refinance_pct",  CashFlowCommonData::AVG,
+	CashFlowCommonData(127, "refinance_pct", "mtg_asset_refinance_pct",  "refinance_pct",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_refinance_pct, 'E','N', '3', 'C', (size_t)&modelOffset->refinance_pct),
-	CashFlowCommonData(126, "refinance_prin", "mtg_asset_refinance_prin",  "refinance_prin",  CashFlowCommonData::SUM,
+	CashFlowCommonData(128, "refinance_prin", "mtg_asset_refinance_prin",  "refinance_prin",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_refinance_prin, 'E','N', '3', 'C', (size_t)&modelOffset->refinance_prin),
-	CashFlowCommonData(127, "refinance_rate", "mtg_asset_refinance_rate",  "refinance_rate",  CashFlowCommonData::AVG,
+	CashFlowCommonData(129, "refinance_rate", "mtg_asset_refinance_rate",  "refinance_rate",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_refinance_rate, 'E','N', '3', 'C', (size_t)&modelOffset->refinance_rate),
-	CashFlowCommonData(128, "restructure_accr_int_net_write_down", "mtg_asset_restructure_accr_int_net_write_down",  "restructure_accr_int_net_write_down",  CashFlowCommonData::SUM,
+	CashFlowCommonData(130, "restructure_accr_int_net_write_down", "mtg_asset_restructure_accr_int_net_write_down",  "restructure_accr_int_net_write_down",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_restructure_accr_int_net_write_down, 'E','N', '3', 'C', (size_t)&modelOffset->restructure_accr_int_net_write_down),
-	CashFlowCommonData(129, "restructure_bk_val_net_write_down", "mtg_asset_restructure_bk_val_net_write_down",  "restructure_bk_val_net_write_down",  CashFlowCommonData::SUM,
+	CashFlowCommonData(131, "restructure_bk_val_net_write_down", "mtg_asset_restructure_bk_val_net_write_down",  "restructure_bk_val_net_write_down",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_restructure_bk_val_net_write_down, 'E','N', '3', 'C', (size_t)&modelOffset->restructure_bk_val_net_write_down),
-	CashFlowCommonData(130, "restructure_cost_basis_net_write_down", "mtg_asset_restructure_cost_basis_net_write_down",  "restructure_cost_basis_net_write_down",  CashFlowCommonData::SUM,
+	CashFlowCommonData(132, "restructure_cost_basis_net_write_down", "mtg_asset_restructure_cost_basis_net_write_down",  "restructure_cost_basis_net_write_down",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_restructure_cost_basis_net_write_down, 'E','N', '3', 'C', (size_t)&modelOffset->restructure_cost_basis_net_write_down),
-	CashFlowCommonData(131, "restructure_pct", "mtg_asset_restructure_pct",  "restructure_pct",  CashFlowCommonData::AVG,
+	CashFlowCommonData(133, "restructure_pct", "mtg_asset_restructure_pct",  "restructure_pct",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_restructure_pct, 'E','N', '3', 'C', (size_t)&modelOffset->restructure_pct),
-	CashFlowCommonData(132, "restructure_prin_net_write_down", "mtg_asset_restructure_prin_net_write_down",  "restructure_prin_net_write_down",  CashFlowCommonData::SUM,
+	CashFlowCommonData(134, "restructure_prin_net_write_down", "mtg_asset_restructure_prin_net_write_down",  "restructure_prin_net_write_down",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_restructure_prin_net_write_down, 'E','N', '3', 'C', (size_t)&modelOffset->restructure_prin_net_write_down),
-	CashFlowCommonData(133, "restructure_rate", "mtg_asset_restructure_rate",  "restructure_rate",  CashFlowCommonData::AVG,
+	CashFlowCommonData(135, "restructure_rate", "mtg_asset_restructure_rate",  "restructure_rate",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_restructure_rate, 'E','N', '3', 'P', (size_t)&modelOffset->restructure_rate),
-	CashFlowCommonData(134, "sched_prin_pmt", "mtg_asset_sched_prin_pmt",  "sched_prin_pmt",  CashFlowCommonData::SUM,
+	CashFlowCommonData(136, "sched_prin_pmt", "mtg_asset_sched_prin_pmt",  "sched_prin_pmt",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_sched_prin_pmt, 'E','Y', '3', 'C', (size_t)&modelOffset->sched_prin_pmt),
-	CashFlowCommonData(135, "sold_pct", "mtg_asset_sold_pct",  "sold_pct",  CashFlowCommonData::AVG,
+	CashFlowCommonData(137, "sold_pct", "mtg_asset_sold_pct",  "sold_pct",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_sold_pct, 'E','N', '3', 'C', (size_t)&modelOffset->sold_pct),
-	CashFlowCommonData(136, "sold_pct_fund_match", "mtg_asset_sold_pct_fund_match",  "sold_pct_fund_match",  CashFlowCommonData::AVG,
+	CashFlowCommonData(138, "sold_pct_fund_match", "mtg_asset_sold_pct_fund_match",  "sold_pct_fund_match",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_sold_pct_fund_match, 'E','N', '3', 'C', (size_t)&modelOffset->sold_pct_fund_match),
-	CashFlowCommonData(137, "sold_pct_neg_cash_flow", "mtg_asset_sold_pct_neg_cash_flow",  "sold_pct_neg_cash_flow",  CashFlowCommonData::AVG,
+	CashFlowCommonData(139, "sold_pct_neg_cash_flow", "mtg_asset_sold_pct_neg_cash_flow",  "sold_pct_neg_cash_flow",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_sold_pct_neg_cash_flow, 'E','N', '3', 'C', (size_t)&modelOffset->sold_pct_neg_cash_flow),
-	CashFlowCommonData(138, "sold_pct_planned", "mtg_asset_sold_pct_planned",  "sold_pct_planned",  CashFlowCommonData::AVG,
+	CashFlowCommonData(140, "sold_pct_planned", "mtg_asset_sold_pct_planned",  "sold_pct_planned",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_sold_pct_planned, 'E','N', '3', 'C', (size_t)&modelOffset->sold_pct_planned),
-	CashFlowCommonData(139, "sold_pct_rebal", "mtg_asset_sold_pct_rebal",  "sold_pct_rebal",  CashFlowCommonData::AVG,
+	CashFlowCommonData(141, "sold_pct_rebal", "mtg_asset_sold_pct_rebal",  "sold_pct_rebal",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_sold_pct_rebal, 'E','N', '3', 'C', (size_t)&modelOffset->sold_pct_rebal),
-	CashFlowCommonData(140, "startup", "mtg_asset_startup",  "startup",  CashFlowCommonData::SUM,
+	CashFlowCommonData(142, "startup", "mtg_asset_startup",  "startup",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::virtual_startup, 'E','N', '3', 'N', (size_t)&modelOffset->startup),
-	CashFlowCommonData(141, "sub_port_id", "mtg_asset_sub_port_id",  "sub_port_id",  CashFlowCommonData::AVG,
+	CashFlowCommonData(143, "sub_port_id", "mtg_asset_sub_port_id",  "sub_port_id",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_sub_port_id, 'E','N', '3', 'P', (size_t)&modelOffset->sub_port_id),
-	CashFlowCommonData(142, "unrealzd_cap_gain", "mtg_asset_unrealzd_cap_gain",  "unrealzd_cap_gain",  CashFlowCommonData::SUM,
+	CashFlowCommonData(144, "unrealzd_cap_gain", "mtg_asset_unrealzd_cap_gain",  "unrealzd_cap_gain",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_unrealzd_cap_gain, 'E','N', '3', 'C', (size_t)&modelOffset->unrealzd_cap_gain),
-	CashFlowCommonData(143, "unrealzd_cap_gain_bef_fund_match_sale", "mtg_asset_unrealzd_cap_gain_bef_fund_match_sale",  "unrealzd_cap_gain_bef_fund_match_sale",  CashFlowCommonData::SUM,
+	CashFlowCommonData(145, "unrealzd_cap_gain_bef_fund_match_sale", "mtg_asset_unrealzd_cap_gain_bef_fund_match_sale",  "unrealzd_cap_gain_bef_fund_match_sale",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_unrealzd_cap_gain_bef_fund_match_sale, 'E','N', '3', 'C', (size_t)&modelOffset->unrealzd_cap_gain_bef_fund_match_sale),
-	CashFlowCommonData(144, "unrealzd_cap_gain_bef_neg_cash_flow_sale", "mtg_asset_unrealzd_cap_gain_bef_neg_cash_flow_sale",  "unrealzd_cap_gain_bef_neg_cash_flow_sale",  CashFlowCommonData::SUM,
+	CashFlowCommonData(146, "unrealzd_cap_gain_bef_neg_cash_flow_sale", "mtg_asset_unrealzd_cap_gain_bef_neg_cash_flow_sale",  "unrealzd_cap_gain_bef_neg_cash_flow_sale",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_unrealzd_cap_gain_bef_neg_cash_flow_sale, 'E','N', '3', 'C', (size_t)&modelOffset->unrealzd_cap_gain_bef_neg_cash_flow_sale),
-	CashFlowCommonData(145, "unrealzd_cap_gain_bef_rebal_sale", "mtg_asset_unrealzd_cap_gain_bef_rebal_sale",  "unrealzd_cap_gain_bef_rebal_sale",  CashFlowCommonData::SUM,
+	CashFlowCommonData(147, "unrealzd_cap_gain_bef_rebal_sale", "mtg_asset_unrealzd_cap_gain_bef_rebal_sale",  "unrealzd_cap_gain_bef_rebal_sale",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_unrealzd_cap_gain_bef_rebal_sale, 'E','N', '3', 'C', (size_t)&modelOffset->unrealzd_cap_gain_bef_rebal_sale),
-	CashFlowCommonData(146, "unrealzd_cap_gain_bef_sale", "mtg_asset_unrealzd_cap_gain_bef_sale",  "unrealzd_cap_gain_bef_sale",  CashFlowCommonData::SUM,
+	CashFlowCommonData(148, "unrealzd_cap_gain_bef_sale", "mtg_asset_unrealzd_cap_gain_bef_sale",  "unrealzd_cap_gain_bef_sale",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_unrealzd_cap_gain_bef_sale, 'E','N', '3', 'C', (size_t)&modelOffset->unrealzd_cap_gain_bef_sale),
-	CashFlowCommonData(147, "unrealzd_cap_gain_gaap_surp", "mtg_asset_unrealzd_cap_gain_gaap_surp",  "unrealzd_cap_gain_gaap_surp",  CashFlowCommonData::SUM,
+	CashFlowCommonData(149, "unrealzd_cap_gain_gaap_surp", "mtg_asset_unrealzd_cap_gain_gaap_surp",  "unrealzd_cap_gain_gaap_surp",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_unrealzd_cap_gain_gaap_surp, 'E','N', '3', 'C', (size_t)&modelOffset->unrealzd_cap_gain_gaap_surp),
-	CashFlowCommonData(148, "unrealzd_cap_gain_incr", "mtg_asset_unrealzd_cap_gain_incr",  "unrealzd_cap_gain_incr",  CashFlowCommonData::SUM,
+	CashFlowCommonData(150, "unrealzd_cap_gain_incr", "mtg_asset_unrealzd_cap_gain_incr",  "unrealzd_cap_gain_incr",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_unrealzd_cap_gain_incr, 'E','Y', '3', 'C', (size_t)&modelOffset->unrealzd_cap_gain_incr),
-	CashFlowCommonData(149, "unrealzd_cap_gain_released_on_sale", "mtg_asset_unrealzd_cap_gain_released_on_sale",  "unrealzd_cap_gain_released_on_sale",  CashFlowCommonData::SUM,
+	CashFlowCommonData(151, "unrealzd_cap_gain_released_on_sale", "mtg_asset_unrealzd_cap_gain_released_on_sale",  "unrealzd_cap_gain_released_on_sale",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_unrealzd_cap_gain_released_on_sale, 'E','Y', '3', 'P', (size_t)&modelOffset->unrealzd_cap_gain_released_on_sale),
-	CashFlowCommonData(150, "unrealzd_cap_gain_to_bk_ratio", "mtg_asset_unrealzd_cap_gain_to_bk_ratio",  "unrealzd_cap_gain_to_bk_ratio",  CashFlowCommonData::AVG,
+	CashFlowCommonData(152, "unrealzd_cap_gain_to_bk_ratio", "mtg_asset_unrealzd_cap_gain_to_bk_ratio",  "unrealzd_cap_gain_to_bk_ratio",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_unrealzd_cap_gain_to_bk_ratio, 'E','N', '3', 'P', (size_t)&modelOffset->unrealzd_cap_gain_to_bk_ratio),
-	CashFlowCommonData(151, "unrealzd_cap_loss_from_dflt", "mtg_asset_unrealzd_cap_loss_from_dflt",  "unrealzd_cap_loss_from_dflt",  CashFlowCommonData::SUM,
+	CashFlowCommonData(153, "unrealzd_cap_loss_from_dflt", "mtg_asset_unrealzd_cap_loss_from_dflt",  "unrealzd_cap_loss_from_dflt",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_unrealzd_cap_loss_from_dflt, 'E','Y', '3', 'C', (size_t)&modelOffset->unrealzd_cap_loss_from_dflt),
-	CashFlowCommonData(152, "weighted_avg_life", "mtg_asset_weighted_avg_life",  "weighted_avg_life",  CashFlowCommonData::AVG,
+	CashFlowCommonData(154, "weighted_avg_life", "mtg_asset_weighted_avg_life",  "weighted_avg_life",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_weighted_avg_life, 'E','N', '3', 'C', (size_t)&modelOffset->weighted_avg_life),
-	CashFlowCommonData(153, "write_down", "mtg_asset_write_down",  "write_down",  CashFlowCommonData::SUM,
+	CashFlowCommonData(155, "write_down", "mtg_asset_write_down",  "write_down",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_write_down, 'E','Y', '3', 'C', (size_t)&modelOffset->write_down),
-	CashFlowCommonData(154, "yld_denom", "mtg_asset_yld_denom",  "yld_denom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(156, "yld_denom", "mtg_asset_yld_denom",  "yld_denom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_yld_denom, 'E','N', '3', 'C', (size_t)&modelOffset->yld_denom),
-	CashFlowCommonData(155, "yld_numer", "mtg_asset_yld_numer",  "yld_numer",  CashFlowCommonData::SUM,
+	CashFlowCommonData(157, "yld_numer", "mtg_asset_yld_numer",  "yld_numer",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_yld_numer, 'E','N', '3', 'C', (size_t)&modelOffset->yld_numer),
-	CashFlowCommonData(156, "yld_numer_adj_aig", "mtg_asset_yld_numer_adj_aig",  "yld_numer_adj_aig",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_yld_numer_adj_aig, 'E','N', '3', 'C', (size_t)&modelOffset->yld_numer_adj_aig)
+	CashFlowCommonData(158, "yld_numer_adj_crbg", "mtg_asset_yld_numer_adj_crbg",  "yld_numer_adj_crbg",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&MTG_ASSET_UDF::mtg_asset_yld_numer_adj_crbg, 'E','N', '3', 'C', (size_t)&modelOffset->yld_numer_adj_crbg)
 };
 const CashFlowCommonData* MTG_ASSET::mCFStaticData[] = {
 	&MTG_ASSET::mCFStaticData_0[0],
@@ -9728,6 +9714,8 @@ const CashFlowCommonData* MTG_ASSET::mCFStaticData[] = {
 	&MTG_ASSET::mCFStaticData_0[154],
 	&MTG_ASSET::mCFStaticData_0[155],
 	&MTG_ASSET::mCFStaticData_0[156],
+	&MTG_ASSET::mCFStaticData_0[157],
+	&MTG_ASSET::mCFStaticData_0[158],
 	nullptr};
 //const CashFlowCommonData END@2
 
@@ -9815,14 +9803,6 @@ namespace {
 	};
 	const EnumList dflt_rate_bef_maturity_defnEnumList(2, dflt_rate_bef_maturity_defnChoicePairs);
 
-	// EnumList for fast_stat_calc_aig                                                                                       
-	const ChoicePair fast_stat_calc_aigChoicePairs[] = {
-		ChoicePair(StrEnum::UNDEFINED, StrEnum::undefinedString)
-		,ChoicePair(StrEnum::YES, "Yes")
-		,ChoicePair(StrEnum::NO, "No")
-	};
-	const EnumList fast_stat_calc_aigEnumList(2, fast_stat_calc_aigChoicePairs);
-
 	// EnumList for gaap_acctng_defn                                                                                       
 	const ChoicePair gaap_acctng_defnChoicePairs[] = {
 		ChoicePair(StrEnum::UNDEFINED, StrEnum::undefinedString)
@@ -9830,14 +9810,6 @@ namespace {
 		,ChoicePair(StrEnum::MARKET_VALUE, "Market Value")
 	};
 	const EnumList gaap_acctng_defnEnumList(2, gaap_acctng_defnChoicePairs);
-
-	// EnumList for ia_prod_v3_rsd_2_aig                                                                                       
-	const ChoicePair ia_prod_v3_rsd_2_aigChoicePairs[] = {
-		ChoicePair(StrEnum::UNDEFINED, StrEnum::undefinedString)
-		,ChoicePair(StrEnum::YES, "Yes")
-		,ChoicePair(StrEnum::NO, "No")
-	};
-	const EnumList ia_prod_v3_rsd_2_aigEnumList(2, ia_prod_v3_rsd_2_aigChoicePairs);
 
 	// EnumList for intex_defn                                                                                       
 	const ChoicePair intex_defnChoicePairs[] = {
@@ -10068,30 +10040,30 @@ TableMgr<VariantTable> MTG_ASSET::mgr_;
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
 	Descriptor(33, Attribute::STR_ENUM,	"cost_basis_defn", -1, (size_t)&modelOffset->cost_basis_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &cost_basis_defnEnumList, Feature(true)),
-	Descriptor(34, Attribute::STR_ENUM,	"data_validation_defn", -1, (size_t)&modelOffset->data_validation_defn,
+	Descriptor(34, Attribute::STRING,	"data_file_name_input", -1, (size_t)&modelOffset->data_file_name_input,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
+	Descriptor(35, Attribute::STR_ENUM,	"data_validation_defn", -1, (size_t)&modelOffset->data_validation_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &data_validation_defnEnumList, Feature(true)),
-	Descriptor(35, Attribute::STR_ENUM,	"dflt_rate_bef_maturity_defn", -1, (size_t)&modelOffset->dflt_rate_bef_maturity_defn,
+	Descriptor(36, Attribute::INT,	"date_lookup", -1, (size_t)&modelOffset->date_lookup,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
+	Descriptor(37, Attribute::STR_ENUM,	"dflt_rate_bef_maturity_defn", -1, (size_t)&modelOffset->dflt_rate_bef_maturity_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &dflt_rate_bef_maturity_defnEnumList, Feature(true)),
-	Descriptor(36, Attribute::DOUBLE,	"dflt_rate_scen_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->dflt_rate_scen_mult,
+	Descriptor(38, Attribute::DOUBLE,	"dflt_rate_scen_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->dflt_rate_scen_mult,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(37, Attribute::DOUBLE,	"dur_wtd_sprd_adj_aig", Descriptor::NOT_INDEXED, (size_t)&modelOffset->dur_wtd_sprd_adj_aig,
+	Descriptor(39, Attribute::DOUBLE,	"dur_wtd_sprd_adj_crbg", Descriptor::NOT_INDEXED, (size_t)&modelOffset->dur_wtd_sprd_adj_crbg,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(38, Attribute::STR_ENUM,	"fast_stat_calc_aig", -1, (size_t)&modelOffset->fast_stat_calc_aig,
-				Descriptor::NOT_SHARED, false, false, (size_t)0, &fast_stat_calc_aigEnumList, Feature(true)),
-	Descriptor(39, Attribute::DOUBLE,	"foreclosure_rate_mult_bef_maturity", Descriptor::NOT_INDEXED, (size_t)&modelOffset->foreclosure_rate_mult_bef_maturity,
+	Descriptor(40, Attribute::DOUBLE,	"foreclosure_rate_mult_bef_maturity", Descriptor::NOT_INDEXED, (size_t)&modelOffset->foreclosure_rate_mult_bef_maturity,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(40, Attribute::DOUBLE,	"foreclosure_rate_mult_since_issue", Descriptor::NOT_INDEXED, (size_t)&modelOffset->foreclosure_rate_mult_since_issue,
+	Descriptor(41, Attribute::DOUBLE,	"foreclosure_rate_mult_since_issue", Descriptor::NOT_INDEXED, (size_t)&modelOffset->foreclosure_rate_mult_since_issue,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(41, Attribute::DOUBLE,	"foreclosure_rate_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->foreclosure_rate_pct,
+	Descriptor(42, Attribute::DOUBLE,	"foreclosure_rate_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->foreclosure_rate_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(42, Attribute::DOUBLE,	"foreclosure_rate_scen_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->foreclosure_rate_scen_mult,
+	Descriptor(43, Attribute::DOUBLE,	"foreclosure_rate_scen_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->foreclosure_rate_scen_mult,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(43, Attribute::DOUBLE,	"foreclosure_write_down_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->foreclosure_write_down_pct,
+	Descriptor(44, Attribute::DOUBLE,	"foreclosure_write_down_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->foreclosure_write_down_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(44, Attribute::STR_ENUM,	"gaap_acctng_defn", -1, (size_t)&modelOffset->gaap_acctng_defn,
+	Descriptor(45, Attribute::STR_ENUM,	"gaap_acctng_defn", -1, (size_t)&modelOffset->gaap_acctng_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &gaap_acctng_defnEnumList, Feature(true)),
-	Descriptor(45, Attribute::STR_ENUM,	"ia_prod_v3_rsd_2_aig", -1, (size_t)&modelOffset->ia_prod_v3_rsd_2_aig,
-				Descriptor::NOT_SHARED, false, false, (size_t)0, &ia_prod_v3_rsd_2_aigEnumList, Feature(true)),
 	Descriptor(46, Attribute::DOUBLE,	"init_bk_val_mp", Descriptor::NOT_INDEXED, (size_t)&modelOffset->init_bk_val_mp,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
 	Descriptor(47, Attribute::DOUBLE,	"init_cost_basis_mp", Descriptor::NOT_INDEXED, (size_t)&modelOffset->init_cost_basis_mp,
@@ -10118,185 +10090,199 @@ TableMgr<VariantTable> MTG_ASSET::mgr_;
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &mkt_val_defnEnumList, Feature(true)),
 	Descriptor(58, Attribute::DOUBLE,	"nonfinancial_int_rate_diff", Descriptor::NOT_INDEXED, (size_t)&modelOffset->nonfinancial_int_rate_diff,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(59, Attribute::STRING,	"planned_sale_date_mp", -1, (size_t)&modelOffset->planned_sale_date_mp,
+	Descriptor(59, Attribute::INT,	"num_variations", -1, (size_t)&modelOffset->num_variations,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(60, Attribute::STR_ENUM,	"pmt_mode_mp", -1, (size_t)&modelOffset->pmt_mode_mp,
+	Descriptor(60, Attribute::STRING,	"planned_sale_date_mp", -1, (size_t)&modelOffset->planned_sale_date_mp,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
+	Descriptor(61, Attribute::STR_ENUM,	"pmt_mode_mp", -1, (size_t)&modelOffset->pmt_mode_mp,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &pmt_mode_mpEnumList, Feature(true)),
-	Descriptor(61, Attribute::STR_ENUM,	"pmt_rate_defn_purch", -1, (size_t)&modelOffset->pmt_rate_defn_purch,
+	Descriptor(62, Attribute::STR_ENUM,	"pmt_rate_defn_purch", -1, (size_t)&modelOffset->pmt_rate_defn_purch,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &pmt_rate_defn_purchEnumList, Feature(true)),
-	Descriptor(62, Attribute::STR_ENUM,	"port_defn_mp", -1, (size_t)&modelOffset->port_defn_mp,
+	Descriptor(63, Attribute::STR_ENUM,	"port_defn_mp", -1, (size_t)&modelOffset->port_defn_mp,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &port_defn_mpEnumList, Feature(true)),
-	Descriptor(63, Attribute::DOUBLE,	"portfolio_sprd_adj_aig", Descriptor::NOT_INDEXED, (size_t)&modelOffset->portfolio_sprd_adj_aig,
+	Descriptor(64, Attribute::DOUBLE,	"port_sprd_adj_crbg", Descriptor::NOT_INDEXED, (size_t)&modelOffset->port_sprd_adj_crbg,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(64, Attribute::STR_ENUM,	"prepmt_defn", -1, (size_t)&modelOffset->prepmt_defn,
+	Descriptor(65, Attribute::STR_ENUM,	"prepmt_defn", -1, (size_t)&modelOffset->prepmt_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &prepmt_defnEnumList, Feature(true)),
-	Descriptor(65, Attribute::DOUBLE,	"prepmt_exercise_pct_input", Descriptor::NOT_INDEXED, (size_t)&modelOffset->prepmt_exercise_pct_input,
+	Descriptor(66, Attribute::DOUBLE,	"prepmt_exercise_pct_input", Descriptor::NOT_INDEXED, (size_t)&modelOffset->prepmt_exercise_pct_input,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(66, Attribute::STR_ENUM,	"prepmt_int_diff_defn", -1, (size_t)&modelOffset->prepmt_int_diff_defn,
+	Descriptor(67, Attribute::STR_ENUM,	"prepmt_int_diff_defn", -1, (size_t)&modelOffset->prepmt_int_diff_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &prepmt_int_diff_defnEnumList, Feature(true)),
-	Descriptor(67, Attribute::STR_ENUM,	"prepmt_model_defn", -1, (size_t)&modelOffset->prepmt_model_defn,
+	Descriptor(68, Attribute::STR_ENUM,	"prepmt_model_defn", -1, (size_t)&modelOffset->prepmt_model_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &prepmt_model_defnEnumList, Feature(true)),
-	Descriptor(68, Attribute::DOUBLE,	"prepmt_nonfinancial_adj", Descriptor::NOT_INDEXED, (size_t)&modelOffset->prepmt_nonfinancial_adj,
+	Descriptor(69, Attribute::DOUBLE,	"prepmt_nonfinancial_adj", Descriptor::NOT_INDEXED, (size_t)&modelOffset->prepmt_nonfinancial_adj,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(69, Attribute::DOUBLE,	"prepmt_nonfinancial_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->prepmt_nonfinancial_pct,
+	Descriptor(70, Attribute::DOUBLE,	"prepmt_nonfinancial_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->prepmt_nonfinancial_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(70, Attribute::DOUBLE,	"prepmt_nonfinancial_seasonality_addn", Descriptor::NOT_INDEXED, (size_t)&modelOffset->prepmt_nonfinancial_seasonality_addn,
+	Descriptor(71, Attribute::DOUBLE,	"prepmt_nonfinancial_seasonality_addn", Descriptor::NOT_INDEXED, (size_t)&modelOffset->prepmt_nonfinancial_seasonality_addn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(71, Attribute::STRING,	"prepmt_opt_first_date_mp", -1, (size_t)&modelOffset->prepmt_opt_first_date_mp,
+	Descriptor(72, Attribute::STRING,	"prepmt_opt_first_date_mp", -1, (size_t)&modelOffset->prepmt_opt_first_date_mp,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(72, Attribute::STR_ENUM,	"prepmt_penalty_defn_mp", -1, (size_t)&modelOffset->prepmt_penalty_defn_mp,
+	Descriptor(73, Attribute::STR_ENUM,	"prepmt_penalty_defn_mp", -1, (size_t)&modelOffset->prepmt_penalty_defn_mp,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &prepmt_penalty_defn_mpEnumList, Feature(true)),
-	Descriptor(73, Attribute::DOUBLE,	"prepmt_penalty_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->prepmt_penalty_pct,
+	Descriptor(74, Attribute::DOUBLE,	"prepmt_penalty_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->prepmt_penalty_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(74, Attribute::DOUBLE,	"prepmt_seasoning_since_issue_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->prepmt_seasoning_since_issue_mult,
+	Descriptor(75, Attribute::DOUBLE,	"prepmt_seasoning_since_issue_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->prepmt_seasoning_since_issue_mult,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(75, Attribute::DOUBLE,	"prin_val_at_issue_mp", Descriptor::NOT_INDEXED, (size_t)&modelOffset->prin_val_at_issue_mp,
+	Descriptor(76, Attribute::DOUBLE,	"prin_val_at_issue_mp", Descriptor::NOT_INDEXED, (size_t)&modelOffset->prin_val_at_issue_mp,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(76, Attribute::STRING,	"proj_date", -1, (size_t)&modelOffset->proj_date,
+	Descriptor(77, Attribute::STRING,	"proj_date", -1, (size_t)&modelOffset->proj_date,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(77, Attribute::STRING,	"purch_asset_id", -1, (size_t)&modelOffset->purch_asset_id,
+	Descriptor(78, Attribute::STRING,	"purch_asset_id", -1, (size_t)&modelOffset->purch_asset_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(78, Attribute::INT,	"purch_asset_sub_port", -1, (size_t)&modelOffset->purch_asset_sub_port,
+	Descriptor(79, Attribute::INT,	"purch_asset_sub_port", -1, (size_t)&modelOffset->purch_asset_sub_port,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(79, Attribute::STR_ENUM,	"purch_defn", -1, (size_t)&modelOffset->purch_defn,
+	Descriptor(80, Attribute::STR_ENUM,	"purch_defn", -1, (size_t)&modelOffset->purch_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &purch_defnEnumList, Feature(true)),
-	Descriptor(80, Attribute::DOUBLE,	"rbc_c1_pct_mp", Descriptor::NOT_INDEXED, (size_t)&modelOffset->rbc_c1_pct_mp,
+	Descriptor(81, Attribute::DOUBLE,	"rbc_c1_pct_mp", Descriptor::NOT_INDEXED, (size_t)&modelOffset->rbc_c1_pct_mp,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(81, Attribute::DOUBLE,	"refinance_rate_mult_bef_maturity", Descriptor::NOT_INDEXED, (size_t)&modelOffset->refinance_rate_mult_bef_maturity,
+	Descriptor(82, Attribute::DOUBLE,	"refinance_rate_mult_bef_maturity", Descriptor::NOT_INDEXED, (size_t)&modelOffset->refinance_rate_mult_bef_maturity,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(82, Attribute::DOUBLE,	"refinance_rate_mult_since_issue", Descriptor::NOT_INDEXED, (size_t)&modelOffset->refinance_rate_mult_since_issue,
+	Descriptor(83, Attribute::DOUBLE,	"refinance_rate_mult_since_issue", Descriptor::NOT_INDEXED, (size_t)&modelOffset->refinance_rate_mult_since_issue,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(83, Attribute::DOUBLE,	"refinance_rate_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->refinance_rate_pct,
+	Descriptor(84, Attribute::DOUBLE,	"refinance_rate_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->refinance_rate_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(84, Attribute::DOUBLE,	"refinance_rate_scen_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->refinance_rate_scen_mult,
+	Descriptor(85, Attribute::DOUBLE,	"refinance_rate_scen_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->refinance_rate_scen_mult,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(85, Attribute::DOUBLE,	"refinancing_cost_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->refinancing_cost_pct,
+	Descriptor(86, Attribute::DOUBLE,	"refinancing_cost_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->refinancing_cost_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(86, Attribute::STR_ENUM,	"refinancing_rate_defn", -1, (size_t)&modelOffset->refinancing_rate_defn,
+	Descriptor(87, Attribute::STR_ENUM,	"refinancing_rate_defn", -1, (size_t)&modelOffset->refinancing_rate_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &refinancing_rate_defnEnumList, Feature(true)),
-	Descriptor(87, Attribute::DOUBLE,	"refinancing_rate_scen_addn", Descriptor::NOT_INDEXED, (size_t)&modelOffset->refinancing_rate_scen_addn,
+	Descriptor(88, Attribute::DOUBLE,	"refinancing_rate_scen_addn", Descriptor::NOT_INDEXED, (size_t)&modelOffset->refinancing_rate_scen_addn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(88, Attribute::DOUBLE,	"refinancing_rate_scen_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->refinancing_rate_scen_mult,
+	Descriptor(89, Attribute::DOUBLE,	"refinancing_rate_scen_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->refinancing_rate_scen_mult,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(89, Attribute::DOUBLE,	"refinancing_rate_scen_yr", Descriptor::NOT_INDEXED, (size_t)&modelOffset->refinancing_rate_scen_yr,
+	Descriptor(90, Attribute::DOUBLE,	"refinancing_rate_scen_yr", Descriptor::NOT_INDEXED, (size_t)&modelOffset->refinancing_rate_scen_yr,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(90, Attribute::DOUBLE,	"restructure_rate_mult_bef_maturity", Descriptor::NOT_INDEXED, (size_t)&modelOffset->restructure_rate_mult_bef_maturity,
+	Descriptor(91, Attribute::DOUBLE,	"restructure_rate_mult_bef_maturity", Descriptor::NOT_INDEXED, (size_t)&modelOffset->restructure_rate_mult_bef_maturity,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(91, Attribute::DOUBLE,	"restructure_rate_mult_since_issue", Descriptor::NOT_INDEXED, (size_t)&modelOffset->restructure_rate_mult_since_issue,
+	Descriptor(92, Attribute::DOUBLE,	"restructure_rate_mult_since_issue", Descriptor::NOT_INDEXED, (size_t)&modelOffset->restructure_rate_mult_since_issue,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(92, Attribute::DOUBLE,	"restructure_rate_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->restructure_rate_pct,
+	Descriptor(93, Attribute::DOUBLE,	"restructure_rate_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->restructure_rate_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(93, Attribute::DOUBLE,	"restructure_rate_scen_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->restructure_rate_scen_mult,
+	Descriptor(94, Attribute::DOUBLE,	"restructure_rate_scen_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->restructure_rate_scen_mult,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(94, Attribute::DOUBLE,	"restructure_write_down_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->restructure_write_down_pct,
+	Descriptor(95, Attribute::DOUBLE,	"restructure_write_down_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->restructure_write_down_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(95, Attribute::STR_ENUM,	"sale_class_mp", -1, (size_t)&modelOffset->sale_class_mp,
+	Descriptor(96, Attribute::STR_ENUM,	"sale_class_mp", -1, (size_t)&modelOffset->sale_class_mp,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &sale_class_mpEnumList, Feature(true)),
-	Descriptor(96, Attribute::STRING,	"seg_id_mp", -1, (size_t)&modelOffset->seg_id_mp,
+	Descriptor(97, Attribute::STRING,	"seg_id_mp", -1, (size_t)&modelOffset->seg_id_mp,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(97, Attribute::DOUBLE,	"servicing_fee_mp", Descriptor::NOT_INDEXED, (size_t)&modelOffset->servicing_fee_mp,
+	Descriptor(98, Attribute::DOUBLE,	"servicing_fee_mp", Descriptor::NOT_INDEXED, (size_t)&modelOffset->servicing_fee_mp,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(98, Attribute::STR_ENUM,	"use_mp", -1, (size_t)&modelOffset->use_mp,
+	Descriptor(99, Attribute::DOUBLE,	"sold_pct_fund_match_value", Descriptor::NOT_INDEXED, (size_t)&modelOffset->sold_pct_fund_match_value,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
+	Descriptor(100, Attribute::DOUBLE,	"sold_pct_neg_cash_flow_value", Descriptor::NOT_INDEXED, (size_t)&modelOffset->sold_pct_neg_cash_flow_value,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
+	Descriptor(101, Attribute::DOUBLE,	"sold_pct_planned_value", Descriptor::NOT_INDEXED, (size_t)&modelOffset->sold_pct_planned_value,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
+	Descriptor(102, Attribute::DOUBLE,	"sold_pct_rebal_value", Descriptor::NOT_INDEXED, (size_t)&modelOffset->sold_pct_rebal_value,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
+	Descriptor(103, Attribute::STRING,	"unique_id_mp", -1, (size_t)&modelOffset->unique_id_mp,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
+	Descriptor(104, Attribute::STR_ENUM,	"use_mp", -1, (size_t)&modelOffset->use_mp,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &use_mpEnumList, Feature(true)),
-	Descriptor(99, Attribute::DOUBLE,	"yld_maint_addn_mp", Descriptor::NOT_INDEXED, (size_t)&modelOffset->yld_maint_addn_mp,
+	Descriptor(105, Attribute::DOUBLE,	"yld_maint_addn_mp", Descriptor::NOT_INDEXED, (size_t)&modelOffset->yld_maint_addn_mp,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(100, Attribute::INT,	"msnumelement", -1, (size_t)&modelOffset->msnumelement,
+	Descriptor(106, Attribute::INT,	"msnumelement", -1, (size_t)&modelOffset->msnumelement,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(101, Attribute::SCALAR_DOUBLE,	"accr_int_per_par_unit", -1, (size_t)&modelOffset->accr_int_per_par_unit,
+	Descriptor(107, Attribute::SCALAR_DOUBLE,	"accr_int_per_par_unit", -1, (size_t)&modelOffset->accr_int_per_par_unit,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((dF)&MTG_ASSET_UDF::mtg_asset_accr_int_per_par_unit)),
-	Descriptor(102, Attribute::SCALAR_INT,	"amortzn_cost_period", -1, (size_t)&modelOffset->amortzn_cost_period,
+	Descriptor(108, Attribute::SCALAR_INT,	"amortzn_cost_period", -1, (size_t)&modelOffset->amortzn_cost_period,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&MTG_ASSET_UDF::mtg_asset_amortzn_cost_period)),
-	Descriptor(103, Attribute::SCALAR_INT,	"amortzn_period", -1, (size_t)&modelOffset->amortzn_period,
+	Descriptor(109, Attribute::SCALAR_INT,	"amortzn_period", -1, (size_t)&modelOffset->amortzn_period,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&MTG_ASSET_UDF::mtg_asset_amortzn_period)),
-	Descriptor(104, Attribute::SCALAR_INT,	"asset_detail_rpt_flag", -1, (size_t)&modelOffset->asset_detail_rpt_flag,
+	Descriptor(110, Attribute::SCALAR_INT,	"asset_detail_rpt_flag", -1, (size_t)&modelOffset->asset_detail_rpt_flag,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&MTG_ASSET_UDF::mtg_asset_asset_detail_rpt_flag)),
-	Descriptor(105, Attribute::SCALAR_INT,	"asset_fund_index", -1, (size_t)&modelOffset->asset_fund_index,
+	Descriptor(111, Attribute::SCALAR_INT,	"asset_fund_index", -1, (size_t)&modelOffset->asset_fund_index,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&MTG_ASSET_UDF::mtg_asset_asset_fund_index)),
-	Descriptor(106, Attribute::SCALAR_INT,	"balloon_pmt_flag", -1, (size_t)&modelOffset->balloon_pmt_flag,
+	Descriptor(112, Attribute::SCALAR_INT,	"balloon_pmt_flag", -1, (size_t)&modelOffset->balloon_pmt_flag,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&MTG_ASSET_UDF::mtg_asset_balloon_pmt_flag)),
-	Descriptor(107, Attribute::SCALAR_INT,	"balloon_pmt_period", -1, (size_t)&modelOffset->balloon_pmt_period,
+	Descriptor(113, Attribute::SCALAR_INT,	"balloon_pmt_period", -1, (size_t)&modelOffset->balloon_pmt_period,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&MTG_ASSET_UDF::mtg_asset_balloon_pmt_period)),
-	Descriptor(108, Attribute::SCALAR_INT,	"commencement_period", -1, (size_t)&modelOffset->commencement_period,
+	Descriptor(114, Attribute::SCALAR_INT,	"commencement_period", -1, (size_t)&modelOffset->commencement_period,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&MTG_ASSET_UDF::mtg_asset_commencement_period)),
-	Descriptor(109, Attribute::SCALAR_STRING,	"data_grp_id", -1, (size_t)&modelOffset->data_grp_id,
+	Descriptor(115, Attribute::SCALAR_STRING,	"data_file_name", -1, (size_t)&modelOffset->data_file_name,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((sF)&MTG_ASSET_UDF::mtg_asset_data_file_name)),
+	Descriptor(116, Attribute::SCALAR_STRING,	"data_grp_id", -1, (size_t)&modelOffset->data_grp_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((sF)&MTG_ASSET_UDF::mtg_asset_data_grp_id)),
-	Descriptor(110, Attribute::SCALAR_INT,	"existing_asset_indicator", -1, (size_t)&modelOffset->existing_asset_indicator,
+	Descriptor(117, Attribute::SCALAR_INT,	"existing_asset_indicator", -1, (size_t)&modelOffset->existing_asset_indicator,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&MTG_ASSET_UDF::mtg_asset_existing_asset_indicator)),
-	Descriptor(111, Attribute::SCALAR_INT,	"foreclosure_asset_id", -1, (size_t)&modelOffset->foreclosure_asset_id,
+	Descriptor(118, Attribute::SCALAR_INT,	"foreclosure_asset_id", -1, (size_t)&modelOffset->foreclosure_asset_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&MTG_ASSET_UDF::mtg_asset_foreclosure_asset_id)),
-	Descriptor(112, Attribute::SCALAR_DOUBLE,	"foreclosure_write_down_pct_calc", -1, (size_t)&modelOffset->foreclosure_write_down_pct_calc,
+	Descriptor(119, Attribute::SCALAR_DOUBLE,	"foreclosure_write_down_pct_calc", -1, (size_t)&modelOffset->foreclosure_write_down_pct_calc,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((dF)&MTG_ASSET_UDF::mtg_asset_foreclosure_write_down_pct_calc)),
-	Descriptor(113, Attribute::SCALAR_INT,	"gaap_inc_defn", -1, (size_t)&modelOffset->gaap_inc_defn,
+	Descriptor(120, Attribute::SCALAR_INT,	"gaap_inc_defn", -1, (size_t)&modelOffset->gaap_inc_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&MTG_ASSET_UDF::mtg_asset_gaap_inc_defn)),
-	Descriptor(114, Attribute::SCALAR_INT,	"gaap_val_defn", -1, (size_t)&modelOffset->gaap_val_defn,
+	Descriptor(121, Attribute::SCALAR_INT,	"gaap_val_defn", -1, (size_t)&modelOffset->gaap_val_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&MTG_ASSET_UDF::mtg_asset_gaap_val_defn)),
-	Descriptor(115, Attribute::SCALAR_INT,	"init_mths_since_issue", -1, (size_t)&modelOffset->init_mths_since_issue,
+	Descriptor(122, Attribute::SCALAR_INT,	"init_mths_since_issue", -1, (size_t)&modelOffset->init_mths_since_issue,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&MTG_ASSET_UDF::mtg_asset_init_mths_since_issue)),
-	Descriptor(116, Attribute::SCALAR_INT,	"maturity_mths_from_next_reset", -1, (size_t)&modelOffset->maturity_mths_from_next_reset,
+	Descriptor(123, Attribute::SCALAR_INT,	"maturity_mths_from_next_reset", -1, (size_t)&modelOffset->maturity_mths_from_next_reset,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&MTG_ASSET_UDF::mtg_asset_maturity_mths_from_next_reset)),
-	Descriptor(117, Attribute::SCALAR_INT,	"maturity_period", -1, (size_t)&modelOffset->maturity_period,
+	Descriptor(124, Attribute::SCALAR_INT,	"maturity_period", -1, (size_t)&modelOffset->maturity_period,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&MTG_ASSET_UDF::mtg_asset_maturity_period)),
-	Descriptor(118, Attribute::SCALAR_DOUBLE,	"mkt_val_per_unit_par", -1, (size_t)&modelOffset->mkt_val_per_unit_par,
+	Descriptor(125, Attribute::SCALAR_DOUBLE,	"mkt_val_per_unit_par", -1, (size_t)&modelOffset->mkt_val_per_unit_par,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((dF)&MTG_ASSET_UDF::mtg_asset_mkt_val_per_unit_par)),
-	Descriptor(119, Attribute::SCALAR_DOUBLE,	"neg_asset_flag", -1, (size_t)&modelOffset->neg_asset_flag,
+	Descriptor(126, Attribute::SCALAR_DOUBLE,	"neg_asset_flag", -1, (size_t)&modelOffset->neg_asset_flag,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((dF)&MTG_ASSET_UDF::mtg_asset_neg_asset_flag)),
-	Descriptor(120, Attribute::SCALAR_DOUBLE,	"par_val_at_issue", -1, (size_t)&modelOffset->par_val_at_issue,
+	Descriptor(127, Attribute::SCALAR_DOUBLE,	"par_val_at_issue", -1, (size_t)&modelOffset->par_val_at_issue,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((dF)&MTG_ASSET_UDF::mtg_asset_par_val_at_issue)),
-	Descriptor(121, Attribute::SCALAR_DOUBLE,	"pct_to_use", -1, (size_t)&modelOffset->pct_to_use,
+	Descriptor(128, Attribute::SCALAR_DOUBLE,	"pct_to_use", -1, (size_t)&modelOffset->pct_to_use,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((dF)&MTG_ASSET_UDF::mtg_asset_pct_to_use)),
-	Descriptor(122, Attribute::SCALAR_DOUBLE,	"planned_sale_period", -1, (size_t)&modelOffset->planned_sale_period,
+	Descriptor(129, Attribute::SCALAR_DOUBLE,	"planned_sale_period", -1, (size_t)&modelOffset->planned_sale_period,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((dF)&MTG_ASSET_UDF::mtg_asset_planned_sale_period)),
-	Descriptor(123, Attribute::SCALAR_INT,	"pmt_freq", -1, (size_t)&modelOffset->pmt_freq,
+	Descriptor(130, Attribute::SCALAR_INT,	"pmt_freq", -1, (size_t)&modelOffset->pmt_freq,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&MTG_ASSET_UDF::mtg_asset_pmt_freq)),
-	Descriptor(124, Attribute::SCALAR_INT,	"pmt_mths", -1, (size_t)&modelOffset->pmt_mths,
+	Descriptor(131, Attribute::SCALAR_INT,	"pmt_mths", -1, (size_t)&modelOffset->pmt_mths,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&MTG_ASSET_UDF::mtg_asset_pmt_mths)),
-	Descriptor(125, Attribute::SCALAR_DOUBLE,	"pmt_rate_at_issue", -1, (size_t)&modelOffset->pmt_rate_at_issue,
+	Descriptor(132, Attribute::SCALAR_DOUBLE,	"pmt_rate_at_issue", -1, (size_t)&modelOffset->pmt_rate_at_issue,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((dF)&MTG_ASSET_UDF::mtg_asset_pmt_rate_at_issue)),
-	Descriptor(126, Attribute::SCALAR_INT,	"pmt_rate_defn", -1, (size_t)&modelOffset->pmt_rate_defn,
+	Descriptor(133, Attribute::SCALAR_INT,	"pmt_rate_defn", -1, (size_t)&modelOffset->pmt_rate_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&MTG_ASSET_UDF::mtg_asset_pmt_rate_defn)),
-	Descriptor(127, Attribute::SCALAR_STRING,	"pmt_rate_defn_string", -1, (size_t)&modelOffset->pmt_rate_defn_string,
+	Descriptor(134, Attribute::SCALAR_STRING,	"pmt_rate_defn_string", -1, (size_t)&modelOffset->pmt_rate_defn_string,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((sF)&MTG_ASSET_UDF::mtg_asset_pmt_rate_defn_string)),
-	Descriptor(128, Attribute::SCALAR_INT,	"pmt_reset_first_period", -1, (size_t)&modelOffset->pmt_reset_first_period,
+	Descriptor(135, Attribute::SCALAR_INT,	"pmt_reset_first_period", -1, (size_t)&modelOffset->pmt_reset_first_period,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&MTG_ASSET_UDF::mtg_asset_pmt_reset_first_period)),
-	Descriptor(129, Attribute::SCALAR_INT,	"prepmt_first_period", -1, (size_t)&modelOffset->prepmt_first_period,
+	Descriptor(136, Attribute::SCALAR_INT,	"prepmt_first_period", -1, (size_t)&modelOffset->prepmt_first_period,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&MTG_ASSET_UDF::mtg_asset_prepmt_first_period)),
-	Descriptor(130, Attribute::SCALAR_INT,	"prepmt_par_first_period", -1, (size_t)&modelOffset->prepmt_par_first_period,
+	Descriptor(137, Attribute::SCALAR_INT,	"prepmt_par_first_period", -1, (size_t)&modelOffset->prepmt_par_first_period,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&MTG_ASSET_UDF::mtg_asset_prepmt_par_first_period)),
-	Descriptor(131, Attribute::SCALAR_INT,	"prepmt_penalty_grading_mths", -1, (size_t)&modelOffset->prepmt_penalty_grading_mths,
+	Descriptor(138, Attribute::SCALAR_INT,	"prepmt_penalty_grading_mths", -1, (size_t)&modelOffset->prepmt_penalty_grading_mths,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&MTG_ASSET_UDF::mtg_asset_prepmt_penalty_grading_mths)),
-	Descriptor(132, Attribute::SCALAR_DOUBLE,	"prepmt_penalty_related_to_pmt_rate", -1, (size_t)&modelOffset->prepmt_penalty_related_to_pmt_rate,
+	Descriptor(139, Attribute::SCALAR_DOUBLE,	"prepmt_penalty_related_to_pmt_rate", -1, (size_t)&modelOffset->prepmt_penalty_related_to_pmt_rate,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((dF)&MTG_ASSET_UDF::mtg_asset_prepmt_penalty_related_to_pmt_rate)),
-	Descriptor(133, Attribute::SCALAR_STRING,	"proj_date_adj", -1, (size_t)&modelOffset->proj_date_adj,
+	Descriptor(140, Attribute::SCALAR_STRING,	"proj_date_adj", -1, (size_t)&modelOffset->proj_date_adj,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((sF)&MTG_ASSET_UDF::mtg_asset_proj_date_adj)),
-	Descriptor(134, Attribute::SCALAR_INT,	"proj_start_date", -1, (size_t)&modelOffset->proj_start_date,
+	Descriptor(141, Attribute::SCALAR_INT,	"proj_start_date", -1, (size_t)&modelOffset->proj_start_date,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&MTG_ASSET_UDF::mtg_asset_proj_start_date)),
-	Descriptor(135, Attribute::SCALAR_INT,	"proj_start_mth", -1, (size_t)&modelOffset->proj_start_mth,
+	Descriptor(142, Attribute::SCALAR_INT,	"proj_start_mth", -1, (size_t)&modelOffset->proj_start_mth,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&MTG_ASSET_UDF::mtg_asset_proj_start_mth)),
-	Descriptor(136, Attribute::SCALAR_INT,	"proj_start_yr", -1, (size_t)&modelOffset->proj_start_yr,
+	Descriptor(143, Attribute::SCALAR_INT,	"proj_start_yr", -1, (size_t)&modelOffset->proj_start_yr,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&MTG_ASSET_UDF::mtg_asset_proj_start_yr)),
-	Descriptor(137, Attribute::SCALAR_INT,	"refinance_asset_id", -1, (size_t)&modelOffset->refinance_asset_id,
+	Descriptor(144, Attribute::SCALAR_INT,	"refinance_asset_id", -1, (size_t)&modelOffset->refinance_asset_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&MTG_ASSET_UDF::mtg_asset_refinance_asset_id)),
-	Descriptor(138, Attribute::SCALAR_INT,	"refinancing_rate_defn_calc", -1, (size_t)&modelOffset->refinancing_rate_defn_calc,
+	Descriptor(145, Attribute::SCALAR_INT,	"refinancing_rate_defn_calc", -1, (size_t)&modelOffset->refinancing_rate_defn_calc,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&MTG_ASSET_UDF::mtg_asset_refinancing_rate_defn_calc)),
-	Descriptor(139, Attribute::SCALAR_INT,	"restructure_asset_id", -1, (size_t)&modelOffset->restructure_asset_id,
+	Descriptor(146, Attribute::SCALAR_INT,	"restructure_asset_id", -1, (size_t)&modelOffset->restructure_asset_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&MTG_ASSET_UDF::mtg_asset_restructure_asset_id)),
-	Descriptor(140, Attribute::SCALAR_DOUBLE,	"restructure_write_down_pct_calc", -1, (size_t)&modelOffset->restructure_write_down_pct_calc,
+	Descriptor(147, Attribute::SCALAR_DOUBLE,	"restructure_write_down_pct_calc", -1, (size_t)&modelOffset->restructure_write_down_pct_calc,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((dF)&MTG_ASSET_UDF::mtg_asset_restructure_write_down_pct_calc)),
-	Descriptor(141, Attribute::SCALAR_INT,	"sale_class_id", -1, (size_t)&modelOffset->sale_class_id,
+	Descriptor(148, Attribute::SCALAR_INT,	"sale_class_id", -1, (size_t)&modelOffset->sale_class_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&MTG_ASSET_UDF::mtg_asset_sale_class_id)),
-	Descriptor(142, Attribute::SCALAR_INT,	"sch_array_size", -1, (size_t)&modelOffset->sch_array_size,
+	Descriptor(149, Attribute::SCALAR_INT,	"sch_array_size", -1, (size_t)&modelOffset->sch_array_size,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&MTG_ASSET_UDF::mtg_asset_sch_array_size)),
-	Descriptor(143, Attribute::SCALAR_INT,	"seg_num", -1, (size_t)&modelOffset->seg_num,
+	Descriptor(150, Attribute::SCALAR_INT,	"seg_num", -1, (size_t)&modelOffset->seg_num,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&MTG_ASSET_UDF::mtg_asset_seg_num)),
-	Descriptor(144, Attribute::SCALAR_INT,	"start_period", -1, (size_t)&modelOffset->start_period,
+	Descriptor(151, Attribute::SCALAR_INT,	"start_period", -1, (size_t)&modelOffset->start_period,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&MTG_ASSET_UDF::mtg_asset_start_period)),
-	Descriptor(145, Attribute::SCALAR_INT,	"use_andrew_davidson", -1, (size_t)&modelOffset->use_andrew_davidson,
+	Descriptor(152, Attribute::SCALAR_INT,	"use_andrew_davidson", -1, (size_t)&modelOffset->use_andrew_davidson,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&MTG_ASSET_UDF::mtg_asset_use_andrew_davidson)),
-	Descriptor(146, Attribute::SCALAR_INT,	"use_intex_databases_for_mtg", -1, (size_t)&modelOffset->use_intex_databases_for_mtg,
+	Descriptor(153, Attribute::SCALAR_INT,	"use_intex_databases_for_mtg", -1, (size_t)&modelOffset->use_intex_databases_for_mtg,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&MTG_ASSET_UDF::mtg_asset_use_intex_databases_for_mtg)),
-	Descriptor(147, Attribute::SCALAR_INT,	"write_sch_file_flag", -1, (size_t)&modelOffset->write_sch_file_flag,
+	Descriptor(154, Attribute::SCALAR_INT,	"write_sch_file_flag", -1, (size_t)&modelOffset->write_sch_file_flag,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&MTG_ASSET_UDF::mtg_asset_write_sch_file_flag)),
-	Descriptor(148, Attribute::SCALAR_DOUBLE,	"yrs_since_last_pmt", -1, (size_t)&modelOffset->yrs_since_last_pmt,
+	Descriptor(155, Attribute::SCALAR_DOUBLE,	"yrs_since_last_pmt", -1, (size_t)&modelOffset->yrs_since_last_pmt,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((dF)&MTG_ASSET_UDF::mtg_asset_yrs_since_last_pmt)),
 	};
 
@@ -10450,8 +10436,15 @@ TableMgr<VariantTable> MTG_ASSET::mgr_;
 	&MTG_ASSET::descriptor_0[146],
 	&MTG_ASSET::descriptor_0[147],
 	&MTG_ASSET::descriptor_0[148],
+	&MTG_ASSET::descriptor_0[149],
+	&MTG_ASSET::descriptor_0[150],
+	&MTG_ASSET::descriptor_0[151],
+	&MTG_ASSET::descriptor_0[152],
+	&MTG_ASSET::descriptor_0[153],
+	&MTG_ASSET::descriptor_0[154],
+	&MTG_ASSET::descriptor_0[155],
 	nullptr};
-	const size_t MTG_ASSET::sDescriptorCount = 149;
+	const size_t MTG_ASSET::sDescriptorCount = 156;
 
 //factory
 MTG_ASSET* MTG_ASSET::makeThis(int isSubmodel, ModelClass* owner, MTG_ASSET* peer, 
@@ -10485,6 +10478,8 @@ MTG_ASSET* MTG_ASSET::makeThis(int isSubmodel, ModelClass* owner, MTG_ASSET* pee
 		setVisitorPointersAndMap(name, newP, 'N');
 
 	// create submodels of this model here
+	newP->sm_mtg_cf_var.setPersistentObject(MTG_CF_ASSET_persistent_object::makeThis(1, newP, (MTG_CF_ASSET*)(peer?peer->sm_mtg_cf_var.getPersistentObject():0), mainRebase, name + "|mtg_cf_var", arrayTemplate?arrayTemplate->sm_mtg_cf_var.getPersistentObject():0, false));
+
 	if (find(unusedModels.begin(), unusedModels.end(), name + "|mtg_cf") == unusedModels.end()) {
 	newP->sm_mtg_cf = MTG_CF_ASSET::makeThis(1, newP, peer?peer->sm_mtg_cf:0, mainRebase, name + "|mtg_cf", (MTG_CF_ASSET_persistent_object*)(arrayTemplate?arrayTemplate->sm_mtg_cf:0));
 	newP->adopt(newP->sm_mtg_cf);
@@ -10543,6 +10538,8 @@ MTG_ASSET_persistent_object* MTG_ASSET_persistent_object::makeThis(int isSubmode
 		setVisitorPointersAndMap(name, newP, 'N');
 
 	// create submodels of this model here
+	newP->sm_mtg_cf_var.setPersistentObject(MTG_CF_ASSET_persistent_object::makeThis(1, newP, (MTG_CF_ASSET*)(peer?peer->sm_mtg_cf_var.getPersistentObject():0), mainRebase, name + "|mtg_cf_var", arrayTemplate?arrayTemplate->sm_mtg_cf_var.getPersistentObject():0, false));
+
 	if (find(unusedModels.begin(), unusedModels.end(), name + "|mtg_cf") == unusedModels.end()) {
 	newP->sm_mtg_cf = (MTG_CF_ASSET*)MTG_CF_ASSET_persistent_object::makeThis(1, newP, peer?peer->sm_mtg_cf:0, mainRebase, name + "|mtg_cf", (MTG_CF_ASSET_persistent_object*)(arrayTemplate?arrayTemplate->sm_mtg_cf:0), fixedArray);
 	newP->adopt(newP->sm_mtg_cf);
@@ -10572,26 +10569,17 @@ typedef xstring (MTG_ASSET_UDF::*sPFs) (xstring);
 
 // constructor if this model class is the base class of another model class
 MTG_ASSET::MTG_ASSET(int columnCount, Descriptor* mocd[], Product* persObj) : ModelClass(columnCount, mocd, persObj), Variable(*this)
-  , sm_bond_is(0)
-  , sm_bond_pv(0)
-  , sm_bond_ym(0)
-  , sm_mtg_is(0)
-  , sm_mtg_pv(0)
-  , sm_mtg_ym(0)
 
   , sm_mtg_cf(0)
+  , sm_mtg_cf_var(0, 0, 0)
 	, adco(company_asset_adco)
 	, asset(company_asset)
-	, bond_pv(company_asset_bond_bond_cf_bond_pv)
-	, bond_ym(company_asset_bond_bond_cf_bond_ym)
 	, epl(company_liab_epl)
 	, fia(company_liab_fia)
-	, intex(company_asset_intex)
+	, inv_strategy(company_inv_strategy)
+	, liab(company_liab)
 	, mtg(company_asset_mtg)
 	, mtg_cf(company_asset_mtg_mtg_cf)
-	, mtg_is(company_asset_mtg_mtg_cf_mtg_is)
-	, mtg_pv(company_asset_mtg_mtg_cf_mtg_pv)
-	, mtg_ym(company_asset_mtg_mtg_cf_mtg_ym)
 	, rates(company_rates)
 	, seg(company_seg)
 {
@@ -10608,27 +10596,18 @@ MTG_ASSET::MTG_ASSET(int columnCount, Descriptor* mocd[], Product* persObj) : Mo
 //constructor begincolumn
 MTG_ASSET::MTG_ASSET(const xstring &modelClassName,
 		int isSm, ModelClass *owner, ModelClass *peer, int mainRebase,
-		const char *name, ModelClass* arrayPersistentObj) : ModelClass(156, MTG_ASSET::descriptorTable, arrayPersistentObj), Variable(*this)
-  , sm_bond_is(0)
-  , sm_bond_pv(0)
-  , sm_bond_ym(0)
-  , sm_mtg_is(0)
-  , sm_mtg_pv(0)
-  , sm_mtg_ym(0)
+		const char *name, ModelClass* arrayPersistentObj) : ModelClass(158, MTG_ASSET::descriptorTable, arrayPersistentObj), Variable(*this)
 
   , sm_mtg_cf(0)
+  , sm_mtg_cf_var(0, 0, 0)
 	, adco(company_asset_adco)
 	, asset(company_asset)
-	, bond_pv(company_asset_bond_bond_cf_bond_pv)
-	, bond_ym(company_asset_bond_bond_cf_bond_ym)
 	, epl(company_liab_epl)
 	, fia(company_liab_fia)
-	, intex(company_asset_intex)
+	, inv_strategy(company_inv_strategy)
+	, liab(company_liab)
 	, mtg(company_asset_mtg)
 	, mtg_cf(company_asset_mtg_mtg_cf)
-	, mtg_is(company_asset_mtg_mtg_cf_mtg_is)
-	, mtg_pv(company_asset_mtg_mtg_cf_mtg_pv)
-	, mtg_ym(company_asset_mtg_mtg_cf_mtg_ym)
 	, rates(company_rates)
 	, seg(company_seg)
  // Tables...
@@ -10650,13 +10629,14 @@ MTG_ASSET::MTG_ASSET(const xstring &modelClassName,
    mCFCDFinder = &CFStaticDataFinder;
    mMOCD = descriptorTable;
 
+		adopt(&sm_mtg_cf_var);
 
 		ModelClassName = modelClassName;
        isSubmodel = isSm;
        isMainModel = !isSm;
 		modelName = name;
 
-#ifdef __CREATE_COMP_COMP_CLASS_
+#ifdef __CREATE_AA_COMP_COMP_CLASS_
        company = 0;
 #endif
 #ifdef __CREATE_ASSET_ASSET_CLASS_
@@ -10665,29 +10645,17 @@ MTG_ASSET::MTG_ASSET(const xstring &modelClassName,
 #ifdef __CREATE_ADCO_ASSET_CLASS_
        company_asset_adco = 0;
 #endif
-#ifdef __CREATE_BOND_CF_ASSET_CLASS_
-       company_asset_bond_bond_cf_bond_pv = 0;
-#endif
-#ifdef __CREATE_BOND_CF_ASSET_CLASS_
-       company_asset_bond_bond_cf_bond_ym = 0;
-#endif
-#ifdef __CREATE_INTEX_ASSET_CLASS_
-       company_asset_intex = 0;
-#endif
 #ifdef __CREATE_MTG_ASSET_CLASS_
        company_asset_mtg = 0;
 #endif
 #ifdef __CREATE_MTG_CF_ASSET_CLASS_
        company_asset_mtg_mtg_cf = 0;
 #endif
-#ifdef __CREATE_MTG_CF_ASSET_CLASS_
-       company_asset_mtg_mtg_cf_mtg_is = 0;
+#ifdef __CREATE_INVSTRAT_ASSET_CLASS_
+       company_inv_strategy = 0;
 #endif
-#ifdef __CREATE_MTG_CF_ASSET_CLASS_
-       company_asset_mtg_mtg_cf_mtg_pv = 0;
-#endif
-#ifdef __CREATE_MTG_CF_ASSET_CLASS_
-       company_asset_mtg_mtg_cf_mtg_ym = 0;
+#ifdef __CREATE_LIAB_LIAB_CLASS_
+       company_liab = 0;
 #endif
 #ifdef __CREATE_EPL_LIAB_CLASS_
        company_liab_epl = 0;
@@ -10717,7 +10685,7 @@ MTG_ASSET::MTG_ASSET(const xstring &modelClassName,
 
 	setSlidingSpace();
 
-	for (int cf_no = 1; cf_no <= 156; cf_no++)
+	for (int cf_no = 1; cf_no <= 158; cf_no++)
 #ifdef CF_MEMORY
 		setPtr_col(cf_no, 0);
 #else
@@ -10758,8 +10726,8 @@ MTG_ASSET::MTG_ASSET(const xstring &modelClassName,
 
  void MTG_ASSET::copy_names() {
 
-#ifdef __CREATE_COMP_COMP_CLASS_
-		company = (COMP_COMP*)(findUnique("company"));
+#ifdef __CREATE_AA_COMP_COMP_CLASS_
+		company = (AA_COMP_COMP*)(findUnique("company"));
 #endif
 #ifdef __CREATE_ASSET_ASSET_CLASS_
 		company_asset = (ASSET_ASSET*)(findUnique("company|asset"));
@@ -10767,29 +10735,17 @@ MTG_ASSET::MTG_ASSET(const xstring &modelClassName,
 #ifdef __CREATE_ADCO_ASSET_CLASS_
 		company_asset_adco = (ADCO_ASSET*)(findUnique("company|asset|adco"));
 #endif
-#ifdef __CREATE_BOND_CF_ASSET_CLASS_
-		company_asset_bond_bond_cf_bond_pv = (BOND_CF_ASSET*)(findUnique("company|asset|bond|bond_cf|bond_pv"));
-#endif
-#ifdef __CREATE_BOND_CF_ASSET_CLASS_
-		company_asset_bond_bond_cf_bond_ym = (BOND_CF_ASSET*)(findUnique("company|asset|bond|bond_cf|bond_ym"));
-#endif
-#ifdef __CREATE_INTEX_ASSET_CLASS_
-		company_asset_intex = (INTEX_ASSET*)(findUnique("company|asset|intex"));
-#endif
 #ifdef __CREATE_MTG_ASSET_CLASS_
 		company_asset_mtg = (MTG_ASSET*)(findUnique("company|asset|mtg"));
 #endif
 #ifdef __CREATE_MTG_CF_ASSET_CLASS_
 		company_asset_mtg_mtg_cf = (MTG_CF_ASSET*)(findUnique("company|asset|mtg|mtg_cf"));
 #endif
-#ifdef __CREATE_MTG_CF_ASSET_CLASS_
-		company_asset_mtg_mtg_cf_mtg_is = (MTG_CF_ASSET*)(findUnique("company|asset|mtg|mtg_cf|mtg_is"));
+#ifdef __CREATE_INVSTRAT_ASSET_CLASS_
+		company_inv_strategy = (INVSTRAT_ASSET*)(findUnique("company|inv_strategy"));
 #endif
-#ifdef __CREATE_MTG_CF_ASSET_CLASS_
-		company_asset_mtg_mtg_cf_mtg_pv = (MTG_CF_ASSET*)(findUnique("company|asset|mtg|mtg_cf|mtg_pv"));
-#endif
-#ifdef __CREATE_MTG_CF_ASSET_CLASS_
-		company_asset_mtg_mtg_cf_mtg_ym = (MTG_CF_ASSET*)(findUnique("company|asset|mtg|mtg_cf|mtg_ym"));
+#ifdef __CREATE_LIAB_LIAB_CLASS_
+		company_liab = (LIAB_LIAB*)(findUnique("company|liab"));
 #endif
 #ifdef __CREATE_EPL_LIAB_CLASS_
 		company_liab_epl = (EPL_LIAB*)(findUnique("company|liab|epl"));
@@ -11013,14 +10969,9 @@ MTG_ASSET_persistent_object::MTG_ASSET_persistent_object(const xstring &modelCla
 			MTG_ASSET(modelClassName, isSm, owner, peer, mainRebase, name, arrayPersistentObj), 
 			mReadArray(true),
 			pfl(0)
-	, sm_bond_is(MTG_ASSET::sm_bond_is)
-	, sm_bond_pv(MTG_ASSET::sm_bond_pv)
-	, sm_bond_ym(MTG_ASSET::sm_bond_ym)
-	, sm_mtg_is(MTG_ASSET::sm_mtg_is)
-	, sm_mtg_pv(MTG_ASSET::sm_mtg_pv)
-	, sm_mtg_ym(MTG_ASSET::sm_mtg_ym)
 
 	, sm_mtg_cf(MTG_ASSET::sm_mtg_cf)
+	, sm_mtg_cf_var(MTG_ASSET::sm_mtg_cf_var)
 	{
 
 
@@ -11046,6 +10997,14 @@ MTG_ASSET::~MTG_ASSET() {
 	if (sliding_wanted == SLIDING_TEST) {
    	show_sliding_windows();
 	}
+//	ModelClass* mtg_cf_var_persObj = sm_mtg_cf_var.getPersistentObject();
+//	doAdopt(mtg_cf_var_persObj, Node::COUNTED); // delete called by node dtor.
+	if (sm_mtg_cf_var.IsValidSubModelOfBaseModelClass()){
+		sm_mtg_cf_var.resize(0);
+		delete sm_mtg_cf_var.getPersistentObject();
+		sm_mtg_cf_var.mPersistentObj = 0;
+	}
+
 }
 //destructor END@2
 void MTG_ASSET::findTargetColumns() {
@@ -11090,6 +11049,8 @@ void MTG_ASSET::resetValues(int decrement) {
 
 void MTG_ASSET::after_startup(int decrement) {
 // Call startup for submodels
+	   sm_mtg_cf_var.doBeforeStartupProcessing(decrement);
+
   if(sm_mtg_cf)
    sm_mtg_cf->doBeforeStartupProcessing(decrement);
 
@@ -11102,7 +11063,7 @@ void MTG_ASSET::after_startup(int decrement) {
 //ms_BeforeStartup END@2
 
 HVector<ModelClass::ddfStruct> MTG_ASSET::ddfVector;
-BitArray MTG_ASSET::dataVariables(149);
+BitArray MTG_ASSET::dataVariables(156);
 bool MTG_ASSET::hasBeenWritten = false;
 
 

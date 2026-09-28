@@ -2,6 +2,8 @@
 #define __SFAS97RD_GAAP_H_
 #pragma warning ( disable : 4819 )
 
+#define __SFAS97RD_GAAP_H_
+
 #include <math.h>
 #include "xstring.h"
 #include "Locator.h"
@@ -60,7 +62,6 @@ extern MY_DLL ofstream log_strm;
 #include "StringProxy.h"			// ... contains String Proxies
 #include "StringEnumProxy.h"		// ... contains StringEnum Proxies
 #include "NumProxyNonMembers.h"		// ... min, max
-#include "StringedProxyNonMembers.h"		// ... concatenation for StringEnum
 #include "ArrayProxy.h"			// ... contains Array Proxies
 #include "ScalarProxy.h"			// ... contains Scalar Proxies
 #include "ModelGroupProxy.h"
@@ -70,6 +71,11 @@ extern MY_DLL ofstream log_strm;
 
 
 using namespace StrEnum;
+
+#ifdef __CREATE_AA_COMP_COMP_CLASS_
+class AA_COMP_COMP;
+class AA_COMP_COMP_persistent_object;
+#endif
 
 #ifdef __CREATE_ADCO_ASSET_CLASS_
 class ADCO_ASSET;
@@ -87,11 +93,6 @@ class ASSET_ASSET;
 class ASSET_ASSET_persistent_object;
 #endif
 
-#ifdef __CREATE_AUTOMATION_CLASS_
-class AUTOMATION;
-class AUTOMATION_persistent_object;
-#endif
-
 #ifdef __CREATE_A_SUBPORT_ASSET_CLASS_
 class A_SUBPORT_ASSET;
 class A_SUBPORT_ASSET_persistent_object;
@@ -104,22 +105,21 @@ typedef TMultiDComp<_2D_A_SUBPORT_ASSET, A_SUBPORT_ASSET_persistent_object> _3D_
 class BOND_ASSET;
 class BOND_ASSET_persistent_object;
 typedef TComp<BOND_ASSET, BOND_ASSET_persistent_object> _1D_BOND_ASSET;
+typedef TMultiDComp<_1D_BOND_ASSET, BOND_ASSET_persistent_object> _2D_BOND_ASSET;
 #endif
 
 #ifdef __CREATE_BOND_CF_ASSET_CLASS_
 class BOND_CF_ASSET;
 class BOND_CF_ASSET_persistent_object;
-#endif
-
-#ifdef __CREATE_COMP_COMP_CLASS_
-class COMP_COMP;
-class COMP_COMP_persistent_object;
+typedef TComp<BOND_CF_ASSET, BOND_CF_ASSET_persistent_object> _1D_BOND_CF_ASSET;
+typedef TMultiDComp<_1D_BOND_CF_ASSET, BOND_CF_ASSET_persistent_object> _2D_BOND_CF_ASSET;
 #endif
 
 #ifdef __CREATE_EIO_ASSET_CLASS_
 class EIO_ASSET;
 class EIO_ASSET_persistent_object;
 typedef TComp<EIO_ASSET, EIO_ASSET_persistent_object> _1D_EIO_ASSET;
+typedef TMultiDComp<_1D_EIO_ASSET, EIO_ASSET_persistent_object> _2D_EIO_ASSET;
 #endif
 
 #ifdef __CREATE_EPA_ASSET_CLASS_
@@ -144,6 +144,7 @@ typedef TComp<FIAAFUND_LIAB, FIAAFUND_LIAB_persistent_object> _1D_FIAAFUND_LIAB;
 class FIACARVM_LIAB;
 class FIACARVM_LIAB_persistent_object;
 typedef TComp<FIACARVM_LIAB, FIACARVM_LIAB_persistent_object> _1D_FIACARVM_LIAB;
+typedef TMultiDComp<_1D_FIACARVM_LIAB, FIACARVM_LIAB_persistent_object> _2D_FIACARVM_LIAB;
 #endif
 
 #ifdef __CREATE_FIA_LIAB_CLASS_
@@ -159,11 +160,6 @@ typedef TComp<HDG_GRP_COMP, HDG_GRP_COMP_persistent_object> _1D_HDG_GRP_COMP;
 typedef TMultiDComp<_1D_HDG_GRP_COMP, HDG_GRP_COMP_persistent_object> _2D_HDG_GRP_COMP;
 #endif
 
-#ifdef __CREATE_INTEX_ASSET_CLASS_
-class INTEX_ASSET;
-class INTEX_ASSET_persistent_object;
-#endif
-
 #ifdef __CREATE_INVSTRAT_ASSET_CLASS_
 class INVSTRAT_ASSET;
 class INVSTRAT_ASSET_persistent_object;
@@ -175,15 +171,24 @@ class LIAB_LIAB;
 class LIAB_LIAB_persistent_object;
 #endif
 
+#ifdef __CREATE_MRB_GAAP_CLASS_
+class MRB_GAAP;
+class MRB_GAAP_persistent_object;
+typedef TComp<MRB_GAAP, MRB_GAAP_persistent_object> _1D_MRB_GAAP;
+#endif
+
 #ifdef __CREATE_MTG_ASSET_CLASS_
 class MTG_ASSET;
 class MTG_ASSET_persistent_object;
 typedef TComp<MTG_ASSET, MTG_ASSET_persistent_object> _1D_MTG_ASSET;
+typedef TMultiDComp<_1D_MTG_ASSET, MTG_ASSET_persistent_object> _2D_MTG_ASSET;
 #endif
 
 #ifdef __CREATE_MTG_CF_ASSET_CLASS_
 class MTG_CF_ASSET;
 class MTG_CF_ASSET_persistent_object;
+typedef TComp<MTG_CF_ASSET, MTG_CF_ASSET_persistent_object> _1D_MTG_CF_ASSET;
+typedef TMultiDComp<_1D_MTG_CF_ASSET, MTG_CF_ASSET_persistent_object> _2D_MTG_CF_ASSET;
 #endif
 
 #ifdef __CREATE_RATES_ECONOMY_CLASS_
@@ -197,22 +202,11 @@ class SEG_COMP_persistent_object;
 typedef TComp<SEG_COMP, SEG_COMP_persistent_object> _1D_SEG_COMP;
 #endif
 
-#ifdef __CREATE_SFAS133_GAAP_CLASS_
-class SFAS133_GAAP;
-class SFAS133_GAAP_persistent_object;
-typedef TComp<SFAS133_GAAP, SFAS133_GAAP_persistent_object> _1D_SFAS133_GAAP;
-#endif
-
 #ifdef __CREATE_SFAS97RD_GAAP_CLASS_
 class SFAS97RD_GAAP;
 class SFAS97RD_GAAP_persistent_object;
 typedef TComp<SFAS97RD_GAAP, SFAS97RD_GAAP_persistent_object> _1D_SFAS97RD_GAAP;
 typedef TMultiDComp<_1D_SFAS97RD_GAAP, SFAS97RD_GAAP_persistent_object> _2D_SFAS97RD_GAAP;
-#endif
-
-#ifdef __CREATE_UTIL_RAFM_CLASS_
-class UTIL_RAFM;
-class UTIL_RAFM_persistent_object;
 #endif
 
 
@@ -257,20 +251,13 @@ public :
 	static void Terminator();
 	static FunctionPtr RegisterTerminatorOnce;
 	
-#if !defined(__VA_LIAB_H_) //WTW - Gen2 - Move outside of EXTERNS
-// integers from VA_POL submodel
-int AV_B_DCA = 0;
-int AV_B_GA = 1;
-#endif
-
-//typedef map <int, long, less <int> > mpmap;//Gen2 - 9/6/2024 - comment out typedef
-map <int, long, less <int> > ul_mp_map;//Gen2 - 9/6/2024 - replace mpmap with full definition
-map <int, long, less <int> > vul_mp_map;//Gen2 - 9/6/2024 - replace mpmap with full definition
-map <int, long, less <int> > iul_mp_map;//Gen2 - 9/6/2024 - replace mpmap with full definition
-map <int, long, less <int> > va_mp_map;//Gen2 - 9/6/2024 - replace mpmap with full definition
-map <int, long, less <int> > fa_mp_map;//Gen2 - 9/6/2024 - replace mpmap with full definition
-map <int, long, less <int> > fia_mp_map;//Gen2 - 9/6/2024 - replace mpmap with full definition
-map <int, long, less <int> > epl_mp_map;//Gen2 - 9/6/2024 - replace mpmap with full definition
+map <int, long, less <int> > ul_mp_map;
+map <int, long, less <int> > vul_mp_map;
+map <int, long, less <int> > iul_mp_map;
+map <int, long, less <int> > va_mp_map;
+map <int, long, less <int> > fa_mp_map;
+map <int, long, less <int> > fia_mp_map;
+map <int, long, less <int> > epl_mp_map;
 xstring reins_defn;
 int cohort_reins_indicator;
 int cohort_reins_yrt_indicator;
@@ -280,42 +267,40 @@ int cohort_max_maturity_period;
 SmartArray <SmartArray <double> > sop031_array;
 SmartArray <SmartArray <double> > gaap_schedule;
 double init_dac_acq_exp;
-double init_dac_acq_exp_loss_rec;
-double init_capzd_acq_exp_accum;
-double init_capzd_acq_exp_accum_loss_rec_int_rate;
-double init_dac_acq_exp_loss_rec_accum;
+double init_dac_acq_exp_sch;
 double init_dac_comm;
-double init_dac_comm_loss_rec;
-double init_capzd_comm_accum;
-double init_capzd_comm_accum_loss_rec_int_rate;
-double init_dac_comm_loss_rec_accum;
+double init_dac_comm_sch;
 double init_dac_prem_bonus;
-double init_dac_prem_bonus_loss_rec;
-double init_capzd_prem_bonus_accum;
-double init_capzd_prem_bonus_accum_loss_rec_int_rate;
-double init_dac_prem_bonus_loss_rec_accum;
+double init_dac_prem_bonus_sch;
 double init_egp_accum;
-double init_egp_accum_loss_rec_int_rate;
 double init_sop031_assess_accum;
 double init_sop031_gmdb_ben_accum;
-double init_sop031_gmib_ben_accum;
-double init_sop031_gmwb_ben_accum;
 double init_sop031_pbr_accum;
 double init_deferred_loads_accum;
 double init_unearn_rev_liab;
+double init_unearn_rev_liab_sch;
 double init_dac_reins_yrt_asset;
-double init_reins_yrt_cost_accum;
+double init_dac_reins_yrt_asset_sch;
 double init_sop031_pbr_fund_val_accum;
 double init_embed_deriv_val;
-double init_sfas133_gmab_liab;
-double init_sfas133_gmib_liab;
-double init_sfas133_gmwb_liab;
+double init_mrb_gmab_liab;
+double init_mrb_gmib_liab;
+double init_mrb_gmwb_liab;
+double init_mrb_gmdb_liab;
 double init_sop031_ulsg_ben_accum;
 double init_sop031_gmdb_br;
-double init_sop031_gmib_br;
-double init_sop031_gmwb_br;
 double init_sop031_pbr_liab;
 double init_sop031_ulsg_br;
+double init_policies_inf_sch;
+
+#if defined(__AA_COMP_COMP_H_)
+RATES_ECONOMY /*modelobject_name: RATES*/ *rates_ptr;
+#else
+RATES_ECONOMY /*modelobject_name: FIA_RATES*/ *rates_ptr;
+#endif
+
+SEG_COMP * seg_element;
+
 
 	void init_(){
 		
@@ -326,42 +311,31 @@ cohort_first_issue_period = 0;
 cohort_last_issue_period = -9999;
 cohort_max_maturity_period = -9999;
 init_dac_acq_exp = 0.0;
-init_dac_acq_exp_loss_rec = 0.0;
-init_capzd_acq_exp_accum = 0.0;
-init_capzd_acq_exp_accum_loss_rec_int_rate = 0.0;
-init_dac_acq_exp_loss_rec_accum = 0.0;
+init_dac_acq_exp_sch = 0.0;
 init_dac_comm = 0.0;
-init_dac_comm_loss_rec = 0.0;
-init_capzd_comm_accum = 0.0;
-init_capzd_comm_accum_loss_rec_int_rate = 0.0;
-init_dac_comm_loss_rec_accum = 0.0;
+init_dac_comm_sch = 0.0;
 init_dac_prem_bonus = 0.0;
-init_dac_prem_bonus_loss_rec = 0.0;
-init_capzd_prem_bonus_accum = 0.0;
-init_capzd_prem_bonus_accum_loss_rec_int_rate = 0.0;
-init_dac_prem_bonus_loss_rec_accum = 0.0;
+init_dac_prem_bonus_sch = 0.0;
 init_egp_accum = 0.0;
-init_egp_accum_loss_rec_int_rate = 0.0;
 init_sop031_assess_accum = 0.0;
 init_sop031_gmdb_ben_accum = 0.0;
-init_sop031_gmib_ben_accum = 0.0;
-init_sop031_gmwb_ben_accum = 0.0;
 init_sop031_pbr_accum = 0.0;
 init_deferred_loads_accum = 0.0;
 init_unearn_rev_liab = 0.0;
+init_unearn_rev_liab_sch = 0.0;
 init_dac_reins_yrt_asset = 0.0;
-init_reins_yrt_cost_accum = 0.0;
+init_dac_reins_yrt_asset_sch = 0.0;
 init_sop031_pbr_fund_val_accum = 0.0;
 init_embed_deriv_val = 0.0;
-init_sfas133_gmab_liab = 0.0;
-init_sfas133_gmib_liab = 0.0;
-init_sfas133_gmwb_liab = 0.0;
+init_mrb_gmab_liab = 0.0;
+init_mrb_gmib_liab = 0.0;
+init_mrb_gmwb_liab = 0.0;
+init_mrb_gmdb_liab = 0.0;
 init_sop031_ulsg_ben_accum = 0.0;
 init_sop031_gmdb_br = 0.0;
-init_sop031_gmib_br = 0.0;
-init_sop031_gmwb_br = 0.0;
 init_sop031_pbr_liab = 0.0;
 init_sop031_ulsg_br = 0.0;
+init_policies_inf_sch = 0.0;
 
 		bIsInit = true;
 	}
@@ -369,16 +343,20 @@ init_sop031_ulsg_br = 0.0;
 
 	}
 
-#ifdef __CREATE_COMP_COMP_CLASS_
-	COMP_COMP	*company;
+#ifdef __CREATE_ADCO_ASSET_CLASS_
+	ADCO_ASSET	*company_asset_adco;
+	ADCO_ASSET	*&adco;
+#endif
+#ifdef __CREATE_ASSET_ASSET_CLASS_
+	ASSET_ASSET	*company_asset;
+	ASSET_ASSET	*&asset;
+#endif
+#ifdef __CREATE_AA_COMP_COMP_CLASS_
+	AA_COMP_COMP	*company;
 #endif
 #ifdef __CREATE_FIA_LIAB_CLASS_
 	FIA_LIAB	*company_liab_fia;
 	FIA_LIAB	*&fia;
-#endif
-#ifdef __CREATE_AUTOMATION_CLASS_
-	AUTOMATION	*company_liab_fia_fia_automation;
-	AUTOMATION	*&fia_automation;
 #endif
 #ifdef __CREATE_RATES_ECONOMY_CLASS_
 	RATES_ECONOMY	*company_liab_fia_fia_rates;
@@ -407,6 +385,7 @@ init_sop031_ulsg_br = 0.0;
  // Column Definition Begins
  	ColumnAccessor < mCFStaticData_0 > acq_exp;
  	ColumnAccessor < mCFStaticData_0 > agp;
+ 	ColumnAccessor < mCFStaticData_0 > agp_history;
  	ColumnAccessor < mCFStaticData_0 > amortzn_int_rate;
  	ColumnAccessor < mCFStaticData_0 > cal_mth;
  	ColumnAccessor < mCFStaticData_0 > cal_yr;
@@ -414,22 +393,10 @@ init_sop031_ulsg_br = 0.0;
  	ColumnAccessor < mCFStaticData_0 > cap_gain;
  	ColumnAccessor < mCFStaticData_0 > cap_gain_fund;
  	ColumnAccessor < mCFStaticData_0 > capzd_acq_exp;
- 	ColumnAccessor < mCFStaticData_0 > capzd_acq_exp_accum;
- 	ColumnAccessor < mCFStaticData_0 > capzd_acq_exp_accum_loss_rec_int_rate;
- 	ColumnAccessor < mCFStaticData_0 > capzd_acq_exp_pv;
- 	ColumnAccessor < mCFStaticData_0 > capzd_acq_exp_pv_loss_rec_int_rate;
- 	ColumnAccessor < mCFStaticData_0 > capzd_comm_accum;
- 	ColumnAccessor < mCFStaticData_0 > capzd_comm_accum_loss_rec_int_rate;
  	ColumnAccessor < mCFStaticData_0 > capzd_comm_bom;
  	ColumnAccessor < mCFStaticData_0 > capzd_comm_chargeback;
  	ColumnAccessor < mCFStaticData_0 > capzd_comm_eom;
- 	ColumnAccessor < mCFStaticData_0 > capzd_comm_pv;
- 	ColumnAccessor < mCFStaticData_0 > capzd_comm_pv_loss_rec_int_rate;
  	ColumnAccessor < mCFStaticData_0 > capzd_prem_bonus;
- 	ColumnAccessor < mCFStaticData_0 > capzd_prem_bonus_accum;
- 	ColumnAccessor < mCFStaticData_0 > capzd_prem_bonus_accum_loss_rec_int_rate;
- 	ColumnAccessor < mCFStaticData_0 > capzd_prem_bonus_pv;
- 	ColumnAccessor < mCFStaticData_0 > capzd_prem_bonus_pv_loss_rec_int_rate;
  	ColumnAccessor < mCFStaticData_0 > capzd_reins_yrt_cost;
  	ColumnAccessor < mCFStaticData_0 > cash_flow_bom;
  	ColumnAccessor < mCFStaticData_0 > cash_flow_int;
@@ -443,55 +410,37 @@ init_sop031_ulsg_br = 0.0;
  	ColumnAccessor < mCFStaticData_0 > dac_acq_exp;
  	ColumnAccessor < mCFStaticData_0 > dac_acq_exp_amortzn;
  	ColumnAccessor < mCFStaticData_0 > dac_acq_exp_incr;
- 	ColumnAccessor < mCFStaticData_0 > dac_acq_exp_int;
- 	ColumnAccessor < mCFStaticData_0 > dac_acq_exp_loss_rec;
- 	ColumnAccessor < mCFStaticData_0 > dac_acq_exp_loss_rec_accum;
- 	ColumnAccessor < mCFStaticData_0 > dac_acq_exp_loss_rec_hist_accum;
  	ColumnAccessor < mCFStaticData_0 > dac_acq_exp_sch;
  	ColumnAccessor < mCFStaticData_0 > dac_comm;
  	ColumnAccessor < mCFStaticData_0 > dac_comm_amortzn;
  	ColumnAccessor < mCFStaticData_0 > dac_comm_incr;
- 	ColumnAccessor < mCFStaticData_0 > dac_comm_int;
- 	ColumnAccessor < mCFStaticData_0 > dac_comm_loss_rec;
- 	ColumnAccessor < mCFStaticData_0 > dac_comm_loss_rec_accum;
- 	ColumnAccessor < mCFStaticData_0 > dac_comm_loss_rec_hist_accum;
  	ColumnAccessor < mCFStaticData_0 > dac_comm_sch;
  	ColumnAccessor < mCFStaticData_0 > dac_incr;
  	ColumnAccessor < mCFStaticData_0 > dac_prem_bonus;
  	ColumnAccessor < mCFStaticData_0 > dac_prem_bonus_amortzn;
  	ColumnAccessor < mCFStaticData_0 > dac_prem_bonus_incr;
- 	ColumnAccessor < mCFStaticData_0 > dac_prem_bonus_int;
- 	ColumnAccessor < mCFStaticData_0 > dac_prem_bonus_loss_rec;
- 	ColumnAccessor < mCFStaticData_0 > dac_prem_bonus_loss_rec_accum;
- 	ColumnAccessor < mCFStaticData_0 > dac_prem_bonus_loss_rec_hist_accum;
  	ColumnAccessor < mCFStaticData_0 > dac_prem_bonus_sch;
  	ColumnAccessor < mCFStaticData_0 > dac_reins_yrt_asset;
  	ColumnAccessor < mCFStaticData_0 > dac_reins_yrt_asset_amortzn;
  	ColumnAccessor < mCFStaticData_0 > dac_reins_yrt_asset_incr;
- 	ColumnAccessor < mCFStaticData_0 > dac_reins_yrt_asset_int;
  	ColumnAccessor < mCFStaticData_0 > dac_reins_yrt_asset_sch;
  	ColumnAccessor < mCFStaticData_0 > date;
  	ColumnAccessor < mCFStaticData_0 > deferred_loads;
  	ColumnAccessor < mCFStaticData_0 > deferred_loads_accum;
+ 	ColumnAccessor < mCFStaticData_0 > deferred_loads_history;
  	ColumnAccessor < mCFStaticData_0 > deferred_loads_pv;
  	ColumnAccessor < mCFStaticData_0 > dth_claim_cost;
  	ColumnAccessor < mCFStaticData_0 > egp;
  	ColumnAccessor < mCFStaticData_0 > egp_accum;
- 	ColumnAccessor < mCFStaticData_0 > egp_accum_loss_rec_int_rate;
  	ColumnAccessor < mCFStaticData_0 > egp_gain_exp;
  	ColumnAccessor < mCFStaticData_0 > egp_gain_inv;
  	ColumnAccessor < mCFStaticData_0 > egp_gain_mort;
  	ColumnAccessor < mCFStaticData_0 > egp_gain_persist_bon_ref;
  	ColumnAccessor < mCFStaticData_0 > egp_gain_surr;
  	ColumnAccessor < mCFStaticData_0 > egp_pv;
- 	ColumnAccessor < mCFStaticData_0 > egp_pv_loss_rec_int_rate;
  	ColumnAccessor < mCFStaticData_0 > egp_sop031_assess_accum;
  	ColumnAccessor < mCFStaticData_0 > egp_sop031_gmdb_ben_accum;
  	ColumnAccessor < mCFStaticData_0 > egp_sop031_gmdb_liab;
- 	ColumnAccessor < mCFStaticData_0 > egp_sop031_gmib_ben_accum;
- 	ColumnAccessor < mCFStaticData_0 > egp_sop031_gmib_liab;
- 	ColumnAccessor < mCFStaticData_0 > egp_sop031_gmwb_ben_accum;
- 	ColumnAccessor < mCFStaticData_0 > egp_sop031_gmwb_liab;
  	ColumnAccessor < mCFStaticData_0 > egp_sop031_res_incr;
  	ColumnAccessor < mCFStaticData_0 > egp_sop031_ulsg_ben_accum;
  	ColumnAccessor < mCFStaticData_0 > egp_sop031_ulsg_liab;
@@ -539,56 +488,51 @@ init_sop031_ulsg_br = 0.0;
  	ColumnAccessor < mCFStaticData_0 > liab_net;
  	ColumnAccessor < mCFStaticData_0 > loads;
  	ColumnAccessor < mCFStaticData_0 > loc_cost;
- 	ColumnAccessor < mCFStaticData_0 > loss_rec_amortzn_int_rate;
  	ColumnAccessor < mCFStaticData_0 > maint_exp_bom;
  	ColumnAccessor < mCFStaticData_0 > maint_exp_eom;
  	ColumnAccessor < mCFStaticData_0 > modco_liab;
  	ColumnAccessor < mCFStaticData_0 > modco_liab_incr;
  	ColumnAccessor < mCFStaticData_0 > modco_res_adj;
+ 	ColumnAccessor < mCFStaticData_0 > mrb_gmab_liab;
+ 	ColumnAccessor < mCFStaticData_0 > mrb_gmdb_liab;
+ 	ColumnAccessor < mCFStaticData_0 > mrb_gmib_liab;
+ 	ColumnAccessor < mCFStaticData_0 > mrb_gmwb_liab;
+ 	ColumnAccessor < mCFStaticData_0 > mrb_liab;
+ 	ColumnAccessor < mCFStaticData_0 > mrb_liab_incr;
  	ColumnAccessor < mCFStaticData_0 > persist_bon_ref;
  	ColumnAccessor < mCFStaticData_0 > pol_loan;
  	ColumnAccessor < mCFStaticData_0 > pol_loan_inc;
- 	ColumnAccessor < mCFStaticData_0 > policies_b;
+ 	ColumnAccessor < mCFStaticData_0 > policies_inf;
+ 	ColumnAccessor < mCFStaticData_0 > policies_inf_sch;
+ 	ColumnAccessor < mCFStaticData_0 > policies_inf_sum;
  	ColumnAccessor < mCFStaticData_0 > prem_bonus;
  	ColumnAccessor < mCFStaticData_0 > prem_tax;
  	ColumnAccessor < mCFStaticData_0 > refund;
  	ColumnAccessor < mCFStaticData_0 > reins_yrt_cost;
- 	ColumnAccessor < mCFStaticData_0 > reins_yrt_cost_accum;
- 	ColumnAccessor < mCFStaticData_0 > reins_yrt_cost_pv;
  	ColumnAccessor < mCFStaticData_0 > rider_charges;
- 	ColumnAccessor < mCFStaticData_0 > sfas133_fia_iul_liab;
- 	ColumnAccessor < mCFStaticData_0 > sfas133_gmab_liab;
- 	ColumnAccessor < mCFStaticData_0 > sfas133_gmib_liab;
- 	ColumnAccessor < mCFStaticData_0 > sfas133_gmwb_liab;
  	ColumnAccessor < mCFStaticData_0 > sfas133_liab;
  	ColumnAccessor < mCFStaticData_0 > sfas133_liab_incr;
  	ColumnAccessor < mCFStaticData_0 > sop031_addl_liab;
  	ColumnAccessor < mCFStaticData_0 > sop031_addl_liab_incr;
  	ColumnAccessor < mCFStaticData_0 > sop031_assess;
  	ColumnAccessor < mCFStaticData_0 > sop031_assess_accum;
+ 	ColumnAccessor < mCFStaticData_0 > sop031_assess_history;
  	ColumnAccessor < mCFStaticData_0 > sop031_assess_pv;
  	ColumnAccessor < mCFStaticData_0 > sop031_egp;
  	ColumnAccessor < mCFStaticData_0 > sop031_egp_accum;
  	ColumnAccessor < mCFStaticData_0 > sop031_egp_pv;
  	ColumnAccessor < mCFStaticData_0 > sop031_gmdb_ben_accum;
  	ColumnAccessor < mCFStaticData_0 > sop031_gmdb_ben_pv;
+ 	ColumnAccessor < mCFStaticData_0 > sop031_gmdb_benefits_history;
  	ColumnAccessor < mCFStaticData_0 > sop031_gmdb_br;
  	ColumnAccessor < mCFStaticData_0 > sop031_gmdb_br_sch;
  	ColumnAccessor < mCFStaticData_0 > sop031_gmdb_liab;
- 	ColumnAccessor < mCFStaticData_0 > sop031_gmib_ben_accum;
- 	ColumnAccessor < mCFStaticData_0 > sop031_gmib_ben_pv;
- 	ColumnAccessor < mCFStaticData_0 > sop031_gmib_br;
- 	ColumnAccessor < mCFStaticData_0 > sop031_gmib_br_sch;
- 	ColumnAccessor < mCFStaticData_0 > sop031_gmib_liab;
- 	ColumnAccessor < mCFStaticData_0 > sop031_gmwb_ben_accum;
- 	ColumnAccessor < mCFStaticData_0 > sop031_gmwb_ben_pv;
- 	ColumnAccessor < mCFStaticData_0 > sop031_gmwb_br;
- 	ColumnAccessor < mCFStaticData_0 > sop031_gmwb_br_sch;
- 	ColumnAccessor < mCFStaticData_0 > sop031_gmwb_liab;
  	ColumnAccessor < mCFStaticData_0 > sop031_pbr;
  	ColumnAccessor < mCFStaticData_0 > sop031_pbr_accum;
+ 	ColumnAccessor < mCFStaticData_0 > sop031_pbr_benefits_history;
  	ColumnAccessor < mCFStaticData_0 > sop031_pbr_fund_val;
  	ColumnAccessor < mCFStaticData_0 > sop031_pbr_fund_val_accum;
+ 	ColumnAccessor < mCFStaticData_0 > sop031_pbr_fund_val_history;
  	ColumnAccessor < mCFStaticData_0 > sop031_pbr_fund_val_pv;
  	ColumnAccessor < mCFStaticData_0 > sop031_pbr_liab;
  	ColumnAccessor < mCFStaticData_0 > sop031_pbr_liab_amortzn;
@@ -596,6 +540,7 @@ init_sop031_ulsg_br = 0.0;
  	ColumnAccessor < mCFStaticData_0 > sop031_pbr_liab_sch;
  	ColumnAccessor < mCFStaticData_0 > sop031_pbr_pv;
  	ColumnAccessor < mCFStaticData_0 > sop031_pbr_units_inf;
+ 	ColumnAccessor < mCFStaticData_0 > sop031_sg_benefits_history;
  	ColumnAccessor < mCFStaticData_0 > sop031_ulsg_ben_accum;
  	ColumnAccessor < mCFStaticData_0 > sop031_ulsg_ben_pv;
  	ColumnAccessor < mCFStaticData_0 > sop031_ulsg_br;
@@ -606,21 +551,13 @@ init_sop031_ulsg_br = 0.0;
  	ColumnAccessor < mCFStaticData_0 > stat_res_rider;
  	ColumnAccessor < mCFStaticData_0 > ulsg_ben;
  	ColumnAccessor < mCFStaticData_0 > unearn_rev_liab;
- 	ColumnAccessor < mCFStaticData_0 > unearn_rev_liab_accum;
  	ColumnAccessor < mCFStaticData_0 > unearn_rev_liab_amortzn;
  	ColumnAccessor < mCFStaticData_0 > unearn_rev_liab_incr;
- 	ColumnAccessor < mCFStaticData_0 > unearn_rev_liab_int;
  	ColumnAccessor < mCFStaticData_0 > unearn_rev_liab_released;
  	ColumnAccessor < mCFStaticData_0 > unearn_rev_liab_sch;
 //Column Definition END@2
 
  // Temporary Table...
-SFAS97RD_GAAP *sm_bond_is;
-SFAS97RD_GAAP *sm_bond_pv;
-SFAS97RD_GAAP *sm_bond_ym;
-SFAS97RD_GAAP *sm_mtg_is;
-SFAS97RD_GAAP *sm_mtg_pv;
-SFAS97RD_GAAP *sm_mtg_ym;
 int main_rebase_model; //1
 
 public :
@@ -651,45 +588,27 @@ public :
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > cohort_history_agp;
   inline double	Get_cohort_history_agp() {
 		return cohort_history_agp; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > cohort_history_capzd_acq_exp;
-  inline double	Get_cohort_history_capzd_acq_exp() {
-		return cohort_history_capzd_acq_exp; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > cohort_history_capzd_comm_bom;
-  inline double	Get_cohort_history_capzd_comm_bom() {
-		return cohort_history_capzd_comm_bom; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > cohort_history_capzd_comm_eom;
-  inline double	Get_cohort_history_capzd_comm_eom() {
-		return cohort_history_capzd_comm_eom; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > cohort_history_capzd_prem_bonus;
-  inline double	Get_cohort_history_capzd_prem_bonus() {
-		return cohort_history_capzd_prem_bonus; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > cohort_history_dac_acq_exp_loss;
-  inline double	Get_cohort_history_dac_acq_exp_loss() {
-		return cohort_history_dac_acq_exp_loss; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > cohort_history_dac_comm_loss;
-  inline double	Get_cohort_history_dac_comm_loss() {
-		return cohort_history_dac_comm_loss; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > cohort_history_dac_prem_bonus_loss;
-  inline double	Get_cohort_history_dac_prem_bonus_loss() {
-		return cohort_history_dac_prem_bonus_loss; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > cohort_history_dac_acq_exp;
+  inline double	Get_cohort_history_dac_acq_exp() {
+		return cohort_history_dac_acq_exp; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > cohort_history_dac_comm;
+  inline double	Get_cohort_history_dac_comm() {
+		return cohort_history_dac_comm; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > cohort_history_dac_prem_bonus;
+  inline double	Get_cohort_history_dac_prem_bonus() {
+		return cohort_history_dac_prem_bonus; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > cohort_history_dac_reins_yrt_asset;
+  inline double	Get_cohort_history_dac_reins_yrt_asset() {
+		return cohort_history_dac_reins_yrt_asset; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > cohort_history_deferred_load;
   inline double	Get_cohort_history_deferred_load() {
 		return cohort_history_deferred_load; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > cohort_history_reins_yrt_cost;
-  inline double	Get_cohort_history_reins_yrt_cost() {
-		return cohort_history_reins_yrt_cost; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > cohort_history_sop031_assess;
   inline double	Get_cohort_history_sop031_assess() {
 		return cohort_history_sop031_assess; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > cohort_history_sop031_gmdb_benefits;
   inline double	Get_cohort_history_sop031_gmdb_benefits() {
 		return cohort_history_sop031_gmdb_benefits; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > cohort_history_sop031_gmib_benefits;
-  inline double	Get_cohort_history_sop031_gmib_benefits() {
-		return cohort_history_sop031_gmib_benefits; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > cohort_history_sop031_gmwb_benefits;
-  inline double	Get_cohort_history_sop031_gmwb_benefits() {
-		return cohort_history_sop031_gmwb_benefits; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > cohort_history_sop031_pbr_benefits;
   inline double	Get_cohort_history_sop031_pbr_benefits() {
 		return cohort_history_sop031_pbr_benefits; }
@@ -710,12 +629,6 @@ public :
 	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > cohort_issue_yrs;
   inline xstring	Get_cohort_issue_yrs() {
 		return cohort_issue_yrs; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > cohort_loss_recognition_int_rate_ceded;
-  inline double	Get_cohort_loss_recognition_int_rate_ceded() {
-		return cohort_loss_recognition_int_rate_ceded; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > cohort_loss_recognition_int_rate_gross;
-  inline double	Get_cohort_loss_recognition_int_rate_gross() {
-		return cohort_loss_recognition_int_rate_gross; }
 	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > cohort_plan_codes;
   inline xstring	Get_cohort_plan_codes() {
 		return cohort_plan_codes; }
@@ -729,29 +642,17 @@ public :
 		return cohort_yr; }
   inline void Set_cohort_yr(const int &v) {
 		cohort_yr.setValue(v); }
-	Attribute::Proxy <int, DESCRIPTOR_TABLE > date_lookup_gen2;
-  inline int	Get_date_lookup_gen2() {
-		return date_lookup_gen2; }
-  inline void Set_date_lookup_gen2(const int &v) {
-		date_lookup_gen2.setValue(v); }
+	Attribute::Proxy <int, DESCRIPTOR_TABLE > comm_py_lookup;
+  inline int	Get_comm_py_lookup() {
+		return comm_py_lookup; }
+  inline void Set_comm_py_lookup(const int &v) {
+		comm_py_lookup.setValue(v); }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > fia_gaap_int_rate;
   inline double	Get_fia_gaap_int_rate() {
 		return fia_gaap_int_rate; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmib_ceded_defn;
-  inline xstring	Get_gmib_ceded_defn() {
-		return gmib_ceded_defn; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmib_gross_defn;
-  inline xstring	Get_gmib_gross_defn() {
-		return gmib_gross_defn; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmwb_ceded_defn;
-  inline xstring	Get_gmwb_ceded_defn() {
-		return gmwb_ceded_defn; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmwb_gross_defn;
-  inline xstring	Get_gmwb_gross_defn() {
-		return gmwb_gross_defn; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > loss_recognition_defn;
-  inline xstring	Get_loss_recognition_defn() {
-		return loss_recognition_defn; }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > model_name;
+  inline xstring	Get_model_name() {
+		return model_name; }
 	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > proj_date;
   inline xstring	Get_proj_date() {
 		return proj_date; }
@@ -779,15 +680,8 @@ public :
 	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > final_period;
 	Attribute::Proxy<Scalar<double>, DESCRIPTOR_TABLE > gaap_int_rate;
 	Attribute::Proxy<Scalar<double>, DESCRIPTOR_TABLE > gaap_int_rate_mthly;
-	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > gmib_defn;
-	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > gmib_sop031_flag;
-	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > gmwb_defn;
-	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > gmwb_sop031_flag;
 	Attribute::Proxy<Scalar<double>, DESCRIPTOR_TABLE > hedge_alloc_factor;
 	Attribute::Proxy<Scalar<double>, DESCRIPTOR_TABLE > host_accrual_rate;
-	Attribute::Proxy<Scalar<double>, DESCRIPTOR_TABLE > loss_rec_int_rate;
-	Attribute::Proxy<Scalar<double>, DESCRIPTOR_TABLE > loss_rec_int_rate_mthly;
-	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > loss_recognition_flag;
 	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > pbr_final_period;
 	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > prem_term_period;
 	Attribute::Proxy<Scalar<xstring>, DESCRIPTOR_TABLE > proj_date_adj;
@@ -831,7 +725,11 @@ bool setup_cohorts(int mp_iss_yr_int, xstring mp_plan_code, xstring mp_cohort_ma
 
 // Sum Over GAAP
 #line 1 "sum_over_gaap.sfas97rd_gaap.for"
-double sum_over_gaap(const xstring &colname, int t);
+double sum_over_gaap(const xstring &/* CiProxyFormula */colname, const int /* CiProxyTime */ t);
+
+// Sum Over GAAP EPL
+#line 1 "sum_over_gaap_epl.sfas97rd_gaap.for"
+double sum_over_gaap_epl(const xstring & colname, const int t);
 
 // Write State of World Financial
 #line 1 "write_state_of_world_financial.sfas97rd_gaap.for"
@@ -912,12 +810,6 @@ public :
 	void write(const xstring& key, long include_submodels = write_submodels);
 
 	ModelClass *Save_main;
-	SFAS97RD_GAAP *&sm_bond_is; //
-	SFAS97RD_GAAP *&sm_bond_pv; //
-	SFAS97RD_GAAP *&sm_bond_ym; //
-	SFAS97RD_GAAP *&sm_mtg_is; //
-	SFAS97RD_GAAP *&sm_mtg_pv; //
-	SFAS97RD_GAAP *&sm_mtg_ym; //
 
 	ProductFeatureList* pfl;
 

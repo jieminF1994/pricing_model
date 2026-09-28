@@ -1,13 +1,12 @@
 ﻿
 //MODELCLASS BEGIN
+//MODELCLASS aa_comp_comp
 //MODELCLASS adco_asset
 //MODELCLASS ann_pba_pba
 //MODELCLASS asset_asset
-//MODELCLASS automation
 //MODELCLASS a_subport_asset
 //MODELCLASS bond_asset
 //MODELCLASS bond_cf_asset
-//MODELCLASS comp_comp
 //MODELCLASS eio_asset
 //MODELCLASS epa_asset
 //MODELCLASS epl_liab
@@ -15,16 +14,14 @@
 //MODELCLASS fiacarvm_liab
 //MODELCLASS fia_liab
 //MODELCLASS hdg_grp_comp
-//MODELCLASS intex_asset
 //MODELCLASS invstrat_asset
 //MODELCLASS liab_liab
+//MODELCLASS mrb_gaap
 //MODELCLASS mtg_asset
 //MODELCLASS mtg_cf_asset
 //MODELCLASS rates_economy
 //MODELCLASS seg_comp
-//MODELCLASS sfas133_gaap
 //MODELCLASS sfas97rd_gaap
-//MODELCLASS util_rafm
 //MODELCLASS END
 
 #if defined(MICROSOFT)
@@ -75,13 +72,12 @@ extern MemCount gMem;
 extern MY_DLL Parmfile *p;
 #include "column2.h"
 #include "ModelClass\adco_asset_udf.h"
+#include "ModelClass\aa_comp_comp.h"
 #include "ModelClass\ann_pba_pba.h"
 #include "ModelClass\asset_asset.h"
-#include "ModelClass\automation.h"
 #include "ModelClass\a_subport_asset.h"
 #include "ModelClass\bond_asset.h"
 #include "ModelClass\bond_cf_asset.h"
-#include "ModelClass\comp_comp.h"
 #include "ModelClass\eio_asset.h"
 #include "ModelClass\epa_asset.h"
 #include "ModelClass\epl_liab.h"
@@ -89,16 +85,14 @@ extern MY_DLL Parmfile *p;
 #include "ModelClass\fiacarvm_liab.h"
 #include "ModelClass\fia_liab.h"
 #include "ModelClass\hdg_grp_comp.h"
-#include "ModelClass\intex_asset.h"
 #include "ModelClass\invstrat_asset.h"
 #include "ModelClass\liab_liab.h"
+#include "ModelClass\mrb_gaap.h"
 #include "ModelClass\mtg_asset.h"
 #include "ModelClass\mtg_cf_asset.h"
 #include "ModelClass\rates_economy.h"
 #include "ModelClass\seg_comp.h"
-#include "ModelClass\sfas133_gaap.h"
 #include "ModelClass\sfas97rd_gaap.h"
-#include "ModelClass\util_rafm.h"
 #pragma optimize( "gs", on )
 
 #include "generatedCppHeader.h"
@@ -109,7 +103,7 @@ extern MY_DLL Parmfile *p;
 //Redundant includes only for snip test:
 //iomanip included for "setprecision()"
 #include <iomanip>
-#include <strstream> //WTW - Gen2
+#include <strstream>
 typedef vector<vector<string>> sowfinput;
 typedef vector<string> sowfcols;
 typedef map <xstring, long, less <xstring> > sowfmap;
@@ -120,7 +114,9 @@ typedef vector<vector<string>> deptaskinput;
 typedef vector<string> deptaskcols;
 typedef map <xstring, long, less <xstring> > deptaskmap;
 typedef deptaskmap::iterator deptaskmapiter;
-//extern MY_DLL strstream log_screen; //WTW - Gen2 - MY_DLL is not supported
+const int pv = 0;
+const int is = 1;
+const int ym = 2;
 const int EFFECTIVE_RATE = 0;
 const int EFFECTIVE_ANNUAL = 1;
 const int NOMINAL_SEMIANNUAL = 2;
@@ -138,9 +134,8 @@ const double LEAST_ANNUAL_GROWTH_RATE = -0.9999;
 const double LEAST_BOND_EQUIVALENT_RATE = 0.0001;
 const double SPOT_SHIFT_FOR_EFFECTIVE_DURATION_CALCULATION = 0.0001;
 const double ONE_MILLION = 1000000.0;
-//WTW - Gen2 - Move Extern definitions to rates header
-//const double MINIMUM_MONTHLY_YIELD_RATIO = -0.9; // annual yield = (1.0-0.9)^12 = 1.0e-12
-//const double MAXIMUM_MONTHLY_YIELD_RATIO	 = 999999999.0; // annual yield = (1.0+999999999.0)^12 = 1.0e+120
+const double MINIMUM_MONTHLY_YIELD_RATIO = -0.9; // annual yield = (1.0-0.9)^12 = 1.0e-12
+const double MAXIMUM_MONTHLY_YIELD_RATIO	 = 999999999.0; // annual yield = (1.0+999999999.0)^12 = 1.0e+120
 const int DECIMALS_TO_ROUND = 6;
 const int ROUND_NEGATIVE_TOZERO = 0;
 const int ROUND_NEAR = 1;
@@ -154,11 +149,10 @@ const int SUM_OVER_NEGATIVE = -101;
 const int TIER = -98;
 const int ANY_GROUP = -99;
 const bool DO_NOT_ISSUE_WARNINGS = false;
-//WTW - Gen2 - Move Extern definitions to rates header
-//const int CALL_CODE = 1; 
-//const int PUT_CODE = 2; 
-//const int CONTINUOUS_PAYOUT_CODE = 3;
-//const int FUTURES_CODE = 4;
+const int CALL_CODE = 1;
+const int PUT_CODE = 2;
+const int CONTINUOUS_PAYOUT_CODE = 3;
+const int FUTURES_CODE = 4;
 // Model point type
 const int NEW_PURCH = 0;
 const int INIT_MP = 1;
@@ -208,11 +202,13 @@ const int HEDGE_CASH_FLOW = 0;
 const int HEDGE_MKT_VAL = 1;
 const int HEDGE_ARRAY_SIZE = 2;
 // global calculation flags
-//extern bool pricing_flag;//WTW - Gen2 - Move Extern definitions to rates header
+extern bool pricing_flag;
 extern bool factors_flag;
 extern bool nb_flag;
 extern bool alm_flag;
 extern bool tcm_flag;
+extern bool pba_disc_rate_flag;
+extern int pba_segment_size;
 extern bool avr_flag;
 extern bool imr_flag;
 extern bool gaap_flag;
@@ -220,17 +216,12 @@ extern bool tgt_cap_flag;
 extern bool stoch_flag;
 extern bool valn_flag;
 extern bool time_step_flag;
-extern bool sfas133_valn_flag;
+extern bool mrb_valn_flag;
 extern bool sop031_valn_flag;
 extern bool sfas97rd_valn_flag;
-extern bool sfas97lp_valn_flag;
-extern bool sfas97lp_gpr_valn_flag;
 extern bool sfas91_valn_flag;
-extern bool sfas60_valn_flag;
-extern bool sfas60_gpr_valn_flag;
+extern bool gaap_ldti_valn_flag;
 extern bool sfas120_nlp_valn_flag;
-extern bool sfas120_valn_flag;
-extern bool sfas120_gpr_valn_flag;
 extern bool loc_gpr_valn_flag;
 extern bool pba_valn_flag;
 extern bool pba_scen_amt_valn_flag;
@@ -239,6 +230,7 @@ extern bool res_scen_amt_valn_flag;
 extern bool res_det_res_valn_flag;
 extern bool res_ag38_8d_valn_flag;
 extern bool std_scen_valn_flag;
+extern bool std_scen_prescribed_assump_flag;
 extern bool rbc_std_scen_valn_flag;
 extern bool rbc_std_scen_step2_valn_flag;
 extern bool res_std_scen_valn_flag;
@@ -261,33 +253,32 @@ extern double aggregate_amount_threshold;
 extern double model_point_amount_threshold;
 extern double rate_ratio_threshold;
 extern vector<string> valn_periods;
+
 // utility functions - elaborated in rates/economy externs
-//WTW - Gen2 - Move Extern definitions to rates header
-/*extern double round_result(int rounding, int negative, double x, int n);
+extern double round_result(int rounding, int negative, double x, int n);
 extern double factorial(int n);
 extern int n_choose_k(int n, int k);
 extern xstring check_date_format(const xstring &date);
+extern int month_from_day_number(int nSerialDate);
+extern int year_from_day_number(int nSerialDate);
+extern int day_from_day_number(int nSerialDate);
+extern int month_number_from_date(int year, int month); 
+extern int day_number_from_date(int nYear, int nMonth, int nDay);
 extern int get_mth_from_date(const xstring &date);
 extern int get_yr_from_date(const xstring &date);
 extern int get_day_from_date(const xstring &date);
-extern int month_from_day_number(int nSerialDate);//WTW - Gen2 - add new formula to replace unsupported MonthFromDayNumber() function
-extern int year_from_day_number(int nSerialDate);//WTW - Gen2 - add new formula to replace unsupported YearFromDayNumber() function
-extern int day_from_day_number(int nSerialDate);//WTW - Gen2 - add new formula to replace unsupported DayFromDayNumber() function
-extern int month_number_from_date(int year, int month); //WTW - Gen2 - add new formula to replace unsupported MonthNumberFromDate() function
-extern int day_number_from_date(int nYear, int nMonth, int nDay); //WTW - Gen2 - add new formula to replace unsupported DayNumberFromDate() function
 extern int get_end_of_mth_day(int yr, int mth);
 extern xstring add_mths_to_date(const xstring &date, int mths);
 extern int get_mth_from_adj_date(const xstring &date, int mths);
 extern double convert_rate_basis(double orig_rate, double orig_rate_basis, double new_rate_basis);
 extern double convert_decrem_rate_basis(double orig_rate, double orig_rate_basis, double new_rate_basis);
-extern long int determine_tbl_size(int sNumberOfDims, ...);
 extern xstring get_file_name(const xstring &source_file);
 extern xstring get_file_path(const xstring &source_file);
-extern xstring get_base_group_name(const xstring &tag, bool seriatim_flag = false);
+extern xstring get_base_group_name(const xstring &tag, bool split_flag = false);
 extern xstring get_string_of_date(double date);
 extern xstring get_string_of_enum_val(StrEnum::EnumValue type);
 extern int date_diff(xstring first_date, xstring second_date);
-extern int number_of_decimals(double xxx, int digits);//WTW - Gen2 - replace preprocessor #define with formula
+extern int number_of_decimals(double xxx,int digits);
 extern xstring write_string(double value, int string_length, int significant_digits);
 extern xstring write_array_to_string(SmartArray <double> value_array, int low, int high);
 extern void read_from_string(xstring temp_string, SmartArray <double> &temp_array);
@@ -308,25 +299,8 @@ extern double bs_opt_val_continuous_highest_gain(int call_or_put, double current
 extern double bs_opt_val_highest_gain(int call_or_put, double current_price, double observed_max, double observed_min, double strike_price, double length_of_sampling_period, int sampling_freq, double yrs_to_expiry, double risk_free_rate, double init_div_yld, double index_vol, int scen_int_freq, int scen_index_freq);
 extern double bs_opt_val_mthly_sum_cap(int crediting_mths, int known_index_vals, double sum_capped_amts,  double mthly_cap_rate, double yrs_to_expiry, double risk_free_rate, double init_div_yld, double index_vol, int scen_int_freq, int scen_index_freq);
 extern double cumul_bivariate_normal_distribn(double x, double y, double rho);
-extern double cumul_normal_distribn(double x);*/
+extern double cumul_normal_distribn(double x);
 
-// RAFM SQLite
-#ifndef _RAFMSQLITE_H_
-#define _RAFMSQLITE_H_
-
-#include <string>
-#include <vector>
-
-using namespace std;
-
-// 20210614 STW: upgrade to RAFM 2.9
-/*
-extern void openDatabase(string dbPath);
-extern void closeDatabase();
-extern string readCsvFile(string csvPath);
-extern void executeQuery(string sql, vector<string>& columns, vector<vector<string>>& results);
-*/
-#endif
 #endif
 extern int trace_wanted;
 
@@ -349,7 +323,6 @@ extern const int& last_proj_task_loop;
 extern const int& proj_task_loop_num;
 extern const int& num_of_proj_task_loops;
 
-extern MY_DLL2 int use_overlay_code;
 extern MY_DLL int trace_level_wanted;
 extern MY_DLL int trace_level;
 extern MY_DLL bool bEmitTurboDebugger;
@@ -386,7 +359,6 @@ return proj_start_mth + t - 1
 
 }
 
-
 //@@ END
 
 //@@ START - cal_yr
@@ -408,7 +380,6 @@ return proj_start_yr + cal_yr_relative(t) - 1;
 
 }
 
-
 //@@ END
 
 //@@ START - cal_yr_relative
@@ -426,7 +397,6 @@ double ADCO_ASSET_UDF::adco_asset_cal_yr_relative(int t) {
 return 1 + floor((proj_start_mth + t - 2) / 12.0);
 
 }
-
 
 //@@ END
 
@@ -450,10 +420,9 @@ int year = cal_yr(t);
 int month = cal_mth(t);
 int day = 1;
 
-return DayNumberFromDate(year, month, day);
+return day_number_from_date(year, month, day);
 
 }
-
 
 //@@ END
 
@@ -494,7 +463,6 @@ return 0.0;
 
 }
 
-
 //@@ END
 
 //@@ START - get_prepmt_rate
@@ -512,7 +480,6 @@ double ADCO_ASSET_UDF::adco_asset_get_prepmt_rate(int t) {
 return prepmt_rates[t];
 
 }
-
 
 //@@ END
 
@@ -581,7 +548,6 @@ return 1.0;
 
 }
 
-
 //@@ END
 
 //@@ START - process_adco_detail
@@ -605,7 +571,6 @@ return 0.0;
 
 }
 
-
 //@@ END
 
 //@@ START - startup
@@ -621,699 +586,7 @@ double ADCO_ASSET_UDF::virtual_startup(int t) {
 
 #line 1 "startup.ADCO_ASSET.for"
 #if 0 // START_HEADER
-#ifndef ADCO_H_
-#define ADCO_H_
-
-//MBS defines
-#ifndef max_maturity
-#define max_maturity        600
-#define months_in_yr        12
-#define maximum_lag		 4
-#define lag_wght_vecsize   (maximum_lag + 1)
-#define curr_cpn_vecsize   (600 + maximum_lag)
-#define balloon_7yr_mat     84
-#define balloon_5yr_mat     60
-#define balloon_10yr_mat	120
-#define balloon_3yr_mat	 36
-#endif
-
-//ABS defines
-#ifndef abs_mh_maxlag
-#define abs_mh_maxlag	4
-#define abs_max_maturity	600
-#endif
-
-// MBS
-#ifndef mbs_enums
-#define mbs_enums
-
-typedef enum typeofloan
-{
-FNMA_30YR,
-FNMA_15YR,
-FNMAB_5YR,
-FNMAB_7YR,
-FRDG_30YR,
-FRDG_20YR,
-FRDG_15YR,
-FRDGB_5YR,
-FRDGB_7YR,
-GNMA_30YR,
-GNMA_15YR,
-GNMA2_30YR,
-FNMA_20YR,
-WHOLE_30YR,
-WHOLE_15YR,
-RELO_30YR,
-RELO_15YR,
-FNMA_10YR,
-FRDG_10YR,
-GNMA2_15YR,
-WHOLEB_5YR,
-WHOLEB_7YR,
-FNMAB_10YR,
-FRDGB_10YR,
-FNMAB_3YR,
-FRDGB_3YR,
-ALT_A_15YR,
-ALT_A_30YR,
-MBS_RESERVE0,
-MBS_RESERVE1,
-MBS_RESERVE2,
-MBS_RESERVE3,
-MBS_RESERVE4,
-MBS_RESERVE5,
-MBS_RESERVE6,
-MBS_RESERVE7,
-MBS_RESERVE8,
-MBS_RESERVE9,
-MAX_LOANTYPE
-} loantype;
-
-typedef enum typeofarm
-{
-FNMA_1YR_NONC,
-FNMA_1YR_CONV,
-FRDH_1YR_NONC,
-FRDH_1YR_CONV,
-FNMA_3YR,
-FRDH_3YR,
-GNMA_1YR,
-D11_COFI,
-ARM_RESERVE0,
-ARM_RESERVE1,
-ARM_RESERVE2,
-ARM_RESERVE3,
-ARM_RESERVE4,
-ARM_RESERVE5,
-ARM_RESERVE6,
-ARM_RESERVE7,
-ARM_RESERVE8,
-ARM_RESERVE9,
-NUM_ARMTYPES
-} armtype;
-
-typedef enum typeofarmindex
-{
-PAR_TSY_1YR,
-PAR_LIBOR_6M,
-PAR_LIBOR_1YR,
-MTA_12,
-PAR_TSY_3YR,
-PAR_TSY_5YR,
-COFI_11D
-} armtypeindex;
-
-typedef enum typeofissuer
-{
-FANNIE_MAE,
-FREDDIE_MAC,
-GINNIE_MAE,
-NONAGENCY_SUBPRIME,
-NONAGENCY_PRIME,
-NONAGENCY_OTHER
-} issuertype;
-
-typedef enum errorcodetype
-{
-ADCOPP_OK,
-ILLEGAL_LOAN_TYPE,
-LICENSE_EXPIRED,
-DATAFILE_MISSING,
-ILLEGAL_DATE,
-NO_MEMORY,
-DATAFILE_ERROR,
-ADCOPP_FPE
-#ifdef AD_LICKEYFILE 
-,KEYFILE_FAILURE
-#endif
-} errorcode;
-#endif
-
-// ABS
-#ifndef abs_enums
-#define abs_enums
-typedef enum abserrcode
-{
-ADCO_ABS_OK,
-ADCO_ABS_INVALID_TYPE,
-ADCO_ABS_LICENSE_EXPIRED,
-ADCO_ABS_DATAFILE_MISSING,
-ADCO_ABS_ILLEGAL_DATE,
-ADCO_ABS_NO_MEMORY,
-ADCO_ABS_DATAFILE_ERROR,
-ADCO_ABS_ADCOPP_FPE,
-ADCO_ABS_MAXERRORNO
-} abs_errorcode;
-
-// Auto Loans 
-typedef enum abs_autot
-{	
-ADCO_AUTO_ALL,
-ADCO_AUTO_STRAT,
-ADCO_AUTO_MAXTYPE		
-} abs_auto_type;
-
-// Manufactured Houseing Enums 
-typedef enum abs_mh_uset
-{
-ADCO_MH_RENTAL,
-ADCO_MH_TRAILER,
-ADCO_MH_OWNER,
-ADCO_MH_UNKUSE,
-ADCO_MH_MAXUSE
-} abs_mh_use_type;
-
-typedef enum abs_mh_widtht
-{
-ADCO_MH_SINGLE,
-ADCO_MH_DOUBLE,
-ADCO_MH_UNKWDTH,
-ADCO_MH_MAXWIDTH
-} abs_mh_width_type;
-
-typedef enum abs_mh_vintt
-{
-ADCO_MH_NEW,
-ADCO_MH_OLD,
-ADCO_MH_UNKVINT,
-ADCO_MH_MAXVINT
-} abs_mh_vint_type;
-
-typedef enum abs_termtype
-{
-ADCO_ABS_5YR,
-ADCO_ABS_15YR,
-ADCO_ABS_30YR,
-ADCO_ABS_MAXTERM
-} abs_term_type;	
-
-// Home Equity Loans 
-typedef enum abs_heliss
-{		
-ADCO_HEL_UNK,			
-ADCO_HEL_AFC,			
-ADCO_HEL_ADV,			
-ADCO_HEL_EC,
-ADCO_HEL_GE,	
-ADCO_HEL_MON,	
-ADCO_HEL_UFC,
-ADCO_HEL_INM,	
-ADCO_HEL_CON,		
-ADCO_HEL_MAXTYPE	
-} abs_hel_issuer;
-#endif
-
-#ifndef abs_enums2
-#define abs_enums2
-// Added for New ARM-HEL model 
-typedef enum adco_mtfra
-{ 
-ADCO_ABS_ARMHEL_6,
-ADCO_ABS_ARMHEL_12,
-ADCO_ABS_ARMHEL_24,
-ADCO_ABS_ARMHEL_36,
-ADCO_ABS_ARMHEL_UNKNOWN,
-ADCO_ABS_ARMHEL_MAXRESET
-} adco_armhel_reset;
-#endif
-
-#define ALLOCATE_ADCO
-// start of EnumConst.h
-#ifndef ADPPMDLAPI_H
-#define ADPPMDLAPI_H
-
-// Stuff To Make Win32 DLL Import/Export Happen Automatically
-#ifdef WIN32
-// Force structure alignment to 32-bit so legacy
-// applications ported from 16-bit Windows don't mess up structure
-// alignments (esp. of adco_CParam)
-#pragma pack( push, inside_adppmdlapi, 8)
-#ifdef WINDOWS_STATIC
-#define ADPPMDL_API
-#else
-#ifdef MAKE_ADPPMDL
-#define ADPPMDL_API __declspec(dllexport)
-#else
-#define ADPPMDL_API __declspec(dllimport)
-#endif
-#endif
-#define EXTERN extern ADPPMDL_API
-#define THROWS( errorclass )
-#else
-#define ADPPMDL_API
-#define EXTERN extern
-// #define THROWS( errorclass ) throw errorclass
-#define THROWS( errorclass )
-#endif
-
-//Some Useful Defines
-#define minimum(a,b) ((a) < (b) ? (a) : (b))
-#define maximum(a,b) ((a) < (b) ? (b) : (a))
-#ifndef NULL
-#define NULL 0
-#endif
-
-#if defined(_MSC_VER) && (_MSC_VER < 1300)
-#define DATEADD(m, y, d)                        \
-    (y) = (y) + ((d) / 12);                     \
-    (m) = (m) + ((d) % 12);                     \
-    if((m) < 1) { --(y); (m) += 12;}            \
-    if((m) > 12) { ++(y); (m) -= 12;}           \
-#define DATEDIFF(sy, sm, ey, em)                \
-    ((ey) - (sy)) * 12 + ((em) - (sm));
-#else
-inline void DATEADD(int& m, int& y, int d){
-    y = y + (d / 12);
-    m = m + (d % 12);
-    if( m < 1 ) { --y; m += 12;}
-    if( m > 12 ) { ++y; m -= 12;}
-}
-inline int DATEDIFF(int sy, int sm, int ey, int em){
-    return (ey - sy) * 12 + (em - sm);
-}
-#endif
-
-#ifdef __unix
-#ifdef __sun
-#if __SUNPRO_CC == 0x420
-#ifndef bool
-#define bool short
-#define true 1
-#define false 0
-#endif
-#endif
-#endif
-#endif
-
-/////////////////////////////////////////////////////////////////////////////
-// All the dynamism of this model comes from lists of enumerated constants
-// represented by adco_cEnumElem and adco_cEnumeration
-/////////////////////////////////////////////////////////////////////////////
-class ADPPMDL_API adco_cEnumElem;
-class ADPPMDL_API adco_cEnumeration;
-
-// All Thrown Errors are subclassed off this class
-class ADPPMDL_API adco_cError;
-
-// Data Classes for Getting Stuff in and out of models
-class ADPPMDL_API adco_CParam;
-class ADPPMDL_API adco_TimeSeries;
-class ADPPMDL_API adco_CString;
-struct ADPPMDL_API vecspec;
-
-// All Models are Subclasses of CAdppmdl.  Instantiation is done by the object
-// Factory
-class ADPPMDL_API CAdppmdl;
-class ADPPMDL_API CAdcoSys;
-
-enum ADCO_DATA_TYPE
-{
-    AD_TYPE_INTEGER = 0,
-    AD_TYPE_DOUBLE,
-    AD_TYPE_STRING,
-    AD_TYPE_ENUMTYPE,
-    AD_TYPE_TIMESERIES,
-    AD_TYPE_UDPTRTYPE,
-    AD_TYPE_LISTTYPE,
-    AD_TYPE_E_INFOONLY,
-    AD_TYPE_E_WARNING,
-    AD_TYPE_E_ERROR,
-    AD_TYPE_NTYPE,  // NULL type
-    AD_TYPE_VECLIST,
-    AD_TYPE_CONDLIST
-};
-
-/////////////////////////////////////////////////////////////////////////////
-// Interfaces
-/////////////////////////////////////////////////////////////////////////////
-class ADPPMDL_API adco_cEnumeration {
-public:
-    virtual void Initialize( void ) const = 0;
-    virtual const char* name() const = 0;
-    virtual const char* description() const = 0;
-    virtual unsigned int idx( const char* ename ) const = 0;
-    virtual const char* elem_name ( unsigned int n ) const = 0;
-    virtual adco_cEnumElem element( unsigned int n ) const = 0;
-    virtual adco_cEnumElem element( const char* ename ) const = 0;
-    virtual const char* elem_desc ( unsigned int n ) const = 0;
-    virtual const char* elem_desc ( const char* ename ) const = 0;
-    virtual const adco_cEnumElem elem_class ( unsigned int n ) const = 0;
-    virtual const adco_cEnumElem elem_class ( const char* ename ) const = 0;
-    virtual unsigned int elem_count () const = 0;
-    bool operator==( const adco_cEnumeration& elist ) const { return this == &elist; }
-    bool operator!=( const adco_cEnumeration& elist ) const { return this != &elist; }
-    virtual bool contains( const adco_cEnumElem& e ) const = 0;
-    virtual bool contains( const char* ename ) const = 0;
-    virtual unsigned int idx( const adco_CParam& ParamElem ) const;
-    virtual const char * sub_name ( unsigned int n ) const
-    { throw("adco_cEnumeration.sub_name() not supported"); return (char *) 0;};
-    virtual const char * sub_name ( const char* ename ) const
-    { throw("adco_cEnumeration.sub_name() not supported"); return (char *) 0;};
-    virtual enum ADCO_DATA_TYPE elem_type(unsigned int n) const;
-}; /* class adco_cEnumeration */
-
-class ADPPMDL_API adco_cEnumElem {
-protected:
-    const adco_cEnumeration* mList;
-    unsigned int mIdx;
-public:
-    // Constructors
-    adco_cEnumElem(){};
-    adco_cEnumElem( const adco_cEnumeration& elist, unsigned int elem_idx );
-    adco_cEnumElem( const adco_cEnumeration& elist, const char* elem_name );
-    // Copy Constructor
-adco_cEnumElem( const adco_cEnumElem& ee)
-    : mList( ee.adco_cEnumElem::list() )
-        , mIdx( ee.adco_cEnumElem::idx() ) {}
-    // Copy by assignment
-    adco_cEnumElem& operator=( const adco_cEnumElem& ee )
-        { mList = ee.list(); mIdx = ee.idx(); return *this; }
-    // Parent List
-    const adco_cEnumeration* list() const { return mList; }
-    // Numeric Idx in Parent List
-    unsigned int idx() const { return mIdx; }
-    operator unsigned int(void) const { return mIdx; }
-    virtual const char* name() const { return mList->elem_name( mIdx ); }
-    virtual const char* description() const { return mList->elem_desc( mIdx ); }
-    virtual const adco_cEnumElem classification() const
-    { return mList->elem_class( mIdx ); }
-    virtual bool operator==( const adco_cEnumElem& ee ) const
-    { return ( mList == ee.mList && mIdx == ee.mIdx ); }
-    virtual bool operator!=( const adco_cEnumElem& ee ) const
-    { return ( mList != ee.mList || mIdx != ee.mIdx ); }
-    virtual const char * sub_name() const
-    { return mList->sub_name( mIdx ); }
-    virtual enum ADCO_DATA_TYPE elem_type() const
-    { return mList->elem_type(mIdx); }
-}; /* class adco_cEnumElem */
-
-// Base class for all thrown adco model errors
-// When a specific error is thrown, it's copy constructor
-// is used to copy the the error from the error context to the heap.
-// After the stack is cut back, destroying the original error instance,
-// the base copy constructor is used to copy a BASE CLASS adco_cError
-// instance into the error handler (catch block) context.
-// This base class instance will contain an mRealMe that points
-// to the heap copy of the real error.
-// When the handler context is exited, the heap copy of the real error
-// and the base class instance in the handler context are destroyed.
-// For this reason, the base copy constructor is smart.  An attempt to
-// copy a base class error instance out of the handler will yield a
-// mRealMe that points to itself, and the original error info is lost.
-class ADPPMDL_API adco_cError
-{
-protected:
-    const adco_cError* mRealMe;
-    adco_cError() { mRealMe = this; }
-public:
-    adco_cError( const adco_cError& e);
-    virtual adco_cEnumElem severity() const;
-    virtual const char* message() const;
-    virtual unsigned int msglen() const;
-    virtual adco_cEnumElem msgelement() const; // in Global System ERRORDEFS list, or NULL_ELEM
-}; /* class ADPPMDL_API adco_cError */
-
-struct  vecspec
-{
-    double forward_final;
-    double forward_value;
-    double backward_final;
-    double backward_value;
-    vecspec(){};
-    vecspec(double modeltune, double tune)
-    {
-        forward_final = tune;
-        forward_value = modeltune * tune;
-        backward_final = 1.0;
-        backward_value = modeltune;
-    }
-    vecspec(double modeltune, double tune, double fbtune)
-    {
-        forward_final = tune * fbtune;
-        forward_value = modeltune * tune * fbtune;
-        backward_final = fbtune;
-        backward_value = modeltune*fbtune;
-    }
-    void addset(double modeltune, double tune)
-    {
-        forward_final = tune;
-        forward_value = modeltune + tune;
-        backward_final = 0.0;
-        backward_value = modeltune;
-    }
-    void addset(double modeltune, double tune, double fbtune)
-    {
-        forward_final = tune + fbtune;
-        forward_value = modeltune + tune + fbtune;
-        backward_final = fbtune;
-        backward_value = modeltune + fbtune;
-    }
-};
-
-class ADPPMDL_API adco_TimeSeries
-{
-public:
-    // Constructors & Desctructors
-    // Use Internal Storage Vector if Values = NULL
-    // Defaults:
-    //              freq = ADCO_MONTHLY
-    //              Values = NULL (Internal Storage)
-    //              maxobs = 0 => TSALLOCINCREMENT
-    //              newlength = 0 => same length as source
-    //              newlength > 0 => set length, copy nobs=min(old length, new length)
-    adco_TimeSeries( int NumObs, int SYear, int SPeriod,
-                     adco_cEnumElem freq, double* Values = NULL,
-                     int maxobs = 0  );
-    // Copies are always deep
-    adco_TimeSeries( const adco_TimeSeries& ts, int newlength = 0 );
-    adco_TimeSeries& operator=( const adco_TimeSeries& tsval );
-    ~adco_TimeSeries();
-
-    // Public Interface
-    adco_cEnumElem frequency() const { return mFrequency; }
-    int StartPeriod() const { return mStartPeriod; }
-    int StartYear() const { return mStartYear; }
-    int LastYear() const;
-    int LastPeriod() const;
-    int Nobs() const { return mNobs; }
-    int Length() const { return mLength; }
-    double* Values() const { return mValues; }
-    int GetIdx( int year, int period ) const;
-    int GetRawIdx( int year, int period ) const;
-    double GetVal( int year, int period ) const; // Can Throw Invalid Index
-    void GetVal( int year, int period, double* vec, int NumObs ) const;
-    void ShallowSetVal( int year, int period, double* vec, int NumObs );
-    void SetVal( int year, int period, double value, int NumObs = 1 );
-    void SetVal( int year, int period, double* vec, int NumObs );
-    void SetVal( int year, int period, const adco_TimeSeries& TS, int NumObs = 0 );
-    // Set from list of nobs/value pairs terminated by a zero pair
-    void SetValFromList( int year, int period, const double* vec );
-    //Extend repeats first/last value as needed
-    void Extend( int SYear, int SPeriod, int NumObs );
-    void Extend( int SYear, int SPeriod, int EYear, int EPeriod );
-    void Truncate( int NumObs );
-    void Truncate( int EYear, int EPeriod );
-    bool InternalStore() const { return mInternalStore; }
-
-protected:
-    int PerYear() const;
-
-    adco_cEnumElem mFrequency;
-    int mStartPeriod;
-    int mStartYear;
-    int mNobs;
-    int mLength;
-    double* mValues;
-    bool mInternalStore;
-}; /* class ADPPMDL_API adco_TimeSeries */
-
-//
-// Parameter Class for moving data in and out of models
-//
-
-// add the sizeof(unsigned int) - 1 in case of a remainder in division
-#define ADCO_EE_SIZE ( ( (sizeof(adco_cEnumeration*) + sizeof(unsigned int) - 1)/ sizeof(unsigned int) ) + 1 )
-
-#include "stdio.h"
-class ADPPMDL_API adco_CParam
-{
-protected:
-    adco_cEnumElem TypeNum( const unsigned int tn_ ) const;
-
-public:
-    const adco_cEnumElem& VarType() const
-    { return mVarType; }
-
-    //Public Constructors
-    adco_CParam(  ){};
-    adco_CParam( int ival );
-    adco_CParam( double dval );
-    adco_CParam( const char* sval );
-    adco_CParam( const adco_cEnumElem& eval );
-    adco_CParam( adco_TimeSeries& tsval );
-    adco_CParam( vecspec & tsval );
-    adco_CParam( void* pval );
-    // Copy Constructor and Assignment
-    adco_CParam( const adco_CParam& cpval );
-    adco_CParam& operator=( const adco_CParam& cpval );
-    // Extract:  Caution - may throw conversion error
-    operator int(void) const;
-    operator double(void) const;
-    // operator adco_CString(void) const;
-    operator const char *(void) const;
-    operator adco_cEnumElem(void) const;
-    operator adco_TimeSeries&(void) const;
-    operator vecspec&(void) const;
-    operator void*(void) const;
-
-private:
-    adco_cEnumElem mVarType;
-    union ADPPMDL_API uparamval {
-        double dblval;
-        int intval;
-        const char* strval;
-        const adco_cEnumeration* enumvall;
-        unsigned int enumvali[ADCO_EE_SIZE];
-        adco_TimeSeries* tsval;
-        void* ptrval;
-    uparamval() : dblval(0) {}
-    } mParamVal;
-
-}; /* class ADPPMDL_API adco_CParam */
-
-//
-// The Generic Model Class.  All Specific Model Types derived from this
-//
-class ADPPMDL_API CAdppmdl
-{
-public:
-    // All Models have at least these 3 lists:
-    // LISTS:  The list of available lists
-    // INPUTS: The list of input parameters
-    // RESULTS:The list of output values
-    virtual const adco_cEnumeration& GetList( const char* listname = 0) = 0;
-
-    // Both current setting of items in the INPUTS list
-    // and results of the PrecCalc and Forecast calls
-    // are retrieved with GetParam
-    virtual adco_CParam GetParam( const adco_cEnumElem Parameter ) = 0;
-    adco_CParam GetParam( const adco_cEnumeration& ParamList, const char* ParamName );
-    virtual adco_CParam GetParam( const char* ParamName );
-
-    // Items in the INPUTS list can be set with SetParam
-    virtual void SetParam( const adco_cEnumElem Parameter, adco_CParam Value ) = 0;
-    virtual void UnSetParam( const adco_cEnumElem Parameter ) = 0;
-
-    // Set elements via "ParamName=Value, ..." string
-    virtual void ParseParams( const char* ParamString ) = 0;
-
-    // These actually run the models
-    virtual void PreCalc() = 0;
-    virtual void Forecast() = 0;
-    virtual CAdppmdl* Duplicate() = 0;
-
-    // CAdppmdl( void );
-    virtual ~CAdppmdl() {};
-}; /* class ADPPMDL_API CAdppmdl */
-
-//
-// The Model Factory Class.  Use this to create instances of CAdppmdl
-//
-class ADPPMDL_API CAdcoSys
-{
-protected:
-    CAdcoSys();
-    ~CAdcoSys();
-
-public:
-    // Create PPModel Objects for users
-    virtual CAdppmdl& Adppmdl_factory( const adco_cEnumElem& model ) THROWS(adco_cError) = 0 ;
-    virtual CAdppmdl& Adppmdl_factory( const char* modelname ) THROWS(adco_cError) = 0;
-    virtual void Adppmdl_recycle( CAdppmdl& model ) = 0;
-
-    // Control Generic Model defaults & behaviors
-    virtual const adco_cEnumeration& ParamList() = 0;
-    virtual const adco_cEnumeration& ModelList() = 0;
-    virtual void SetParam( const adco_cEnumElem& Param, const adco_CParam& value ) = 0;
-    virtual void SetParam( const char* ParamName, const adco_CParam& value ) = 0;
-    virtual adco_CParam GetParam( const adco_cEnumElem& Param ) = 0;
-    virtual adco_CParam GetParam( const char* ParamName ) = 0;
-    virtual const adco_cEnumeration& ErrorList() = 0;
-};
-// Some of the models have a "TuneBack" parameter of type void*.  If you set
-// this to the address of a adco_ppmodel_callback_func,  The model will call
-// back this function at the beginning of each processing stage (Currently
-// PreCalc(0) or Forecast(1)).  Why?  Some 3rd party cashflow generators allow
-// for a prepayment model callback function pointer.  They are supposed to
-// pass this to us so you can step in at each call to the prepayment model.
-
-#ifdef _WIN32
-#define STDCALL __stdcall
-#else
-#define STDCALL
-#endif
-typedef void STDCALL adco_ppmodel_callback_func(
-    int stage,
-    void* adco_50_tuning_ptr,
-    char* datafile_path,
-    int* no_forecast_callback,
-    void* ppmdl
-    );
-
-#ifdef WIN32
-#pragma pack( pop, inside_adppmdlapi)
-#endif
-
-#endif
-#ifndef ADPPMDLXTERN_H
-#define ADPPMDLXTERN_H
-
-EXTERN const adco_cEnumElem NULL_ELEM;
-EXTERN const adco_cEnumeration* pNullList;
-
-EXTERN const adco_cEnumeration* pErrorClass;
-
-EXTERN const adco_cEnumElem ADCO_E_INFOONLY;
-EXTERN const adco_cEnumElem ADCO_E_WARNING;
-EXTERN const adco_cEnumElem ADCO_E_ERROR;
-
-EXTERN const adco_cEnumeration* pAdco_PPModel_Types;
-EXTERN const adco_cEnumElem POOLTYPE;
-EXTERN const adco_cEnumElem LOANTYPE;
-EXTERN const adco_cEnumElem UTILITYTYPE;
-
-// Time Series Frequencies
-// EXTERN const adco_cEnumeration* pAdco_Obs_Frequency;
-EXTERN const adco_cEnumElem ADCO_MONTHLY; // Only one defined as of v5.0
-
-// Parameter Types
-EXTERN const adco_cEnumeration* pAdco_ParamTypes;
-EXTERN const adco_cEnumElem ADCO_INTTYPE;
-EXTERN const adco_cEnumElem ADCO_DBLTYPE;
-EXTERN const adco_cEnumElem ADCO_STRTYPE;
-EXTERN const adco_cEnumElem ADCO_ENUMTYPE;
-EXTERN const adco_cEnumElem ADCO_TSTYPE;
-EXTERN const adco_cEnumElem ADCO_UDPTRTYPE;
-
-ADPPMDL_API CAdcoSys* adco_CreateSystem( void );
-ADPPMDL_API void adco_DestroySystem( CAdcoSys* pSys );
-ADPPMDL_API void addseasonality(adco_TimeSeries *pforecast, adco_TimeSeries *phistory, int firstoffset);
-
-#ifdef _WIN32
-#define  DEFAULTDATAFILEDIR     "c:\\adco\\ppmodel\\"
-#define  DIRPATHSEPARATOR       '\\'
-#else
-#define  DEFAULTDATAFILEDIR     "./"
-#define  DIRPATHSEPARATOR       '/'
-#endif
-const char DIRPATHSEPSTRING[2] = {DIRPATHSEPARATOR,0};
-
-const int TUNETYPE_STRLEN = 32;
-
-#endif
-
-#endif
+#include "Adco.h"
 #endif // END_HEADER
 
 #if 0 // START_EXTERNS
@@ -1389,7 +662,6 @@ return 0.0;
 
 }
 
-
 //@@ END
 
 //@@ START - asset_detail_rpt_flag
@@ -1409,7 +681,6 @@ if (asset_detail_rpt_defn == YES
 return NO;
 
 }
-
 
 //@@ END
 
@@ -1508,7 +779,6 @@ return -1;
 
 }
 
-
 //@@ END
 
 //@@ START - issuer
@@ -1566,7 +836,6 @@ if (prepmt_model_defn == ABS
 return -1;
 
 }
-
 
 //@@ END
 
@@ -1878,10 +1147,7 @@ else // prepmt_model_defn == ABS
 		} // end switch statement
 	}
 
-return -1;
-
 }
-
 
 //@@ END
 
@@ -1903,7 +1169,6 @@ return proj_mth + 1;
 
 }
 
-
 //@@ END
 
 //@@ START - orig_proj_start_yr
@@ -1924,7 +1189,6 @@ return get_yr_from_date(proj_date);
 
 }
 
-
 //@@ END
 
 //@@ START - output_file
@@ -1940,7 +1204,6 @@ return get_file_name(output_location());
 
 }
 
-
 //@@ END
 
 //@@ START - output_path
@@ -1955,7 +1218,6 @@ xstring ADCO_ASSET_UDF::adco_asset_output_path() {
 return get_file_path(output_location());
 
 }
-
 
 //@@ END
 
@@ -1975,7 +1237,6 @@ if (time_step_flag && !valn_flag)
 return add_mths_to_date(proj_date, valn_period);
 
 }
-
 
 //@@ END
 
@@ -1997,7 +1258,6 @@ return proj_mth + 1;
 
 }
 
-
 //@@ END
 
 //@@ START - proj_start_yr
@@ -2018,7 +1278,6 @@ return get_yr_from_date(proj_date_adj);
 
 }
 
-
 //@@ END
 
 //@@ START - start_period
@@ -2033,7 +1292,6 @@ int ADCO_ASSET_UDF::adco_asset_start_period() {
 return max(0, commencement_period);
 
 }
-
 
 //@@ END
 
@@ -2111,14 +1369,14 @@ try {
 	int tempidx = SMM->GetIdx(histyr, histmth);	
 	double* SMMptr = SMM->Values() + tempidx;
 
-	assert(sizeof(smm_forecast) >= max_maturity);
-
+	//assert(sizeof(smm_forecast) >= max_maturity);
+	
 	for (month = 0; month < max_maturity && month < SMM->Length() + tempidx; month++)
   		smm_forecast[month] = SMMptr[month];
 
 	if (process_adco_detail(t))
 		{
-		string version = Mdl.GetParam(AbsAutoResults.element("VERSION"));
+		string version = static_cast<const char*>(Mdl.GetParam(AbsAutoResults.element("VERSION")));
 		xstring loan_type = "";
 		int pvcalc = 0;
 		int nycalc = 0;
@@ -2201,7 +1459,7 @@ char * loan_type = "";
 memset(twoyr_forecast, 0, curr_cpn_vecsize * sizeof(double));
 memset(tenyr_forecast, 0, curr_cpn_vecsize * sizeof(double));
 
-assert(pAdcoSystem != NULL);
+//assert(pAdcoSystem != NULL);
 
 if (original_term > 240) // term per Intex instructions re from Eknath at ADCO
 	term_type = ADCO_ABS_30YR;
@@ -2403,7 +1661,7 @@ try
 	double* SMMptr = SMM->Values() + tempidx;
 
 	int month = 0; //, i = 0, idx = 0, error = 0;
-	assert(sizeof(smm_forecast) >= max_maturity);
+	//assert(sizeof(smm_forecast) >= max_maturity);
 	
     // Save to SMM array
 	for (month = 0; month < max_maturity && month < SMM->Length() - tempidx; month++)
@@ -2447,7 +1705,7 @@ try
 	
 	if (process_adco_detail(t))
 		{
-		string version = Mdl.GetParam(AbsHelResults.element("VERSION"));
+		string version = static_cast<const char*>(Mdl.GetParam(AbsHelResults.element("VERSION")));
 		
 		// Setup HPI Forecast vector
 		adco_CParam HPIFcst = Mdl.GetParam(AbsHelInputs.element("HPIForecast"));
@@ -2602,7 +1860,7 @@ char * loan_type = "";
 memset(twoyr_forecast, 0, curr_cpn_vecsize * sizeof(double));
 memset(tenyr_forecast, 0, curr_cpn_vecsize * sizeof(double));
 
-assert(pAdcoSystem != NULL);
+//assert(pAdcoSystem != NULL);
 
 if (original_term >= 240) // term per Intex instructions re from Eknath at ADCO
 	term_type = ADCO_ABS_30YR;
@@ -2753,14 +2011,14 @@ try
 	double* SMMptr = SMM->Values() + tempidx;
 
 	int month = 0; 
-	assert(sizeof(smm_forecast) >= max_maturity);
+	//assert(sizeof(smm_forecast) >= max_maturity);
 
 	for (month = 0; month < max_maturity && month < SMM->Length() - tempidx; month++)
   		smm_forecast[month] = SMMptr[month];
 
 	if (process_adco_detail(t))
 		{
-		string version = Mdl.GetParam(AbsMHResults.element("VERSION"));
+		string version = static_cast<const char*>(Mdl.GetParam(AbsMHResults.element("VERSION")));
 		char * loan_type;
 		int pvcalc = 0;
 		int nycalc = 0;
@@ -2891,7 +2149,7 @@ twoyr_forecast[0]
 		2.0,
 		0.0,
 		NOMINAL_SEMIANNUAL,
-		shift_defn,0) * 100.0;//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+		shift_defn) * 100.0;
 
 tenyr_forecast[0]
 = rates->get_int_rate(t - offset,
@@ -2900,7 +2158,7 @@ tenyr_forecast[0]
 		10.0,
 		0.0,
 		NOMINAL_SEMIANNUAL,
-		shift_defn,0) * 100.0;//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+		shift_defn) * 100.0;
 
 // Determine spread year and month which is the period previous to histyr and histmth
 int sprdmth = histmth;
@@ -2920,8 +2178,10 @@ try {ccycalc.PreCalc();}
 
 catch(adco_cError &error_detail) 
 	{
-	error_processing(error_detail.message());
-	return;
+	throw FatalError(xstring("ADCO Model Failure - ") + error_detail.message());
+	
+	//error_processing(error_detail.message());
+	//return;	
 	}
 
 // Capture the spread at period before histyr and histmth
@@ -2951,8 +2211,10 @@ try {ccycalc.Forecast();}
 
 catch (adco_cError &error_detail) 
 	{
-	error_processing(error_detail.message());
-	return;
+	throw FatalError(xstring("ADCO Model Failure - ") + error_detail.message());
+	
+	//error_processing(error_detail.message());
+	//return;	
 	}
 
 // Save the CCYForecast to an array
@@ -3038,7 +2300,7 @@ else //if !exists load, else just keep the current one.
 						           rate_term,
 						           0.0,
 						           NOMINAL_SEMIANNUAL,
-						           NO_SHIFT,0) * 100.0)//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+						           NO_SHIFT) * 100.0)
 			  * 1.067413 + 0.391367;
 
 		myHist->SetVal(msdyr, msdmth, rate_history, curr_cpn_vecsize + max_maturity);	
@@ -3071,7 +2333,7 @@ else //if !exists load, else just keep the current one.
 						           rate_term,
 						           0.0,
 						           NOMINAL_SEMIANNUAL,
-						           NO_SHIFT,0) * 100.0)//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+						           NO_SHIFT) * 100.0)
 			  * 1.012891 + 0.343203;
 
 		myHist->SetVal(msdyr, msdmth, rate_history, curr_cpn_vecsize + max_maturity);	
@@ -3104,7 +2366,7 @@ else //if !exists load, else just keep the current one.
 						           rate_term,
 						           0.0,
 						           NOMINAL_SEMIANNUAL,
-						           NO_SHIFT,0) * 100.0)//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+						           NO_SHIFT) * 100.0)
 			  * 1.069434 + 0.092266;
 
 		myHist->SetVal(msdyr, msdmth, rate_history, curr_cpn_vecsize + max_maturity);	
@@ -3156,7 +2418,7 @@ else //if !exists load, else just keep the current one.
 						          rate_term,
 						          0.0,
 						          NOMINAL_SEMIANNUAL,
-						          NO_SHIFT,0) * 100.0;//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+						          NO_SHIFT) * 100.0;
 		
 		myHist->SetVal(msdyr, msdmth, rate_history, curr_cpn_vecsize + max_maturity);	
 
@@ -3189,7 +2451,7 @@ else //if !exists load, else just keep the current one.
 
 		// Capture current mortgage rate from history 
 		int idx = myHist->GetIdx(msdyr, msdmth);
-		assert(idx > 0);
+		//assert(idx > 0);
 		double cur_mtg_cpn = myHist->Values()[idx - 1];
 	
 		// Use the CCYCALC model to create the CCY forecast
@@ -3212,7 +2474,7 @@ else //if !exists load, else just keep the current one.
 			            2.0,
 			            0.0,
 			            NOMINAL_SEMIANNUAL,
-			            NO_SHIFT,0) * 100.0;//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+			            NO_SHIFT) * 100.0;
 	
         tenyr_forecast[month]
         = rates->get_int_rate(0 - valn_period,
@@ -3221,7 +2483,7 @@ else //if !exists load, else just keep the current one.
 			            10.0,
 			            0.0,
 			            NOMINAL_SEMIANNUAL,
-			            NO_SHIFT,0) * 100.0;//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+			            NO_SHIFT) * 100.0;
 
 		// Set the CCY initial parameters
 		ccycalc.SetParam(CCYInputs.element("CCY_Type"), CCYTypes.element(eeCCYType.name()));
@@ -3236,8 +2498,10 @@ else //if !exists load, else just keep the current one.
 		
 		catch(adco_cError &error_detail) 
 			{
-			error_processing(error_detail.message());
-			return;
+			throw FatalError(xstring("ADCO Model Failure - ") + error_detail.message());
+	
+			//error_processing(error_detail.message());
+			//return;	
 			}
 	
 		// Create 2yr and 10yr Forecasts
@@ -3250,7 +2514,7 @@ else //if !exists load, else just keep the current one.
 					2.0,
 					0.0,
 					NOMINAL_SEMIANNUAL,
-					NO_SHIFT,0) * 100.0;//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+					NO_SHIFT) * 100.0;
 	
 			tenyr_forecast[month]
 			= rates->get_int_rate(month - valn_period,
@@ -3259,7 +2523,7 @@ else //if !exists load, else just keep the current one.
 					10.0,
 					0.0,
 					NOMINAL_SEMIANNUAL,
-					NO_SHIFT,0) * 100.0;//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+					NO_SHIFT) * 100.0;
 			}
 
 		adco_TimeSeries Fcst2yr(curr_cpn_vecsize, msdyr, msdmth, ADCO_MONTHLY);
@@ -3276,8 +2540,10 @@ else //if !exists load, else just keep the current one.
 	
 		catch(adco_cError &error_detail) 
 			{
-			error_processing(error_detail.message());
-			return;
+			throw FatalError(xstring("ADCO Model Failure - ") + error_detail.message());
+	
+			//error_processing(error_detail.message());
+			//return;	
 			}
 			
 		// Get the CCY Forecast TimeSeries.
@@ -3293,9 +2559,16 @@ else //if !exists load, else just keep the current one.
 		pAdcoSystem->Adppmdl_recycle(ccycalc);
 		}
 
+	int process_adco_detail_local = 0;
+
+	if (asset_detail_rpt_flag == YES
+		&& (t >= asset_detail_rpt_start_period
+			&& t <= asset_detail_rpt_final_period))
+		process_adco_detail_local = 1;
+
 	try
 		{
-		if (process_adco_detail(t))
+		if (process_adco_detail_local)
 			{
 			int start_index = myHist->GetIdx(msdyr - 1, msdmth);
 		
@@ -3329,8 +2602,10 @@ else //if !exists load, else just keep the current one.
 		
 	catch (adco_cError &error_detail) 
 		{
-		error_processing(error_detail.message());
-		return;
+		throw FatalError(xstring("ADCO Model Failure - ") + error_detail.message());
+	
+		//error_processing(error_detail.message());
+		//return;	
 		}
 	}
 
@@ -3369,7 +2644,7 @@ double tenyr_forecast[curr_cpn_vecsize];
 memset(twoyr_forecast, 0, curr_cpn_vecsize * sizeof(double));
 memset(tenyr_forecast, 0, curr_cpn_vecsize * sizeof(double));
 
-assert(pAdcoSystem != NULL);
+//assert(pAdcoSystem != NULL);
 
 const adco_cEnumeration& SysParamList = pAdcoSystem->ParamList();
 const adco_cEnumElem DirParam = SysParamList.element("DATAFILEDIR");
@@ -3381,276 +2656,293 @@ const adco_cEnumeration& ModelList = pAdcoSystem->ModelList();
 // Make Enum Element for MBS Fixed Model type (only do name lookup once)
 const adco_cEnumElem FixMdlType = ModelList.element("FIXEDMBS");
 
+int process_adco_detail_local = 0;
+
+if (asset_detail_rpt_flag == YES
+	&& (t >= asset_detail_rpt_start_period
+		&& t <= asset_detail_rpt_final_period))
+	process_adco_detail_local = 1;
+
+double local_states[53];
+	
+for (int state = 0; state < 53; state++) 
+    local_states[state] = states[state];
+
+double local_property_types[3];
+	
+for (int type = 0; type < 3; type++) 
+    local_property_types[type] = property_types[type];
+    
+double local_loan_purpose[3];
+
+for (int type = 0; type < 3; type++) 
+    local_loan_purpose[type] = loan_purp[type];
+
+double local_occupancy[3];
+
+for (int type = 0; type < 3; type++) 
+    local_occupancy[type] = occupancy[type];
+
+xstring asset_id_local = asset_id;
+xstring category_id_local = category_id;
+xstring shift_defn_local = shift_defn;
+
+// Get a fixed-rate prepayment model
+CAdppmdl& Mdl = pAdcoSystem->Adppmdl_factory(FixMdlType);
+
+const adco_cEnumeration& FixedInputs = Mdl.GetList("INPUTS");
+const adco_cEnumeration& FixedResults = Mdl.GetList("RESULTS");
+const adco_cEnumeration& FixedCCYTypeMap = Mdl.GetList("CCYTYPEMAP");
+const adco_cEnumeration& SwitchList = Mdl.GetList("SWITCH");
+
+char * loan_type;
+	
+//determine loan type
+switch (ad_loan_type)
+	{
+	case FNMAB_3YR:
+		loan_type = "FNMAB_3YR";
+		break;
+	case FNMAB_5YR:
+		loan_type = "FNMAB_5YR";
+		break;
+	case FNMAB_7YR:
+		loan_type = "FNMAB_7YR";
+		break;
+	case FNMAB_10YR:
+		loan_type = "FNMAB_10YR";
+		break;
+	case FNMA_10YR:
+		loan_type = "FNMA_10YR";
+		break;
+	case FNMA_15YR:
+		loan_type = "FNMA_15YR";
+		break;
+	case FNMA_20YR:
+		loan_type = "FNMA_20YR";
+		break;
+	case FNMA_30YR:
+		loan_type = "FNMA_30YR";
+		break;
+	case GNMA_15YR:
+		loan_type = "GNMA_15YR";
+		break;
+	case GNMA_30YR:
+		loan_type = "GNMA_30YR";
+		break;
+	case GNMA2_15YR:
+		loan_type = "GNMA2_15YR";
+		break;
+	case GNMA2_30YR:
+		loan_type = "GNMA2_30YR";
+		break;
+	case FRDGB_3YR:
+		loan_type = "FHLB_3YR";
+		break;
+	case FRDGB_5YR:
+		loan_type = "FHLB_5YR";
+		break;
+	case FRDGB_7YR:
+		loan_type = "FHLB_7YR";
+		break;
+	case FRDGB_10YR:
+		loan_type = "FHLB_10YR";
+		break;
+	case FRDG_10YR:
+		loan_type = "FHL_10YR";
+		break;
+	case FRDG_20YR:
+		loan_type = "FHL_20YR";
+		break;
+	case FRDG_15YR:
+		loan_type = "FHL_15YR";
+		break;
+	case FRDG_30YR:
+		loan_type = "FHL_30YR";
+		break;
+	case WHOLEB_5YR:
+		loan_type = "WHOLEB_5YR";
+		break;
+	case WHOLEB_7YR:
+		loan_type = "WHOLEB_7YR";
+		break;
+	case WHOLE_15YR:
+		loan_type = "WHOLE_15YR";
+		break;
+	case WHOLE_30YR:
+		loan_type = "WHOLE_30YR";
+		break;
+	case RELO_15YR:
+		loan_type = "RELO_15YR";
+		break;
+	case RELO_30YR:
+		loan_type = "RELO_30YR";
+		break;
+	case ALT_A_15YR:
+		loan_type = "ALT_A_15YR";
+		break;
+	case ALT_A_30YR:
+		loan_type = "ALT_A_30YR";
+		break;
+	default:
+		loan_type = "Undefined";
+		break;
+	}
+    	
+// Initial State Inputs - required
+Mdl.SetParam(FixedInputs.element("LoanType"), loan_type);
+Mdl.SetParam(FixedInputs.element("WAC"), (double)coupon);
+Mdl.SetParam(FixedInputs.element("Age"), (int)age);
+Mdl.SetParam(FixedInputs.element("FirstForecastMonth"), histmth);
+Mdl.SetParam(FixedInputs.element("FirstForecastYear"), histyr);
+Mdl.SetParam(FixedInputs.element("RemainingTerm"), (double)remaining_term);
+	
+// Setup Fixed Curve Type
+Mdl.SetParam(FixedInputs.element("Curve_Type"), "PAR_TSY");
+	
+if (historical_loan_size_effect_defn == YES) 
+    Mdl.SetParam(FixedInputs.element("UseHistoricalLoanSize"), 
+                                        SwitchList.element("ON"));
+else 
+    Mdl.SetParam(FixedInputs.element("UseHistoricalLoanSize"), 
+                                        SwitchList.element("OFF"));
+
+// Other advanced inputs - optional
+
+// face value is set to par value of loan at issue 
+Mdl.SetParam(FixedInputs.element("Orig_Face"), (double)original_face);
+
+Mdl.SetParam(FixedInputs.element("Credit_Score"), (double)credit_score);
+Mdl.SetParam(FixedInputs.element("Original_LTV"), (double)original_ltv);
+Mdl.SetParam(FixedInputs.element("Regional_HPI"), (double)regional_hpi);
+Mdl.SetParam(FixedInputs.element("State"), local_states);
+Mdl.SetParam(FixedInputs.element("Property_Type"), local_property_types);
+Mdl.SetParam(FixedInputs.element("Loan_Purpose"), local_loan_purpose);
+Mdl.SetParam(FixedInputs.element("Occupancy"), local_occupancy);
+	
+//***These parameters are in the ADCO interface, but will not be used. ***
+	
+// Tuning Inputs - optional
+// Andrew Davidson strongly recommends that their File based tuning only be utilized,  
+// and that the end user should not concern themselves with passing tuning parameters 
+// to the interface. However, if the user wishes to pass their own tuning parameters 
+// the below code can be uncommented and used. It should be noted that the second
+// parameter being passed to "SetParam" will need to be created as MoSes variables.
+
+// Sensitivity Tuning Factors -- affects only Forecast() (only future projection)	
+//Mdl.SetParam(FixedInputs.element("TuningStartMonth"), (int) tuning_start_mth);
+//Mdl.SetParam(FixedInputs.element("TuningStartYear"), (int) tuning_start_yr);
+//Mdl.SetParam(FixedInputs.element("TuningEndMonth"), (int) tuning_end_mth);
+//Mdl.SetParam(FixedInputs.element("TuningEndYear"), (int) tuning_end_yr);
+//Mdl.SetParam(FixedInputs.element("TuningRampMonths"), (int) tuning_ramp_months);
+//Mdl.SetParam(FixedInputs.element("TuningFadeMonths"), (int) tuning_fade_months);
+//Mdl.SetParam(FixedInputs.element("SmmTuneScale"), (double) smm_tune_scale);
+//Mdl.SetParam(FixedInputs.element("SmmTuneBurnout"), (double) smm_tune_burnout);
+//Mdl.SetParam(FixedInputs.element("SmmTuneLag"), (double) smm_tune_lag);
+//Mdl.SetParam(FixedInputs.element("SmmTuneSlide"), (double) smm_tune_slide);
+//Mdl.SetParam(FixedInputs.element("SmmTuneTurnOver"), (double) smm_tune_turn_over);
+//Mdl.SetParam(FixedInputs.element("SmmTuneRefi"), (double) smm_tune_refi);
+//Mdl.SetParam(FixedInputs.element("SmmTuneCashout"), (double) smm_tune_cashout);
+//Mdl.SetParam(FixedInputs.element("SmmTuneCure"), (double) smm_tune_cure);
+//Mdl.SetParam(FixedInputs.element("SmmTuneAge"), (double) smm_tune_age);
+//Mdl.SetParam(FixedInputs.element("SmmTuneSATO"), (double) smm_tune_sato);
+//Mdl.SetParam(FixedInputs.element("SmmTuneCATO"), (double) smm_tune_cato);
+//Mdl.SetParam(FixedInputs.element("Cashout_RM"), (double) cashout_rm);
+//Mdl.SetParam(FixedInputs.element("Cure_RM"), (double) cure_rm);
+//Mdl.SetParam(FixedInputs.element("Refi_RM"), (double) refi_rm);
+//Mdl.SetParam(FixedInputs.element("Turnover_RM"), (double) turnover_rm);
+//Mdl.SetParam(FixedInputs.element("Psi0"), (double) (double) psi_0);
+//Mdl.SetParam(FixedInputs.element("PsiT"), (double) (double) psi_T);
+		
+// Model Tuning Factors -- affects both PreCalc()and Forecast() 
+// (History and future projection) These are obsolete.
+//Mdl.SetParam(FixedInputs.element("SmmTuneScaleModel"), (double) smm_tune_scale_model);
+//Mdl.SetParam(FixedInputs.element("SmmTuneBurnoutModel"), (double) smm_tune_burnout_model);
+//Mdl.SetParam(FixedInputs.element("SmmTuneLagModel"), (double) smm_tune_lag_model);
+//Mdl.SetParam(FixedInputs.element("SmmTuneSlideModel"), (double) smm_tune_slide_model);
+//Mdl.SetParam(FixedInputs.element("SmmTuneTurnOverModel"), (double) smm_tune_turn_over_model);
+//Mdl.SetParam(FixedInputs.element("SmmTuneRefiModel"), (double) smm_tune_refi_model);
+//Mdl.SetParam(FixedInputs.element("SmmTuneCashoutModel"), (double) smm_tune_cashout_model);
+//Mdl.SetParam(FixedInputs.element("SmmTuneCureModel"), (double) smm_tune_cure_model);
+//Mdl.SetParam(FixedInputs.element("SmmTuneAgeModel"), (double) smm_tune_age_model);
+//Mdl.SetParam(FixedInputs.element("SmmTuneSATOModel"), (double) smm_tune_sato_model);
+//Mdl.SetParam(FixedInputs.element("SmmTuneCATOModel"), (double) smm_tune_cato_model);
+	
+// Deprecated items use FirstForecastYear and FirstForecastMonth instead.
+//adco_cEnumElem FixedOrigYear = FixedInputs.element("OriginationYear");
+//adco_cEnumElem FixedOrigMonth = FixedInputs.element("OriginationMonth");
+    
+// Old Names for FirstForecastYear and FirstForecastMonth. These are obsolete.
+//adco_cEnumElem FixedAsOfYear = FixedInputs.element("AsOfYear");
+//adco_cEnumElem FixedAsOfMonth = FixedInputs.element("AsOfMonth");
+	
+// These input parameters are not needed since the US Library has already handled projection 
+// length and valuation period offset. 
+// adco_cEnumElem FixedForecastMonths = FixedInputs.element("ForecastMonths");
+// adco_cEnumElem FixedForecastOffset = FixedInputs.element("ForecastOffset");
+	
+// Forecast Results that are not needed
+//adco_cEnumElem FixedMaxLag = FixedResults.element("MaxLag");
+//adco_cEnumElem FixedForecastCount = FixedResults.element("ForecastCount");
+//adco_cEnumElem FixedModel = FixedResults.element("Model");
+//adco_cEnumElem FixedLicense = FixedResults.element("License");
+
+// Obsolete and have no effect on the projection
+//adco_cEnumElem FixedHPIForecast = FixedInputs.element("HPIForecast"); 
+//adco_cEnumElem FixedHPIRvsnval = FixedInputs.element("HPIRvsnVal");
+	
+// Miscellaneous parameters that are not needed
+//adco_cEnumElem FixedDealID = FixedInputs.element("DealID");
+//adco_cEnumElem FixedPoolID = FixedInputs.element("PoolID");
+//adco_cEnumElem FixedZeroVectorsFlag = FixedInputs.element("ZeroVectorsFlag");
+//adco_cEnumElem FixedTuneString = FixedInputs.element("TuneString");
+//adco_cEnumElem FixedTuningShelf = FixedInputs.element("TuningShelf");
+//adco_cEnumElem FixedTuningShelf1 = FixedInputs.element("TuningShelf1");
+//adco_cEnumElem FixedTuningShelf2 = FixedInputs.element("TuningShelf2");
+//adco_cEnumElem FixedTuningShelf3 = FixedInputs.element("TuningShelf3");
+//adco_cEnumElem FixedTuningShelf4 = FixedInputs.element("TuningShelf4");	
+//adco_cEnumElem FixedDumpFile = FixedResults.element("DUMPFILE")
+//****************************************************************************
+
+// CCY History
+adco_TimeSeries * myCCYHist = NULL;
+
+get_history(t, loan_type, Mdl, myCCYHist, FixedResults,
+				histmth, histyr, msdyr, msdmth);
+
+adco_CParam CCYHistP(*myCCYHist);
+Mdl.SetParam(FixedInputs.element("CCYHistory"), CCYHistP);
+
+// Capture current mortgage rate from history 
+int idx = myCCYHist->GetIdx(histyr, histmth);
+//assert(idx > 0);
+cur_mtg_cpn = myCCYHist->Values()[idx - 1];
+
+try {Mdl.PreCalc();}
+    
+catch(adco_cError & error_detail)
+	{
+	throw FatalError(xstring("ADCO Model Failure - ") + error_detail.message());
+	
+	//error_processing(error_detail.message());
+	//return;	
+	}
+		
+// Set CCY Type
+const adco_cEnumElem& eeCCYType = FixedCCYTypeMap.element(loan_type).classification();
+
+// Forecast the CCY rate
+adco_TimeSeries * myCCYForecast = NULL;
+
+ccy_rate_forecast(t, offset, histyr, histmth, eeCCYType,
+	                cur_mtg_cpn, myCCYForecast, twoyr_forecast, tenyr_forecast, spread);
+
+double coupon_local = coupon;
+int age_local = age;
+double remaining_term_local = remaining_term;
+
 try 
 	{
-	// Get a fixed-rate prepayment model
-	CAdppmdl& Mdl = pAdcoSystem->Adppmdl_factory(FixMdlType);
-
-	const adco_cEnumeration& FixedInputs = Mdl.GetList("INPUTS");
-	const adco_cEnumeration& FixedResults = Mdl.GetList("RESULTS");
-	const adco_cEnumeration& FixedCCYTypeMap = Mdl.GetList("CCYTYPEMAP");
-    const adco_cEnumeration& SwitchList = Mdl.GetList("SWITCH");
-
-	char * loan_type;
-	
-    //determine loan type
-	switch (ad_loan_type)
-		{
-		case FNMAB_3YR:
-			loan_type = "FNMAB_3YR";
-			break;
-		case FNMAB_5YR:
-			loan_type = "FNMAB_5YR";
-			break;
-		case FNMAB_7YR:
-			loan_type = "FNMAB_7YR";
-			break;
-		case FNMAB_10YR:
-			loan_type = "FNMAB_10YR";
-			break;
-		case FNMA_10YR:
-			loan_type = "FNMA_10YR";
-			break;
-		case FNMA_15YR:
-			loan_type = "FNMA_15YR";
-			break;
-		case FNMA_20YR:
-			loan_type = "FNMA_20YR";
-			break;
-		case FNMA_30YR:
-			loan_type = "FNMA_30YR";
-			break;
-		case GNMA_15YR:
-			loan_type = "GNMA_15YR";
-			break;
-		case GNMA_30YR:
-			loan_type = "GNMA_30YR";
-			break;
-		case GNMA2_15YR:
-			loan_type = "GNMA2_15YR";
-			break;
-		case GNMA2_30YR:
-			loan_type = "GNMA2_30YR";
-			break;
-		case FRDGB_3YR:
-			loan_type = "FHLB_3YR";
-			break;
-		case FRDGB_5YR:
-			loan_type = "FHLB_5YR";
-			break;
-		case FRDGB_7YR:
-			loan_type = "FHLB_7YR";
-			break;
-		case FRDGB_10YR:
-			loan_type = "FHLB_10YR";
-			break;
-		case FRDG_10YR:
-			loan_type = "FHL_10YR";
-			break;
-		case FRDG_20YR:
-			loan_type = "FHL_20YR";
-			break;
-		case FRDG_15YR:
-			loan_type = "FHL_15YR";
-			break;
-		case FRDG_30YR:
-			loan_type = "FHL_30YR";
-			break;
-		case WHOLEB_5YR:
-			loan_type = "WHOLEB_5YR";
-			break;
-		case WHOLEB_7YR:
-			loan_type = "WHOLEB_7YR";
-			break;
-		case WHOLE_15YR:
-			loan_type = "WHOLE_15YR";
-			break;
-		case WHOLE_30YR:
-			loan_type = "WHOLE_30YR";
-			break;
-		case RELO_15YR:
-			loan_type = "RELO_15YR";
-			break;
-		case RELO_30YR:
-			loan_type = "RELO_30YR";
-			break;
-		case ALT_A_15YR:
-			loan_type = "ALT_A_15YR";
-			break;
-		case ALT_A_30YR:
-			loan_type = "ALT_A_30YR";
-			break;
-		default:
-			loan_type = "Undefined";
-			break;
-		}
-    	
-    // Initial State Inputs - required
-	Mdl.SetParam(FixedInputs.element("LoanType"), loan_type);
-    Mdl.SetParam(FixedInputs.element("WAC"), (double) coupon);
-	Mdl.SetParam(FixedInputs.element("Age"), (int) age);
-	Mdl.SetParam(FixedInputs.element("FirstForecastMonth"), histmth);
-	Mdl.SetParam(FixedInputs.element("FirstForecastYear"), histyr);
-	Mdl.SetParam(FixedInputs.element("RemainingTerm"), (int) remaining_term);
-	
-	// Setup Fixed Curve Type
-	Mdl.SetParam(FixedInputs.element("Curve_Type"), "PAR_TSY");
-	
-	if (historical_loan_size_effect_defn == YES) 
-    	Mdl.SetParam(FixedInputs.element("UseHistoricalLoanSize"), 
-                                         SwitchList.element("ON"));
-	else 
-        Mdl.SetParam(FixedInputs.element("UseHistoricalLoanSize"), 
-                                         SwitchList.element("OFF"));
-
-	// Other advanced inputs - optional
-
-    // face value is set to par value of loan at issue 
-	Mdl.SetParam(FixedInputs.element("Orig_Face"), (double) original_face);
-	
-	double local_states[53];
-	
-	for (int state = 0; state < 53; state++) 
-        local_states[state] = states[state];
-
-	double local_property_types[3];
-	
-	for (int type = 0; type < 3; type++) 
-        local_property_types[type] = property_types[type];
-    
-    double local_loan_purpose[3];
-
-    for (int type = 0; type < 3; type++) 
-        local_loan_purpose[type] = loan_purp[type];
-
-    double local_occupancy[3];
-
-    for (int type = 0; type < 3; type++) 
-        local_occupancy[type] = occupancy[type];
-
-	Mdl.SetParam(FixedInputs.element("Credit_Score"), (double) credit_score);
-	Mdl.SetParam(FixedInputs.element("Original_LTV"), (double) original_ltv);
-	Mdl.SetParam(FixedInputs.element("Regional_HPI"), (double) regional_hpi);
-	Mdl.SetParam(FixedInputs.element("State"), local_states);
-    Mdl.SetParam(FixedInputs.element("Property_Type"), local_property_types);
-    Mdl.SetParam(FixedInputs.element("Loan_Purpose"), local_loan_purpose);
-	Mdl.SetParam(FixedInputs.element("Occupancy"), local_occupancy);
-	
-	//***These parameters are in the ADCO interface, but will not be used. ***
-	
-	// Tuning Inputs - optional
-    // Andrew Davidson strongly recommends that their File based tuning only be utilized,  
-    // and that the end user should not concern themselves with passing tuning parameters 
-    // to the interface. However, if the user wishes to pass their own tuning parameters 
-    // the below code can be uncommented and used. It should be noted that the second
-    // parameter being passed to "SetParam" will need to be created as MoSes variables.
-
-	// Sensitivity Tuning Factors -- affects only Forecast() (only future projection)	
-	//Mdl.SetParam(FixedInputs.element("TuningStartMonth"), (int) tuning_start_mth);
-	//Mdl.SetParam(FixedInputs.element("TuningStartYear"), (int) tuning_start_yr);
-	//Mdl.SetParam(FixedInputs.element("TuningEndMonth"), (int) tuning_end_mth);
-	//Mdl.SetParam(FixedInputs.element("TuningEndYear"), (int) tuning_end_yr);
-    //Mdl.SetParam(FixedInputs.element("TuningRampMonths"), (int) tuning_ramp_months);
-    //Mdl.SetParam(FixedInputs.element("TuningFadeMonths"), (int) tuning_fade_months);
-    //Mdl.SetParam(FixedInputs.element("SmmTuneScale"), (double) smm_tune_scale);
-	//Mdl.SetParam(FixedInputs.element("SmmTuneBurnout"), (double) smm_tune_burnout);
-	//Mdl.SetParam(FixedInputs.element("SmmTuneLag"), (double) smm_tune_lag);
-    //Mdl.SetParam(FixedInputs.element("SmmTuneSlide"), (double) smm_tune_slide);
-	//Mdl.SetParam(FixedInputs.element("SmmTuneTurnOver"), (double) smm_tune_turn_over);
-    //Mdl.SetParam(FixedInputs.element("SmmTuneRefi"), (double) smm_tune_refi);
-    //Mdl.SetParam(FixedInputs.element("SmmTuneCashout"), (double) smm_tune_cashout);
-	//Mdl.SetParam(FixedInputs.element("SmmTuneCure"), (double) smm_tune_cure);
-    //Mdl.SetParam(FixedInputs.element("SmmTuneAge"), (double) smm_tune_age);
-	//Mdl.SetParam(FixedInputs.element("SmmTuneSATO"), (double) smm_tune_sato);
-	//Mdl.SetParam(FixedInputs.element("SmmTuneCATO"), (double) smm_tune_cato);
-	//Mdl.SetParam(FixedInputs.element("Cashout_RM"), (double) cashout_rm);
-	//Mdl.SetParam(FixedInputs.element("Cure_RM"), (double) cure_rm);
-	//Mdl.SetParam(FixedInputs.element("Refi_RM"), (double) refi_rm);
-	//Mdl.SetParam(FixedInputs.element("Turnover_RM"), (double) turnover_rm);
-	//Mdl.SetParam(FixedInputs.element("Psi0"), (double) (double) psi_0);
-	//Mdl.SetParam(FixedInputs.element("PsiT"), (double) (double) psi_T);
-		
-	// Model Tuning Factors -- affects both PreCalc()and Forecast() 
-	// (History and future projection) These are obsolete.
-    //Mdl.SetParam(FixedInputs.element("SmmTuneScaleModel"), (double) smm_tune_scale_model);
-    //Mdl.SetParam(FixedInputs.element("SmmTuneBurnoutModel"), (double) smm_tune_burnout_model);
-    //Mdl.SetParam(FixedInputs.element("SmmTuneLagModel"), (double) smm_tune_lag_model);
-    //Mdl.SetParam(FixedInputs.element("SmmTuneSlideModel"), (double) smm_tune_slide_model);
-    //Mdl.SetParam(FixedInputs.element("SmmTuneTurnOverModel"), (double) smm_tune_turn_over_model);
-	//Mdl.SetParam(FixedInputs.element("SmmTuneRefiModel"), (double) smm_tune_refi_model);
-	//Mdl.SetParam(FixedInputs.element("SmmTuneCashoutModel"), (double) smm_tune_cashout_model);
-	//Mdl.SetParam(FixedInputs.element("SmmTuneCureModel"), (double) smm_tune_cure_model);
-	//Mdl.SetParam(FixedInputs.element("SmmTuneAgeModel"), (double) smm_tune_age_model);
-	//Mdl.SetParam(FixedInputs.element("SmmTuneSATOModel"), (double) smm_tune_sato_model);
-	//Mdl.SetParam(FixedInputs.element("SmmTuneCATOModel"), (double) smm_tune_cato_model);
-	
-	// Deprecated items use FirstForecastYear and FirstForecastMonth instead.
-	//adco_cEnumElem FixedOrigYear = FixedInputs.element("OriginationYear");
-    //adco_cEnumElem FixedOrigMonth = FixedInputs.element("OriginationMonth");
-    
-    // Old Names for FirstForecastYear and FirstForecastMonth. These are obsolete.
-	//adco_cEnumElem FixedAsOfYear = FixedInputs.element("AsOfYear");
-	//adco_cEnumElem FixedAsOfMonth = FixedInputs.element("AsOfMonth");
-	
-	// These input parameters are not needed since the US Library has already handled projection 
-    // length and valuation period offset. 
-    // adco_cEnumElem FixedForecastMonths = FixedInputs.element("ForecastMonths");
-	// adco_cEnumElem FixedForecastOffset = FixedInputs.element("ForecastOffset");
-	
-	// Forecast Results that are not needed
-	//adco_cEnumElem FixedMaxLag = FixedResults.element("MaxLag");
-	//adco_cEnumElem FixedForecastCount = FixedResults.element("ForecastCount");
-	//adco_cEnumElem FixedModel = FixedResults.element("Model");
-    //adco_cEnumElem FixedLicense = FixedResults.element("License");
-
-    // Obsolete and have no effect on the projection
-    //adco_cEnumElem FixedHPIForecast = FixedInputs.element("HPIForecast"); 
-	//adco_cEnumElem FixedHPIRvsnval = FixedInputs.element("HPIRvsnVal");
-	
-	// Miscellaneous parameters that are not needed
-	//adco_cEnumElem FixedDealID = FixedInputs.element("DealID");
-	//adco_cEnumElem FixedPoolID = FixedInputs.element("PoolID");
-	//adco_cEnumElem FixedZeroVectorsFlag = FixedInputs.element("ZeroVectorsFlag");
-	//adco_cEnumElem FixedTuneString = FixedInputs.element("TuneString");
-    //adco_cEnumElem FixedTuningShelf = FixedInputs.element("TuningShelf");
-	//adco_cEnumElem FixedTuningShelf1 = FixedInputs.element("TuningShelf1");
-	//adco_cEnumElem FixedTuningShelf2 = FixedInputs.element("TuningShelf2");
-	//adco_cEnumElem FixedTuningShelf3 = FixedInputs.element("TuningShelf3");
-	//adco_cEnumElem FixedTuningShelf4 = FixedInputs.element("TuningShelf4");	
-	//adco_cEnumElem FixedDumpFile = FixedResults.element("DUMPFILE")
-	//****************************************************************************
-
-	// CCY History
-	adco_TimeSeries * myCCYHist = NULL;
-
-	get_history(t, loan_type, Mdl, myCCYHist, FixedResults,
-				   histmth, histyr, msdyr, msdmth);
-
-	adco_CParam CCYHistP(*myCCYHist);
-	Mdl.SetParam(FixedInputs.element("CCYHistory"), CCYHistP);
-
-	// Capture current mortgage rate from history 
-	int idx = myCCYHist->GetIdx(histyr, histmth);
-	assert(idx > 0);
-	cur_mtg_cpn = myCCYHist->Values()[idx - 1];
-
-	try {Mdl.PreCalc();}
-    
-	catch(adco_cError & error_detail)
-		{
-		error_processing(error_detail.message());
-		return;
-		}
-		
-	// Set CCY Type
-	const adco_cEnumElem& eeCCYType = FixedCCYTypeMap.element(loan_type).classification();
-
-	// Forecast the CCY rate
-	adco_TimeSeries * myCCYForecast = NULL;
-
-	ccy_rate_forecast(t, offset, histyr, histmth, eeCCYType,
-	                  cur_mtg_cpn, myCCYForecast, twoyr_forecast, tenyr_forecast, spread);
-
 	// Parameterize the Fixed Model with the CCY Forecast TimeSeries.
 	adco_CParam CCYfcst(*myCCYForecast);
 	Mdl.SetParam(FixedInputs.element("CCYForecast"), CCYfcst);
@@ -3660,8 +2952,10 @@ try
 
 	catch(adco_cError &error_detail) 
 		{
-		error_processing(error_detail.message());
-		return;
+		throw FatalError(xstring("ADCO Model Failure - ") + error_detail.message());
+	
+		//error_processing(error_detail.message());
+		//return;	
 		}
 
 	// Save the SMM results to a timeseries
@@ -3672,7 +2966,7 @@ try
 	double* SMMptr = SMM->Values() + tempidx;
 
 	int month = 0; 
-	assert(sizeof(smm_forecast) >= max_maturity);
+	//assert(sizeof(smm_forecast) >= max_maturity);
     
     // Save to SMM array
 	for (month = 0; month < max_maturity && month < SMM->Length() - tempidx; month++)
@@ -3714,9 +3008,9 @@ try
 	for (month = 0; month < max_maturity && month < TurnoverSMM->Length() - tempidx; month++)
   	   smm_turnover_forecast[month] = TurnoverSMMptr[month];
 
-	if (process_adco_detail(t))
+	if (process_adco_detail_local)
 	    {
-		string version = Mdl.GetParam(FixedResults.element("VERSION"));
+		string version = static_cast<const char*>(Mdl.GetParam(FixedResults.element("VERSION")));
 
 		// Setup HPI Forecast vector
 		adco_CParam HPIFcst = Mdl.GetParam(FixedInputs.element("HPIForecast"));
@@ -3837,8 +3131,8 @@ try
 			
 		ADCOFile << endl
 				 << "ADCO Prepayment Detail" << endl
-				 << "AssetID," << asset_id << endl
-				 << "Category," << category_id << endl
+				 << "AssetID," << asset_id_local << endl
+				 << "Category," << category_id_local << endl
 				 << "ADCOPrepaymentModelType,MBS Fixed Rate Mortgage" << endl
 				 << "ADCOVersion," << version << endl
 				 << "ProjTaskLoop," << proj_task_loop_num << endl
@@ -3847,10 +3141,10 @@ try
 				 << "PVCalc," << pvcalc << endl
 				 << "NYCalc," << nycalc << endl
 				 << "MVCalc," << mvcalc << endl
-				 << "ShftdYldCv," << shift_defn << endl
+				 << "ShftdYldCv," << shift_defn_local << endl
 				 << "LoanType," << loan_type << endl
-				 << "Age," << age << endl
-				 << "RemTerm," << remaining_term << endl
+				 << "Age," << age_local << endl
+				 << "RemTerm," << remaining_term_local << endl
 				 << "Spread," << spread << endl
 				 << "HPIType,Conforming Loans" << endl
 				 << "HistYr," << histyr << endl
@@ -3860,7 +3154,7 @@ try
 
 		int month = 0;
 		
-		for (month = -4; month < remaining_term; month++)
+		for (month = -4; month < remaining_term_local; month++)
 			{
 			if (month < 0)
 				{
@@ -3890,7 +3184,7 @@ try
 					dCCY = CCY->Values()[idx];
 
 				ADCOFile << month << ","
-						 << coupon << ","
+						 << coupon_local << ","
 						 << twoyr_forecast[month] << ","
 						 << tenyr_forecast[month] << ","
 						 << dCCY << ","
@@ -3910,8 +3204,10 @@ try
 	}
 catch (adco_cError &error_detail) 
 	{
-	error_processing(error_detail.message());
-	return;
+	throw FatalError(xstring("ADCO Model Failure - ") + error_detail.message());
+	
+	//error_processing(error_detail.message());
+	//return;	
 	}
 }
 
@@ -3947,7 +3243,7 @@ for(loop = 0; loop < loopend; loop++)
 							rateterm,
 							0.0, 
 							NOMINAL_SEMIANNUAL,
-							shift_defn,0) * 100.0;//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+							shift_defn) * 100.0;
 
 			else // use current scenario rate level
 				rateforecast[startidx+loop]
@@ -3957,7 +3253,7 @@ for(loop = 0; loop < loopend; loop++)
 							rateterm,
 							0.0, 
 							NOMINAL_SEMIANNUAL,
-							shift_defn,0) * 100.0;//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+							shift_defn) * 100.0;
              }
 
 		else // MV Calculations
@@ -3970,7 +3266,7 @@ for(loop = 0; loop < loopend; loop++)
 							rateterm,
 							0.0, 
 							NOMINAL_SEMIANNUAL,
-							shift_defn,0) * 100.0;//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+							shift_defn) * 100.0;
 
 			else // use forward scenario rates
 				rateforecast[startidx+loop]
@@ -3980,7 +3276,7 @@ for(loop = 0; loop < loopend; loop++)
 							(loop + 1.0 - offset) * (1.0 / 12.0),
 							rateterm,
 							NOMINAL_SEMIANNUAL,
-							shift_defn,0) * 100.0;//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+							shift_defn) * 100.0;
 			}
 		}
 
@@ -3992,7 +3288,7 @@ for(loop = 0; loop < loopend; loop++)
 					rateterm,
 					0.0,
 					NOMINAL_SEMIANNUAL,
-					shift_defn,0) * 100.0;//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+					shift_defn) * 100.0;
 	} // End for future treasury rates
 
 return;
@@ -4167,7 +3463,6 @@ if (!(prepmt_model_defn == ABS  // All 5.2h models except these use the smm comp
 		{
 		if (!process_adco_detail(t))
 			{
-			makeRunLogYellow();
 			log_screen.setf(ios::fixed, ios::floatfield);
 			log_screen << setprecision(6);
 		    log_screen << "Warning: ADCO component prepayment rates do not sum up to the "
@@ -4181,7 +3476,6 @@ if (!(prepmt_model_defn == ABS  // All 5.2h models except these use the smm comp
 			}
 		else
 			{
-			makeRunLogYellow();
 			log_screen.setf(ios::fixed, ios::floatfield);
 			log_screen << setprecision(6);
 		    log_screen << "Warning: ADCO component prepayment rates do not sum up to the "
@@ -4509,8 +3803,8 @@ try
         int ccy_last_hist_yr = myCCYHist->LastYear();
         int ccy_last_hist_mth = myCCYHist->LastPeriod();
        
-        if (MonthNumberFromDate(histyr, histmth)  // if starting history date falls after
-             > MonthNumberFromDate(ccy_last_hist_yr, ccy_last_hist_mth)) // last date of available CCY history data
+        if (month_number_from_date(histyr, histmth)  // if starting history date falls after
+             > month_number_from_date(ccy_last_hist_yr, ccy_last_hist_mth)) // last date of available CCY history data
         	{
             // Then we need to extend the CCY History, so call get_history()
             adco_TimeSeries * myCCYHist = NULL;
@@ -4677,7 +3971,7 @@ try
 
 	int idx = myWACForecast->GetIdx(histyr, histmth);	//should always be zero
 
-	assert(idx == 0);
+	//assert(idx == 0);
 
 	double* WACptr = myWACForecast->Values() + idx;
 
@@ -4704,7 +3998,7 @@ try
 
 	int month = 0; 
 	
-	assert(sizeof(smm_forecast) >= max_maturity);
+	//assert(sizeof(smm_forecast) >= max_maturity);
     
     // Save to SMM array
 	for (month = 0; month < max_maturity && month < SMM->Length() - idx; month++)
@@ -4748,7 +4042,7 @@ try
 	
 	if (process_adco_detail(t))
 	    {
-		string version = Mdl.GetParam(UnifiedResults.element("VERSION"));
+		string version = static_cast<const char*>(Mdl.GetParam(UnifiedResults.element("VERSION")));
 		
 		int pvcalc = 0;
 		int nycalc = 0;
@@ -5496,15 +4790,11 @@ typedef xstring (ADCO_ASSET_UDF::*sPFs) (xstring);
 
 // constructor if this model class is the base class of another model class
 ADCO_ASSET::ADCO_ASSET(int columnCount, Descriptor* mocd[], Product* persObj) : ModelClass(columnCount, mocd, persObj), Variable(*this)
-  , sm_bond_is(0)
-  , sm_bond_pv(0)
-  , sm_bond_ym(0)
-  , sm_mtg_is(0)
-  , sm_mtg_pv(0)
-  , sm_mtg_ym(0)
 
+	, adco(company_asset_adco)
+	, asset(company_asset)
 	, epl(company_liab_epl)
-	, intex(company_asset_intex)
+	, liab(company_liab)
 	, rates(company_rates)
 {
 	gProxyInitialiser = 0;
@@ -5520,15 +4810,11 @@ ADCO_ASSET::ADCO_ASSET(int columnCount, Descriptor* mocd[], Product* persObj) : 
 ADCO_ASSET::ADCO_ASSET(const xstring &modelClassName,
 		int isSm, ModelClass *owner, ModelClass *peer, int mainRebase,
 		const char *name, ModelClass* arrayPersistentObj) : ModelClass(9, ADCO_ASSET::descriptorTable, arrayPersistentObj), Variable(*this)
-  , sm_bond_is(0)
-  , sm_bond_pv(0)
-  , sm_bond_ym(0)
-  , sm_mtg_is(0)
-  , sm_mtg_pv(0)
-  , sm_mtg_ym(0)
 
+	, adco(company_asset_adco)
+	, asset(company_asset)
 	, epl(company_liab_epl)
-	, intex(company_asset_intex)
+	, liab(company_liab)
 	, rates(company_rates)
  // Tables...
  // Generic Tables ...
@@ -5554,8 +4840,17 @@ ADCO_ASSET::ADCO_ASSET(const xstring &modelClassName,
        isMainModel = !isSm;
 		modelName = name;
 
-#ifdef __CREATE_INTEX_ASSET_CLASS_
-       company_asset_intex = 0;
+#ifdef __CREATE_AA_COMP_COMP_CLASS_
+       company = 0;
+#endif
+#ifdef __CREATE_ASSET_ASSET_CLASS_
+       company_asset = 0;
+#endif
+#ifdef __CREATE_ADCO_ASSET_CLASS_
+       company_asset_adco = 0;
+#endif
+#ifdef __CREATE_LIAB_LIAB_CLASS_
+       company_liab = 0;
 #endif
 #ifdef __CREATE_EPL_LIAB_CLASS_
        company_liab_epl = 0;
@@ -5625,8 +4920,17 @@ ADCO_ASSET::ADCO_ASSET(const xstring &modelClassName,
 
  void ADCO_ASSET::copy_names() {
 
-#ifdef __CREATE_INTEX_ASSET_CLASS_
-		company_asset_intex = (INTEX_ASSET*)(findUnique("company|asset|intex"));
+#ifdef __CREATE_AA_COMP_COMP_CLASS_
+		company = (AA_COMP_COMP*)(findUnique("company"));
+#endif
+#ifdef __CREATE_ASSET_ASSET_CLASS_
+		company_asset = (ASSET_ASSET*)(findUnique("company|asset"));
+#endif
+#ifdef __CREATE_ADCO_ASSET_CLASS_
+		company_asset_adco = (ADCO_ASSET*)(findUnique("company|asset|adco"));
+#endif
+#ifdef __CREATE_LIAB_LIAB_CLASS_
+		company_liab = (LIAB_LIAB*)(findUnique("company|liab"));
 #endif
 #ifdef __CREATE_EPL_LIAB_CLASS_
 		company_liab_epl = (EPL_LIAB*)(findUnique("company|liab|epl"));
@@ -5844,12 +5148,6 @@ ADCO_ASSET_persistent_object::ADCO_ASSET_persistent_object(const xstring &modelC
 			ADCO_ASSET(modelClassName, isSm, owner, peer, mainRebase, name, arrayPersistentObj), 
 			mReadArray(true),
 			pfl(0)
-	, sm_bond_is(ADCO_ASSET::sm_bond_is)
-	, sm_bond_pv(ADCO_ASSET::sm_bond_pv)
-	, sm_bond_ym(ADCO_ASSET::sm_bond_ym)
-	, sm_mtg_is(ADCO_ASSET::sm_mtg_is)
-	, sm_mtg_pv(ADCO_ASSET::sm_mtg_pv)
-	, sm_mtg_ym(ADCO_ASSET::sm_mtg_ym)
 
 	{
 

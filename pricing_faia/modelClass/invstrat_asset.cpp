@@ -1,13 +1,12 @@
 ﻿
 //MODELCLASS BEGIN
+//MODELCLASS aa_comp_comp
 //MODELCLASS adco_asset
 //MODELCLASS ann_pba_pba
 //MODELCLASS asset_asset
-//MODELCLASS automation
 //MODELCLASS a_subport_asset
 //MODELCLASS bond_asset
 //MODELCLASS bond_cf_asset
-//MODELCLASS comp_comp
 //MODELCLASS eio_asset
 //MODELCLASS epa_asset
 //MODELCLASS epl_liab
@@ -15,16 +14,14 @@
 //MODELCLASS fiacarvm_liab
 //MODELCLASS fia_liab
 //MODELCLASS hdg_grp_comp
-//MODELCLASS intex_asset
 //MODELCLASS invstrat_asset
 //MODELCLASS liab_liab
+//MODELCLASS mrb_gaap
 //MODELCLASS mtg_asset
 //MODELCLASS mtg_cf_asset
 //MODELCLASS rates_economy
 //MODELCLASS seg_comp
-//MODELCLASS sfas133_gaap
 //MODELCLASS sfas97rd_gaap
-//MODELCLASS util_rafm
 //MODELCLASS END
 
 #if defined(MICROSOFT)
@@ -75,14 +72,13 @@ extern MemCount gMem;
 extern MY_DLL Parmfile *p;
 #include "column2.h"
 #include "ModelClass\invstrat_asset_udf.h"
+#include "ModelClass\aa_comp_comp.h"
 #include "ModelClass\adco_asset.h"
 #include "ModelClass\ann_pba_pba.h"
 #include "ModelClass\asset_asset.h"
-#include "ModelClass\automation.h"
 #include "ModelClass\a_subport_asset.h"
 #include "ModelClass\bond_asset.h"
 #include "ModelClass\bond_cf_asset.h"
-#include "ModelClass\comp_comp.h"
 #include "ModelClass\eio_asset.h"
 #include "ModelClass\epa_asset.h"
 #include "ModelClass\epl_liab.h"
@@ -90,15 +86,13 @@ extern MY_DLL Parmfile *p;
 #include "ModelClass\fiacarvm_liab.h"
 #include "ModelClass\fia_liab.h"
 #include "ModelClass\hdg_grp_comp.h"
-#include "ModelClass\intex_asset.h"
 #include "ModelClass\liab_liab.h"
+#include "ModelClass\mrb_gaap.h"
 #include "ModelClass\mtg_asset.h"
 #include "ModelClass\mtg_cf_asset.h"
 #include "ModelClass\rates_economy.h"
 #include "ModelClass\seg_comp.h"
-#include "ModelClass\sfas133_gaap.h"
 #include "ModelClass\sfas97rd_gaap.h"
-#include "ModelClass\util_rafm.h"
 #pragma optimize( "gs", on )
 
 #include "generatedCppHeader.h"
@@ -109,7 +103,7 @@ extern MY_DLL Parmfile *p;
 //Redundant includes only for snip test:
 //iomanip included for "setprecision()"
 #include <iomanip>
-#include <strstream> //WTW - Gen2
+#include <strstream>
 typedef vector<vector<string>> sowfinput;
 typedef vector<string> sowfcols;
 typedef map <xstring, long, less <xstring> > sowfmap;
@@ -120,7 +114,9 @@ typedef vector<vector<string>> deptaskinput;
 typedef vector<string> deptaskcols;
 typedef map <xstring, long, less <xstring> > deptaskmap;
 typedef deptaskmap::iterator deptaskmapiter;
-//extern MY_DLL strstream log_screen; //WTW - Gen2 - MY_DLL is not supported
+const int pv = 0;
+const int is = 1;
+const int ym = 2;
 const int EFFECTIVE_RATE = 0;
 const int EFFECTIVE_ANNUAL = 1;
 const int NOMINAL_SEMIANNUAL = 2;
@@ -138,9 +134,8 @@ const double LEAST_ANNUAL_GROWTH_RATE = -0.9999;
 const double LEAST_BOND_EQUIVALENT_RATE = 0.0001;
 const double SPOT_SHIFT_FOR_EFFECTIVE_DURATION_CALCULATION = 0.0001;
 const double ONE_MILLION = 1000000.0;
-//WTW - Gen2 - Move Extern definitions to rates header
-//const double MINIMUM_MONTHLY_YIELD_RATIO = -0.9; // annual yield = (1.0-0.9)^12 = 1.0e-12
-//const double MAXIMUM_MONTHLY_YIELD_RATIO	 = 999999999.0; // annual yield = (1.0+999999999.0)^12 = 1.0e+120
+const double MINIMUM_MONTHLY_YIELD_RATIO = -0.9; // annual yield = (1.0-0.9)^12 = 1.0e-12
+const double MAXIMUM_MONTHLY_YIELD_RATIO	 = 999999999.0; // annual yield = (1.0+999999999.0)^12 = 1.0e+120
 const int DECIMALS_TO_ROUND = 6;
 const int ROUND_NEGATIVE_TOZERO = 0;
 const int ROUND_NEAR = 1;
@@ -154,11 +149,10 @@ const int SUM_OVER_NEGATIVE = -101;
 const int TIER = -98;
 const int ANY_GROUP = -99;
 const bool DO_NOT_ISSUE_WARNINGS = false;
-//WTW - Gen2 - Move Extern definitions to rates header
-//const int CALL_CODE = 1; 
-//const int PUT_CODE = 2; 
-//const int CONTINUOUS_PAYOUT_CODE = 3;
-//const int FUTURES_CODE = 4;
+const int CALL_CODE = 1;
+const int PUT_CODE = 2;
+const int CONTINUOUS_PAYOUT_CODE = 3;
+const int FUTURES_CODE = 4;
 // Model point type
 const int NEW_PURCH = 0;
 const int INIT_MP = 1;
@@ -208,11 +202,13 @@ const int HEDGE_CASH_FLOW = 0;
 const int HEDGE_MKT_VAL = 1;
 const int HEDGE_ARRAY_SIZE = 2;
 // global calculation flags
-//extern bool pricing_flag;//WTW - Gen2 - Move Extern definitions to rates header
+extern bool pricing_flag;
 extern bool factors_flag;
 extern bool nb_flag;
 extern bool alm_flag;
 extern bool tcm_flag;
+extern bool pba_disc_rate_flag;
+extern int pba_segment_size;
 extern bool avr_flag;
 extern bool imr_flag;
 extern bool gaap_flag;
@@ -220,17 +216,12 @@ extern bool tgt_cap_flag;
 extern bool stoch_flag;
 extern bool valn_flag;
 extern bool time_step_flag;
-extern bool sfas133_valn_flag;
+extern bool mrb_valn_flag;
 extern bool sop031_valn_flag;
 extern bool sfas97rd_valn_flag;
-extern bool sfas97lp_valn_flag;
-extern bool sfas97lp_gpr_valn_flag;
 extern bool sfas91_valn_flag;
-extern bool sfas60_valn_flag;
-extern bool sfas60_gpr_valn_flag;
+extern bool gaap_ldti_valn_flag;
 extern bool sfas120_nlp_valn_flag;
-extern bool sfas120_valn_flag;
-extern bool sfas120_gpr_valn_flag;
 extern bool loc_gpr_valn_flag;
 extern bool pba_valn_flag;
 extern bool pba_scen_amt_valn_flag;
@@ -239,6 +230,7 @@ extern bool res_scen_amt_valn_flag;
 extern bool res_det_res_valn_flag;
 extern bool res_ag38_8d_valn_flag;
 extern bool std_scen_valn_flag;
+extern bool std_scen_prescribed_assump_flag;
 extern bool rbc_std_scen_valn_flag;
 extern bool rbc_std_scen_step2_valn_flag;
 extern bool res_std_scen_valn_flag;
@@ -261,33 +253,32 @@ extern double aggregate_amount_threshold;
 extern double model_point_amount_threshold;
 extern double rate_ratio_threshold;
 extern vector<string> valn_periods;
+
 // utility functions - elaborated in rates/economy externs
-//WTW - Gen2 - Move Extern definitions to rates header
-/*extern double round_result(int rounding, int negative, double x, int n);
+extern double round_result(int rounding, int negative, double x, int n);
 extern double factorial(int n);
 extern int n_choose_k(int n, int k);
 extern xstring check_date_format(const xstring &date);
+extern int month_from_day_number(int nSerialDate);
+extern int year_from_day_number(int nSerialDate);
+extern int day_from_day_number(int nSerialDate);
+extern int month_number_from_date(int year, int month); 
+extern int day_number_from_date(int nYear, int nMonth, int nDay);
 extern int get_mth_from_date(const xstring &date);
 extern int get_yr_from_date(const xstring &date);
 extern int get_day_from_date(const xstring &date);
-extern int month_from_day_number(int nSerialDate);//WTW - Gen2 - add new formula to replace unsupported MonthFromDayNumber() function
-extern int year_from_day_number(int nSerialDate);//WTW - Gen2 - add new formula to replace unsupported YearFromDayNumber() function
-extern int day_from_day_number(int nSerialDate);//WTW - Gen2 - add new formula to replace unsupported DayFromDayNumber() function
-extern int month_number_from_date(int year, int month); //WTW - Gen2 - add new formula to replace unsupported MonthNumberFromDate() function
-extern int day_number_from_date(int nYear, int nMonth, int nDay); //WTW - Gen2 - add new formula to replace unsupported DayNumberFromDate() function
 extern int get_end_of_mth_day(int yr, int mth);
 extern xstring add_mths_to_date(const xstring &date, int mths);
 extern int get_mth_from_adj_date(const xstring &date, int mths);
 extern double convert_rate_basis(double orig_rate, double orig_rate_basis, double new_rate_basis);
 extern double convert_decrem_rate_basis(double orig_rate, double orig_rate_basis, double new_rate_basis);
-extern long int determine_tbl_size(int sNumberOfDims, ...);
 extern xstring get_file_name(const xstring &source_file);
 extern xstring get_file_path(const xstring &source_file);
-extern xstring get_base_group_name(const xstring &tag, bool seriatim_flag = false);
+extern xstring get_base_group_name(const xstring &tag, bool split_flag = false);
 extern xstring get_string_of_date(double date);
 extern xstring get_string_of_enum_val(StrEnum::EnumValue type);
 extern int date_diff(xstring first_date, xstring second_date);
-extern int number_of_decimals(double xxx, int digits);//WTW - Gen2 - replace preprocessor #define with formula
+extern int number_of_decimals(double xxx,int digits);
 extern xstring write_string(double value, int string_length, int significant_digits);
 extern xstring write_array_to_string(SmartArray <double> value_array, int low, int high);
 extern void read_from_string(xstring temp_string, SmartArray <double> &temp_array);
@@ -308,25 +299,8 @@ extern double bs_opt_val_continuous_highest_gain(int call_or_put, double current
 extern double bs_opt_val_highest_gain(int call_or_put, double current_price, double observed_max, double observed_min, double strike_price, double length_of_sampling_period, int sampling_freq, double yrs_to_expiry, double risk_free_rate, double init_div_yld, double index_vol, int scen_int_freq, int scen_index_freq);
 extern double bs_opt_val_mthly_sum_cap(int crediting_mths, int known_index_vals, double sum_capped_amts,  double mthly_cap_rate, double yrs_to_expiry, double risk_free_rate, double init_div_yld, double index_vol, int scen_int_freq, int scen_index_freq);
 extern double cumul_bivariate_normal_distribn(double x, double y, double rho);
-extern double cumul_normal_distribn(double x);*/
+extern double cumul_normal_distribn(double x);
 
-// RAFM SQLite
-#ifndef _RAFMSQLITE_H_
-#define _RAFMSQLITE_H_
-
-#include <string>
-#include <vector>
-
-using namespace std;
-
-// 20210614 STW: upgrade to RAFM 2.9
-/*
-extern void openDatabase(string dbPath);
-extern void closeDatabase();
-extern string readCsvFile(string csvPath);
-extern void executeQuery(string sql, vector<string>& columns, vector<vector<string>>& results);
-*/
-#endif
 #endif
 extern int trace_wanted;
 
@@ -349,6 +323,15 @@ extern int pv_cp_asset_defn;
 extern int pv_cp_model_point;
 #endif
 
+sowmpoutput bond_state_of_world_header_mp_output;
+sowmpoutput mtg_state_of_world_header_mp_output;
+sowmpoutput sec_state_of_world_header_mp_output;
+sowmpoutput ird_state_of_world_header_mp_output;
+sowmpoutput re_state_of_world_header_mp_output;
+sowmpoutput eqt_state_of_world_header_mp_output;
+sowmpoutput eio_state_of_world_header_mp_output;
+sowmpoutput epa_state_of_world_header_mp_output;
+
 extern MY_DLL long scenario_number;
 extern MY_DLL long layer;
 extern MY_DLL2 int write_submodels;
@@ -360,7 +343,6 @@ extern const int& last_proj_task_loop;
 extern const int& proj_task_loop_num;
 extern const int& num_of_proj_task_loops;
 
-extern MY_DLL2 int use_overlay_code;
 extern MY_DLL int trace_level_wanted;
 extern MY_DLL int trace_level;
 extern MY_DLL bool bEmitTurboDebugger;
@@ -400,7 +382,6 @@ return proj_start_mth + t - 1
 
 }
 
-
 //@@ END
 
 //@@ START - cal_yr
@@ -425,7 +406,6 @@ return proj_start_yr + cal_yr_relative(t) - 1;
 
 }
 
-
 //@@ END
 
 //@@ START - cal_yr_relative
@@ -446,7 +426,6 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 return 1 + floor((proj_start_mth + t - 2) / 12.0);
 
 }
-
 
 //@@ END
 
@@ -469,14 +448,14 @@ if (t < 0)
 	return NO_AVG;
 
 if (t == 0)
-	return (seg->init_cash + seg->init_cash_addn)
-		   * seg->existing_asset_pct_to_use
-		   + seg->hedge_sale_amt(t)
-		   - seg->hedge_inv_amt_eom(t)
-		   - seg->hedge_exp(t);
+	return (seg_element->init_cash + seg_element->init_cash_addn)
+		   * seg_element->initial_asset_pct_to_use_time_step
+		   + seg_element->hedge_sale_amt(t)
+		   - seg_element->hedge_inv_amt_eom(t)
+		   - seg_element->hedge_exp(t);
 
 // Cash flow for investment final
-double cash_flow_for_inv_final = seg->cash_flow_for_inv(t);
+double cash_flow_for_inv_final = seg_element->cash_flow_for_inv(t);
 
 // Ensure negative cash flow strategy for period is selected
 neg_cash_flow_strat_set(t);
@@ -498,11 +477,9 @@ else if (cash_flow_for_asset_purch(t) < 0
 		   - inv_amt(t)
 		   - interim_cash(t);
 
-
 return cash;
 
 }
-
 
 //@@ END
 
@@ -526,12 +503,14 @@ if (t <= 0)
 
 double cash_avail_for_inv = cash_flow_for_inv(t) - cash_incr(t);
 
+seg_id = seg_id;
+double inv_amt_min_local = inv_amt_min;
 double cash_for_investment_eom = 0.0;
 
 if (inv_eom_flag(t))
 	cash_for_investment_eom	= cash_avail_for_inv;
 
-if (cash_for_investment_eom >= inv_amt_min
+if (cash_for_investment_eom >= inv_amt_min_local
 	&& cash_for_investment_eom > 0.0
 	&& !use_dur_match_strat(t))
 	{
@@ -540,7 +519,7 @@ if (cash_for_investment_eom >= inv_amt_min
 	}
 
 if (asset->asset_detail_rpt_inv_strat_flag(t))
-	seg->SALFile << endl
+	seg_element->SALFile << endl
 				 << "EOM Cash For Asset Purchases" << endl
 				 << "SelectedStrat," << inv_strat_id << endl
 				 << "CashTgtPct," << cash_tgt_pct << endl
@@ -553,7 +532,6 @@ if (asset->asset_detail_rpt_inv_strat_flag(t))
 return cash_for_investment_eom;
 
 }
-
 
 //@@ END
 
@@ -592,7 +570,7 @@ else if (!use_dur_match_strat(t))
 	inv_strat_select(t, CURRENT, DO_NOT_ISSUE_WARNINGS, warnings);
 
 if (asset->asset_detail_rpt_inv_strat_flag(t))
-	seg->SALFile << endl
+	seg_element->SALFile << endl
 				 << "EOM Cash Flow For Investment" << endl 
 				 << "CashFlowForInvBefRebal," << cash_flow_for_inv_bef_rebal(t) << endl 
 				 << "(+) RebalNetCashFlow," << cash_flow_rebal(t) << endl
@@ -601,7 +579,6 @@ if (asset->asset_detail_rpt_inv_strat_flag(t))
 return local_cash_flow_for_inv_eom;
 
 }
-
 
 //@@ END
 
@@ -625,13 +602,13 @@ if (t <= 0)
 
 double cash_flow_for_inv_bef_rebal = 0.0;
 
-double liab_cash_flow = seg->liab_cash_flow(t);
-double asset_cash_flow_bef_sale = seg->asset_cash_flow_bef_sale(t);
+double liab_cash_flow = seg_element->liab_cash_flow(t);
+double asset_cash_flow_bef_sale = seg_element->asset_cash_flow_bef_sale(t);
 double interim_cash = this->interim_cash(t - 1);
 double plan_sale_cash_flow = cash_flow_planned_sale(t);
 double hedge_sale_cash_flow = cash_flow_hedge_sale(t);
-double hedge_inv_cash_flow_eom = seg->hedge_inv_amt_eom(t);
-double hedge_exp_eom = seg->hedge_exp(t);
+double hedge_inv_cash_flow_eom = seg_element->hedge_inv_amt_eom(t);
+double hedge_exp_eom = seg_element->hedge_exp(t);
 
 double tax_cash_flow = 0.0;
 double distribn_cash_flow = 0.0;
@@ -639,15 +616,15 @@ double contribn_from_business_seg = 0.0;
 
 if (sale_possible_imr_avr_flag(t))
 	{
-	tax_cash_flow = seg->tax_bef_sale(t);
-	distribn_cash_flow = seg->distribn_bef_sale(t);
-	contribn_from_business_seg = seg->contribn_from_business_seg_bef_sale(t);
+	tax_cash_flow = seg_element->tax_bef_sale(t);
+	distribn_cash_flow = seg_element->distribn_bef_sale(t);
+	contribn_from_business_seg = seg_element->contribn_from_business_seg_bef_sale(t);
 	}	
 else 
 	{
-	tax_cash_flow = seg->tax(t);
-	distribn_cash_flow = seg->distribn(t);
-	contribn_from_business_seg = seg->contribn_from_business_seg(t);
+	tax_cash_flow = seg_element->tax(t);
+	distribn_cash_flow = seg_element->distribn(t);
+	contribn_from_business_seg = seg_element->contribn_from_business_seg(t);
 	}
 
 cash_flow_for_inv_bef_rebal
@@ -664,26 +641,26 @@ cash_flow_for_inv_bef_rebal
 
 if (asset->asset_detail_rpt_inv_strat_flag(t))
 	{
-	seg->SALFile << endl;
-	seg->SALFile << "EOM Cash Flow For Investment Before Rebalancing" 
+	seg_element->SALFile << endl;
+	seg_element->SALFile << "EOM Cash Flow For Investment Before Rebalancing" 
 				 << " (Period=" << t << " "
 				 << " Year=" << xint(cal_yr(t))
 				 << " Month=" << xint(cal_mth(t))
 				 << ")"
 				 << endl;
-	seg->SALFile << "LiabilityCashFlow," << liab_cash_flow << endl
+	seg_element->SALFile << "LiabilityCashFlow," << liab_cash_flow << endl
 				 << "(+) InterimCash," << interim_cash << endl
 				 << "(+) AssetCashFlowBefSales," << asset_cash_flow_bef_sale << endl;
 
 	if (sale_possible_imr_avr_flag(t))
-		seg->SALFile << "(-) MthlyTaxableIncTaxBefSale," << tax_cash_flow << endl
+		seg_element->SALFile << "(-) MthlyTaxableIncTaxBefSale," << tax_cash_flow << endl
 					 << "(-) DistribnBefSale," << distribn_cash_flow << endl;
 	else
-		seg->SALFile << "(-) MthlyTaxableIncTax," << tax_cash_flow << endl
+		seg_element->SALFile << "(-) MthlyTaxableIncTax," << tax_cash_flow << endl
 					 << "(-) Distribn," << distribn_cash_flow << endl
  					 << "(+) ContribFromBusSeg," << contribn_from_business_seg << endl;
 
-	seg->SALFile << "(+) PlannedSalesNetCashFlow," << plan_sale_cash_flow << endl
+	seg_element->SALFile << "(+) PlannedSalesNetCashFlow," << plan_sale_cash_flow << endl
 				 << "(+) HedgeSalesCashFlow," << hedge_sale_cash_flow << endl
 				 << "(-) HedgeInvCashFlow," << hedge_inv_cash_flow_eom << endl
 				 << "(-) HedgeExpenses," << hedge_exp_eom << endl
@@ -693,7 +670,6 @@ if (asset->asset_detail_rpt_inv_strat_flag(t))
 return cash_flow_for_inv_bef_rebal;
 
 }
-
 
 //@@ END
 
@@ -717,13 +693,12 @@ if (t <= 0)
 
 double cash_flow_hedge_sale = 0.0;
 
-if (seg->business_seg_flag)
-	cash_flow_hedge_sale = seg->hedge_sale_amt(t);
+if (seg_element->business_seg_flag)
+	cash_flow_hedge_sale = seg_element->hedge_sale_amt(t);
 
 return cash_flow_hedge_sale;
 
 }
-
 
 //@@ END
 
@@ -755,8 +730,8 @@ if (!sale_planned_or_min_size_flag(t))
 
 if (asset->asset_detail_rpt_inv_strat_flag(t))
 	{
-	seg->SALFile << endl;
-	seg->SALFile << "Planned and Minimum Asset Sales"
+	seg_element->SALFile << endl;
+	seg_element->SALFile << "Planned and Minimum Asset Sales"
 			     << " Period=" << t
 			     << " Year=" << xint(cal_yr(t))
 			     << " Month=" << xint(cal_mth(t))
@@ -772,7 +747,6 @@ return sell_assets_control(t,
                            0.0); // required_amount
 
 }
-
 
 //@@ END
 
@@ -791,12 +765,20 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 //^^^
 
 #line 1 "cash_flow_rebal.INVSTRAT_ASSET.for"
-if (t <= 0 || rebal_freq == NOT_APPLICABLE)
+if (t <= 0)
+	return NO_AVG;
+
+seg_id = seg_id;
+StrEnum::EnumValue rebal_freq_local = rebal_freq;
+seg_id = seg_id;
+StrEnum::EnumValue rebal_dur_match_defn_local = rebal_dur_match_defn;
+
+if (rebal_freq_local == NOT_APPLICABLE)
 	return NO_AVG;
 
 bool tmpFalseBool = false;
 
-if (rebal_dur_match_defn == NO)
+if (rebal_dur_match_defn_local == NO)
 	inv_strat_select(t, CURRENT, DO_NOT_ISSUE_WARNINGS, tmpFalseBool);
 else if (!use_dur_match_strat(t))
 	inv_strat_select(t, CURRENT, DO_NOT_ISSUE_WARNINGS, tmpFalseBool);
@@ -808,8 +790,8 @@ if (asset_sub_port_distribn_defn == CASH
 
 if (asset->asset_detail_rpt_inv_strat_flag(t))
 	{
-	seg->SALFile << endl;
-	seg->SALFile << "EOM Rebalancing Sales" 
+	seg_element->SALFile << endl;
+	seg_element->SALFile << "EOM Rebalancing Sales" 
 				 << " (Period=" << t << " "
 				 << " Year=" << xint(cal_yr(t))
 				 << " Month=" << xint(cal_mth(t))
@@ -831,7 +813,6 @@ return net_cash_flow_local;
 
 }
 
-
 //@@ END
 
 //@@ START - cash_flow_rebal_estimate
@@ -849,14 +830,14 @@ double INVSTRAT_ASSET_UDF::invstrat_asset_cash_flow_rebal_estimate(int t) {
 
 #line 1 "cash_flow_rebal_estimate.INVSTRAT_ASSET.for"
 if (t <= 0)
-	return NO_AVG;
+	return 0.0;
 
 if (mths_to_rebal(t) > 0)
 	return 0.0;
 
 if (asset->asset_detail_rpt_inv_strat_flag(t))
 	{
-	seg->SALFile << endl
+	seg_element->SALFile << endl
 	 			 << "EOM Expected Rebalancing Sales:"
 				 << " Period=" << t
 				 << " Year=" << xint(cal_yr(t))
@@ -871,7 +852,6 @@ clear_expected_sale_vars(t);
 return cash_investment_sale_net_prelim(t);
 
 }
-
 
 #undef NO_AVG
 #define NO_AVG The_Real_NO_AVG
@@ -899,13 +879,13 @@ if (t <= 0)
 double investable_assets = 0.0;
 
 double bk_val
-= seg->sum_over_assets("bk_val_bef_neg_cash_flow_sale", t, SUM_OVER_ALL, 
+= seg_element->sum_over_assets("bk_val_bef_neg_cash_flow_sale", t, SUM_OVER_ALL, 
 		SUM_OVER_ALL, SUM_OVER_ALL, BEFORE_NCF_SALE);
 double accr_int
-= seg->sum_over_assets("accr_int_bef_neg_cash_flow_sale", t, SUM_OVER_ALL, 
+= seg_element->sum_over_assets("accr_int_bef_neg_cash_flow_sale", t, SUM_OVER_ALL, 
 		SUM_OVER_ALL, SUM_OVER_ALL, BEFORE_NCF_SALE);
 double accr_rent
-= seg->sum_over_assets("accr_rent_bef_neg_cash_flow_sale", t, SUM_OVER_ALL, 
+= seg_element->sum_over_assets("accr_rent_bef_neg_cash_flow_sale", t, SUM_OVER_ALL, 
 		SUM_OVER_ALL, SUM_OVER_ALL, BEFORE_NCF_SALE);
 
 investable_assets = bk_val
@@ -937,28 +917,11 @@ else if (neg_cash_flow_cash_bal_defn == TARGETED_CASH_BALANCE)
 	cash_threshold = investable_assets
 		             * cash_tgt_pct;
 
+//20250527 CRBG logic
+double c4_adj = seg_element->rbc_c4(t) * company->tgt_cap_rbc_mult * seg_element->tgt_cap_pct_inv_in_seg;
+
 // Cash increase
 double cash_incr = 0.0;
-
-// 20220315 LYF START
-double c4_adj;
-if(rbc_c4_method == "Use RBC C4")
-{
-	c4_adj = seg -> rbc_c4(t) * company->tgt_cap_rbc_mult * seg->tgt_cap_pct_inv_in_seg;
-}
-else if(rbc_c4_method == "Use RBC C4 Change")
-{
-	c4_adj = (seg -> rbc_c4(t) - seg -> rbc_c4(t - 1)) * company->tgt_cap_rbc_mult * seg->tgt_cap_pct_inv_in_seg;
-}
-else if(rbc_c4_method == "None")
-{
-	c4_adj = 0.0;
-}
-else
-{
-	throw FatalError("cash_incr used the wrong RBC C4 method. Please Check.");
-}
-// 20220315 LYF END
 
 if (neg_cash_flow_strat != NEGATIVE_ASSETS
 	&& investable_assets_bef_rebal(t) < 0.0)
@@ -970,25 +933,11 @@ else if (cash_flow_for_inv(t) >= 0.0
 		     && (neg_cash_flow_strat == BORROW
 			     || (asset->mths_to_asset_sale(t) > 0
 				     && neg_cash_flow_strat == SELL_ASSETS_TO_COVER_NEGATIVE_CASH_BALANCE))))
-	{
-		// 20210607 STW: import IA Prod v3.0 RSD v2 change and wrap it with a flag. The code has not been tested yet.
-		if(ia_prod_v3_rsd_2_defer_cf_aig == YES)
-		{
-			cash_incr
-			= min(cash_flow_for_inv(t),
-				  investable_assets * cash_tgt_pct + seg->opt_payoff_aig(t)   // add by HYH on 6/1/2021 to hold the opt_payoff_aig until next month after option purchase
-				  + c4_adj // 20220315 LYF 
-				  - cash(t - 1));
-		}
-		else
-		{
-			cash_incr
-			= min(cash_flow_for_inv(t),
-				  investable_assets * cash_tgt_pct 
-				  + c4_adj  // 20220315 HYH 
-				  - cash(t - 1));
-		}
-	}
+	cash_incr
+	= min(cash_flow_for_inv(t),
+		  investable_assets * cash_tgt_pct
+		  + seg_element->opt_payoff_crbg(t) + c4_adj
+		  - cash(t - 1));
 else if (cash_flow_for_inv(t) < 0.0
 		 && neg_cash_flow_cash_bal_defn == TARGETED_CASH_BALANCE
 		 && (neg_cash_flow_strat == NEGATIVE_ASSETS
@@ -998,7 +947,7 @@ else if (cash_flow_for_inv(t) < 0.0
 	= min(0.0,
 	      investable_assets
 		  * cash_tgt_pct
-		  + c4_adj  // 20220315 HYH 
+		  + c4_adj
 		  - cash(t - 1));
 else if (cash_flow_for_inv(t) < 0
 		 && (neg_cash_flow_cash_bal_defn == REDUCE_CASH_BALANCE_TO_THRESHOLD 
@@ -1010,15 +959,13 @@ else if (cash_flow_for_inv(t) < 0
 	= min(max(cash_flow_for_inv(t),
 			  cash_threshold
 			  - cash(t - 1)),
-		  max(investable_assets * cash_tgt_pct
-			  + c4_adj,  // 20220315 HYH 
+		  max(investable_assets * cash_tgt_pct + c4_adj,
 			  cash_threshold)
 			  - cash(t - 1));
 
 return cash_incr;
 
 }
-
 
 //@@ END
 
@@ -1040,14 +987,19 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 if (t <= 0)
 	return NO_AVG;
 
+seg_id = seg_id;
+StrEnum::EnumValue rebal_freq_local = rebal_freq;
+
 if (!inv_eom_flag(t)
-	|| rebal_freq == NOT_APPLICABLE
+	|| rebal_freq_local == NOT_APPLICABLE
 	|| mths_to_rebal(t) > 0)
 	return NO_AVG;
 
 bool warnings = false;
+seg_id = seg_id;
+StrEnum::EnumValue rebal_dur_match_defn_local = rebal_dur_match_defn;
 	
-if (rebal_dur_match_defn == NO)
+if (rebal_dur_match_defn_local == NO)
 	inv_strat_select(t, CURRENT, DO_NOT_ISSUE_WARNINGS, warnings);
 
 else if (!use_dur_match_strat(t))
@@ -1056,7 +1008,6 @@ else if (!use_dur_match_strat(t))
 return rebal_sale(t, YES); // Sell assets
 
 }
-
 
 //@@ END
 
@@ -1075,22 +1026,26 @@ double INVSTRAT_ASSET_UDF::invstrat_asset_cash_investment_sale_net_prelim(int t)
 
 #line 1 "cash_investment_sale_net_prelim.INVSTRAT_ASSET.for"
 if (t <= 0)
-	return NO_AVG;
+	return 0.0;
+
+seg_id = seg_id;
+StrEnum::EnumValue rebal_freq_local = rebal_freq;
 
 if (!inv_eom_flag(t)
-	|| rebal_freq == NOT_APPLICABLE
+	|| rebal_freq_local == NOT_APPLICABLE
 	|| mths_to_rebal(t) > 0)
 	return 0.0;
 
 bool warnings = false;
+seg_id = seg_id;
+StrEnum::EnumValue rebal_dur_match_defn_local = rebal_dur_match_defn;
 	
-if (rebal_dur_match_defn == NO)
+if (rebal_dur_match_defn_local == NO)
 	inv_strat_select(t, CURRENT, DO_NOT_ISSUE_WARNINGS, warnings);
 
 return rebal_sale(t, NO); // Not selling assets
 
 }
-
 
 #undef NO_AVG
 #define NO_AVG The_Real_NO_AVG
@@ -1140,13 +1095,13 @@ initialize_sale_and_inv_vars_eom(t);
 
 if (asset->asset_detail_rpt_inv_strat_flag(t))
 	{
-	seg->SALFile << endl;
-	seg->SALFile << "Negative Cash Flow Sales"
+	seg_element->SALFile << endl;
+	seg_element->SALFile << "Negative Cash Flow Sales"
 				 << " Period=" << t
 				 << " Year=" << xint(cal_yr(t))
 				 << " Month=" << xint(cal_mth(t))
 				 << endl;
-	seg->SALFile << " ... Negative Cash Flow Strategy = " << inv_strat_id
+	seg_element->SALFile << " ... Negative Cash Flow Strategy = " << inv_strat_id
 				 << endl;
 	asset_detail_rpt_individual_sale(t, HEADER);
 	}
@@ -1229,7 +1184,7 @@ for (class_priority_level = 1;
 
 if (asset->asset_detail_rpt_inv_strat_flag(t))
 	{
-	seg->SALFile << " ... " << setw(14) << setprecision(2) << net_cash_from_sales
+	seg_element->SALFile << " ... " << setw(14) << setprecision(2) << net_cash_from_sales
 				 << "  Net Cash From Negative Cash Flow Sales"
 				 << endl;
 	}
@@ -1237,7 +1192,6 @@ if (asset->asset_detail_rpt_inv_strat_flag(t))
 return net_cash_from_sales;
 
 }
-
 
 //@@ END
 
@@ -1261,10 +1215,9 @@ int year = cal_yr(t);
 int month = cal_mth(t);
 int day = 1;
 
-return DayNumberFromDate(year, month, day);
+return day_number_from_date(year, month, day);
 
 }
-
 
 //@@ END
 
@@ -1291,7 +1244,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - dur_final_port
@@ -1306,9 +1258,7 @@ double INVSTRAT_ASSET_UDF::invstrat_asset_dur_final_port(int t) {
 //^^^
 
 #line 1 "dur_final_port.INVSTRAT_ASSET.for"
-if (t <= 0
-	//20220613 STW: add a condition for model efficiency improvement
-	|| fast_stat_calc_aig == YES)
+if (t <= 0 || company->calc_eff_dur_crbg == NO)
 	return NO_AVG;
 
 // forced calls for reporting
@@ -1316,11 +1266,11 @@ mkt_val_sale_for_dur_match(t);
 mkt_val_purch_for_dur_match(t);
 
 double duration_numerator
-= seg->sum_over_assets("mkt_val_times_eff_dur", t, SUM_OVER_ALL, 
+= seg_element->sum_over_assets("mkt_val_times_eff_dur", t, SUM_OVER_ALL, 
 					   SUM_OVER_ALL, INVESTMENT_FUND_INDEX, END_OF_PERIOD);
 
 double duration_denominator
-= seg->sum_over_assets("mkt_val_for_eff_dur", t, SUM_OVER_ALL, 
+= seg_element->sum_over_assets("mkt_val_for_eff_dur", t, SUM_OVER_ALL, 
 					   SUM_OVER_ALL, INVESTMENT_FUND_INDEX, END_OF_PERIOD);
 
 if (fabs(duration_denominator) < model_point_amount_threshold)
@@ -1329,7 +1279,6 @@ if (fabs(duration_denominator) < model_point_amount_threshold)
 return duration_numerator / duration_denominator;
 
 }
-
 
 //@@ END
 
@@ -1345,14 +1294,8 @@ double INVSTRAT_ASSET_UDF::invstrat_asset_dur_match_flag(int t) {
 //^^^
 
 #line 1 "dur_match_flag.INVSTRAT_ASSET.for"
-if (t <= 0)
+if (t <= 0 || company->calc_eff_dur_crbg == NO)
 	return NO_AVG;
-
-//20220613 STW: model efficiency improvement
-if(fast_stat_calc_aig == YES)
-{
-	return 0;
-}
 
 // Initialize strategy set (if necessary)
 inv_strat_set(t);
@@ -1366,7 +1309,6 @@ if (asset->mths_to_next_mkt_val_calc(t) == 0
 return 0;
 
 }
-
 
 //@@ END
 
@@ -1391,12 +1333,13 @@ if (t <= 0 || asset->mths_to_next_mkt_val_calc(t) > 0)
 // Select investment strategy set, which determines dur_match_tgt_incr input variable.
 inv_strat_set(t);
 
-double target = dur_match_tgt_input + dur_match_tgt_incr;
+date_lookup = date(t);
+double dur_match_tgt_local = dur_match_tgt_input;
+
+double target = dur_match_tgt_local + dur_match_tgt_incr;
 
 if (data_validation_defn == YES	&& target < 0.0)
-	{
-	makeRunLogYellow();
-		
+	{		
 	log_screen << "Warning: Duration matching target is negative for t = " << t
 	           << ", and has been set to zero."
 			   << MSG_USER;
@@ -1405,7 +1348,6 @@ if (data_validation_defn == YES	&& target < 0.0)
 return max(0.0, target);
 
 }
-
 
 //@@ END
 
@@ -1430,12 +1372,13 @@ if (t <= 0 || asset->mths_to_next_mkt_val_calc(t) > 0)
 // Select investment strategy set, which determines dur_match_tolerance_incr input variable.
 inv_strat_set(t);
 
-double tolerance = dur_match_tolerance_input + dur_match_tolerance_incr;
+date_lookup = date(t);
+double dur_match_tolerance_local = dur_match_tolerance_input;
+
+double tolerance = dur_match_tolerance_local + dur_match_tolerance_incr;
 
 if (data_validation_defn == YES && tolerance < 0.0)
-	{
-	makeRunLogYellow();
-		
+	{		
 	log_screen << "Warning: Duration matching tolerance is negative for t = " << t
 	           << ", and has been set to zero."
 			   << MSG_USER;
@@ -1444,7 +1387,6 @@ if (data_validation_defn == YES && tolerance < 0.0)
 return max(0.0, tolerance);
 
 }
-
 
 //@@ END
 
@@ -1461,41 +1403,6 @@ double INVSTRAT_ASSET_UDF::invstrat_asset_finalize(int t) {
 
 #line 1 "finalize.INVSTRAT_ASSET.for"
 #if defined (__BOND_ASSET_H_) || defined (__MTG_ASSET_H_) || defined (__SEC_ASSET_H_)
-// Shrink asset model point clones, if necessary
-if (!is_last_proj_task_loop
-	&& pv_model_point >= 0)
-	{
-	if (pv_asset_defn == MORTGAGE_CODE)
-		{
-		#if defined(__MTG_ASSET_H_)
-		if (asset->sm_mtg.size() > 0)
-			asset->sm_mtg[0]->shrink_mtg_clone(pv_model_point);
-		else
-		; // Place-holder
-		#endif
-		}
-
-	else if (pv_asset_defn == BOND_CODE)
-		{
-		#if defined(__BOND_ASSET_H_)
-		if (asset->sm_bond.size() > 0)
-			asset->sm_bond[0]->shrink_bond_clone(pv_model_point);
-		else
-		; // Place-holder
-		#endif
-		}
-
-	else if (pv_asset_defn == SEC_CODE)
-		{
-		#if defined(__SEC_ASSET_H_)
-		if (asset->sm_sec.size() > 0)
-			asset->sm_sec[0]->shrink_sec_clone(pv_model_point);
-		else
-		; // Place-holder
-		#endif
-		}
-	}
-
 pv_asset_defn = -1;
 pv_model_point = -1;
 
@@ -1508,20 +1415,21 @@ pv_cp_model_point = -1;
 
 // Call finalize for individual assets
 int mp = 0;
-mpmap::iterator mp_map_iter;
+map <int, long, less <int> >::iterator mp_map_iter;
 
 #if defined(__BOND_ASSET_H_)
 if (asset->sm_bond.size())
 	{
-	BOND_ASSET *bond_element = NULL;
+    if (time_step_flag && !valn_flag
+            && proj_set_sub_loop_num < valn_periods.size())
+            write_bond_state_of_world_header_mp();
 
-	for (mp_map_iter = seg->bond_mp_map_active.begin();
-		 mp_map_iter != seg->bond_mp_map_active.end();
+	for (mp_map_iter = seg_element->bond_mp_map_active.begin();
+		 mp_map_iter != seg_element->bond_mp_map_active.end();
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		bond_element = asset->sm_bond[mp];
-		bond_element->finalize(last_proj_period);	
+		asset->sm_bond[mp][0]->finalize(t);
 		}
 	}
 #endif
@@ -1529,16 +1437,16 @@ if (asset->sm_bond.size())
 #if defined(__MTG_ASSET_H_)
 if (asset->sm_mtg.size())
 	{
-	MTG_ASSET *mtg_element = NULL;
+    if (time_step_flag && !valn_flag
+            && proj_set_sub_loop_num < valn_periods.size())
+            write_mtg_state_of_world_header_mp();
 	
-	for (mp_map_iter = seg->mtg_mp_map_active.begin();
-		 mp_map_iter != seg->mtg_mp_map_active.end();
+	for (mp_map_iter = seg_element->mtg_mp_map_active.begin();
+		 mp_map_iter != seg_element->mtg_mp_map_active.end();
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		mtg_element = asset->sm_mtg[mp];
-
-		mtg_element->finalize(last_proj_period);		
+		asset->sm_mtg[mp][0]->finalize(t);
 		}
 	}
 #endif
@@ -1546,16 +1454,16 @@ if (asset->sm_mtg.size())
 #if defined(__SEC_ASSET_H_)
 if (asset->sm_sec.size())
 	{
-	SEC_ASSET *sec_element = NULL;
-	
-	for (mp_map_iter = seg->sec_mp_map_active.begin();
-		 mp_map_iter != seg->sec_mp_map_active.end();
+    if (time_step_flag && !valn_flag
+            && proj_set_sub_loop_num < valn_periods.size())
+            write_sec_state_of_world_header_mp();
+				
+	for (mp_map_iter = seg_element->sec_mp_map_active.begin();
+		 mp_map_iter != seg_element->sec_mp_map_active.end();
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		sec_element = asset->sm_sec[mp];
-
-		sec_element->finalize(last_proj_period);		
+		asset->sm_sec[mp]->finalize(t);	
 		}
 	}
 #endif
@@ -1563,16 +1471,16 @@ if (asset->sm_sec.size())
 #if defined(__IRD_ASSET_H_)
 if (asset->sm_ird.size())
 	{
-	IRD_ASSET *ird_element = NULL;
+    if (time_step_flag && !valn_flag
+            && proj_set_sub_loop_num < valn_periods.size())
+            write_ird_state_of_world_header_mp();
 	
-	for (mp_map_iter = seg->ird_mp_map_active.begin();
-		 mp_map_iter != seg->ird_mp_map_active.end();
+	for (mp_map_iter = seg_element->ird_mp_map_active.begin();
+		 mp_map_iter != seg_element->ird_mp_map_active.end();
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		ird_element = asset->sm_ird[mp];
-
-		ird_element->finalize(last_proj_period);		
+		asset->sm_ird[mp][0]->finalize(t);	
 		}
 	}
 #endif
@@ -1580,16 +1488,16 @@ if (asset->sm_ird.size())
 #if defined(__RE_ASSET_H_)
 if (asset->sm_re.size())
 	{
-	RE_ASSET *re_element = NULL;
+    if (time_step_flag && !valn_flag
+            && proj_set_sub_loop_num < valn_periods.size())
+            write_re_state_of_world_header_mp();
 	
-	for (mp_map_iter = seg->re_mp_map_active.begin();
-		 mp_map_iter != seg->re_mp_map_active.end();
+	for (mp_map_iter = seg_element->re_mp_map_active.begin();
+		 mp_map_iter != seg_element->re_mp_map_active.end();
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		re_element = asset->sm_re[mp];
-
-		re_element->finalize(last_proj_period);		
+		asset->sm_re[mp]->finalize(t);
 		}
 	}
 #endif
@@ -1597,16 +1505,16 @@ if (asset->sm_re.size())
 #if defined(__EQT_ASSET_H_)
 if (asset->sm_eqt.size())
 	{
-	EQT_ASSET *eqt_element = NULL;
+    if (time_step_flag && !valn_flag
+            && proj_set_sub_loop_num < valn_periods.size())
+            write_eqt_state_of_world_header_mp();
 	
-	for (mp_map_iter = seg->eqt_mp_map_active.begin();
-		 mp_map_iter != seg->eqt_mp_map_active.end();
+	for (mp_map_iter = seg_element->eqt_mp_map_active.begin();
+		 mp_map_iter != seg_element->eqt_mp_map_active.end();
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		eqt_element = asset->sm_eqt[mp];
-
-		eqt_element->finalize(last_proj_period);		
+		asset->sm_eqt[mp]->finalize(t);	
 		}
 	}
 #endif
@@ -1614,16 +1522,16 @@ if (asset->sm_eqt.size())
 #if defined(__EIO_ASSET_H_)
 if (asset->sm_eio.size())
 	{
-	EIO_ASSET *eio_element = NULL;
-	
-	for (mp_map_iter = seg->eio_mp_map_active.begin();
-		 mp_map_iter != seg->eio_mp_map_active.end();
+    if (time_step_flag && !valn_flag
+            && proj_set_sub_loop_num < valn_periods.size())
+            write_eio_state_of_world_header_mp();
+				
+	for (mp_map_iter = seg_element->eio_mp_map_active.begin();
+		 mp_map_iter != seg_element->eio_mp_map_active.end();
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		eio_element = asset->sm_eio[mp];
-
-		eio_element->finalize(last_proj_period);		
+		asset->sm_eio[mp][0]->finalize(t);	
 		}
 	}
 #endif
@@ -1631,33 +1539,27 @@ if (asset->sm_eio.size())
 #if defined(__EPA_ASSET_H_)
 if (asset->sm_epa.size())
 	{
-	EPA_ASSET *epa_element = NULL;
+    if (time_step_flag && !valn_flag
+            && proj_set_sub_loop_num < valn_periods.size())
+            write_epa_state_of_world_header_mp();
 	
-	for (mp_map_iter = seg->epa_mp_map_active.begin();
-		 mp_map_iter != seg->epa_mp_map_active.end();
+	for (mp_map_iter = seg_element->epa_mp_map_active.begin();
+		 mp_map_iter != seg_element->epa_mp_map_active.end();
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		epa_element = asset->sm_epa[mp];
-
-		epa_element->finalize(last_proj_period);		
+		asset->sm_epa[mp]->finalize(t);	
 		}
 	}
 #endif
 
-if (seg->SALFile != NULL)
-	seg->SALFile.close();
-
-if (PVCFile != NULL)
-	PVCFile.close();
-
-if (YMFile != NULL)
-	YMFile.close();
+seg_element->SALFile.close();
+PVCFile.close();
+YMFile.close();
 
 return 1;
 
 }
-
 
 //@@ END
 
@@ -1679,11 +1581,10 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 if (t <= 0)
 	return NO_AVG;
 
-return seg->sum_over_assets("foreclosure_bk_val_net_write_down", t, SUM_OVER_ALL, 
+return seg_element->sum_over_assets("foreclosure_bk_val_net_write_down", t, SUM_OVER_ALL, 
 							SUM_OVER_ALL, INVESTMENT_FUND_INDEX, BEFORE_SALE);
 
 }
-
 
 //@@ END
 
@@ -1705,11 +1606,10 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 if (t <= 0)
 	return NO_AVG;
 
-return seg->sum_over_assets("foreclosure_bk_val_net_write_down_neg_asset", t, SUM_OVER_ALL, 
+return seg_element->sum_over_assets("foreclosure_bk_val_net_write_down_neg_asset", t, SUM_OVER_ALL, 
 							SUM_OVER_ALL, INVESTMENT_FUND_INDEX, BEFORE_SALE);
 
 }
-
 
 //@@ END
 
@@ -1738,7 +1638,7 @@ if (asset_id < 0)
 	return NO_AVG;
 
 double aggregate_cost_basis_net_of_write_down
-= seg->sum_over_assets("foreclosure_cost_basis_net_write_down", t, SUM_OVER_ALL, 
+= seg_element->sum_over_assets("foreclosure_cost_basis_net_write_down", t, SUM_OVER_ALL, 
 					   SUM_OVER_ALL, INVESTMENT_FUND_INDEX, BEFORE_SALE);
 
 if (fabs(aggregate_cost_basis_net_of_write_down) < model_point_amount_threshold)
@@ -1770,8 +1670,8 @@ if (asset->asset_detail_rpt_pv_defn == YES
 if (asset->asset_detail_rpt_inv_strat_defn == YES
 	&& asset->asset_detail_rpt_flag(t))
 	{
-	seg->SALFile << endl;
-	seg->SALFile << "Purchasing Foreclosure Assets"
+	seg_element->SALFile << endl;
+	seg_element->SALFile << "Purchasing Foreclosure Assets"
 				 << " period=" << t
 				 << endl;
 	asset_detail_rpt_buy_purch_asset(t, HEADER);
@@ -1811,7 +1711,7 @@ else
 
 	// purchase positive asset
 	refinance_foreclosure_restructure_cost_basis
-	= foreclosure_cost_basis_net_write_down(t)
+	= aggregate_cost_basis_net_of_write_down
 	  - foreclosure_cost_basis_net_write_down_neg_asset(t);
 
 	refinance_foreclosure_restructure_bk_val
@@ -1844,7 +1744,6 @@ return aggregate_cost_basis_net_of_write_down;
 
 }
 
-
 //@@ END
 
 //@@ START - foreclosure_cost_basis_net_write_down_neg_asset
@@ -1865,11 +1764,10 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 if (t <= 0)
 	return NO_AVG;
 
-return seg->sum_over_assets("foreclosure_cost_basis_net_write_down_neg_asset", t, SUM_OVER_ALL, 
+return seg_element->sum_over_assets("foreclosure_cost_basis_net_write_down_neg_asset", t, SUM_OVER_ALL, 
 							SUM_OVER_ALL, INVESTMENT_FUND_INDEX, BEFORE_SALE);
 
 }
-
 
 //@@ END
 
@@ -1891,11 +1789,10 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 if (t <= 0)
 	return NO_AVG;
 
-return seg->sum_over_assets("foreclosure_prin_net_write_down", t, SUM_OVER_ALL, 
+return seg_element->sum_over_assets("foreclosure_prin_net_write_down", t, SUM_OVER_ALL, 
 							SUM_OVER_ALL, INVESTMENT_FUND_INDEX, BEFORE_SALE);
 
 }
-
 
 //@@ END
 
@@ -1917,11 +1814,10 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 if (t <= 0)
 	return NO_AVG;
 
-return seg->sum_over_assets("foreclosure_prin_net_write_down_neg_asset", t, SUM_OVER_ALL, 
+return seg_element->sum_over_assets("foreclosure_prin_net_write_down_neg_asset", t, SUM_OVER_ALL, 
 							SUM_OVER_ALL, INVESTMENT_FUND_INDEX, BEFORE_SALE);
 
 }
-
 
 //@@ END
 
@@ -1937,8 +1833,8 @@ double INVSTRAT_ASSET_UDF::invstrat_asset_initialize(int t) {
 //^^^
 
 #line 1 "initialize.INVSTRAT_ASSET.for"
-stratmap::iterator stratmap_iter;
-purchmap::iterator purchmap_iter;
+map <xstring, int, less<xstring> >::iterator stratmap_iter;
+map <xstring, int, less<xstring> >::iterator purchmap_iter;
 
 // set investment strategy group
 this->setGroup(seg_id);
@@ -1950,9 +1846,13 @@ if (neg_cash_flow_sale_class_priority.size() < 5)
 if (rebal_sale_class_priority.size() < 5)
 	rebal_sale_class_priority.resize(5);
 
+seg_id = seg_id;
 rebal_sale_class_priority[1] = rebal_sale_priority_not_assigned;
+seg_id = seg_id;
 rebal_sale_class_priority[2] = rebal_sale_priority_avail_for_sale;
+seg_id = seg_id;
 rebal_sale_class_priority[3] = rebal_sale_priority_trading;
+seg_id = seg_id;
 rebal_sale_class_priority[4] = rebal_sale_priority_held_to_maturity;
 
 if (asset_fund_to_sell_flag.size() < MAXIMUM_NUMBER_OF_ASSET_FUNDS)
@@ -2071,7 +1971,7 @@ set_purch_asset_maps();
 if (asset->asset_detail_rpt_inv_strat_flag(t))
 	{
 	int counter = 0;
-	seg->SALFile << endl 
+	seg_element->SALFile << endl 
 				 << "Calendar Period Strategy Application" << endl 
 				 << "Period,Date,PlannedStrategy,ShorterStrategy,ShortestStrategy,LongerStrategy,LongestStrategy,DurMatchTgt,DurMatchTolerance" << endl;
 
@@ -2085,32 +1985,55 @@ if (asset->asset_detail_rpt_inv_strat_flag(t))
 
 	for (int mth = 1; mth <= final_period; mth++)
 		{
-		if (mth == 1 
-			|| inv_strat_planned.AtTime(mth) != inv_strat_planned_prior
-			|| inv_strat_planned_shorter.AtTime(mth) != inv_strat_planned_shorter_prior
-			|| inv_strat_planned_shortest.AtTime(mth) != inv_strat_planned_shortest_prior
-			|| inv_strat_planned_longer.AtTime(mth) != inv_strat_planned_longer_prior
-			|| inv_strat_planned_longest.AtTime(mth) != inv_strat_planned_longest_prior
-			|| abs(dur_match_tgt_input.AtTime(mth) - dur_match_tgt_input_prior) > rate_ratio_threshold
-			|| abs(dur_match_tolerance_input.AtTime(mth) - dur_match_tolerance_input_prior) > rate_ratio_threshold)
-			{
-			seg->SALFile << mth << ","
-						 << get_string_of_date(date(mth)) << ","
-						 << inv_strat_planned.AtTime(mth) << ","
-						 << inv_strat_planned_shorter.AtTime(mth) << ","
-						 << inv_strat_planned_shortest.AtTime(mth) << ","
-						 << inv_strat_planned_longer.AtTime(mth) << ","
-						 << inv_strat_planned_longest.AtTime(mth) << ","	
-						 << dur_match_tgt_input.AtTime(mth) << ","
-						 << dur_match_tolerance_input.AtTime(mth) << endl;		
+		date_lookup = date(mth);
+		xstring inv_strat_planned_local = inv_strat_planned;
 
-			inv_strat_planned_prior = inv_strat_planned.AtTime(mth);
-			inv_strat_planned_shorter_prior = inv_strat_planned_shorter.AtTime(mth);
-			inv_strat_planned_shortest_prior = inv_strat_planned_shortest.AtTime(mth);
-			inv_strat_planned_longer_prior = inv_strat_planned_longer.AtTime(mth);
-			inv_strat_planned_longest_prior = inv_strat_planned_longest.AtTime(mth);
-			dur_match_tgt_input_prior = dur_match_tgt_input.AtTime(mth);
-			dur_match_tolerance_input_prior = dur_match_tolerance_input.AtTime(mth);
+		date_lookup = date(mth);
+		xstring inv_strat_planned_shorter_local = inv_strat_planned_shorter;
+
+		date_lookup = date(mth);
+		xstring inv_strat_planned_shortest_local = inv_strat_planned_shortest;
+
+		date_lookup = date(mth);
+		xstring inv_strat_planned_longer_local = inv_strat_planned_longer;
+
+		date_lookup = date(mth);
+		xstring inv_strat_planned_longest_local = inv_strat_planned_longest;
+		
+		date_lookup = date(mth);
+		double dur_match_tgt_local = dur_match_tgt_input;
+
+		date_lookup = date(mth);
+		double dur_match_tolerance_local = dur_match_tolerance_input;
+
+		if (mth == 1 
+			|| inv_strat_planned_local != inv_strat_planned_prior
+			|| inv_strat_planned_shorter_local != inv_strat_planned_shorter_prior
+			|| inv_strat_planned_shortest_local != inv_strat_planned_shortest_prior
+			|| inv_strat_planned_longer_local != inv_strat_planned_longer_prior
+			|| inv_strat_planned_longest_local != inv_strat_planned_longest_prior
+			|| abs(dur_match_tgt_local - dur_match_tgt_input_prior) > rate_ratio_threshold
+			|| abs(dur_match_tolerance_local - dur_match_tolerance_input_prior) > rate_ratio_threshold)
+			{
+			date_lookup = date(mth);
+			seg_element->SALFile << mth << ","
+						 << get_string_of_date(date(mth)) << ","
+						 << inv_strat_planned_local << ","
+						 << inv_strat_planned_shorter_local << ","
+						 << inv_strat_planned_shortest_local << ","
+						 << inv_strat_planned_longer_local << ","
+						 << inv_strat_planned_longest_local << ","	
+						 << dur_match_tgt_local << ","
+						 << dur_match_tolerance_local << endl;		
+
+			date_lookup = date(mth);
+			inv_strat_planned_prior = inv_strat_planned_local;
+			inv_strat_planned_shorter_prior = inv_strat_planned_shorter_local;
+			inv_strat_planned_shortest_prior = inv_strat_planned_shortest_local;
+			inv_strat_planned_longer_prior = inv_strat_planned_longer_local;
+			inv_strat_planned_longest_prior = inv_strat_planned_longest_local;
+			dur_match_tgt_input_prior = dur_match_tgt_local;
+			dur_match_tolerance_input_prior = dur_match_tolerance_local;
 
 			if ((stratmap_iter = stratmap_inv.find(inv_strat_planned_prior)) == stratmap_inv.end())
 				{
@@ -2143,66 +2066,100 @@ if (asset->asset_detail_rpt_inv_strat_flag(t))
 				}
 			}
 		}
+		
+	seg_id = seg_id;
+	int inv_strat_economic_tests_local = inv_strat_economic_tests;
 
-	if (inv_strat_economic_tests)
+	if (inv_strat_economic_tests_local)
 		{
-		seg->SALFile << endl 
+		seg_element->SALFile << endl 
 					 << "Economic Strategy Application" << endl 
 					 << "TestNum,TestDefn,Mths,TestCalcDefn,Rate1Term,Rate2Term,LagMths,CompareDefn,FixedTestVal,PlannedStrategy,"
 					 << "DurMatchTgtIncr,DurMatchToleranceIncr,ShorterStrategy,ShortestStrategy,LongerStrategy,LongestStrategy" << endl;
 
-		for (inv_strat_economic_test_num = 1; inv_strat_economic_test_num <= inv_strat_economic_tests; inv_strat_economic_test_num++)
+		for (inv_strat_economic_test_num = 1; inv_strat_economic_test_num <= inv_strat_economic_tests_local; inv_strat_economic_test_num++)
 			{
-			seg->SALFile << inv_strat_economic_test_num << ","
-						 << inv_strat_economic_test_defn << ","
-						 << inv_strat_economic_mths << ","
-						 << inv_strat_economic_test_calc_defn << ","
-						 << inv_strat_economic_rate_1_term << ","
-						 << inv_strat_economic_rate_2_term << ","
-						 << inv_strat_economic_lag_mths << ","
-						 << inv_strat_economic_compare_defn << ","
-						 << inv_strat_economic_fixed_test_val << ","
-						 << inv_strat_economic_planned << ","
-						 << inv_strat_economic_dur_match_tgt_incr << ","
-						 << inv_strat_economic_dur_match_tolerance_incr << ","
-						 << inv_strat_economic_shorter << ","
-						 << inv_strat_economic_shortest << ","
-						 << inv_strat_economic_longer << ","
-						 << inv_strat_economic_longest << endl;
+			inv_strat_economic_test_num = inv_strat_economic_test_num;
+			StrEnum::EnumValue inv_strat_economic_test_defn_local = inv_strat_economic_test_defn;
+			inv_strat_economic_test_num = inv_strat_economic_test_num;
+			int inv_strat_economic_mths_local = inv_strat_economic_mths;
+			inv_strat_economic_test_num = inv_strat_economic_test_num;
+			StrEnum::EnumValue inv_strat_economic_test_calc_defn_local = inv_strat_economic_test_calc_defn;
+			inv_strat_economic_test_num = inv_strat_economic_test_num;
+			double inv_strat_economic_rate_1_term_local = inv_strat_economic_rate_1_term;
+			inv_strat_economic_test_num = inv_strat_economic_test_num;
+			double inv_strat_economic_rate_2_term_local = inv_strat_economic_rate_2_term;
+			inv_strat_economic_test_num = inv_strat_economic_test_num;
+			int inv_strat_economic_lag_mths_local = inv_strat_economic_lag_mths;
+			inv_strat_economic_test_num = inv_strat_economic_test_num;
+			StrEnum::EnumValue inv_strat_economic_compare_defn_local = inv_strat_economic_compare_defn;
+			inv_strat_economic_test_num = inv_strat_economic_test_num;
+			double inv_strat_economic_fixed_test_val_local = inv_strat_economic_fixed_test_val;
+			inv_strat_economic_test_num = inv_strat_economic_test_num;
+			xstring inv_strat_economic_planned_local = inv_strat_economic_planned;
+			inv_strat_economic_test_num = inv_strat_economic_test_num;
+			double inv_strat_economic_dur_match_tgt_incr_local = inv_strat_economic_dur_match_tgt_incr;
+			inv_strat_economic_test_num = inv_strat_economic_test_num;
+			double inv_strat_economic_dur_match_tolerance_incr_local = inv_strat_economic_dur_match_tolerance_incr;
+			inv_strat_economic_test_num = inv_strat_economic_test_num;
+			xstring inv_strat_economic_shorter_local = inv_strat_economic_shorter;
+			inv_strat_economic_test_num = inv_strat_economic_test_num;
+			xstring inv_strat_economic_shortest_local = inv_strat_economic_shortest;
+			inv_strat_economic_test_num = inv_strat_economic_test_num;
+			xstring inv_strat_economic_longer_local = inv_strat_economic_longer;
+			inv_strat_economic_test_num = inv_strat_economic_test_num;
+			xstring inv_strat_economic_longest_local = inv_strat_economic_longest;
 
-			if ((stratmap_iter = stratmap_inv.find(inv_strat_economic_planned)) == stratmap_inv.end())
+			seg_element->SALFile << inv_strat_economic_test_num << ","
+						 << inv_strat_economic_test_defn_local << ","
+						 << inv_strat_economic_mths_local << ","
+						 << inv_strat_economic_test_calc_defn_local << ","
+						 << inv_strat_economic_rate_1_term_local << ","
+						 << inv_strat_economic_rate_2_term_local << ","
+						 << inv_strat_economic_lag_mths_local << ","
+						 << inv_strat_economic_compare_defn_local << ","
+						 << inv_strat_economic_fixed_test_val_local << ","
+						 << inv_strat_economic_planned_local << ","
+						 << inv_strat_economic_dur_match_tgt_incr_local << ","
+						 << inv_strat_economic_dur_match_tolerance_incr_local << ","
+						 << inv_strat_economic_shorter_local << ","
+						 << inv_strat_economic_shortest_local << ","
+						 << inv_strat_economic_longer_local << ","
+						 << inv_strat_economic_longest_local << endl;
+
+			if ((stratmap_iter = stratmap_inv.find(inv_strat_economic_planned_local)) == stratmap_inv.end())
 				{
-				stratmap_inv[inv_strat_economic_planned] = counter;
+				stratmap_inv[inv_strat_economic_planned_local] = counter;
 				counter++;
 				}
 
-			if ((stratmap_iter = stratmap_inv.find(inv_strat_economic_shorter)) == stratmap_inv.end())
+			if ((stratmap_iter = stratmap_inv.find(inv_strat_economic_shorter_local)) == stratmap_inv.end())
 				{
-				stratmap_inv[inv_strat_economic_shorter] = counter;
+				stratmap_inv[inv_strat_economic_shorter_local] = counter;
 				counter++;
 				}
 
-			if ((stratmap_iter = stratmap_inv.find(inv_strat_economic_shortest)) == stratmap_inv.end())
+			if ((stratmap_iter = stratmap_inv.find(inv_strat_economic_shortest_local)) == stratmap_inv.end())
 				{
-				stratmap_inv[inv_strat_economic_shortest] = counter;
+				stratmap_inv[inv_strat_economic_shortest_local] = counter;
 				counter++;
 				}
 
-			if ((stratmap_iter = stratmap_inv.find(inv_strat_economic_longer)) == stratmap_inv.end())
+			if ((stratmap_iter = stratmap_inv.find(inv_strat_economic_longer_local)) == stratmap_inv.end())
 				{
-				stratmap_inv[inv_strat_economic_longer] = counter;
+				stratmap_inv[inv_strat_economic_longer_local] = counter;
 				counter++;
 				}
 
-			if ((stratmap_iter = stratmap_inv.find(inv_strat_economic_longest)) == stratmap_inv.end())
+			if ((stratmap_iter = stratmap_inv.find(inv_strat_economic_longest_local)) == stratmap_inv.end())
 				{
-				stratmap_inv[inv_strat_economic_longest] = counter;
+				stratmap_inv[inv_strat_economic_longest_local] = counter;
 				counter++;
 				}
 			}
 		}
 
-	seg->SALFile << endl 
+	seg_element->SALFile << endl 
 				 << "Negative Cash Flow Calendar Period Strategy Application" << endl 
 				 << "Period,Date,StrategyDefn,CashBalDefn,CashThreshPct,CashThreshAddn,NegAssetStrat,SaleSelectionDefn,SalePriorityAvailForSale,SalePriorityTrading,SalePriorityHeldToMat,SalePriorityNotAssigned" << endl;
 
@@ -2219,41 +2176,71 @@ if (asset->asset_detail_rpt_inv_strat_flag(t))
 
 	for (int mth = 1; mth <= final_period; mth++)
 		{
-		if (mth == 1 
-			|| neg_cash_flow_strat_planned.AtTime(mth) != neg_cash_flow_strat_planned_prior
-			|| neg_cash_flow_strat_planned_cash_bal_defn.AtTime(mth) != neg_cash_flow_strat_planned_cash_bal_defn_prior
-			|| abs(neg_cash_flow_strat_planned_cash_thresh_pct.AtTime(mth) - neg_cash_flow_strat_planned_cash_thresh_pct_prior) > rate_ratio_threshold
-			|| abs(neg_cash_flow_strat_planned_cash_thresh_addn.AtTime(mth) - neg_cash_flow_strat_planned_cash_thresh_addn_prior) > rate_ratio_threshold
-			|| neg_cash_flow_strat_planned_neg_assets.AtTime(mth) != neg_cash_flow_strat_planned_neg_assets_prior
-			|| neg_cash_flow_strat_planned_sale_selection_defn.AtTime(mth) != neg_cash_flow_strat_planned_sale_selection_defn_prior
-			|| abs(neg_cash_flow_strat_planned_sale_priority_avail_for_sale.AtTime(mth) - neg_cash_flow_strat_planned_sale_priority_avail_for_sale_prior) > rate_ratio_threshold
-			|| abs(neg_cash_flow_strat_planned_sale_priority_trading.AtTime(mth) - neg_cash_flow_strat_planned_sale_priority_trading_prior) > rate_ratio_threshold
-			|| abs(neg_cash_flow_strat_planned_sale_priority_held_to_maturity.AtTime(mth) - neg_cash_flow_strat_planned_sale_priority_held_to_maturity_prior) > rate_ratio_threshold
-			|| abs(neg_cash_flow_strat_planned_sale_priority_not_assigned.AtTime(mth) - neg_cash_flow_strat_planned_sale_priority_not_assigned_prior) > rate_ratio_threshold)
-			{
-			seg->SALFile << mth << ","
-						 << get_string_of_date(date(mth)) << ","
-						 << neg_cash_flow_strat_planned.AtTime(mth) << ","
-						 << neg_cash_flow_strat_planned_cash_bal_defn.AtTime(mth) << ","
-						 << neg_cash_flow_strat_planned_cash_thresh_pct.AtTime(mth) << ","
-						 << neg_cash_flow_strat_planned_cash_thresh_addn.AtTime(mth) << ","
-						 << neg_cash_flow_strat_planned_neg_assets.AtTime(mth) << ","
-						 << neg_cash_flow_strat_planned_sale_selection_defn.AtTime(mth) << ","
-						 << neg_cash_flow_strat_planned_sale_priority_avail_for_sale.AtTime(mth) << ","
-						 << neg_cash_flow_strat_planned_sale_priority_trading.AtTime(mth) << ","
-						 << neg_cash_flow_strat_planned_sale_priority_held_to_maturity.AtTime(mth) << ","
-						 << neg_cash_flow_strat_planned_sale_priority_not_assigned.AtTime(mth) << "," << endl;		
+		date_lookup = date(mth);
+		xstring neg_cash_flow_strat_planned_local = neg_cash_flow_strat_planned;
 
-			neg_cash_flow_strat_planned_prior = neg_cash_flow_strat_planned.AtTime(mth);
-			neg_cash_flow_strat_planned_cash_bal_defn_prior = neg_cash_flow_strat_planned_cash_bal_defn.AtTime(mth);
-			neg_cash_flow_strat_planned_cash_thresh_pct_prior = neg_cash_flow_strat_planned_cash_thresh_pct.AtTime(mth);
-			neg_cash_flow_strat_planned_cash_thresh_addn_prior = neg_cash_flow_strat_planned_cash_thresh_addn.AtTime(mth);
-			neg_cash_flow_strat_planned_neg_assets_prior = neg_cash_flow_strat_planned_neg_assets.AtTime(mth);
-			neg_cash_flow_strat_planned_sale_selection_defn_prior = neg_cash_flow_strat_planned_sale_selection_defn.AtTime(mth);
-			neg_cash_flow_strat_planned_sale_priority_avail_for_sale_prior = neg_cash_flow_strat_planned_sale_priority_avail_for_sale.AtTime(mth);
-			neg_cash_flow_strat_planned_sale_priority_trading_prior = neg_cash_flow_strat_planned_sale_priority_trading.AtTime(mth);
-			neg_cash_flow_strat_planned_sale_priority_held_to_maturity_prior = neg_cash_flow_strat_planned_sale_priority_held_to_maturity.AtTime(mth);
-			neg_cash_flow_strat_planned_sale_priority_not_assigned_prior = neg_cash_flow_strat_planned_sale_priority_not_assigned.AtTime(mth);
+		date_lookup = date(mth);
+		xstring neg_cash_flow_strat_planned_cash_bal_defn_local = neg_cash_flow_strat_planned_cash_bal_defn;
+
+		date_lookup = date(mth);
+		double neg_cash_flow_strat_planned_cash_thresh_pct_local = neg_cash_flow_strat_planned_cash_thresh_pct;
+		
+		date_lookup = date(mth);
+		double neg_cash_flow_strat_planned_cash_thresh_addn_local = neg_cash_flow_strat_planned_cash_thresh_addn;
+
+		date_lookup = date(mth);
+		xstring neg_cash_flow_strat_planned_neg_assets_local = neg_cash_flow_strat_planned_neg_assets;
+
+		date_lookup = date(mth);
+		xstring neg_cash_flow_strat_planned_sale_selection_defn_local = neg_cash_flow_strat_planned_sale_selection_defn;
+
+		date_lookup = date(mth);
+		int neg_cash_flow_strat_planned_sale_priority_avail_for_sale_local = neg_cash_flow_strat_planned_sale_priority_avail_for_sale;
+
+		date_lookup = date(mth);
+		int neg_cash_flow_strat_planned_sale_priority_trading_local = neg_cash_flow_strat_planned_sale_priority_trading;
+
+		date_lookup = date(mth);
+		int neg_cash_flow_strat_planned_sale_priority_held_to_maturity_local = neg_cash_flow_strat_planned_sale_priority_held_to_maturity;
+
+		date_lookup = date(mth);
+		int neg_cash_flow_strat_planned_sale_priority_not_assigned_local = neg_cash_flow_strat_planned_sale_priority_not_assigned;
+
+		if (mth == 1 
+			|| neg_cash_flow_strat_planned_local != neg_cash_flow_strat_planned_prior
+			|| neg_cash_flow_strat_planned_cash_bal_defn_local != neg_cash_flow_strat_planned_cash_bal_defn_prior
+			|| abs(neg_cash_flow_strat_planned_cash_thresh_pct_local - neg_cash_flow_strat_planned_cash_thresh_pct_prior) > rate_ratio_threshold
+			|| abs(neg_cash_flow_strat_planned_cash_thresh_addn_local - neg_cash_flow_strat_planned_cash_thresh_addn_prior) > rate_ratio_threshold
+			|| neg_cash_flow_strat_planned_neg_assets_local != neg_cash_flow_strat_planned_neg_assets_prior
+			|| neg_cash_flow_strat_planned_sale_selection_defn_local != neg_cash_flow_strat_planned_sale_selection_defn_prior
+			|| abs(neg_cash_flow_strat_planned_sale_priority_avail_for_sale_local - neg_cash_flow_strat_planned_sale_priority_avail_for_sale_prior) > rate_ratio_threshold
+			|| abs(neg_cash_flow_strat_planned_sale_priority_trading_local - neg_cash_flow_strat_planned_sale_priority_trading_prior) > rate_ratio_threshold
+			|| abs(neg_cash_flow_strat_planned_sale_priority_held_to_maturity_local - neg_cash_flow_strat_planned_sale_priority_held_to_maturity_prior) > rate_ratio_threshold
+			|| abs(neg_cash_flow_strat_planned_sale_priority_not_assigned_local - neg_cash_flow_strat_planned_sale_priority_not_assigned_prior) > rate_ratio_threshold)
+			{
+			seg_element->SALFile << mth << ","
+						 << get_string_of_date(date(mth)) << ","
+						 << neg_cash_flow_strat_planned_local << ","
+						 << neg_cash_flow_strat_planned_cash_bal_defn_local << ","
+						 << neg_cash_flow_strat_planned_cash_thresh_pct_local << ","
+						 << neg_cash_flow_strat_planned_cash_thresh_addn_local << ","
+						 << neg_cash_flow_strat_planned_neg_assets_local << ","
+						 << neg_cash_flow_strat_planned_sale_selection_defn_local << ","
+						 << neg_cash_flow_strat_planned_sale_priority_avail_for_sale_local << ","
+						 << neg_cash_flow_strat_planned_sale_priority_trading_local << ","
+						 << neg_cash_flow_strat_planned_sale_priority_held_to_maturity_local << ","
+						 << neg_cash_flow_strat_planned_sale_priority_not_assigned_local << "," << endl;		
+
+			neg_cash_flow_strat_planned_prior = neg_cash_flow_strat_planned_local;
+			neg_cash_flow_strat_planned_cash_bal_defn_prior = neg_cash_flow_strat_planned_cash_bal_defn_local;
+			neg_cash_flow_strat_planned_cash_thresh_pct_prior = neg_cash_flow_strat_planned_cash_thresh_pct_local;
+			neg_cash_flow_strat_planned_cash_thresh_addn_prior = neg_cash_flow_strat_planned_cash_thresh_addn_local;
+			neg_cash_flow_strat_planned_neg_assets_prior = neg_cash_flow_strat_planned_neg_assets_local;
+			neg_cash_flow_strat_planned_sale_selection_defn_prior = neg_cash_flow_strat_planned_sale_selection_defn_local;
+			neg_cash_flow_strat_planned_sale_priority_avail_for_sale_prior = neg_cash_flow_strat_planned_sale_priority_avail_for_sale_local;
+			neg_cash_flow_strat_planned_sale_priority_trading_prior = neg_cash_flow_strat_planned_sale_priority_trading_local;
+			neg_cash_flow_strat_planned_sale_priority_held_to_maturity_prior = neg_cash_flow_strat_planned_sale_priority_held_to_maturity_local;
+			neg_cash_flow_strat_planned_sale_priority_not_assigned_prior = neg_cash_flow_strat_planned_sale_priority_not_assigned_local;
 
 			if (neg_cash_flow_strat_planned_neg_assets_prior != "NONE")
 				{
@@ -2266,40 +2253,79 @@ if (asset->asset_detail_rpt_inv_strat_flag(t))
 			}
 		}
 
+	seg_id = seg_id;
+	int neg_cash_flow_strat_economic_tests_local = neg_cash_flow_strat_economic_tests;
 
-	if (neg_cash_flow_strat_economic_tests)
+	if (neg_cash_flow_strat_economic_tests_local)
 		{
-		seg->SALFile << endl 
+		seg_element->SALFile << endl 
 					 << "Economic Strategy Application" << endl 
 					 << "TestNum,TestDefn,Mths,TestCalcDefn,Rate1Term,Rate2Term,LagMths,CompareDefn,FixedTestVal,"
 					 << "StrategyDefn,,CashBalDefn,CashThreshPct,CashThreshAddn,NegAssetStrat,"
 					 << "SaleSelectionDefn,SalePriorityAvailForSale,SalePriorityTrading,SalePriorityHeldToMat,SalePriorityNotAssigned" << endl;
 
-		for (neg_cash_flow_strat_economic_test_num = 1; neg_cash_flow_strat_economic_test_num <= neg_cash_flow_strat_economic_tests; neg_cash_flow_strat_economic_test_num++)
+		for (neg_cash_flow_strat_economic_test_num = 1; neg_cash_flow_strat_economic_test_num <= neg_cash_flow_strat_economic_tests_local; neg_cash_flow_strat_economic_test_num++)
 			{
-			seg->SALFile << neg_cash_flow_strat_economic_test_num << ","
-						 << neg_cash_flow_strat_economic_test_defn << ","
-						 << neg_cash_flow_strat_economic_mths << ","
-						 << neg_cash_flow_strat_economic_test_calc_defn << ","
-						 << neg_cash_flow_strat_economic_rate_1_term << ","
-						 << neg_cash_flow_strat_economic_rate_2_term << ","
-						 << neg_cash_flow_strat_economic_lag_mths << ","
-						 << neg_cash_flow_strat_economic_compare_defn << ","
-						 << neg_cash_flow_strat_economic_fixed_test_val << ","
-						 << neg_cash_flow_strat_economic << ","
-						 << neg_cash_flow_strat_economic_cash_bal_defn << ","
-						 << neg_cash_flow_strat_economic_cash_thresh_pct << ","
-						 << neg_cash_flow_strat_economic_cash_thresh_addn << ","
-						 << neg_cash_flow_strat_economic_neg_assets << ","
-						 << neg_cash_flow_strat_economic_sale_selection_defn << ","
-						 << neg_cash_flow_strat_economic_sale_priority_avail_for_sale << ","
-						 << neg_cash_flow_strat_economic_sale_priority_trading << ","
-						 << neg_cash_flow_strat_economic_sale_priority_held_to_maturity << ","
-						 << neg_cash_flow_strat_economic_sale_priority_not_assigned << endl;
+			neg_cash_flow_strat_economic_test_num = neg_cash_flow_strat_economic_test_num;
+			StrEnum::EnumValue neg_cash_flow_strat_economic_test_defn_local = neg_cash_flow_strat_economic_test_defn;
+			neg_cash_flow_strat_economic_test_num = neg_cash_flow_strat_economic_test_num;
+			int neg_cash_flow_strat_economic_mths_local = neg_cash_flow_strat_economic_mths;
+			neg_cash_flow_strat_economic_test_num = neg_cash_flow_strat_economic_test_num;
+			StrEnum::EnumValue neg_cash_flow_strat_economic_test_calc_defn_local = neg_cash_flow_strat_economic_test_calc_defn;
+			neg_cash_flow_strat_economic_test_num = neg_cash_flow_strat_economic_test_num;
+			double neg_cash_flow_strat_economic_rate_1_term_local = neg_cash_flow_strat_economic_rate_1_term;
+			neg_cash_flow_strat_economic_test_num = neg_cash_flow_strat_economic_test_num;
+			double neg_cash_flow_strat_economic_rate_2_term_local = neg_cash_flow_strat_economic_rate_2_term;
+			neg_cash_flow_strat_economic_test_num = neg_cash_flow_strat_economic_test_num;
+			int neg_cash_flow_strat_economic_lag_mths_local = neg_cash_flow_strat_economic_lag_mths;
+			neg_cash_flow_strat_economic_test_num = neg_cash_flow_strat_economic_test_num;
+			StrEnum::EnumValue neg_cash_flow_strat_economic_compare_defn_local = neg_cash_flow_strat_economic_compare_defn;
+			neg_cash_flow_strat_economic_test_num = neg_cash_flow_strat_economic_test_num;
+			double neg_cash_flow_strat_economic_fixed_test_val_local = neg_cash_flow_strat_economic_fixed_test_val;
+			neg_cash_flow_strat_economic_test_num = neg_cash_flow_strat_economic_test_num;
+			StrEnum::EnumValue neg_cash_flow_strat_economic_local = neg_cash_flow_strat_economic;
+			neg_cash_flow_strat_economic_test_num = neg_cash_flow_strat_economic_test_num;
+			StrEnum::EnumValue neg_cash_flow_strat_economic_cash_bal_defn_local = neg_cash_flow_strat_economic_cash_bal_defn;
+			neg_cash_flow_strat_economic_test_num = neg_cash_flow_strat_economic_test_num;
+			double neg_cash_flow_strat_economic_cash_thresh_pct_local = neg_cash_flow_strat_economic_cash_thresh_pct;
+			neg_cash_flow_strat_economic_test_num = neg_cash_flow_strat_economic_test_num;
+			double neg_cash_flow_strat_economic_cash_thresh_addn_local = neg_cash_flow_strat_economic_cash_thresh_addn;
+			neg_cash_flow_strat_economic_test_num = neg_cash_flow_strat_economic_test_num;
+			xstring neg_cash_flow_strat_economic_neg_assets_local = neg_cash_flow_strat_economic_neg_assets;
+			neg_cash_flow_strat_economic_test_num = neg_cash_flow_strat_economic_test_num;
+			StrEnum::EnumValue neg_cash_flow_strat_economic_sale_selection_defn_local = neg_cash_flow_strat_economic_sale_selection_defn;
+			neg_cash_flow_strat_economic_test_num = neg_cash_flow_strat_economic_test_num;
+			int neg_cash_flow_strat_economic_sale_priority_avail_for_sale_local = neg_cash_flow_strat_economic_sale_priority_avail_for_sale;
+			neg_cash_flow_strat_economic_test_num = neg_cash_flow_strat_economic_test_num;
+			int neg_cash_flow_strat_economic_sale_priority_trading_local = neg_cash_flow_strat_economic_sale_priority_trading;
+			neg_cash_flow_strat_economic_test_num = neg_cash_flow_strat_economic_test_num;
+			int neg_cash_flow_strat_economic_sale_priority_held_to_maturity_local = neg_cash_flow_strat_economic_sale_priority_held_to_maturity;
+			neg_cash_flow_strat_economic_test_num = neg_cash_flow_strat_economic_test_num;
+			int neg_cash_flow_strat_economic_sale_priority_not_assigned_local = neg_cash_flow_strat_economic_sale_priority_not_assigned;
 
-			if (neg_cash_flow_strat_economic_neg_assets != "NONE")
+			seg_element->SALFile << neg_cash_flow_strat_economic_test_num << ","
+						 << neg_cash_flow_strat_economic_test_defn_local << ","
+						 << neg_cash_flow_strat_economic_mths_local << ","
+						 << neg_cash_flow_strat_economic_test_calc_defn_local << ","
+						 << neg_cash_flow_strat_economic_rate_1_term_local << ","
+						 << neg_cash_flow_strat_economic_rate_2_term_local << ","
+						 << neg_cash_flow_strat_economic_lag_mths_local << ","
+						 << neg_cash_flow_strat_economic_compare_defn_local << ","
+						 << neg_cash_flow_strat_economic_fixed_test_val_local << ","
+						 << neg_cash_flow_strat_economic_local << ","
+						 << neg_cash_flow_strat_economic_cash_bal_defn_local << ","
+						 << neg_cash_flow_strat_economic_cash_thresh_pct_local << ","
+						 << neg_cash_flow_strat_economic_cash_thresh_addn_local << ","
+						 << neg_cash_flow_strat_economic_neg_assets_local << ","
+						 << neg_cash_flow_strat_economic_sale_selection_defn_local << ","
+						 << neg_cash_flow_strat_economic_sale_priority_avail_for_sale_local << ","
+						 << neg_cash_flow_strat_economic_sale_priority_trading_local << ","
+						 << neg_cash_flow_strat_economic_sale_priority_held_to_maturity_local << ","
+						 << neg_cash_flow_strat_economic_sale_priority_not_assigned_local << endl;
+
+			if (neg_cash_flow_strat_economic_neg_assets_local != "NONE")
 				{
-				if ((stratmap_iter = stratmap_inv.find(neg_cash_flow_strat_economic_neg_assets)) == stratmap_inv.end())
+				if ((stratmap_iter = stratmap_inv.find(neg_cash_flow_strat_economic_neg_assets_local)) == stratmap_inv.end())
 					{
 					stratmap_inv[neg_cash_flow_strat_planned_neg_assets_prior] = counter;
 					counter++;
@@ -2308,33 +2334,41 @@ if (asset->asset_detail_rpt_inv_strat_flag(t))
 			}
 		}
 
-	seg->SALFile << endl
+	seg_element->SALFile << endl
  				 << "Investment Strategy Input" << endl;
 
 	for (stratmap_iter = stratmap_inv.begin();
 		 stratmap_iter != stratmap_inv.end();
 		 stratmap_iter++)
 		{
-		inv_strat_id = stratmap_iter->first;
+		double asset_sub_port_inv_tgt_pct_local = 0.0;
 
-		seg->SALFile << endl
+		inv_strat_id = stratmap_iter->first;
+		double inv_strat_cash_tgt_pct_local = inv_strat_cash_tgt_pct;
+
+		inv_strat_id = stratmap_iter->first;
+		StrEnum::EnumValue inv_strat_distribn_defn_local = inv_strat_distribn_defn;
+
+		seg_element->SALFile << endl
 					 << "StratID,CashTgtPct,DistribnDefn" << endl
 					 << inv_strat_id << ","
-					 << inv_strat_cash_tgt_pct << ","
-					 << inv_strat_distribn_defn << endl;
+					 << inv_strat_cash_tgt_pct_local << ","
+					 << inv_strat_distribn_defn_local << endl;
 
-		if (1.0 - inv_strat_cash_tgt_pct > rate_ratio_threshold)
+		if (1.0 - inv_strat_cash_tgt_pct_local > rate_ratio_threshold)
 			{
-			seg->SALFile << "Investment Strategy Distribution Targets by Asset Sub Portfolio" << endl
+			seg_element->SALFile << "Investment Strategy Distribution Targets by Asset Sub Portfolio" << endl
 						 << "SubPortID,TgtPct" << endl;
 
 			for (int sub_port = 0; sub_port < company->sm_asset->sm_asset_sub_port[seg_num].size(); sub_port++)
 				{
 				asset_sub_port_id = company->sm_asset->asset_sub_ports[sub_port];
+				inv_strat_id = stratmap_iter->first;
+				asset_sub_port_inv_tgt_pct_local = asset_sub_port_inv_tgt_pct;
 
-				if (asset_sub_port_inv_tgt_pct > rate_ratio_threshold)
-					seg->SALFile << asset_sub_port_id << ","
-								 << asset_sub_port_inv_tgt_pct << endl;
+				if (asset_sub_port_inv_tgt_pct_local > rate_ratio_threshold)
+					seg_element->SALFile << asset_sub_port_id << ","
+								 << asset_sub_port_inv_tgt_pct_local << endl;
 				}
 			}
 
@@ -2344,23 +2378,31 @@ if (asset->asset_detail_rpt_inv_strat_flag(t))
 			 purchmap_iter++)
 			{
 			int panum = purchmap_iter->second;
+			inv_strat_id = stratmap_iter->first;		
 			purch_asset_id = purch_assets_id[panum];
 			asset_sub_port_id = purch_asset_sub_port_id;
+			
+			inv_strat_id = stratmap_iter->first;		
+			asset_sub_port_inv_tgt_pct_local = asset_sub_port_inv_tgt_pct;
 
-			if (asset_sub_port_inv_tgt_pct > rate_ratio_threshold 
-				&& purch_asset_weight > rate_ratio_threshold)
+			inv_strat_id = stratmap_iter->first;		
+			purch_asset_id = purch_assets_id[panum];	
+			double purch_asset_weight_local = purch_asset_weight;
+
+			if (asset_sub_port_inv_tgt_pct_local > rate_ratio_threshold 
+				&& purch_asset_weight_local > rate_ratio_threshold)
 				{
 				if (write_header)
 					{
-					seg->SALFile << "Purchase Asset Investment Strategy Weights" << endl
+					seg_element->SALFile << "Purchase Asset Investment Strategy Weights" << endl
 								 << "PurchAssetID,SubPortID,TgtPct" << endl;
 
 					write_header = false;
 					}
 
-				seg->SALFile << purch_asset_id << ","
+				seg_element->SALFile << purch_asset_id << ","
 							 << asset_sub_port_id << ","
-							 << purch_asset_weight << endl;
+							 << purch_asset_weight_local << endl;
 				}
 			}
 		}
@@ -2415,7 +2457,6 @@ return 1.0;
 
 }
 
-
 //@@ END
 
 //@@ START - initialize_sale_and_inv_vars_eom
@@ -2434,13 +2475,12 @@ if (t <= 0)
 	return NO_AVG;
 
 if (asset->asset_detail_rpt_inv_strat_flag(t))
-	seg->SALFile << endl
+	seg_element->SALFile << endl
 			     << "Initializing standard sales and investment variables at EOM t=" << t << endl;
 
 return initialize_sale_and_inv_vars(t, SUM_OVER_POSITIVE, END_OF_MONTH);
 
 }
-
 
 //@@ END
 
@@ -2459,18 +2499,19 @@ double INVSTRAT_ASSET_UDF::invstrat_asset_initialize_sub_port_sale_vars_eom(int 
 
 #line 1 "initialize_sub_port_sale_vars_eom.INVSTRAT_ASSET.for"
 if (t <= 0)
-	return NO_AVG;
+	return 0.0;
 
 if (market_values_not_calculated_for_asset_sub_port_map.empty())
 	return 1.0;
 
-mvmap::iterator mvmap_iter;
+map <int, int, less<int> >::iterator mvmap_iter;
 int sub_port_number = 0;
 int asset_sub_ports_remaining_before_sales = 0;
-A_SUBPORT_ASSET * current_sub_port = NULL;
+current_sub_port = NULL;
 
 // check to see if we need to initialize selected asset sub portfolios
-asset->sm_asset_sub_port[seg_num][ALL][0]->sub_ports_to_initialize_for_sale = 0;
+for (sub_port_number = 0; sub_port_number < asset->sm_asset_sub_port[seg_num].size(); sub_port_number++)
+	asset->sm_asset_sub_port[seg_num][sub_port_number][0]->sub_ports_to_initialize_for_sale = 0;
 
 asset_sub_ports_remaining_before_sales
 = market_values_not_calculated_for_asset_sub_port_map.size();
@@ -2504,7 +2545,7 @@ if (asset->asset_detail_rpt_inv_strat_flag(t))
 			sub_ports_to_process = sub_ports_to_process + " " + current_sub_port->group;
 		}
 
-	seg->SALFile << " .i. Initializing asset sub portfolio sales variables"
+	seg_element->SALFile << " .i. Initializing asset sub portfolio sales variables"
 			     << " for sub portfolios" << sub_ports_to_process
 			     << ":: Period=" << t
 			     << " Year=" << xint(cal_yr(t))
@@ -2570,57 +2611,55 @@ xstring_initial_unrealized_capital_gains = "unrealzd_cap_gain_bef_rebal_sale";
 int sum_type = SUM_OVER_POSITIVE;
 
 // now calculate initial amounts
-mpmap::iterator mp_map_iter;
+map <int, long, less <int> >::iterator mp_map_iter;
 
 #if defined(__BOND_ASSET_H_)
-BOND_ASSET *current_bond_element;
-if (seg->bond_mp_map_active.size())
+if (seg_element->bond_mp_map_active.size())
 	{
-	col_number_asset_sub_port_number = asset->sm_bond[0]->Column(xstring_asset_sub_port_number).Number();
-	col_number_accrued_interest = asset->sm_bond[0]->Column(xstring_initial_accrued_interest).Number();
-	col_number_market_value = asset->sm_bond[0]->Column(xstring_initial_market_value).Number();
-	col_number_notional_amount_before_pm_sales = asset->sm_bond[0]->Column("notional_amt_bef_rebal_sale").Number();
-	col_number_notional_amount = asset->sm_bond[0]->Column("notional_amt").Number();
-	col_number_unrealized_capital_gains = asset->sm_bond[0]->Column(xstring_initial_unrealized_capital_gains).Number();
+	col_number_asset_sub_port_number = asset->sm_bond[0][0]->Column(xstring_asset_sub_port_number).Number();
+	col_number_accrued_interest = asset->sm_bond[0][0]->Column(xstring_initial_accrued_interest).Number();
+	col_number_market_value = asset->sm_bond[0][0]->Column(xstring_initial_market_value).Number();
+	col_number_notional_amount_before_pm_sales = asset->sm_bond[0][0]->Column("notional_amt_bef_rebal_sale").Number();
+	col_number_notional_amount = asset->sm_bond[0][0]->Column("notional_amt").Number();
+	col_number_unrealized_capital_gains = asset->sm_bond[0][0]->Column(xstring_initial_unrealized_capital_gains).Number();
 
-	for (mp_map_iter = seg->bond_mp_map_active.begin();
-		 mp_map_iter != seg->bond_mp_map_active.end();
+	for (mp_map_iter = seg_element->bond_mp_map_active.begin();
+		 mp_map_iter != seg_element->bond_mp_map_active.end();
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		current_bond_element = asset->sm_bond[mp];
 
-		sub_port_number = xint(current_bond_element->Column(col_number_asset_sub_port_number).Value(t));
+		sub_port_number = xint(asset->sm_bond[mp][0]->Column(col_number_asset_sub_port_number).Value(t));
 
 		if (sum_type == SUM_OVER_POSITIVE
-			&& current_bond_element->neg_asset_flag < 0)
+			&& asset->sm_bond[mp][0]->neg_asset_flag < 0)
 			continue;
 
 		if (sum_type == SUM_OVER_NEGATIVE
-			&& current_bond_element->neg_asset_flag > 0)
+			&& asset->sm_bond[mp][0]->neg_asset_flag > 0)
 			continue;
 
 		if (asset->sm_asset_sub_port[seg_num][sub_port_number][0]->sub_ports_to_initialize_for_sale != 1
-			|| (t > max(0, current_bond_element->commencement_period)
-				&& current_bond_element->Column(col_number_notional_amount).Value(t - 1) < ASSET_ACTIVE_THRESHOLD)
-			|| (t == current_bond_element->commencement_period
-				&& current_bond_element->Column(col_number_notional_amount_before_pm_sales).Value(t) < ASSET_ACTIVE_THRESHOLD))
+			|| (t > max(0, asset->sm_bond[mp][0]->commencement_period)
+				&& asset->sm_bond[mp][0]->Column(col_number_notional_amount).Value(t - 1) < ASSET_ACTIVE_THRESHOLD)
+			|| (t == asset->sm_bond[mp][0]->commencement_period
+				&& asset->sm_bond[mp][0]->Column(col_number_notional_amount_before_pm_sales).Value(t) < ASSET_ACTIVE_THRESHOLD))
 			continue;
 
-		sale_class = current_bond_element->sale_class_id;
-		fund_index = current_bond_element->asset_fund_index;
-		local_multiplicative_factor = current_bond_element->pct_to_use;
+		sale_class = asset->sm_bond[mp][0]->sale_class_id;
+		fund_index = asset->sm_bond[mp][0]->asset_fund_index;
+		local_multiplicative_factor = asset->sm_bond[mp][0]->pct_to_use;
 
 		local_accrued_interest
-		= current_bond_element->Column(col_number_accrued_interest).Value(t)
+		= asset->sm_bond[mp][0]->Column(col_number_accrued_interest).Value(t)
 		  * local_multiplicative_factor;
 
 		local_market_value
-		= current_bond_element->Column(col_number_market_value).Value(t)
+		= asset->sm_bond[mp][0]->Column(col_number_market_value).Value(t)
 		  * local_multiplicative_factor;
 
 		local_unrealized_capital_gains
-		= current_bond_element->Column(col_number_unrealized_capital_gains).Value(t)
+		= asset->sm_bond[mp][0]->Column(col_number_unrealized_capital_gains).Value(t)
 		  * local_multiplicative_factor;
 
 		sub_port_class_fund_initial_market_value[sub_port_number][sale_class][fund_index]
@@ -2643,9 +2682,9 @@ if (seg->bond_mp_map_active.size())
 			else
 			log_screen << " " << setw(18) << setprecision(6) << 0.0
 					<< " " << setw(18) << setprecision(6) << 0.0;
-			log_screen << " " << setw(10) << current_bond_element->asset_id
-					<< " |" << current_bond_element->modelName
-					<< " " << current_bond_element->asset_purp
+			log_screen << " " << setw(10) << asset->sm_bond[mp][0]->asset_id
+					<< " |" << asset->sm_bond[mp][0]->modelName
+					<< " " << asset->sm_bond[mp][0]->asset_purp
 					<< MSG_ERROR;
 			}
 #endif
@@ -2654,54 +2693,52 @@ if (seg->bond_mp_map_active.size())
 #endif
 
 #if defined(__MTG_ASSET_H_)
-MTG_ASSET *current_mtg_element;
-if (seg->mtg_mp_map_active.size())
+if (seg_element->mtg_mp_map_active.size())
 	{
-	col_number_asset_sub_port_number = asset->sm_mtg[0]->Column(xstring_asset_sub_port_number).Number();
-	col_number_accrued_interest = asset->sm_mtg[0]->Column(xstring_initial_accrued_interest).Number();
-	col_number_market_value = asset->sm_mtg[0]->Column(xstring_initial_market_value).Number();
-	col_number_notional_amount_before_pm_sales = asset->sm_mtg[0]->Column("notional_amt_bef_rebal_sale").Number();
-	col_number_notional_amount = asset->sm_mtg[0]->Column("notional_amt").Number();
-	col_number_unrealized_capital_gains = asset->sm_mtg[0]->Column(xstring_initial_unrealized_capital_gains).Number();
+	col_number_asset_sub_port_number = asset->sm_mtg[0][0]->Column(xstring_asset_sub_port_number).Number();
+	col_number_accrued_interest = asset->sm_mtg[0][0]->Column(xstring_initial_accrued_interest).Number();
+	col_number_market_value = asset->sm_mtg[0][0]->Column(xstring_initial_market_value).Number();
+	col_number_notional_amount_before_pm_sales = asset->sm_mtg[0][0]->Column("notional_amt_bef_rebal_sale").Number();
+	col_number_notional_amount = asset->sm_mtg[0][0]->Column("notional_amt").Number();
+	col_number_unrealized_capital_gains = asset->sm_mtg[0][0]->Column(xstring_initial_unrealized_capital_gains).Number();
 
-	for (mp_map_iter = seg->mtg_mp_map_active.begin();
-		 mp_map_iter != seg->mtg_mp_map_active.end();
+	for (mp_map_iter = seg_element->mtg_mp_map_active.begin();
+		 mp_map_iter != seg_element->mtg_mp_map_active.end();
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		current_mtg_element = asset->sm_mtg[mp];
 
-		sub_port_number = xint(current_mtg_element->Column(col_number_asset_sub_port_number).Value(t));
+		sub_port_number = xint(asset->sm_mtg[mp][0]->Column(col_number_asset_sub_port_number).Value(t));
 
 		if (sum_type == SUM_OVER_POSITIVE
-			&& current_mtg_element->neg_asset_flag < 0)
+			&& asset->sm_mtg[mp][0]->neg_asset_flag < 0)
 			continue;
 
 		if (sum_type == SUM_OVER_NEGATIVE
-			&& current_mtg_element->neg_asset_flag > 0)
+			&& asset->sm_mtg[mp][0]->neg_asset_flag > 0)
 			continue;
 
 		if (asset->sm_asset_sub_port[seg_num][sub_port_number][0]->sub_ports_to_initialize_for_sale != 1
-			|| (t > max(0, current_mtg_element->commencement_period)
-				&& current_mtg_element->Column(col_number_notional_amount).Value(t - 1) < ASSET_ACTIVE_THRESHOLD)
-			|| (t == current_mtg_element->commencement_period
-				&& current_mtg_element->Column(col_number_notional_amount_before_pm_sales).Value(t) < ASSET_ACTIVE_THRESHOLD))
+			|| (t > max(0, asset->sm_mtg[mp][0]->commencement_period)
+				&& asset->sm_mtg[mp][0]->Column(col_number_notional_amount).Value(t - 1) < ASSET_ACTIVE_THRESHOLD)
+			|| (t == asset->sm_mtg[mp][0]->commencement_period
+				&& asset->sm_mtg[mp][0]->Column(col_number_notional_amount_before_pm_sales).Value(t) < ASSET_ACTIVE_THRESHOLD))
 			continue;
 
-		sale_class = current_mtg_element->sale_class_id;
-		fund_index = current_mtg_element->asset_fund_index;
-		local_multiplicative_factor = current_mtg_element->pct_to_use;
+		sale_class = asset->sm_mtg[mp][0]->sale_class_id;
+		fund_index = asset->sm_mtg[mp][0]->asset_fund_index;
+		local_multiplicative_factor = asset->sm_mtg[mp][0]->pct_to_use;
 
 		local_accrued_interest
-		= current_mtg_element->Column(col_number_accrued_interest).Value(t)
+		= asset->sm_mtg[mp][0]->Column(col_number_accrued_interest).Value(t)
 		  * local_multiplicative_factor;
 
 		local_market_value
-		= current_mtg_element->Column(col_number_market_value).Value(t)
+		= asset->sm_mtg[mp][0]->Column(col_number_market_value).Value(t)
 		  * local_multiplicative_factor;
 
 		local_unrealized_capital_gains
-		= current_mtg_element->Column(col_number_unrealized_capital_gains).Value(t)
+		= asset->sm_mtg[mp][0]->Column(col_number_unrealized_capital_gains).Value(t)
 		  * local_multiplicative_factor;
 
 		sub_port_class_fund_initial_market_value[sub_port_number][sale_class][fund_index]
@@ -2724,9 +2761,9 @@ if (seg->mtg_mp_map_active.size())
 			else
 			log_screen << " " << setw(18) << setprecision(6) << 0.0
 					<< " " << setw(18) << setprecision(6) << 0.0;
-			log_screen << " " << setw(10) << current_mtg_element->asset_id
-					<< " |" << current_mtg_element->modelName
-					<< " " << current_mtg_element->asset_purp
+			log_screen << " " << setw(10) << asset->sm_mtg[mp][0]->asset_id
+					<< " |" << asset->sm_mtg[mp][0]->modelName
+					<< " " << asset->sm_mtg[mp][0]->asset_purp
 					<< MSG_ERROR;
 			}
 #endif
@@ -2735,8 +2772,7 @@ if (seg->mtg_mp_map_active.size())
 #endif
 
 #if defined(__SEC_ASSET_H_)
-SEC_ASSET *current_sec_element;
-if (seg->sec_mp_map_active.size())
+if (seg_element->sec_mp_map_active.size())
 	{
 	col_number_asset_sub_port_number = asset->sm_sec[0]->Column(xstring_asset_sub_port_number).Number();
 	col_number_accrued_interest = asset->sm_sec[0]->Column(xstring_initial_accrued_interest).Number();
@@ -2745,44 +2781,43 @@ if (seg->sec_mp_map_active.size())
 	col_number_notional_amount = asset->sm_sec[0]->Column("notional_amt").Number();
 	col_number_unrealized_capital_gains = asset->sm_sec[0]->Column(xstring_initial_unrealized_capital_gains).Number();
 
-	for (mp_map_iter = seg->sec_mp_map_active.begin();
-		 mp_map_iter != seg->sec_mp_map_active.end();
+	for (mp_map_iter = seg_element->sec_mp_map_active.begin();
+		 mp_map_iter != seg_element->sec_mp_map_active.end();
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		current_sec_element = asset->sm_sec[mp];
 
-		sub_port_number = xint(current_sec_element->Column(col_number_asset_sub_port_number).Value(t));
+		sub_port_number = xint(asset->sm_sec[mp]->Column(col_number_asset_sub_port_number).Value(t));
 
 		if (sum_type == SUM_OVER_POSITIVE
-			&& current_sec_element->neg_asset_flag < 0)
+			&& asset->sm_sec[mp]->neg_asset_flag < 0)
 			continue;
 
 		if (sum_type == SUM_OVER_NEGATIVE
-			&& current_sec_element->neg_asset_flag > 0)
+			&& asset->sm_sec[mp]->neg_asset_flag > 0)
 			continue;
 
 		if (asset->sm_asset_sub_port[seg_num][sub_port_number][0]->sub_ports_to_initialize_for_sale != 1
-			|| (t > max(0, current_sec_element->commencement_period)
-				&& current_sec_element->Column(col_number_notional_amount).Value(t - 1) < ASSET_ACTIVE_THRESHOLD)
-			|| (t == current_sec_element->commencement_period
-				&& current_sec_element->Column(col_number_notional_amount_before_pm_sales).Value(t) < ASSET_ACTIVE_THRESHOLD))
+			|| (t > max(0, asset->sm_sec[mp]->commencement_period)
+				&& asset->sm_sec[mp]->Column(col_number_notional_amount).Value(t - 1) < ASSET_ACTIVE_THRESHOLD)
+			|| (t == asset->sm_sec[mp]->commencement_period
+				&& asset->sm_sec[mp]->Column(col_number_notional_amount_before_pm_sales).Value(t) < ASSET_ACTIVE_THRESHOLD))
 			continue;
 
-		sale_class = current_sec_element->sale_class_id;
-		fund_index = current_sec_element->asset_fund_index;
-		local_multiplicative_factor = current_sec_element->pct_to_use;
+		sale_class = asset->sm_sec[mp]->sale_class_id;
+		fund_index = asset->sm_sec[mp]->asset_fund_index;
+		local_multiplicative_factor = asset->sm_sec[mp]->pct_to_use;
 
 		local_accrued_interest
-		= current_sec_element->Column(col_number_accrued_interest).Value(t)
+		= asset->sm_sec[mp]->Column(col_number_accrued_interest).Value(t)
 		  * local_multiplicative_factor;
 
 		local_market_value
-		= current_sec_element->Column(col_number_market_value).Value(t)
+		= asset->sm_sec[mp]->Column(col_number_market_value).Value(t)
 		  * local_multiplicative_factor;
 
 		local_unrealized_capital_gains
-		= current_sec_element->Column(col_number_unrealized_capital_gains).Value(t)
+		= asset->sm_sec[mp]->Column(col_number_unrealized_capital_gains).Value(t)
 		  * local_multiplicative_factor;
 
 		sub_port_class_fund_initial_market_value[sub_port_number][sale_class][fund_index]
@@ -2805,9 +2840,9 @@ if (seg->sec_mp_map_active.size())
 			else
 			log_screen << " " << setw(18) << setprecision(6) << 0.0
 					<< " " << setw(18) << setprecision(6) << 0.0;
-			log_screen << " " << setw(10) << current_sec_element->asset_id
-					<< " |" << current_sec_element->modelName
-					<< " " << current_sec_element->asset_purp
+			log_screen << " " << setw(10) << asset->sm_sec[mp]->asset_id
+					<< " |" << asset->sm_sec[mp]->modelName
+					<< " " << asset->sm_sec[mp]->asset_purp
 					<< MSG_ERROR;
 			}
 #endif
@@ -2816,54 +2851,52 @@ if (seg->sec_mp_map_active.size())
 #endif
 
 #if defined(__IRD_ASSET_H_)
-IRD_ASSET *current_ird_element;
-if (seg->ird_mp_map_active.size())
+if (seg_element->ird_mp_map_active.size())
 	{
-	col_number_asset_sub_port_number = asset->sm_ird[0]->Column(xstring_asset_sub_port_number).Number();
-	col_number_accrued_interest = asset->sm_ird[0]->Column(xstring_initial_accrued_interest).Number();
-	col_number_market_value = asset->sm_ird[0]->Column(xstring_initial_market_value).Number();
-	col_number_notional_amount_before_pm_sales = asset->sm_ird[0]->Column("notional_amt_bef_rebal_sale").Number();
-	col_number_notional_amount = asset->sm_ird[0]->Column("notional_amt").Number();
-	col_number_unrealized_capital_gains = asset->sm_ird[0]->Column(xstring_initial_unrealized_capital_gains).Number();
+	col_number_asset_sub_port_number = asset->sm_ird[0][0]->Column(xstring_asset_sub_port_number).Number();
+	col_number_accrued_interest = asset->sm_ird[0][0]->Column(xstring_initial_accrued_interest).Number();
+	col_number_market_value = asset->sm_ird[0][0]->Column(xstring_initial_market_value).Number();
+	col_number_notional_amount_before_pm_sales = asset->sm_ird[0][0]->Column("notional_amt_bef_rebal_sale").Number();
+	col_number_notional_amount = asset->sm_ird[0][0]->Column("notional_amt").Number();
+	col_number_unrealized_capital_gains = asset->sm_ird[0][0]->Column(xstring_initial_unrealized_capital_gains).Number();
 
-	for (mp_map_iter = seg->ird_mp_map_active.begin();
-		 mp_map_iter != seg->ird_mp_map_active.end();
+	for (mp_map_iter = seg_element->ird_mp_map_active.begin();
+		 mp_map_iter != seg_element->ird_mp_map_active.end();
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		current_ird_element = asset->sm_ird[mp];
 
-		sub_port_number = xint(current_ird_element->Column(col_number_asset_sub_port_number).Value(t));
+		sub_port_number = xint(asset->sm_ird[mp][0]->Column(col_number_asset_sub_port_number).Value(t));
 
 		if (sum_type == SUM_OVER_POSITIVE
-			&& current_ird_element->neg_asset_flag < 0)
+			&& asset->sm_ird[mp][0]->neg_asset_flag < 0)
 			continue;
 
 		if (sum_type == SUM_OVER_NEGATIVE
-			&& current_ird_element->neg_asset_flag > 0)
+			&& asset->sm_ird[mp][0]->neg_asset_flag > 0)
 			continue;
 
 		if (asset->sm_asset_sub_port[seg_num][sub_port_number][0]->sub_ports_to_initialize_for_sale != 1
-			|| (t > max(0, current_ird_element->commencement_period)
-				&& current_ird_element->Column(col_number_notional_amount).Value(t - 1) < ASSET_ACTIVE_THRESHOLD)
-			|| (t == current_ird_element->commencement_period
-				&& current_ird_element->Column(col_number_notional_amount_before_pm_sales).Value(t) < ASSET_ACTIVE_THRESHOLD))
+			|| (t > max(0, asset->sm_ird[mp][0]->commencement_period)
+				&& asset->sm_ird[mp][0]->Column(col_number_notional_amount).Value(t - 1) < ASSET_ACTIVE_THRESHOLD)
+			|| (t == asset->sm_ird[mp][0]->commencement_period
+				&& asset->sm_ird[mp][0]->Column(col_number_notional_amount_before_pm_sales).Value(t) < ASSET_ACTIVE_THRESHOLD))
 			continue;
 
-		sale_class = current_ird_element->sale_class_id;
-		fund_index = current_ird_element->asset_fund_index;
-		local_multiplicative_factor = current_ird_element->pct_to_use;
+		sale_class = asset->sm_ird[mp][0]->sale_class_id;
+		fund_index = asset->sm_ird[mp][0]->asset_fund_index;
+		local_multiplicative_factor = asset->sm_ird[mp][0]->pct_to_use;
 
 		local_accrued_interest
-		= current_ird_element->Column(col_number_accrued_interest).Value(t)
+		= asset->sm_ird[mp][0]->Column(col_number_accrued_interest).Value(t)
 		  * local_multiplicative_factor;
 
 		local_market_value
-		= current_ird_element->Column(col_number_market_value).Value(t)
+		= asset->sm_ird[mp][0]->Column(col_number_market_value).Value(t)
 		  * local_multiplicative_factor;
 
 		local_unrealized_capital_gains
-		= current_ird_element->Column(col_number_unrealized_capital_gains).Value(t)
+		= asset->sm_ird[mp][0]->Column(col_number_unrealized_capital_gains).Value(t)
 		  * local_multiplicative_factor;
 
 		sub_port_class_fund_initial_market_value[sub_port_number][sale_class][fund_index]
@@ -2886,9 +2919,9 @@ if (seg->ird_mp_map_active.size())
 			else
 			log_screen << " " << setw(18) << setprecision(6) << 0.0
 					<< " " << setw(18) << setprecision(6) << 0.0;
-			log_screen << " " << setw(10) << current_ird_element->asset_id
-					<< " |" << current_ird_element->modelName
-					<< " " << current_ird_element->asset_purp
+			log_screen << " " << setw(10) << asset->sm_ird[mp][0]->asset_id
+					<< " |" << asset->sm_ird[mp][0]->modelName
+					<< " " << asset->sm_ird[mp][0]->asset_purp
 					<< MSG_ERROR;
 			}
 #endif
@@ -2897,8 +2930,7 @@ if (seg->ird_mp_map_active.size())
 #endif
 
 #if defined(__RE_ASSET_H_)
-RE_ASSET *current_re_element;
-if (seg->re_mp_map_active.size())
+if (seg_element->re_mp_map_active.size())
 	{
 	col_number_asset_sub_port_number = asset->sm_re[0]->Column(xstring_asset_sub_port_number).Number();
 	col_number_accrued_rent = asset->sm_re[0]->Column(xstring_initial_accrued_rent).Number();
@@ -2907,44 +2939,43 @@ if (seg->re_mp_map_active.size())
 	col_number_notional_amount = asset->sm_re[0]->Column("notional_amt").Number();
 	col_number_unrealized_capital_gains = asset->sm_re[0]->Column(xstring_initial_unrealized_capital_gains).Number();
 
-	for (mp_map_iter = seg->re_mp_map_active.begin();
-		 mp_map_iter != seg->re_mp_map_active.end();
+	for (mp_map_iter = seg_element->re_mp_map_active.begin();
+		 mp_map_iter != seg_element->re_mp_map_active.end();
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		current_re_element = asset->sm_re[mp];
 
-		sub_port_number = xint(current_re_element->Column(col_number_asset_sub_port_number).Value(t));
+		sub_port_number = xint(asset->sm_re[mp]->Column(col_number_asset_sub_port_number).Value(t));
 
 		if (sum_type == SUM_OVER_POSITIVE
-			&& current_re_element->neg_asset_flag < 0)
+			&& asset->sm_re[mp]->neg_asset_flag < 0)
 			continue;
 
 		if (sum_type == SUM_OVER_NEGATIVE
-			&& current_re_element->neg_asset_flag > 0)
+			&& asset->sm_re[mp]->neg_asset_flag > 0)
 			continue;
 
 		if (asset->sm_asset_sub_port[seg_num][sub_port_number][0]->sub_ports_to_initialize_for_sale != 1
-			|| (t > max(0, current_re_element->commencement_period)
-				&& current_re_element->Column(col_number_notional_amount).Value(t - 1) < ASSET_ACTIVE_THRESHOLD)
-			|| (t == current_re_element->commencement_period
-				&& current_re_element->Column(col_number_notional_amount_before_pm_sales).Value(t) < ASSET_ACTIVE_THRESHOLD))
+			|| (t > max(0, asset->sm_re[mp]->commencement_period)
+				&& asset->sm_re[mp]->Column(col_number_notional_amount).Value(t - 1) < ASSET_ACTIVE_THRESHOLD)
+			|| (t == asset->sm_re[mp]->commencement_period
+				&& asset->sm_re[mp]->Column(col_number_notional_amount_before_pm_sales).Value(t) < ASSET_ACTIVE_THRESHOLD))
 			continue;
 
-		sale_class = current_re_element->sale_class_id;
-		fund_index = current_re_element->asset_fund_index;
-		local_multiplicative_factor = current_re_element->pct_to_use;
+		sale_class = asset->sm_re[mp]->sale_class_id;
+		fund_index = asset->sm_re[mp]->asset_fund_index;
+		local_multiplicative_factor = asset->sm_re[mp]->pct_to_use;
 
 		local_accrued_rent
-		= current_re_element->Column(col_number_accrued_rent).Value(t)
+		= asset->sm_re[mp]->Column(col_number_accrued_rent).Value(t)
 		  * local_multiplicative_factor;
 
 		local_market_value
-		= current_re_element->Column(col_number_market_value).Value(t)
+		= asset->sm_re[mp]->Column(col_number_market_value).Value(t)
 		  * local_multiplicative_factor;
 
 		local_unrealized_capital_gains
-		= current_re_element->Column(col_number_unrealized_capital_gains).Value(t)
+		= asset->sm_re[mp]->Column(col_number_unrealized_capital_gains).Value(t)
 		  * local_multiplicative_factor;
 
 		sub_port_class_fund_initial_market_value[sub_port_number][sale_class][fund_index]
@@ -2967,9 +2998,9 @@ if (seg->re_mp_map_active.size())
 			else
 			log_screen << " " << setw(18) << setprecision(6) << 0.0
 					<< " " << setw(18) << setprecision(6) << 0.0;
-			log_screen << " " << setw(10) << current_re_element->asset_id
-					<< " |" << current_re_element->modelName
-					<< " " << current_re_element->asset_purp
+			log_screen << " " << setw(10) << asset->sm_re[mp]->asset_id
+					<< " |" << asset->sm_re[mp]->modelName
+					<< " " << asset->sm_re[mp]->asset_purp
 					<< MSG_ERROR;
 			}
 #endif
@@ -2978,8 +3009,7 @@ if (seg->re_mp_map_active.size())
 #endif
 
 #if defined(__EQT_ASSET_H_)
-EQT_ASSET *current_eqt_element;
-if (seg->eqt_mp_map_active.size())
+if (seg_element->eqt_mp_map_active.size())
 	{
 	col_number_asset_sub_port_number = asset->sm_eqt[0]->Column(xstring_asset_sub_port_number).Number();
 	col_number_market_value = asset->sm_eqt[0]->Column(xstring_initial_market_value).Number();
@@ -2987,40 +3017,39 @@ if (seg->eqt_mp_map_active.size())
 	col_number_notional_amount = asset->sm_eqt[0]->Column("notional_amt").Number();
 	col_number_unrealized_capital_gains = asset->sm_eqt[0]->Column(xstring_initial_unrealized_capital_gains).Number();
 
-	for (mp_map_iter = seg->eqt_mp_map_active.begin();
-		 mp_map_iter != seg->eqt_mp_map_active.end();
+	for (mp_map_iter = seg_element->eqt_mp_map_active.begin();
+		 mp_map_iter != seg_element->eqt_mp_map_active.end();
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		current_eqt_element = asset->sm_eqt[mp];
 
-		sub_port_number = xint(current_eqt_element->Column(col_number_asset_sub_port_number).Value(t));
+		sub_port_number = xint(asset->sm_eqt[mp]->Column(col_number_asset_sub_port_number).Value(t));
 
 		if (sum_type == SUM_OVER_POSITIVE
-			&& current_eqt_element->neg_asset_flag < 0)
+			&& asset->sm_eqt[mp]->neg_asset_flag < 0)
 			continue;
 
 		if (sum_type == SUM_OVER_NEGATIVE
-			&& current_eqt_element->neg_asset_flag > 0)
+			&& asset->sm_eqt[mp]->neg_asset_flag > 0)
 			continue;
 
 		if (asset->sm_asset_sub_port[seg_num][sub_port_number][0]->sub_ports_to_initialize_for_sale != 1
-			|| (t > max(0, current_eqt_element->commencement_period)
-				&& current_eqt_element->Column(col_number_notional_amount).Value(t - 1) < ASSET_ACTIVE_THRESHOLD)
-			|| (t == current_eqt_element->commencement_period
-				&& current_eqt_element->Column(col_number_notional_amount_before_pm_sales).Value(t) < ASSET_ACTIVE_THRESHOLD))
+			|| (t > max(0, asset->sm_eqt[mp]->commencement_period)
+				&& asset->sm_eqt[mp]->Column(col_number_notional_amount).Value(t - 1) < ASSET_ACTIVE_THRESHOLD)
+			|| (t == asset->sm_eqt[mp]->commencement_period
+				&& asset->sm_eqt[mp]->Column(col_number_notional_amount_before_pm_sales).Value(t) < ASSET_ACTIVE_THRESHOLD))
 			continue;
 
-		sale_class = current_eqt_element->sale_class_id;
-		fund_index = current_eqt_element->asset_fund_index;
-		local_multiplicative_factor = current_eqt_element->pct_to_use;
+		sale_class = asset->sm_eqt[mp]->sale_class_id;
+		fund_index = asset->sm_eqt[mp]->asset_fund_index;
+		local_multiplicative_factor = asset->sm_eqt[mp]->pct_to_use;
 
 		local_market_value
-		= current_eqt_element->Column(col_number_market_value).Value(t)
+		= asset->sm_eqt[mp]->Column(col_number_market_value).Value(t)
 		  * local_multiplicative_factor;
 
 		local_unrealized_capital_gains
-		= current_eqt_element->Column(col_number_unrealized_capital_gains).Value(t)
+		= asset->sm_eqt[mp]->Column(col_number_unrealized_capital_gains).Value(t)
 		  * local_multiplicative_factor;
 
 		sub_port_class_fund_initial_market_value[sub_port_number][sale_class][fund_index]
@@ -3043,9 +3072,9 @@ if (seg->eqt_mp_map_active.size())
 			else
 			log_screen << " " << setw(18) << setprecision(6) << 0.0
 					<< " " << setw(18) << setprecision(6) << 0.0;
-			log_screen << " " << setw(10) << current_eqt_element->asset_id
-					<< " |" << current_eqt_element->modelName
-					<< " " << current_eqt_element->asset_purp
+			log_screen << " " << setw(10) << asset->sm_eqt[mp]->asset_id
+					<< " |" << asset->sm_eqt[mp]->modelName
+					<< " " << asset->sm_eqt[mp]->asset_purp
 					<< MSG_ERROR;
 			}
 #endif
@@ -3054,8 +3083,7 @@ if (seg->eqt_mp_map_active.size())
 #endif
 
 #if defined(__EIO_ASSET_H_)
-EIO_ASSET *current_eio_element;
-if (seg->eio_mp_map_active.size())
+if (seg_element->eio_mp_map_active.size())
 	{
 	col_number_asset_sub_port_number = asset->sm_eio[0]->Column(xstring_asset_sub_port_number).Number();
 	col_number_market_value = asset->sm_eio[0]->Column(xstring_initial_market_value).Number();
@@ -3063,40 +3091,39 @@ if (seg->eio_mp_map_active.size())
 	col_number_notional_amount = asset->sm_eio[0]->Column("notional_amt").Number();
 	col_number_unrealized_capital_gains = asset->sm_eio[0]->Column(xstring_initial_unrealized_capital_gains).Number();
 
-	for (mp_map_iter = seg->eio_mp_map_active.begin();
-		 mp_map_iter != seg->eio_mp_map_active.end();
+	for (mp_map_iter = seg_element->eio_mp_map_active.begin();
+		 mp_map_iter != seg_element->eio_mp_map_active.end();
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		current_eio_element = asset->sm_eio[mp];
 
-		sub_port_number = xint(current_eio_element->Column(col_number_asset_sub_port_number).Value(t));
+		sub_port_number = xint(asset->sm_eio[mp][0]->Column(col_number_asset_sub_port_number).Value(t));
 
 		if (sum_type == SUM_OVER_POSITIVE
-			&& current_eio_element->neg_asset_flag < 0)
+			&& asset->sm_eio[mp][0]->neg_asset_flag < 0)
 			continue;
 
 		if (sum_type == SUM_OVER_NEGATIVE
-			&& current_eio_element->neg_asset_flag > 0)
+			&& asset->sm_eio[mp][0]->neg_asset_flag > 0)
 			continue;
 
 		if (asset->sm_asset_sub_port[seg_num][sub_port_number][0]->sub_ports_to_initialize_for_sale != 1
-			|| (t > max(0, current_eio_element->commencement_period)
-				&& current_eio_element->Column(col_number_notional_amount).Value(t - 1) < ASSET_ACTIVE_THRESHOLD)
-			|| (t == current_eio_element->commencement_period
-				&& current_eio_element->Column(col_number_notional_amount_before_pm_sales).Value(t) < ASSET_ACTIVE_THRESHOLD))
+			|| (t > max(0, asset->sm_eio[mp][0]->commencement_period)
+				&& asset->sm_eio[mp][0]->Column(col_number_notional_amount).Value(t - 1) < ASSET_ACTIVE_THRESHOLD)
+			|| (t == asset->sm_eio[mp][0]->commencement_period
+				&& asset->sm_eio[mp][0]->Column(col_number_notional_amount_before_pm_sales).Value(t) < ASSET_ACTIVE_THRESHOLD))
 			continue;
 
-		sale_class = current_eio_element->sale_class_id;
-		fund_index = current_eio_element->asset_fund_index;
-		local_multiplicative_factor = current_eio_element->pct_to_use;
+		sale_class = asset->sm_eio[mp][0]->sale_class_id;
+		fund_index = asset->sm_eio[mp][0]->asset_fund_index;
+		local_multiplicative_factor = asset->sm_eio[mp][0]->pct_to_use;
 
 		local_market_value
-		= current_eio_element->Column(col_number_market_value).Value(t)
+		= asset->sm_eio[mp][0]->Column(col_number_market_value).Value(t)
 		  * local_multiplicative_factor;
 
 		local_unrealized_capital_gains
-		= current_eio_element->Column(col_number_unrealized_capital_gains).Value(t)
+		= asset->sm_eio[mp][0]->Column(col_number_unrealized_capital_gains).Value(t)
 		  * local_multiplicative_factor;
 
 		sub_port_class_fund_initial_market_value[sub_port_number][sale_class][fund_index]
@@ -3119,9 +3146,9 @@ if (seg->eio_mp_map_active.size())
 			else
 			log_screen << " " << setw(18) << setprecision(6) << 0.0
 					<< " " << setw(18) << setprecision(6) << 0.0;
-			log_screen << " " << setw(10) << current_eio_element->asset_id
-					<< " |" << current_eio_element->modelName
-					<< " " << current_eio_element->asset_purp
+			log_screen << " " << setw(10) << asset->sm_eio[mp][0]->asset_id
+					<< " |" << asset->sm_eio[mp][0]->modelName
+					<< " " << asset->sm_eio[mp][0]->asset_purp
 					<< MSG_ERROR;
 			}
 #endif
@@ -3130,8 +3157,7 @@ if (seg->eio_mp_map_active.size())
 #endif
 
 #if defined(__EPA_ASSET_H_)
-EPA_ASSET *current_epa_element;
-if (seg->epa_mp_map_active.size())
+if (seg_element->epa_mp_map_active.size())
 	{
 	col_number_asset_sub_port_number = asset->sm_epa[0]->Column(xstring_asset_sub_port_number).Number();
 	col_number_accrued_interest = asset->sm_epa[0]->Column(xstring_initial_accrued_interest).Number();
@@ -3140,44 +3166,43 @@ if (seg->epa_mp_map_active.size())
 	col_number_notional_amount = asset->sm_epa[0]->Column("notional_amt").Number();
 	col_number_unrealized_capital_gains = asset->sm_epa[0]->Column(xstring_initial_unrealized_capital_gains).Number();
 
-	for (mp_map_iter = seg->epa_mp_map_active.begin();
-		 mp_map_iter != seg->epa_mp_map_active.end();
+	for (mp_map_iter = seg_element->epa_mp_map_active.begin();
+		 mp_map_iter != seg_element->epa_mp_map_active.end();
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		current_epa_element = asset->sm_epa[mp];
 
-		sub_port_number = xint(current_epa_element->Column(col_number_asset_sub_port_number).Value(t));
+		sub_port_number = xint(asset->sm_epa[mp]->Column(col_number_asset_sub_port_number).Value(t));
 
 		if (sum_type == SUM_OVER_POSITIVE
-			&& current_epa_element->neg_asset_flag < 0)
+			&& asset->sm_epa[mp]->neg_asset_flag < 0)
 			continue;
 
 		if (sum_type == SUM_OVER_NEGATIVE
-			&& current_epa_element->neg_asset_flag > 0)
+			&& asset->sm_epa[mp]->neg_asset_flag > 0)
 			continue;
 
 		if (asset->sm_asset_sub_port[seg_num][sub_port_number][0]->sub_ports_to_initialize_for_sale != 1
-			|| (t > max(0, current_epa_element->commencement_period)
-				&& current_epa_element->Column(col_number_notional_amount).Value(t - 1) < ASSET_ACTIVE_THRESHOLD)
-			|| (t == current_epa_element->commencement_period
-				&& current_epa_element->Column(col_number_notional_amount_before_pm_sales).Value(t) < ASSET_ACTIVE_THRESHOLD))
+			|| (t > max(0, asset->sm_epa[mp]->commencement_period)
+				&& asset->sm_epa[mp]->Column(col_number_notional_amount).Value(t - 1) < ASSET_ACTIVE_THRESHOLD)
+			|| (t == asset->sm_epa[mp]->commencement_period
+				&& asset->sm_epa[mp]->Column(col_number_notional_amount_before_pm_sales).Value(t) < ASSET_ACTIVE_THRESHOLD))
 			continue;
 
-		sale_class = current_epa_element->sale_class_id;
-		fund_index = current_epa_element->asset_fund_index;
-		local_multiplicative_factor = current_epa_element->pct_to_use;
+		sale_class = asset->sm_epa[mp]->sale_class_id;
+		fund_index = asset->sm_epa[mp]->asset_fund_index;
+		local_multiplicative_factor = asset->sm_epa[mp]->pct_to_use;
 
 		local_accrued_interest
-		= current_epa_element->Column(col_number_accrued_interest).Value(t)
+		= asset->sm_epa[mp]->Column(col_number_accrued_interest).Value(t)
 		  * local_multiplicative_factor;
 
 		local_market_value
-		= current_epa_element->Column(col_number_market_value).Value(t)
+		= asset->sm_epa[mp]->Column(col_number_market_value).Value(t)
 		  * local_multiplicative_factor;
 
 		local_unrealized_capital_gains
-		= current_epa_element->Column(col_number_unrealized_capital_gains).Value(t)
+		= asset->sm_epa[mp]->Column(col_number_unrealized_capital_gains).Value(t)
 		  * local_multiplicative_factor;
 
 		sub_port_class_fund_initial_market_value[sub_port_number][sale_class][fund_index]
@@ -3201,9 +3226,9 @@ if (seg->epa_mp_map_active.size())
 			else
 			log_screen << " " << setw(18) << setprecision(6) << 0.0
 					<< " " << setw(18) << setprecision(6) << 0.0;
-			log_screen << " " << setw(10) << current_epa_element->asset_id
-					<< " |" << current_epa_element->modelName
-					<< " " << current_epa_element->asset_purp
+			log_screen << " " << setw(10) << asset->sm_epa[mp]->asset_id
+					<< " |" << asset->sm_epa[mp]->modelName
+					<< " " << asset->sm_epa[mp]->asset_purp
 					<< MSG_ERROR;
 			}
 #endif
@@ -3214,7 +3239,6 @@ if (seg->epa_mp_map_active.size())
 return 1.0;
 
 }
-
 
 #undef NO_AVG
 #define NO_AVG The_Real_NO_AVG
@@ -3241,7 +3265,7 @@ if (t < 0)
 if (t == 0)
 	{
 	if (time_step_flag && valn_period > 0)
-		return seg->init_interim_cash;
+		return seg_element->init_interim_cash * seg_element->initial_asset_pct_to_use_time_step;
 
 	return NO_AVG;
 	}
@@ -3276,7 +3300,6 @@ if (fabs(local_interim_cash_inv) > aggregate_amount_threshold)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -3314,12 +3337,11 @@ if (cash_flow_for_asset_purch < 0.0
 else if (!use_dur_match_strat(t))
 	inv_strat_select(t, CURRENT, DO_NOT_ISSUE_WARNINGS, warnings);
 
-
 if (cash_tgt_pct > (1.0 - rate_ratio_threshold))
 	return NO_AVG;
 
 if (asset->asset_detail_rpt_inv_strat_flag(t))
-	seg->SALFile << endl
+	seg_element->SALFile << endl
 				 << "EOM Current Strategy Investments " << endl
 				 << "Selected Current Strategy Label," << inv_strat_id << endl
 				 << "Selected Current Cash Percentage," << cash_tgt_pct << endl
@@ -3330,7 +3352,6 @@ return buy_assets_inv(t,
 				cash_flow_for_asset_purch);
 
 }
-
 
 //@@ END
 
@@ -3365,7 +3386,6 @@ return -cash_flow_for_asset_purch(t);
 
 }
 
-
 //@@ END
 
 //@@ START - inv_eom_flag
@@ -3383,18 +3403,22 @@ double INVSTRAT_ASSET_UDF::invstrat_asset_inv_eom_flag(int t) {
 if (t <= 0)
 	return NO_AVG;
 
-if (cal_yr_relative(t) <= yrs_to_inv_mthly
-	|| ((cal_yr_relative(t) > yrs_to_inv_mthly)
-	     && (cal_yr_relative(t) <= (yrs_to_inv_mthly + yrs_to_inv_qtrly))
+seg_id = seg_id;
+int yrs_to_inv_mthly_local = yrs_to_inv_mthly;
+seg_id = seg_id;
+int yrs_to_inv_qtrly_local = yrs_to_inv_qtrly;
+
+if (cal_yr_relative(t) <= yrs_to_inv_mthly_local
+	|| ((cal_yr_relative(t) > yrs_to_inv_mthly_local)
+	     && (cal_yr_relative(t) <= (yrs_to_inv_mthly_local + yrs_to_inv_qtrly_local))
 		 	&& xint(cal_mth(t)) % 3 == 0)
-	|| ((cal_yr_relative(t) > (yrs_to_inv_mthly + yrs_to_inv_qtrly))
+	|| ((cal_yr_relative(t) > (yrs_to_inv_mthly_local + yrs_to_inv_qtrly_local))
 		&& xint(cal_mth(t)) % 12 == 0))
 	return 1;
 
 return 0;
 
 }
-
 
 //@@ END
 
@@ -3416,13 +3440,12 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 if (t <= 0)
 	return NO_AVG;
 
-return seg->sum_over_assets("bk_val_plus_accr_int_bef_rebal_sale", t, SUM_OVER_ALL, 
+return seg_element->sum_over_assets("bk_val_plus_accr_int_bef_rebal_sale", t, SUM_OVER_ALL, 
 							SUM_OVER_ALL, SUM_OVER_ALL, BEFORE_PM_SALE)
 	   + cash(t - 1)
 	   + cash_flow_for_inv_bef_rebal(t);
 
 }
-
 
 //@@ END
 
@@ -3447,16 +3470,18 @@ if (t <= 0)
 if (t > 0 && asset->mths_to_next_mkt_val_calc(t) != 0)
 	return NO_AVG;
 
-if (rebal_dur_match_defn == NO)
-	return seg->sum_over_assets("mkt_val_for_dur_bef_neg_cash_flow_sale", t, SUM_OVER_ALL, 
+seg_id = seg_id;
+StrEnum::EnumValue rebal_dur_match_defn_local = rebal_dur_match_defn;
+
+if (rebal_dur_match_defn_local == NO)
+	return seg_element->sum_over_assets("mkt_val_for_dur_bef_neg_cash_flow_sale", t, SUM_OVER_ALL, 
 								SUM_OVER_ALL, INVESTMENT_FUND_INDEX, BEFORE_NCF_SALE);
 
 // else rebal_dur_match_defn == YES
-return seg->sum_over_assets("mkt_val_for_dur_bef_rebal_sale", t, SUM_OVER_ALL, 
+return seg_element->sum_over_assets("mkt_val_for_dur_bef_rebal_sale", t, SUM_OVER_ALL, 
 							SUM_OVER_ALL, INVESTMENT_FUND_INDEX, BEFORE_PM_SALE);
 
 }
-
 
 //@@ END
 
@@ -3479,12 +3504,11 @@ if (t <= 0)
 	return NO_AVG;
 
 if (use_dur_match_strat(t))
-	return seg->sum_over_assets("mkt_val_purch", t, SUM_OVER_ALL, SUM_OVER_ALL, INVESTMENT_FUND_INDEX, END_OF_PERIOD);
+	return seg_element->sum_over_assets("mkt_val_purch", t, SUM_OVER_ALL, SUM_OVER_ALL, INVESTMENT_FUND_INDEX, END_OF_PERIOD);
 
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -3511,15 +3535,14 @@ if (fabs(cash_flow_planned_sale(t))
 	+ fabs(cash_net_neg_cash_flow_sale(t)) > model_point_amount_threshold)
 	{
 	mv_sold
-	= seg->sum_over_assets("mkt_val_sold", t, SUM_OVER_ALL, SUM_OVER_ALL, SUM_OVER_ALL, BEFORE_EOM_PURCH)
-      + seg->sum_over_assets("accr_int_sold", t, SUM_OVER_ALL, SUM_OVER_ALL, SUM_OVER_ALL, BEFORE_EOM_PURCH)
-      + seg->sum_over_assets("accr_rent_sold", t, SUM_OVER_ALL, SUM_OVER_ALL, SUM_OVER_ALL, BEFORE_EOM_PURCH);
+	= seg_element->sum_over_assets("mkt_val_sold", t, SUM_OVER_ALL, SUM_OVER_ALL, SUM_OVER_ALL, BEFORE_EOM_PURCH)
+      + seg_element->sum_over_assets("accr_int_sold", t, SUM_OVER_ALL, SUM_OVER_ALL, SUM_OVER_ALL, BEFORE_EOM_PURCH)
+      + seg_element->sum_over_assets("accr_rent_sold", t, SUM_OVER_ALL, SUM_OVER_ALL, SUM_OVER_ALL, BEFORE_EOM_PURCH);
 	}
 
 return mv_sold;
 
 }
-
 
 //@@ END
 
@@ -3540,12 +3563,11 @@ if (t <= 0)
 
 if (fabs(cash_flow_planned_sale(t))
 	+ fabs(cash_flow_rebal(t)) > model_point_amount_threshold)
-	return seg->sum_over_assets("mkt_val_for_dur_sold", t, SUM_OVER_ALL, SUM_OVER_ALL, INVESTMENT_FUND_INDEX, END_OF_PERIOD);
+	return seg_element->sum_over_assets("mkt_val_for_dur_sold", t, SUM_OVER_ALL, SUM_OVER_ALL, INVESTMENT_FUND_INDEX, END_OF_PERIOD);
 				 
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -3570,16 +3592,18 @@ if (t <= 0)
 if (t > 0 && asset->mths_to_next_mkt_val_calc(t) != 0)
 	return NO_AVG;
 
-if (rebal_dur_match_defn == NO)
-	return seg->sum_over_assets("mkt_val_times_dur_bef_neg_cash_flow_sale", t, SUM_OVER_ALL, 
+seg_id = seg_id;
+StrEnum::EnumValue rebal_dur_match_defn_local = rebal_dur_match_defn;
+
+if (rebal_dur_match_defn_local == NO)
+	return seg_element->sum_over_assets("mkt_val_times_dur_bef_neg_cash_flow_sale", t, SUM_OVER_ALL, 
 								SUM_OVER_ALL, INVESTMENT_FUND_INDEX, BEFORE_NCF_SALE);
 
 // else if (rebal_dur_match_defn == YES)
-return seg->sum_over_assets("mkt_val_times_dur_bef_rebal_sale", t, SUM_OVER_ALL, 
+return seg_element->sum_over_assets("mkt_val_times_dur_bef_rebal_sale", t, SUM_OVER_ALL, 
 							SUM_OVER_ALL, INVESTMENT_FUND_INDEX, BEFORE_PM_SALE);
 
 }
-
 
 //@@ END
 
@@ -3601,24 +3625,27 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 if (t < 0)
        return NO_AVG;
 
+seg_id = seg_id;
+StrEnum::EnumValue rebal_freq_local = rebal_freq;
+
 if (t == 0)
        {
-       if (rebal_freq == ANNUALLY)
+       if (rebal_freq_local == ANNUALLY)
               return 12 - ((proj_start_mth - 1) % 12);
        
-       if (rebal_freq == AT_ASSET_FREQUENCY)
+       if (rebal_freq_local == AT_ASSET_FREQUENCY)
               return asset->mths_to_next_mkt_val_calc(t);
 
-       if (rebal_freq == MONTHLY)
+       if (rebal_freq_local == MONTHLY)
               return 1;
 
-       if (rebal_freq == QUARTERLY)
+       if (rebal_freq_local == QUARTERLY)
               return 3 - ((proj_start_mth - 1) % 3);
 
-       if (rebal_freq == SEMIANNUALLY)
+       if (rebal_freq_local == SEMIANNUALLY)
               return 6 - ((proj_start_mth - 1) % 6);
 
-       // else rebal_freq == NOT_APPLICABLE
+       // else rebal_freq_local == NOT_APPLICABLE
        return 9999;
        }
 
@@ -3626,29 +3653,28 @@ if (mths_to_rebal(t - 1) > 0)
        return mths_to_rebal(t - 1) - 1;
 
 if (mths_to_rebal(t - 1) == 0
-       && rebal_freq == ANNUALLY)
+       && rebal_freq_local == ANNUALLY)
        return 11;
 
 if (mths_to_rebal(t - 1) == 0
-       && rebal_freq == AT_ASSET_FREQUENCY)
+       && rebal_freq_local == AT_ASSET_FREQUENCY)
        return asset->mths_to_next_mkt_val_calc(t);
 
 if (mths_to_rebal(t - 1) == 0
-       && rebal_freq == MONTHLY)
+       && rebal_freq_local == MONTHLY)
        return 0;
 
 if (mths_to_rebal(t - 1) == 0
-       && rebal_freq == QUARTERLY)
+       && rebal_freq_local == QUARTERLY)
        return 2;
 
 if (mths_to_rebal(t - 1) == 0
-       && rebal_freq == SEMIANNUALLY)
+       && rebal_freq_local == SEMIANNUALLY)
        return 5;
 
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -3670,11 +3696,10 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 if (t <= 0)
 	return NO_AVG;
 
-return seg->sum_over_assets("refinance_bk_val", t, SUM_OVER_ALL, 
+return seg_element->sum_over_assets("refinance_bk_val", t, SUM_OVER_ALL, 
 							SUM_OVER_ALL, INVESTMENT_FUND_INDEX, BEFORE_SALE);
 
 }
-
 
 //@@ END
 
@@ -3696,11 +3721,10 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 if (t <= 0)
 	return NO_AVG;
 
-return seg->sum_over_assets("refinance_bk_val_neg_assets", t, SUM_OVER_ALL, 
+return seg_element->sum_over_assets("refinance_bk_val_neg_assets", t, SUM_OVER_ALL, 
 							SUM_OVER_ALL, INVESTMENT_FUND_INDEX, BEFORE_SALE);
 
 }
-
 
 //@@ END
 
@@ -3729,7 +3753,7 @@ if (asset_id < 0)
 	return NO_AVG;
 
 double aggregate_refinance_cost_basis
-= seg->sum_over_assets("refinance_cost_basis", t, SUM_OVER_ALL, 
+= seg_element->sum_over_assets("refinance_cost_basis", t, SUM_OVER_ALL, 
 					   SUM_OVER_ALL, INVESTMENT_FUND_INDEX, BEFORE_SALE);
 
 if (fabs(aggregate_refinance_cost_basis) < model_point_amount_threshold)
@@ -3761,8 +3785,8 @@ if (asset->asset_detail_rpt_pv_defn == YES
 if (asset->asset_detail_rpt_inv_strat_defn == YES
 	&& asset->asset_detail_rpt_flag(t))
 	{
-	seg->SALFile << endl;
-	seg->SALFile << "Purchasing Refinance Assets"
+	seg_element->SALFile << endl;
+	seg_element->SALFile << "Purchasing Refinance Assets"
 				 << " period=" << t
 				 << endl;
 	asset_detail_rpt_buy_purch_asset(t, HEADER);
@@ -3802,7 +3826,7 @@ else
 
 	// purchase positive asset
 	refinance_foreclosure_restructure_cost_basis
-	= refinance_cost_basis(t)
+	= aggregate_refinance_cost_basis
 	  - refinance_cost_basis_neg_asset(t);
 
 	refinance_foreclosure_restructure_bk_val
@@ -3835,7 +3859,6 @@ return aggregate_refinance_cost_basis;
 
 }
 
-
 //@@ END
 
 //@@ START - refinance_cost_basis_neg_asset
@@ -3856,11 +3879,10 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 if (t <= 0)
 	return NO_AVG;
 
-return seg->sum_over_assets("refinance_cost_basis_neg_asset", t, SUM_OVER_ALL, 
+return seg_element->sum_over_assets("refinance_cost_basis_neg_asset", t, SUM_OVER_ALL, 
 							SUM_OVER_ALL, INVESTMENT_FUND_INDEX, BEFORE_SALE);
 
 }
-
 
 //@@ END
 
@@ -3882,11 +3904,10 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 if (t <= 0)
 	return NO_AVG;
 
-return seg->sum_over_assets("refinance_prin", t, SUM_OVER_ALL, 
+return seg_element->sum_over_assets("refinance_prin", t, SUM_OVER_ALL, 
 							SUM_OVER_ALL, INVESTMENT_FUND_INDEX, BEFORE_SALE);
 
 }
-
 
 //@@ END
 
@@ -3908,11 +3929,10 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 if (t <= 0)
 	return NO_AVG;
 
-return seg->sum_over_assets("refinance_prin_neg_asset", t, SUM_OVER_ALL, 
+return seg_element->sum_over_assets("refinance_prin_neg_asset", t, SUM_OVER_ALL, 
 							SUM_OVER_ALL, INVESTMENT_FUND_INDEX, BEFORE_SALE);
 
 }
-
 
 //@@ END
 
@@ -3934,11 +3954,10 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 if (t <= 0)
 	return NO_AVG;
 
-return seg->sum_over_assets("restructure_bk_val_net_write_down", t, SUM_OVER_ALL, 
+return seg_element->sum_over_assets("restructure_bk_val_net_write_down", t, SUM_OVER_ALL, 
 							SUM_OVER_ALL, INVESTMENT_FUND_INDEX, BEFORE_SALE);
 
 }
-
 
 //@@ END
 
@@ -3960,11 +3979,10 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 if (t <= 0)
 	return NO_AVG;
 
-return seg->sum_over_assets("restructure_bk_val_net_write_down_neg_asset", t, SUM_OVER_ALL, 
+return seg_element->sum_over_assets("restructure_bk_val_net_write_down_neg_asset", t, SUM_OVER_ALL, 
 							SUM_OVER_ALL, INVESTMENT_FUND_INDEX, BEFORE_SALE);
 
 }
-
 
 //@@ END
 
@@ -3993,7 +4011,7 @@ if (asset_id < 0)
 	return NO_AVG;
 
 double aggregate_restructure_cost_basis_net_of_write_down
-= seg->sum_over_assets("restructure_cost_basis_net_write_down", t, SUM_OVER_ALL, 
+= seg_element->sum_over_assets("restructure_cost_basis_net_write_down", t, SUM_OVER_ALL, 
 					   SUM_OVER_ALL, INVESTMENT_FUND_INDEX, BEFORE_SALE);
 
 if (fabs(aggregate_restructure_cost_basis_net_of_write_down) < model_point_amount_threshold)
@@ -4025,8 +4043,8 @@ if (asset->asset_detail_rpt_pv_defn == YES
 if (asset->asset_detail_rpt_inv_strat_defn == YES
 	&& asset->asset_detail_rpt_flag(t))
 	{
-	seg->SALFile << endl;
-	seg->SALFile << "Purchasing Restructure Assets"
+	seg_element->SALFile << endl;
+	seg_element->SALFile << "Purchasing Restructure Assets"
 				 << " period=" << t
 				 << endl;
 	asset_detail_rpt_buy_purch_asset(t, HEADER);
@@ -4066,7 +4084,7 @@ else
 
 	// purchase positive asset
 	refinance_foreclosure_restructure_cost_basis
-	= restructure_cost_basis_net_write_down(t)
+	= aggregate_restructure_cost_basis_net_of_write_down
 	  - restructure_cost_basis_net_write_down_neg_asset(t);
 
 	refinance_foreclosure_restructure_bk_val
@@ -4099,7 +4117,6 @@ return aggregate_restructure_cost_basis_net_of_write_down;
 
 }
 
-
 //@@ END
 
 //@@ START - restructure_cost_basis_net_write_down_neg_asset
@@ -4120,11 +4137,10 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 if (t <= 0)
 	return NO_AVG;
 
-return seg->sum_over_assets("restructure_cost_basis_net_write_down_neg_asset", t, SUM_OVER_ALL, 
+return seg_element->sum_over_assets("restructure_cost_basis_net_write_down_neg_asset", t, SUM_OVER_ALL, 
 							SUM_OVER_ALL, INVESTMENT_FUND_INDEX, BEFORE_SALE);
 
 }
-
 
 //@@ END
 
@@ -4146,11 +4162,10 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 if (t <= 0)
 	return NO_AVG;
 
-return seg->sum_over_assets("restructure_prin_net_write_down", t, SUM_OVER_ALL, 
+return seg_element->sum_over_assets("restructure_prin_net_write_down", t, SUM_OVER_ALL, 
 							SUM_OVER_ALL, INVESTMENT_FUND_INDEX, BEFORE_SALE);
 
 }
-
 
 //@@ END
 
@@ -4172,11 +4187,10 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 if (t <= 0)
 	return NO_AVG;
 
-return seg->sum_over_assets("restructure_prin_net_write_down_neg_asset", t, SUM_OVER_ALL, 
+return seg_element->sum_over_assets("restructure_prin_net_write_down_neg_asset", t, SUM_OVER_ALL, 
 							SUM_OVER_ALL, INVESTMENT_FUND_INDEX, BEFORE_SALE);
 
 }
-
 
 //@@ END
 
@@ -4196,45 +4210,45 @@ if (t <= 0)
 	return NO_AVG;
 
 int mp;
-mpmap::iterator mp_map_iter;
+map <int, long, less <int> >::iterator mp_map_iter;
 
 #if defined(__BOND_ASSET_H_)
-for (mp_map_iter = seg->bond_mp_map_active.begin();
-	 mp_map_iter != seg->bond_mp_map_active.end();
+for (mp_map_iter = seg_element->bond_mp_map_active.begin();
+	 mp_map_iter != seg_element->bond_mp_map_active.end();
 	 mp_map_iter++)
 	{
 	mp = mp_map_iter->first;
-	if (asset->sm_bond[mp]->notional_amt(t - 1) < ASSET_ACTIVE_THRESHOLD)
+	if (asset->sm_bond[mp][0]->notional_amt(t - 1) < ASSET_ACTIVE_THRESHOLD)
 		continue;
 
-	if (asset->sm_bond[mp]->commencement_period <= t
-		&& (t == asset->sm_bond[mp]->planned_sale_period
-			|| asset->sm_bond[mp]->asset_min_size_sale_flag(t) == 1))
+	if (asset->sm_bond[mp][0]->commencement_period <= t
+		&& (t == asset->sm_bond[mp][0]->planned_sale_period
+			|| asset->sm_bond[mp][0]->asset_min_size_sale_flag(t) == 1))
 		return 1;
 	}
 #endif
 
 #if defined(__MTG_ASSET_H_)
-for (mp_map_iter = seg->mtg_mp_map_active.begin();
-	 mp_map_iter != seg->mtg_mp_map_active.end();
+for (mp_map_iter = seg_element->mtg_mp_map_active.begin();
+	 mp_map_iter != seg_element->mtg_mp_map_active.end();
 	 mp_map_iter++)
 	{
 	mp = mp_map_iter->first;
-	if ((t > asset->sm_mtg[mp]->commencement_period 
+	if ((t > asset->sm_mtg[mp][0]->commencement_period 
 		// allow for inclusion of restructure, foreclosure, refinance assets
-		&& asset->sm_mtg[mp]->notional_amt(t - 1) < ASSET_ACTIVE_THRESHOLD))
+		&& asset->sm_mtg[mp][0]->notional_amt(t - 1) < ASSET_ACTIVE_THRESHOLD))
 		continue;
 
-	if (asset->sm_mtg[mp]->commencement_period <= t
-		&& (t == asset->sm_mtg[mp]->planned_sale_period
-			|| asset->sm_mtg[mp]->asset_min_size_sale_flag(t) == 1))
+	if (asset->sm_mtg[mp][0]->commencement_period <= t
+		&& (t == asset->sm_mtg[mp][0]->planned_sale_period
+			|| asset->sm_mtg[mp][0]->asset_min_size_sale_flag(t) == 1))
 		return 1;
 	}
 #endif
 
 #if defined(__SEC_ASSET_H_)
-for (mp_map_iter = seg->sec_mp_map_active.begin();
-	 mp_map_iter != seg->sec_mp_map_active.end();
+for (mp_map_iter = seg_element->sec_mp_map_active.begin();
+	 mp_map_iter != seg_element->sec_mp_map_active.end();
 	 mp_map_iter++)
 	{
 	mp = mp_map_iter->first;
@@ -4249,24 +4263,24 @@ for (mp_map_iter = seg->sec_mp_map_active.begin();
 #endif
 
 #if defined(__IRD_ASSET_H_)
-for (mp_map_iter = seg->ird_mp_map_active.begin();
-	 mp_map_iter != seg->ird_mp_map_active.end();
+for (mp_map_iter = seg_element->ird_mp_map_active.begin();
+	 mp_map_iter != seg_element->ird_mp_map_active.end();
 	 mp_map_iter++)
 	{
 	mp = mp_map_iter->first;
-	if (asset->sm_ird[mp]->notional_amt(t - 1) < ASSET_ACTIVE_THRESHOLD)
+	if (asset->sm_ird[mp][0]->notional_amt(t - 1) < ASSET_ACTIVE_THRESHOLD)
 		continue;
 
-	if (asset->sm_ird[mp]->commencement_period <= t
-		&& (t == asset->sm_ird[mp]->planned_sale_period
-			|| asset->sm_ird[mp]->asset_min_size_sale_flag(t) == 1))
+	if (asset->sm_ird[mp][0]->commencement_period <= t
+		&& (t == asset->sm_ird[mp][0]->planned_sale_period
+			|| asset->sm_ird[mp][0]->asset_min_size_sale_flag(t) == 1))
 		return 1;
 	}
 #endif
 
 #if defined(__EQT_ASSET_H_)
-for (mp_map_iter = seg->eqt_mp_map_active.begin();
-	 mp_map_iter != seg->eqt_mp_map_active.end();
+for (mp_map_iter = seg_element->eqt_mp_map_active.begin();
+	 mp_map_iter != seg_element->eqt_mp_map_active.end();
 	 mp_map_iter++)
 	{
 	mp = mp_map_iter->first;
@@ -4281,8 +4295,8 @@ for (mp_map_iter = seg->eqt_mp_map_active.begin();
 #endif
 
 #if defined(__RE_ASSET_H_)
-for (mp_map_iter = seg->re_mp_map_active.begin();
-	 mp_map_iter != seg->re_mp_map_active.end();
+for (mp_map_iter = seg_element->re_mp_map_active.begin();
+	 mp_map_iter != seg_element->re_mp_map_active.end();
 	 mp_map_iter++)
 	{
 	mp = mp_map_iter->first;
@@ -4297,24 +4311,24 @@ for (mp_map_iter = seg->re_mp_map_active.begin();
 #endif
 
 #if defined(__EIO_ASSET_H_)
-for (mp_map_iter = seg->eio_mp_map_active.begin();
-	 mp_map_iter != seg->eio_mp_map_active.end();
+for (mp_map_iter = seg_element->eio_mp_map_active.begin();
+	 mp_map_iter != seg_element->eio_mp_map_active.end();
 	 mp_map_iter++)
 	{
 	mp = mp_map_iter->first;
-	if (asset->sm_eio[mp]->notional_amt(t - 1) < ASSET_ACTIVE_THRESHOLD)
+	if (asset->sm_eio[mp][0]->notional_amt(t - 1) < ASSET_ACTIVE_THRESHOLD)
 		continue;
 
-	if (asset->sm_eio[mp]->commencement_period <= t
-		&& (t == asset->sm_eio[mp]->planned_sale_period
-			|| asset->sm_eio[mp]->asset_min_size_sale_flag(t) == 1))
+	if (asset->sm_eio[mp][0]->commencement_period <= t
+		&& (t == asset->sm_eio[mp][0]->planned_sale_period
+			|| asset->sm_eio[mp][0]->asset_min_size_sale_flag(t) == 1))
 		return 1;
 	}
 #endif
 
 #if defined(__EPA_ASSET_H_)
-for (mp_map_iter = seg->epa_mp_map_active.begin();
-	 mp_map_iter != seg->epa_mp_map_active.end();
+for (mp_map_iter = seg_element->epa_mp_map_active.begin();
+	 mp_map_iter != seg_element->epa_mp_map_active.end();
 	 mp_map_iter++)
 	{
 	mp = mp_map_iter->first;
@@ -4330,7 +4344,6 @@ for (mp_map_iter = seg->epa_mp_map_active.begin();
 return 0;
 
 }
-
 
 //@@ END
 
@@ -4366,7 +4379,10 @@ if (neg_cash_flow_strat == SELL_ASSETS_TO_COVER_NEGATIVE_CASH_BALANCE
 		|| asset->mkt_val_calc_freq_sale == WHENEVER_NEEDED))
 	return 1;
 
-if (rebal_freq != NOT_APPLICABLE
+seg_id = seg_id;
+StrEnum::EnumValue rebal_freq_local = rebal_freq;
+
+if (rebal_freq_local != NOT_APPLICABLE
 	&& mths_to_rebal(t) == 0)
 	return 1;
 
@@ -4376,7 +4392,6 @@ if (dur_match_flag(t))
 return 0;
 
 }
-
 
 //@@ END
 
@@ -4406,6 +4421,15 @@ extern ofstream& YMFile;
 extern int pv_cp_asset_defn;
 extern int pv_cp_model_point;
 #endif
+
+sowmpoutput bond_state_of_world_header_mp_output;
+sowmpoutput mtg_state_of_world_header_mp_output;
+sowmpoutput sec_state_of_world_header_mp_output;
+sowmpoutput ird_state_of_world_header_mp_output;
+sowmpoutput re_state_of_world_header_mp_output;
+sowmpoutput eqt_state_of_world_header_mp_output;
+sowmpoutput eio_state_of_world_header_mp_output;
+sowmpoutput epa_state_of_world_header_mp_output;
 #endif // END_EXTERNS
 
 #if 0 // START_CLASS
@@ -4483,23 +4507,17 @@ SmartArray <SmartArray <double> > sub_port_fund_book_plus_accrued_purchases;
 SmartArray <SmartArray <SmartArray <double> > > sub_port_class_fund_accrued_interest_purchases;
 SmartArray <SmartArray <SmartArray <double> > > sub_port_class_fund_book_value_purchases;
 // Sales processing maps and multimaps
-typedef map <int, int, less<int> > mvmap;
-mvmap market_values_not_calculated_for_asset_sub_port_map;
-typedef multimap <pair<double,double>, pair<int,int>, less<pair<double,double> > > evmmap;
-evmmap extreme_value_multimap;
+map <int, int, less<int> > market_values_not_calculated_for_asset_sub_port_map;
+multimap <pair<double,double>, pair<int,int>, less<pair<double,double> > > extreme_value_multimap;
 
 StrEnum::EnumValue display_rebal_sales_header;
 
-typedef map <int, long, less <int> > mpmap;
-
 // Purchase asset map
-typedef map <xstring, int, less<xstring> > purchmap;
-purchmap purchmap_investment;
-purchmap purchmap_hedging; // for eio hedges
+map <xstring, int, less<xstring> > purchmap_investment;
+map <xstring, int, less<xstring> > purchmap_hedging; // for eio hedges
 
 // Investment strategy map
-typedef map <xstring, int, less<xstring> > stratmap;
-stratmap stratmap_inv;
+map <xstring, int, less<xstring> > stratmap_inv;
 
 // Purchase asset id vectors
 vector <string> purch_bond_assets;
@@ -4509,6 +4527,12 @@ vector <string> purch_ird_assets;
 vector <string> purch_re_assets;
 vector <string> purch_eqt_assets;
 vector <string> purch_eio_assets;
+
+A_SUBPORT_ASSET * current_sub_port;
+A_SUBPORT_ASSET * a_subport_element;
+
+SEG_COMP *seg_element;
+
 #endif // END_CLASS
 
 #if 0 // START_CONSTRUCTOR
@@ -4535,22 +4559,35 @@ purch_asset_max_num = 0;
 initialize_purch_asset_maps = true;
 neg_cash_flow_sales_priority_class_max = 0;
 
-prior_strategy_selected_t = NO_AVG;
-prior_strategy_set_t = NO_AVG;
+prior_strategy_selected_t = 0;
+prior_strategy_set_t = 0;
 prior_strategy_type = UNDEFINED;
 
-prior_neg_cash_flow_strategy_selected_t = NO_AVG;
-prior_neg_cash_flow_strategy_set_t = NO_AVG;
+prior_neg_cash_flow_strategy_selected_t = 0;
+prior_neg_cash_flow_strategy_set_t = 0;
 prior_neg_cash_flow_strategy_type = UNDEFINED;
 
 #endif // END_CONSTRUCTOR
 
+#if 0 // START_TERMINATOR
+bond_state_of_world_header_mp_output.close();
+mtg_state_of_world_header_mp_output.close();
+sec_state_of_world_header_mp_output.close();
+ird_state_of_world_header_mp_output.close();
+re_state_of_world_header_mp_output.close();
+eqt_state_of_world_header_mp_output.close();
+eio_state_of_world_header_mp_output.close();
+epa_state_of_world_header_mp_output.close();
+PVCFile.close();
+YMFile.close();
+#endif // END_TERMINATOR
+
+gen2_declarations;
 display_rebal_sales_header = NO;
 
 return 1.0;
 
 }
-
 
 //@@ END
 
@@ -4580,24 +4617,24 @@ initialize_sale_and_inv_vars_eom(t);
 
 if (asset->asset_detail_rpt_inv_strat_flag(t))
 	{
-	seg->SALFile << endl;
-	seg->SALFile << "Duration Matching Investment Strategy Determination"
+	seg_element->SALFile << endl;
+	seg_element->SALFile << "Duration Matching Investment Strategy Determination"
 				 << " (Period=" << t << " "
 				 << " Year=" << xint(cal_yr(t))
 				 << " Month=" << xint(cal_mth(t))
 				 << ")"
 				 << endl;
-	seg->SALFile << "Strategy Set Information:" << endl;
-	seg->SALFile << "Current," << inv_strat_current << endl;
-	seg->SALFile << "Negative," << inv_strat_neg << endl;
-	seg->SALFile << "AltShorter," << inv_strat_shorter << endl;
-	seg->SALFile << "AltShortest," << inv_strat_shortest << endl;
-	seg->SALFile << "AltLonger," << inv_strat_longer << endl;
-	seg->SALFile << "AltLongest," << inv_strat_longest << endl;
-	seg->SALFile << "Target," << dur_match_tgt(t) << endl;
-	seg->SALFile << "Tolerance," << dur_match_tolerance(t) << endl;
-	seg->SALFile << "Targ+Tol," << dur_match_tgt(t) + dur_match_tolerance(t) << endl;
-	seg->SALFile << "Targ-Tol," << dur_match_tgt(t) - dur_match_tolerance(t) << endl;
+	seg_element->SALFile << "Strategy Set Information:" << endl;
+	seg_element->SALFile << "Current," << inv_strat_current << endl;
+	seg_element->SALFile << "Negative," << inv_strat_neg << endl;
+	seg_element->SALFile << "AltShorter," << inv_strat_shorter << endl;
+	seg_element->SALFile << "AltShortest," << inv_strat_shortest << endl;
+	seg_element->SALFile << "AltLonger," << inv_strat_longer << endl;
+	seg_element->SALFile << "AltLongest," << inv_strat_longest << endl;
+	seg_element->SALFile << "Target," << dur_match_tgt(t) << endl;
+	seg_element->SALFile << "Tolerance," << dur_match_tolerance(t) << endl;
+	seg_element->SALFile << "Targ+Tol," << dur_match_tgt(t) + dur_match_tolerance(t) << endl;
+	seg_element->SALFile << "Targ-Tol," << dur_match_tgt(t) - dur_match_tolerance(t) << endl;
 	}
 
 for (int panum = 0; panum < purch_asset_max_num; panum++)
@@ -4611,7 +4648,7 @@ dur_bef_match(t);
 
 if (asset->asset_detail_rpt_inv_strat_flag(t))
 	{
-	seg->SALFile << "Duration Before Duration Matching =," << dur_bef_match(t) << ","
+	seg_element->SALFile << "Duration Before Duration Matching =," << dur_bef_match(t) << ","
 				 << "= [ " << setprecision(2) << mkt_val_times_dur_bef_dur_match(t)
 				 << " / " << setprecision(2) << mkt_val_for_dur_bef_dur_match(t)
 				 << " ]"
@@ -4623,7 +4660,10 @@ inv_strat_select(t, CURRENT, DO_NOT_ISSUE_WARNINGS, warnings);
 
 cash_flow_bef_rebal_sales = cash_flow_for_inv_bef_rebal(t);
 
-if (rebal_dur_match_defn == NO)
+seg_id = seg_id;
+StrEnum::EnumValue rebal_dur_match_defn_local = rebal_dur_match_defn;
+
+if (rebal_dur_match_defn_local == NO)
 	{
 	rebal_sales_cash_flow = cash_flow_rebal(t);	
 	rebal_sales_completed = YES;
@@ -4635,22 +4675,22 @@ cash_flow_for_inv = cash_flow_bef_rebal_sales + rebal_sales_cash_flow;
 
 if (asset->asset_detail_rpt_inv_strat_flag(t))
 	{
-	seg->SALFile << "Estimated Cash Flow For Investment" << endl;
-	seg->SALFile << setprecision(2);
-	seg->SALFile << "CashFlowForInvBefRebal," << setw(12) << cash_flow_bef_rebal_sales << endl;
-	seg->SALFile << (rebal_sales_completed == YES
+	seg_element->SALFile << "Estimated Cash Flow For Investment" << endl;
+	seg_element->SALFile << setprecision(2);
+	seg_element->SALFile << "CashFlowForInvBefRebal," << setw(12) << cash_flow_bef_rebal_sales << endl;
+	seg_element->SALFile << (rebal_sales_completed == YES
 				 ? " (+) RebalSalesNetCashFlow,"
 				 : " (+) EstimatedRebalSalesNetCashFlow,")
 				 << setw(12) << rebal_sales_cash_flow << endl;
-	seg->SALFile << ",--------------" << endl;
-	seg->SALFile << "CashFlowForInv," << setw(12) << cash_flow_for_inv << endl;
-	seg->SALFile << setprecision(6);
+	seg_element->SALFile << ",--------------" << endl;
+	seg_element->SALFile << "CashFlowForInv," << setw(12) << cash_flow_for_inv << endl;
+	seg_element->SALFile << setprecision(6);
 	}
 
 if (cash_flow_for_inv < 0.0)
 	{
 	if (asset->asset_detail_rpt_inv_strat_flag(t))
-		seg->SALFile << " ... <<<< DM - Negative Strategy Selected >>>> "
+		seg_element->SALFile << " ... <<<< DM - Negative Strategy Selected >>>> "
 				 << endl;
 
 	return NO_AVG;
@@ -4659,7 +4699,7 @@ if (cash_flow_for_inv < 0.0)
 // Current strategy produced positive cash flows;
 // Determine duration estimate for current strategy
 if (asset->asset_detail_rpt_inv_strat_flag(t))
-	seg->SALFile << " ... Duration Estimate For Current Strategy"
+	seg_element->SALFile << " ... Duration Estimate For Current Strategy"
 				 << endl;
 
 dur_based_on_current_strat
@@ -4671,7 +4711,7 @@ if (fabs(dur_based_on_current_strat
 	{
 	// Selected current strategy
 	if (asset->asset_detail_rpt_inv_strat_flag(t))
-		seg->SALFile << " ... <<<< DM - Current Strategy Selected. >>>>"
+		seg_element->SALFile << " ... <<<< DM - Current Strategy Selected. >>>>"
 					 << endl;
 
 	inv_strat_select(t, CURRENT, DO_NOT_ISSUE_WARNINGS, warnings);
@@ -4694,7 +4734,6 @@ return 1.0;
 
 }
 
-
 //@@ END
 
 //@@ START - final_period
@@ -4709,7 +4748,6 @@ int INVSTRAT_ASSET_UDF::invstrat_asset_final_period() {
 return last_proj_period;
 
 }
-
 
 //@@ END
 
@@ -4728,13 +4766,12 @@ if (foreclosure_inv_id.length() == 0
 
 xstring purchmap_index = "Mortgage:" + foreclosure_inv_id;
 
-purchmap::iterator purchmap_iter;
+map <xstring, int, less<xstring> >::iterator purchmap_iter;
 if ((purchmap_iter = purchmap_investment.find(purchmap_index)) != purchmap_investment.end())
 	return purchmap_iter->second;
 
 if (is_first_proj_task_loop)
 	{
-	makeRunLogYellow();
 	log_screen << "Warning: Unrecognized foreclosure_inv_id '"
 			   << foreclosure_inv_id
 			   << "'. Foreclosure assets cannot be purchased."
@@ -4744,7 +4781,6 @@ if (is_first_proj_task_loop)
 return -1;
 
 }
-
 
 //@@ END
 
@@ -4761,7 +4797,6 @@ return add_mths_to_date(proj_date, valn_period);
 
 }
 
-
 //@@ END
 
 //@@ START - proj_start_date
@@ -4773,10 +4808,9 @@ int INVSTRAT_ASSET_UDF::invstrat_asset_proj_start_date() {
 
 
 #line 1 "proj_start_date.INVSTRAT_ASSET.for"
-return MonthNumberFromDate(proj_start_yr, proj_start_mth);
+return day_number_from_date(proj_start_yr, proj_start_mth, 1);
 
 }
-
 
 //@@ END
 
@@ -4798,7 +4832,6 @@ return proj_mth + 1;
 
 }
 
-
 //@@ END
 
 //@@ START - proj_start_yr
@@ -4819,7 +4852,6 @@ return get_yr_from_date(proj_date_adj);
 
 }
 
-
 //@@ END
 
 //@@ START - rebal_sales_priority_class_max
@@ -4831,13 +4863,21 @@ int INVSTRAT_ASSET_UDF::invstrat_asset_rebal_sales_priority_class_max() {
 
 
 #line 1 "rebal_sales_priority_class_max.INVSTRAT_ASSET.for"
-return max(rebal_sale_priority_not_assigned,
-			max(rebal_sale_priority_avail_for_sale,
-				max(rebal_sale_priority_trading,
-					max(rebal_sale_priority_held_to_maturity, 1))));
+seg_id = seg_id;
+int rebal_sale_priority_not_assigned_local = rebal_sale_priority_not_assigned;
+seg_id = seg_id;
+int rebal_sale_priority_avail_for_sale_local = rebal_sale_priority_avail_for_sale;
+seg_id = seg_id;
+int rebal_sale_priority_trading_local = rebal_sale_priority_trading;
+seg_id = seg_id;
+int rebal_sale_priority_held_to_maturity_local = rebal_sale_priority_held_to_maturity;
+
+return max(rebal_sale_priority_not_assigned_local,
+			max(rebal_sale_priority_avail_for_sale_local,
+				max(rebal_sale_priority_trading_local,
+					max(rebal_sale_priority_held_to_maturity_local, 1))));
 
 }
-
 
 //@@ END
 
@@ -4856,13 +4896,12 @@ if (refinance_inv_id.length() == 0
 
 xstring purchmap_index = "Mortgage:" + refinance_inv_id;
 
-purchmap::iterator purchmap_iter;
+map <xstring, int, less<xstring> >::iterator purchmap_iter;
 if ((purchmap_iter = purchmap_investment.find(purchmap_index)) != purchmap_investment.end())
 	return purchmap_iter->second;
 
 if (is_first_proj_task_loop)
 	{
-	makeRunLogYellow();
 	log_screen << "Warning: Unrecognized refinance_inv_id '"
 			   << refinance_inv_id
 			   << "'. Refinance assets cannot be purchased."
@@ -4872,7 +4911,6 @@ if (is_first_proj_task_loop)
 return -1;
 
 }
-
 
 //@@ END
 
@@ -4891,13 +4929,12 @@ if (restructure_inv_id.length() == 0
 
 xstring purchmap_index = "Mortgage:" + restructure_inv_id;
 
-purchmap::iterator purchmap_iter;
+map <xstring, int, less<xstring> >::iterator purchmap_iter;
 if ((purchmap_iter = purchmap_investment.find(purchmap_index)) != purchmap_investment.end())
 	return purchmap_iter->second;
 
 if (is_first_proj_task_loop)
 	{
-	makeRunLogYellow();
 	log_screen << "Warning: Unrecognized restructure_inv_id '"
 			   << restructure_inv_id
 			   << "'. Restructure assets cannot be purchased."
@@ -4907,7 +4944,6 @@ if (is_first_proj_task_loop)
 return -1;
 
 }
-
 
 //@@ END
 
@@ -4935,7 +4971,6 @@ return local_max;
 
 }
 
-
 //@@ END
 
 //@@ START - seg_num
@@ -4952,7 +4987,6 @@ return getElementNumber();
 
 }
 
-
 //@@ END
 
 //@@ START - start_period
@@ -4967,7 +5001,6 @@ int INVSTRAT_ASSET_UDF::invstrat_asset_start_period() {
 return 0;
 
 }
-
 
 //@@ END
 
@@ -5001,14 +5034,14 @@ void INVSTRAT_ASSET::asset_detail_rpt_buy_purch_asset(int t, StrEnum::EnumValue 
 
 if (option == HEADER)
 	{
-	seg->SALFile << endl;
-	seg->SALFile << "AssetID,SubPortID,SalesClass,AssetFund,NotionalAmt,MarketValue,CostBasis,BookValue,YrsToMat,WAL,EffDur " << endl;
+	seg_element->SALFile << endl;
+	seg_element->SALFile << "AssetID,SubPortID,SalesClass,AssetFund,NotionalAmt,MarketValue,CostBasis,BookValue,YrsToMat,WAL,EffDur " << endl;
 	return;
 	}
 
 if (option == PURCHASED)
 	{
-	seg->SALFile << identifier << ","
+	seg_element->SALFile << identifier << ","
 				 << asset->sm_asset_sub_port[seg_num][sub_port_num][0]->sub_port_id << ","
 				 << sales_class << ","
 				 << asset_fund << ","
@@ -5035,11 +5068,11 @@ else
 if (option == VIRTUAL_PURCHASE)
 	{
 	if (sequence_id > 0)
-		seg->SALFile << sequence_id;
+		seg_element->SALFile << sequence_id;
 	else
-		seg->SALFile << "v";
+		seg_element->SALFile << "v";
 	
-	seg->SALFile << identifier << ","
+	seg_element->SALFile << identifier << ","
 				 << asset->sm_asset_sub_port[seg_num][sub_port_num][0]->sub_port_id << ","
 				 << ","				// sales_class_num
 				 << asset_fund_code << ","
@@ -5057,11 +5090,11 @@ if (option == VIRTUAL_PURCHASE)
 if (option == NOT_PURCHASED)
 	{
 	if (sequence_id > 0)
-		seg->SALFile << sequence_id;
+		seg_element->SALFile << sequence_id;
 	else
-		seg->SALFile << "v";
+		seg_element->SALFile << "v";
 	
-	seg->SALFile << identifier << ","
+	seg_element->SALFile << identifier << ","
 				 << asset->sm_asset_sub_port[seg_num][sub_port_num][0]->sub_port_id << ","
 				 << "," // sales_class_num
 				 << " " << asset_fund_code
@@ -5091,14 +5124,14 @@ void INVSTRAT_ASSET::asset_detail_rpt_individual_sale(int t, StrEnum::EnumValue 
 
 if (option == HEADER)
 	{
-	seg->SALFile << "AssetID,Sub_Port,C,Fn,Pct-Sold,NetCsh,BV-Sold,AI-Sold,MV-Sold,Cap-Gain,Unreal-CG,DurMeas" << endl;
+	seg_element->SALFile << "AssetID,Sub_Port,C,Fn,Pct-Sold,NetCsh,BV-Sold,AI-Sold,MV-Sold,Cap-Gain,Unreal-CG,DurMeas" << endl;
 	return;
 	}
 
-seg->SALFile << identifier << ","
+seg_element->SALFile << identifier << ","
 			 << sub_port_num << ","
 			 << sales_class_num << ","
-			 << seg->zAssetFund[asset_fund_index] << ","
+			 << seg_element->zAssetFund[asset_fund_index] << ","
 			 << percent_of_asset_to_sell << ","
 			 << net_cash_from_asset_sale << ","
 			 << bk_val_sold << ","
@@ -5130,16 +5163,19 @@ if(fabs(investable_assets_bef_rebal(t)) > 1.0)
 	double other_investable_assets_including_cash = investable_assets_bef_rebal(t);
 
 	if (is_book)
-		seg->SALFile << endl << "Sub_Port,C,BV+AI,Percent,Target,Tolerance,MaxTrnovr,MinTrnovr" << endl;
+		seg_element->SALFile << endl << "Sub_Port,C,BV+AI,Percent,Target,Tolerance,MaxTrnovr,MinTrnovr" << endl;
 	else
-		seg->SALFile << endl << "Sub_Port,C,MV+AI,Percent,Target,Tolerance,MaxTrnovr,MinTrnovr " << endl;
+		seg_element->SALFile << endl << "Sub_Port,C,MV+AI,Percent,Target,Tolerance,MaxTrnovr,MinTrnovr " << endl;
 
-	if (rebal_freq == QUARTERLY
-		|| (rebal_freq == AT_ASSET_FREQUENCY
+	seg_id = seg_id;
+	StrEnum::EnumValue rebal_freq_local = rebal_freq;
+
+	if (rebal_freq_local == QUARTERLY
+		|| (rebal_freq_local == AT_ASSET_FREQUENCY
 			&& asset->mkt_val_calc_freq == QUARTERLY))
 		turnover_rate_freq = 4;
-	else if (rebal_freq == SEMIANNUALLY
-			 || (rebal_freq == AT_ASSET_FREQUENCY
+	else if (rebal_freq_local == SEMIANNUALLY
+			 || (rebal_freq_local == AT_ASSET_FREQUENCY
 				 && asset->mkt_val_calc_freq == SEMIANNUALLY))
 		turnover_rate_freq = 2;
 	else
@@ -5166,7 +5202,7 @@ if(fabs(investable_assets_bef_rebal(t)) > 1.0)
 				{
 				other_investable_assets_including_cash -= asd_sub_port_class_book_plus_accrued;
 
-				seg->SALFile << sploop << ","
+				seg_element->SALFile << sploop << ","
 							 << clloop << ","
 							 << asd_sub_port_class_book_plus_accrued << ","
 							 << asd_sub_port_class_book_plus_accrued / investable_assets_bef_rebal(t) << ","
@@ -5178,7 +5214,7 @@ if(fabs(investable_assets_bef_rebal(t)) > 1.0)
 			} // end_for on clloop
 		} // end_for on sploop
 
-	seg->SALFile << "other,,"
+	seg_element->SALFile << "other,,"
 				 << other_investable_assets_including_cash << ","
 				 << ((fabs(investable_assets_bef_rebal(t)) <= 1.0)
 					? (0.0) : (other_investable_assets_including_cash / investable_assets_bef_rebal(t)))
@@ -5200,7 +5236,7 @@ double asd_investment_allocation = 0;
 double asd_sum_of_investment_allocations = 0;
 double asd_investment_strategy_sub_port_percent = 0;
 
-seg->SALFile << "SubPortID,Book+Acc,TgtPct,PosAssetActPct,InvAlloc,SumInvAlloc" << endl;
+seg_element->SALFile << "SubPortID,Book+Acc,TgtPct,PosAssetActPct,InvAlloc,SumInvAlloc" << endl;
 
 for (sploop = 0; sploop < asset->sm_asset_sub_port[seg_num].size(); sploop++)
 	{
@@ -5236,7 +5272,7 @@ for (sploop = 0; sploop < asset->sm_asset_sub_port[seg_num].size(); sploop++)
 	  + asd_investment_allocation;
 
 	if (asd_investment_strategy_sub_port_percent > 0.0)
-		seg->SALFile << asset->sm_asset_sub_port[seg_num][sploop][0]->sub_port_id << "," 
+		seg_element->SALFile << asset->sm_asset_sub_port[seg_num][sploop][0]->sub_port_id << "," 
 					 << sub_port_book_plus_accrued[sploop] << "," 
 					 << asd_investment_strategy_sub_port_percent << "," 
 					 << asd_actual_percent << "," 
@@ -5264,7 +5300,10 @@ double cash_flow_for_asset_purch = 0;
 int asset_sub_port = 0;
 int fund_index = 0;
 
-if (rebal_dur_match_defn == NO)
+seg_id = seg_id;
+StrEnum::EnumValue rebal_dur_match_defn_local = rebal_dur_match_defn;
+
+if (rebal_dur_match_defn_local == NO)
 	{
 	for (asset_sub_port = 0; asset_sub_port < asset->sm_asset_sub_port[seg_num].size(); asset_sub_port++)
 		for (fund_index = 0; fund_index < MAXIMUM_NUMBER_OF_ASSET_FUNDS; fund_index++)
@@ -5318,25 +5357,11 @@ if (cash_flow_for_inv >= 0
 		&& (neg_cash_flow_strat == BORROW
 			|| (asset->mths_to_asset_sale(t) > 0
 				&& neg_cash_flow_strat == SELL_ASSETS_TO_COVER_NEGATIVE_CASH_BALANCE))))
-	{
-		// 20210607 STW: import IA Prod v3.0 RSD v2 change and wrap it with a flag. The code has not been tested yet.
-		if(ia_prod_v3_rsd_2_defer_cf_aig == YES)
-		{
-			cash_incr
-			= min(cash_flow_for_inv,
-				  investable_assets
-				   * cash_tgt_pct + seg->opt_payoff_aig(t)   // add by HYH on 6/1/2021 to hold the opt_payoff_aig until next month after option purchase
-				   - cash(t - 1));
-		}
-		else
-		{
-			cash_incr
-			= min(cash_flow_for_inv,
-				  investable_assets
-				   * cash_tgt_pct
-				   - cash(t - 1));
-		}
-	}
+	cash_incr
+	= min(cash_flow_for_inv,
+		  investable_assets
+		   * cash_tgt_pct + seg_element->opt_payoff_crbg(t) //20250527 CRBG logic
+		   - cash(t - 1));
 
 else if (cash_flow_for_inv < 0
 		 && (neg_cash_flow_cash_bal_defn == TARGETED_CASH_BALANCE)
@@ -5370,13 +5395,13 @@ cash_flow_for_asset_purch
 
 if (asset->asset_detail_rpt_inv_strat_flag(t))
 	{
-	seg->SALFile << " ... Estimated Cash Flows For Investment Strategy " << inv_strat_id << endl;
-	seg->SALFile << setprecision(2);
-	seg->SALFile << "CashFlowForInv," << setw(12) << cash_flow_for_inv << endl;
-	seg->SALFile << "(-) CashAccountIncr," << setw(12) << cash_incr	 << endl;
-	seg->SALFile << ",--------------" << endl;
-	seg->SALFile << "CashForAssetInv," << setw(12) << cash_flow_for_asset_purch << endl;
-	seg->SALFile << setprecision(6);
+	seg_element->SALFile << " ... Estimated Cash Flows For Investment Strategy " << inv_strat_id << endl;
+	seg_element->SALFile << setprecision(2);
+	seg_element->SALFile << "CashFlowForInv," << setw(12) << cash_flow_for_inv << endl;
+	seg_element->SALFile << "(-) CashAccountIncr," << setw(12) << cash_incr	 << endl;
+	seg_element->SALFile << ",--------------" << endl;
+	seg_element->SALFile << "CashForAssetInv," << setw(12) << cash_flow_for_asset_purch << endl;
+	seg_element->SALFile << setprecision(6);
 	}
 
 // fill expected purchase variables
@@ -5401,7 +5426,7 @@ else
 
 if (asset->asset_detail_rpt_inv_strat_flag(t))
 	{
-	seg->SALFile << setprecision(6)
+	seg_element->SALFile << setprecision(6)
 				 << "Duration Estimate," << duration_based_on_current_strategy << ","
 				 << setprecision(2)
 				 << "= [ " << mkt_val_times_dur_bef_dur_match(t)
@@ -5411,7 +5436,7 @@ if (asset->asset_detail_rpt_inv_strat_flag(t))
 				 << " - " << expected_mkt_val_for_dur_sale
 				 << " + " << expected_mkt_val_for_dur_purch << " ]"
 				 << endl;
-	seg->SALFile << setprecision(6);
+	seg_element->SALFile << setprecision(6);
 	}
 
 return duration_based_on_current_strategy;
@@ -5434,21 +5459,21 @@ else
 
 investing_flag = true;
 
-// Force call seg->inv_asset(t - 1)
+// Force call seg_element->inv_asset(t - 1)
 if (t == 1)
-	seg->inv_asset(t - 1);	
+	seg_element->inv_asset(t - 1);	
 
 if (save_assets == YES)
 	{
 	if (asset->asset_detail_rpt_inv_strat_flag(t))
 		{
-		seg->SALFile << endl;
-		seg->SALFile << "Liability Hedge Investments "
+		seg_element->SALFile << endl;
+		seg_element->SALFile << "Liability Hedge Investments "
 				<< "Period=" << t << " "
 				<< "Year=" << xint(cal_yr(t)) << " "
 				<< "Month=" << xint(cal_mth(t))
 				<< endl;
-		seg->SALFile << "Hedge Group," << hedge_group_code
+		seg_element->SALFile << "Hedge Group," << hedge_group_code
 				<< endl;
 
 		asset_detail_rpt_buy_purch_asset(t, HEADER);
@@ -5510,7 +5535,10 @@ double INVSTRAT_ASSET::buy_assets_inv(int t, int save_assets, double cash_flow_f
 expected_mkt_val_for_dur_purch = 0.0;
 expected_mkt_val_times_dur_purch = 0.0;
 
-if (fabs(cash_flow_for_asset_purch) < inv_amt_min
+seg_id = seg_id;
+double inv_amt_min_local = inv_amt_min;
+
+if (fabs(cash_flow_for_asset_purch) < inv_amt_min_local
 	|| cash_tgt_pct > (1.0 - rate_ratio_threshold))
 	return 0.0;
 
@@ -5543,7 +5571,7 @@ if (cash_flow_for_asset_purch > 0.0
 	= aggregate_book_plus_accrued + cash_flow_for_asset_purch;
 
 	if (asset->asset_detail_rpt_inv_strat_flag(t))
-		seg->SALFile << endl
+		seg_element->SALFile << endl
 					 << "Cash For Purchasing Assets," << cash_flow_for_asset_purch << endl
 					 << "Assets Other Than Cash," << assets_other_than_cash << endl;
 
@@ -5626,7 +5654,7 @@ if (cash_flow_for_asset_purch > 0.0
 			{
 			if (asset_sub_port_distribn_defn == BOOK)
 				{
-				seg->SALFile << "Distance " << ((cash_flow_for_asset_purch > 0.0)
+				seg_element->SALFile << "Distance " << ((cash_flow_for_asset_purch > 0.0)
 												 ? "Below" : "Above") << " Target Allocation,"
 							 << ((cash_flow_for_asset_purch > 0.0)
 								  ? distance_below_target_allocation
@@ -5702,7 +5730,7 @@ if (cash_flow_for_asset_purch > 0.0
 							{
 							if (save_assets == YES
 								|| (save_assets == NO
-									/*&& purch_assets_dur_calculated[panum] == NO*/))//AIG - REMOVE THIS CONDITION TO ALLOW PURCHASE ASSETS OF THE SAME NAME TO RECALCULATE DURATION WITH A DIFFERENT PORTFOLIO SPREAD ADJUSTMENT
+									&& purch_assets_dur_calculated[panum] == NO))
 								{
 								local_amount_invested
 								+= buy_purch_asset_inv(t,
@@ -5775,7 +5803,7 @@ if (cash_flow_for_asset_purch > 0.0
 	}
 
 if (asset->asset_detail_rpt_inv_strat_flag(t))
-	seg->SALFile << "Total Cash Purchasing Assets," << local_amount_invested
+	seg_element->SALFile << "Total Cash Purchasing Assets," << local_amount_invested
 				 << endl;
 
 return local_amount_invested;
@@ -5823,18 +5851,17 @@ purch_asset_id = purch_assets_id[panum];
 #if defined(__EIO_ASSET_H_)
 if (purch_assets_type[panum] == INDEX_OPTION)
 	{
+	purch_asset_id = purch_asset_id;
 	asset->purch_asset_yrs_to_maturity = purch_eio_yrs_to_maturity;
-
-	EIO_ASSET *current_eio_element;
 
 	purch_asset_index
 	= purch_assets_id[panum] + get_string_of_enum_val(port_defn);
 
-	new_mp_num = seg->asset_mp_maps(MP_NEXT_CODE, INDEX_OPTION_CODE);
-	current_eio_element = asset->sm_eio[new_mp_num];
-	current_eio_element->seg = seg;
+	new_mp_num = seg_element->asset_mp_maps(MP_NEXT_CODE, INDEX_OPTION_CODE);
+	asset->sm_eio[new_mp_num][0]->seg_element = seg_element;
+	asset->sm_eio[new_mp_num][0]->seg_id = seg_id;
 
-	current_eio_element->setup_purch_hedge_asset(t, save_assets,
+	asset->sm_eio[new_mp_num][0]->setup_purch_hedge_asset(t, save_assets,
 				panum, new_mp_num,
 				purch_assets_asset_sub_port_num[panum],
 				hedge_group_code,
@@ -5844,9 +5871,9 @@ if (purch_assets_type[panum] == INDEX_OPTION)
 				short_strike);
 
 	bool asset_detail_flag = false;
-	if (investing_bom_flag && current_eio_element->asset_detail_pv_flag(t + 1))
+	if (investing_bom_flag && asset->sm_eio[new_mp_num][0]->asset_detail_pv_flag(t + 1))
 		asset_detail_flag = true;
-	else if (!investing_bom_flag && current_eio_element->asset_detail_pv_flag(t))
+	else if (!investing_bom_flag && asset->sm_eio[new_mp_num][0]->asset_detail_pv_flag(t))
 		asset_detail_flag = true;
 
 	if (save_assets == YES && asset_detail_flag)
@@ -5854,7 +5881,7 @@ if (purch_assets_type[panum] == INDEX_OPTION)
 		if (investing_bom_flag)
 			{
 			PVCText << " .p. Purchasing Liability Hedge Index Option " << purch_assets_id[panum]
-					<< " |" << current_eio_element->modelName
+					<< " |" << asset->sm_eio[new_mp_num][0]->modelName
 					<< " in hedge group " << hedge_group_code
 					<< " at beginning of period " << t + 1;
 
@@ -5863,7 +5890,7 @@ if (purch_assets_type[panum] == INDEX_OPTION)
 		else
 			{
 			PVCText << " .p. Purchasing Liability Hedge Index Option " << purch_assets_id[panum]
-					<< " |" << current_eio_element->modelName
+					<< " |" << asset->sm_eio[new_mp_num][0]->modelName
 					<< " in hedge group " << hedge_group_code
 					<< " at end of period " << t;
 
@@ -5878,44 +5905,44 @@ if (purch_assets_type[panum] == INDEX_OPTION)
 
 	if (save_assets == YES && asset_detail_strat_flag)
 		{
-		asd_sequence_num = current_eio_element->sequence_id;
-		asd_identifier = current_eio_element->asset_id;
-		asd_sub_port = current_eio_element->purch_asset_sub_port;
-		asd_class = current_eio_element->sale_class_id;
-		asd_fund = current_eio_element->asset_fund_index;
-		asd_neg_asset_flag = current_eio_element->neg_asset_flag;
-		asd_notional_amount = current_eio_element->notional_amt_bef_sale(t);
-		asd_market_value = current_eio_element->mkt_val_bef_sale(t);
-		asd_cost_basis = current_eio_element->cost_basis_bef_sale(t);
-		asd_book_value = current_eio_element->bk_val_bef_sale(t);
-		asd_ytm = (current_eio_element->maturity_period - t) / 12.0;
+		asd_sequence_num = asset->sm_eio[new_mp_num][0]->sequence_id;
+		asd_identifier = asset->sm_eio[new_mp_num][0]->asset_id;
+		asd_sub_port = asset->sm_eio[new_mp_num][0]->purch_asset_sub_port;
+		asd_class = asset->sm_eio[new_mp_num][0]->sale_class_id;
+		asd_fund = asset->sm_eio[new_mp_num][0]->asset_fund_index;
+		asd_neg_asset_flag = asset->sm_eio[new_mp_num][0]->neg_asset_flag;
+		asd_notional_amount = asset->sm_eio[new_mp_num][0]->notional_amt_bef_sale(t);
+		asd_market_value = asset->sm_eio[new_mp_num][0]->mkt_val_bef_sale(t);
+		asd_cost_basis = asset->sm_eio[new_mp_num][0]->cost_basis_bef_sale(t);
+		asd_book_value = asset->sm_eio[new_mp_num][0]->bk_val_bef_sale(t);
+		asd_ytm = (asset->sm_eio[new_mp_num][0]->maturity_period - t) / 12.0;
 		asd_wal = 0;
 		asd_eff_dur = 0;
-		asd_model_name = current_eio_element->modelName;
+		asd_model_name = asset->sm_eio[new_mp_num][0]->modelName;
 		}
 
 	if (save_assets == YES
 		&& port_defn == HEDGING
-		&& fabs(current_eio_element->mkt_val_bef_sale(t)) > 0)
+		&& fabs(asset->sm_eio[new_mp_num][0]->mkt_val_bef_sale(t)) > 0)
 		local_amount_invested
-		+= current_eio_element->mkt_val_bef_sale(t)
-		   * current_eio_element->pct_to_use;
+		+= asset->sm_eio[new_mp_num][0]->mkt_val_bef_sale(t)
+		   * asset->sm_eio[new_mp_num][0]->pct_to_use;
 
 	if (save_assets == NO)
 		{
 		purch_assets_dur_defn[panum] = NO;
 		purch_assets_dur_calculated[panum] = YES;
 		purch_assets_dur[panum] = 0;
-		seg->asset_mp_maps(MP_INACTIVE_CODE, INDEX_OPTION_CODE, new_mp_num);
+		seg_element->asset_mp_maps(MP_INACTIVE_CODE, INDEX_OPTION_CODE, new_mp_num);
 		}
 	else // if (save_assets == YES)
 		{
-		sub_port_num = xint(current_eio_element->sub_port_id(t));
-		sale_class = current_eio_element->sale_class_id;
-		fund_index = current_eio_element->asset_fund_index;
+		sub_port_num = xint(asset->sm_eio[new_mp_num][0]->sub_port_id(t));
+		sale_class = asset->sm_eio[new_mp_num][0]->sale_class_id;
+		fund_index = asset->sm_eio[new_mp_num][0]->asset_fund_index;
 
 		// Accumulate purchase amounts
-		local_book_value = current_eio_element->bk_val_bef_sale(t);
+		local_book_value = asset->sm_eio[new_mp_num][0]->bk_val_bef_sale(t);
 
 		sub_port_fund_book_plus_accrued_purchases[sub_port_num][fund_index]
 		+= local_book_value;
@@ -5929,29 +5956,29 @@ else
 #if defined(__IRD_ASSET_H_)
 if (purch_assets_type[panum] == INTEREST_RATE_DERIVATIVE)
 	{
+	purch_asset_id = purch_asset_id;
 	asset->purch_asset_yrs_to_maturity = purch_ird_yrs_to_maturity;
+	purch_asset_id = purch_asset_id;
 	asset->purch_asset_mths_to_first_reset = purch_ird_mths_to_first_reset;
 
-	IRD_ASSET * current_ird_element;
 
-	new_mp_num = seg->asset_mp_maps(MP_NEXT_CODE, IRD_CODE);
-	current_ird_element = asset->sm_ird[new_mp_num];
-	current_ird_element->seg = seg;
-	current_ird_element->seg_id = seg_id;
+	new_mp_num = seg_element->asset_mp_maps(MP_NEXT_CODE, IRD_CODE);
+	asset->sm_ird[new_mp_num][0]->seg_element = seg_element;
+	asset->sm_ird[new_mp_num][0]->seg_id = seg_id;
 
-	current_ird_element->setup_purch_hedge_asset(t,
+	asset->sm_ird[new_mp_num][0]->setup_purch_hedge_asset(t,
 											   save_assets,
 											   panum,
 											   new_mp_num,
 											   purch_assets_asset_sub_port_num[panum],
 											   hedge_group_code,
 											   purch_asset_amt,
-											   seg->asset_mp_sequence_num);
+											   seg_element->asset_mp_sequence_num);
 	
-	if (save_assets == YES && current_ird_element->asset_detail_pv_flag(t))
+	if (save_assets == YES && asset->sm_ird[new_mp_num][0]->asset_detail_pv_flag(t))
 		{
 		PVCText << " .p. Purchasing Liability Hedge Interest Rate Derivative" << purch_assets_id[panum]
-				<< " |" << current_ird_element->modelName
+				<< " |" << asset->sm_ird[new_mp_num][0]->modelName
 				<< " in hedge group " << hedge_group_code
 				<< " at end of period " << t;
 
@@ -5963,45 +5990,45 @@ if (purch_assets_type[panum] == INTEREST_RATE_DERIVATIVE)
 
 	if (save_assets == YES && asset_detail_strat_flag)
 		{
-		asd_sequence_num = current_ird_element->sequence_id;
-		asd_identifier = current_ird_element->asset_id;
-		asd_sub_port = current_ird_element->purch_asset_sub_port;
-		asd_class = current_ird_element->sale_class_id;
-		asd_fund = current_ird_element->asset_fund_index;
-		asd_neg_asset_flag = current_ird_element->neg_asset_flag;
-		asd_notional_amount = current_ird_element->notional_amt_bef_sale(t);
-		asd_market_value = current_ird_element->mkt_val_bef_sale(t);
-		asd_cost_basis = current_ird_element->cost_basis_bef_sale(t);
-		asd_book_value = current_ird_element->bk_val_bef_sale(t);
-		asd_ytm = (current_ird_element->maturity_period - t) / 12.0;
+		asd_sequence_num = asset->sm_ird[new_mp_num][0]->sequence_id;
+		asd_identifier = asset->sm_ird[new_mp_num][0]->asset_id;
+		asd_sub_port = asset->sm_ird[new_mp_num][0]->purch_asset_sub_port;
+		asd_class = asset->sm_ird[new_mp_num][0]->sale_class_id;
+		asd_fund = asset->sm_ird[new_mp_num][0]->asset_fund_index;
+		asd_neg_asset_flag = asset->sm_ird[new_mp_num][0]->neg_asset_flag;
+		asd_notional_amount = asset->sm_ird[new_mp_num][0]->notional_amt_bef_sale(t);
+		asd_market_value = asset->sm_ird[new_mp_num][0]->mkt_val_bef_sale(t);
+		asd_cost_basis = asset->sm_ird[new_mp_num][0]->cost_basis_bef_sale(t);
+		asd_book_value = asset->sm_ird[new_mp_num][0]->bk_val_bef_sale(t);
+		asd_ytm = (asset->sm_ird[new_mp_num][0]->maturity_period - t) / 12.0;
 		asd_wal = 0;
 		asd_eff_dur = 0;
-		asd_model_name = current_ird_element->modelName;
+		asd_model_name = asset->sm_ird[new_mp_num][0]->modelName;
 		}
 	
 	if (save_assets == YES
 		&& port_defn == HEDGING
-		&& fabs(current_ird_element->mkt_val_bef_sale(t)) > 0)
+		&& fabs(asset->sm_ird[new_mp_num][0]->mkt_val_bef_sale(t)) > 0)
 		local_amount_invested
-		+= current_ird_element->mkt_val_bef_sale(t)
-		   * current_ird_element->pct_to_use;
+		+= asset->sm_ird[new_mp_num][0]->mkt_val_bef_sale(t)
+		   * asset->sm_ird[new_mp_num][0]->pct_to_use;
 	
 	if (save_assets == NO)
 		{
 		purch_assets_dur_defn[panum] = YES;
 		purch_assets_dur_calculated[panum] = YES;
 		purch_assets_dur[panum] = 0.0;
-		seg->asset_mp_maps(MP_INACTIVE_CODE, IRD_CODE, new_mp_num);
+		seg_element->asset_mp_maps(MP_INACTIVE_CODE, IRD_CODE, new_mp_num);
 		}
 	else // if (save_assets == YES)
 		{
-		sub_port_num = xint(current_ird_element->sub_port_id(t));
-		sale_class = current_ird_element->sale_class_id;
-		fund_index = current_ird_element->asset_fund_index;
+		sub_port_num = xint(asset->sm_ird[new_mp_num][0]->sub_port_id(t));
+		sale_class = asset->sm_ird[new_mp_num][0]->sale_class_id;
+		fund_index = asset->sm_ird[new_mp_num][0]->asset_fund_index;
 	
 		// Accumulate purchase amounts
-		local_book_value = current_ird_element->bk_val_bef_sale(t);
-		local_accrued_interest = current_ird_element->accr_int_bef_sale(t);
+		local_book_value = asset->sm_ird[new_mp_num][0]->bk_val_bef_sale(t);
+		local_accrued_interest = asset->sm_ird[new_mp_num][0]->accr_int_bef_sale(t);
 	
 		sub_port_fund_book_plus_accrued_purchases[sub_port_num][fund_index] += local_book_value + local_accrued_interest;
 		sub_port_class_fund_accrued_interest_purchases[sub_port_num][sale_class][fund_index] += local_accrued_interest;
@@ -6085,26 +6112,25 @@ purch_asset_id = purch_assets_id[panum];
 
 if (purch_assets_type[panum] == BOND)
 	{
+	purch_asset_id = purch_asset_id;
 	asset->purch_asset_yrs_to_maturity = purch_bond_yrs_to_maturity;
-
-	BOND_ASSET * current_bond_element;
 	
-	new_mp_num = seg->asset_mp_maps(MP_NEXT_CODE, BOND_CODE);
-	current_bond_element = asset->sm_bond[new_mp_num];
-	current_bond_element->seg = seg;
-	current_bond_element->seg_id = seg_id;
+	new_mp_num = seg_element->asset_mp_maps(MP_NEXT_CODE, BOND_CODE);
+	asset->sm_bond[new_mp_num][0]->seg_element = seg_element;
+	asset->sm_bond[new_mp_num][0]->seg_id = seg_id;
+	asset->sm_bond[new_mp_num][0]->sm_bond_cf_var.resize(1);
 
-	current_bond_element->setup_purch_inv_asset(t,
+	asset->sm_bond[new_mp_num][0]->setup_purch_inv_asset(t,
 												save_assets,
 												panum,
 												new_mp_num,
 												purch_asset_amt,
-												seg->asset_mp_sequence_num);
+												seg_element->asset_mp_sequence_num);
 
-	if (current_bond_element->asset_detail_rpt_pv_flag(t))
+	if (asset->sm_bond[new_mp_num][0]->asset_detail_rpt_pv_flag(t))
 		{
 		PVCText << " .p. Purchasing bond " << purch_assets_id[panum]
-				<< " |" << current_bond_element->modelName
+				<< " |" << asset->sm_bond[new_mp_num][0]->modelName
 				<< " in sub portfolio " << purch_assets_asset_sub_port_num[panum]
 				<< " at time " << ((inv_purch_timing == END_OF_MONTH) ? t : t+1)
 				<< " " << inv_purch_timing;
@@ -6113,46 +6139,46 @@ if (purch_assets_type[panum] == BOND)
 
 	if (asset->asset_detail_rpt_inv_strat_flag(t))
 		{
-		asd_sequence_num = current_bond_element->sequence_id;
-		asd_identifier = current_bond_element->asset_id;
-		asd_sub_port = current_bond_element->purch_asset_sub_port;
-		asd_class = current_bond_element->sale_class_id;
-		asd_fund = current_bond_element->asset_fund_index;
-		asd_neg_asset_flag = current_bond_element->neg_asset_flag;
-		asd_notional_amount = current_bond_element->notional_amt_bef_sale(t);
-		asd_market_value = current_bond_element->mkt_val_bef_sale(t);
-		asd_cost_basis = current_bond_element->cost_basis_bef_sale(t);
-		asd_book_value = current_bond_element->bk_val_bef_sale(t);
-		asd_ytm = (current_bond_element->maturity_period - t) / 12.0;
-		asd_wal = current_bond_element->weighted_avg_life(t);
-		asd_eff_dur = current_bond_element->eff_dur(t);
-		asd_model_name = current_bond_element->modelName;
+		asd_sequence_num = asset->sm_bond[new_mp_num][0]->sequence_id;
+		asd_identifier = asset->sm_bond[new_mp_num][0]->asset_id;
+		asd_sub_port = asset->sm_bond[new_mp_num][0]->purch_asset_sub_port;
+		asd_class = asset->sm_bond[new_mp_num][0]->sale_class_id;
+		asd_fund = asset->sm_bond[new_mp_num][0]->asset_fund_index;
+		asd_neg_asset_flag = asset->sm_bond[new_mp_num][0]->neg_asset_flag;
+		asd_notional_amount = asset->sm_bond[new_mp_num][0]->notional_amt_bef_sale(t);
+		asd_market_value = asset->sm_bond[new_mp_num][0]->mkt_val_bef_sale(t);
+		asd_cost_basis = asset->sm_bond[new_mp_num][0]->cost_basis_bef_sale(t);
+		asd_book_value = asset->sm_bond[new_mp_num][0]->bk_val_bef_sale(t);
+		asd_ytm = (asset->sm_bond[new_mp_num][0]->maturity_period - t) / 12.0;
+		asd_wal = asset->sm_bond[new_mp_num][0]->weighted_avg_life(t);
+		asd_eff_dur = asset->sm_bond[new_mp_num][0]->eff_dur(t);
+		asd_model_name = asset->sm_bond[new_mp_num][0]->modelName;
 		}
 
 	if (port_defn == INVESTMENT
-		&& current_bond_element->mkt_val_bef_sale(t) > 0)
+		&& asset->sm_bond[new_mp_num][0]->mkt_val_bef_sale(t) > 0)
 		local_amount_invested += purch_asset_amt;
 		
 	if (save_assets == NO)
 		{
 		purch_assets_dur_defn[panum] = YES;
 		purch_assets_dur_calculated[panum] = YES;
-		purch_assets_dur[panum]	= current_bond_element->dur_val(t);
+		purch_assets_dur[panum]	= asset->sm_bond[new_mp_num][0]->dur_val(t);
 
-		seg->asset_mp_maps(MP_INACTIVE_CODE, BOND_CODE, new_mp_num);
+		seg_element->asset_mp_maps(MP_INACTIVE_CODE, BOND_CODE, new_mp_num);
 		}
 	else // if (save_assets == YES)
 		{
-		sub_port_num = xint(current_bond_element->sub_port_id(t));
-		sale_class = current_bond_element->sale_class_id;
-		fund_index = current_bond_element->asset_fund_index;
+		sub_port_num = xint(asset->sm_bond[new_mp_num][0]->sub_port_id(t));
+		sale_class = asset->sm_bond[new_mp_num][0]->sale_class_id;
+		fund_index = asset->sm_bond[new_mp_num][0]->asset_fund_index;
 
 		// Force call to reduce sliding windows sizes
-		current_bond_element->net_yld(t);
+		asset->sm_bond[new_mp_num][0]->net_yld(t);
 
 		// Accumulate purchase amounts
-		local_book_value = current_bond_element->bk_val_bef_sale(t);
-		local_accrued_interest = current_bond_element->accr_int_bef_sale(t);
+		local_book_value = asset->sm_bond[new_mp_num][0]->bk_val_bef_sale(t);
+		local_accrued_interest = asset->sm_bond[new_mp_num][0]->accr_int_bef_sale(t);
 
 		sub_port_fund_book_plus_accrued_purchases[sub_port_num][fund_index] += local_book_value + local_accrued_interest;
 		sub_port_class_fund_accrued_interest_purchases[sub_port_num][sale_class][fund_index] += local_accrued_interest;
@@ -6165,28 +6191,27 @@ else
 #if defined(__MTG_ASSET_H_)
 if (purch_assets_type[panum] == MORTGAGE)
 	{
+	purch_asset_id = purch_asset_id;
 	asset->purch_asset_yrs_to_maturity = purch_mtg_yrs_to_maturity;
-
-	MTG_ASSET * current_mtg_element;
 	
-	new_mp_num = seg->asset_mp_maps(MP_NEXT_CODE, MORTGAGE_CODE);
-	current_mtg_element = asset->sm_mtg[new_mp_num];
-	current_mtg_element->seg = seg;
-	current_mtg_element->seg_id = seg_id;
+	new_mp_num = seg_element->asset_mp_maps(MP_NEXT_CODE, MORTGAGE_CODE);
+	asset->sm_mtg[new_mp_num][0]->seg_element = seg_element;
+	asset->sm_mtg[new_mp_num][0]->seg_id = seg_id;
+	asset->sm_mtg[new_mp_num][0]->sm_mtg_cf_var.resize(1); 
 
-	current_mtg_element->setup_purch_inv_asset(t,
+	asset->sm_mtg[new_mp_num][0]->setup_purch_inv_asset(t,
 											   save_assets,
 											   panum,
 											   new_mp_num,
 											   port_defn,
 											   purch_assets_asset_sub_port_num[panum],
 											   purch_asset_amt,
-											   seg->asset_mp_sequence_num);
+											   seg_element->asset_mp_sequence_num);
 
-	if (current_mtg_element->asset_detail_pv_flag(t))
+	if (asset->sm_mtg[new_mp_num][0]->asset_detail_pv_flag(t))
 		{
 		PVCText << " .p. Purchasing mortgage " << purch_assets_id[panum]
-				<< " |" << current_mtg_element->modelName
+				<< " |" << asset->sm_mtg[new_mp_num][0]->modelName
 				<< " in sub portfolio " << purch_assets_asset_sub_port_num[panum]
 				<< " at time " << ((inv_purch_timing == END_OF_MONTH) ? t : t+1)
 				<< " " << inv_purch_timing;
@@ -6195,24 +6220,24 @@ if (purch_assets_type[panum] == MORTGAGE)
 
 	if (asset->asset_detail_rpt_inv_strat_flag(t))
 		{
-		asd_sequence_num = current_mtg_element->sequence_id;
-		asd_identifier = current_mtg_element->asset_id;
-		asd_sub_port = current_mtg_element->purch_asset_sub_port;
-		asd_class = current_mtg_element->sale_class_id;
-		asd_fund = current_mtg_element->asset_fund_index;
-		asd_neg_asset_flag = current_mtg_element->neg_asset_flag;
-		asd_notional_amount = current_mtg_element->notional_amt_bef_sale(t);
-		asd_market_value = current_mtg_element->mkt_val_bef_sale(t);
-		asd_cost_basis = current_mtg_element->cost_basis_bef_sale(t);
-		asd_book_value = current_mtg_element->bk_val_bef_sale(t);
-		asd_ytm = (current_mtg_element->maturity_period - t) / 12.0;
-		asd_wal = current_mtg_element->weighted_avg_life(t);
-		asd_eff_dur = current_mtg_element->eff_dur(t);
-		asd_model_name = current_mtg_element->modelName;
+		asd_sequence_num = asset->sm_mtg[new_mp_num][0]->sequence_id;
+		asd_identifier = asset->sm_mtg[new_mp_num][0]->asset_id;
+		asd_sub_port = asset->sm_mtg[new_mp_num][0]->purch_asset_sub_port;
+		asd_class = asset->sm_mtg[new_mp_num][0]->sale_class_id;
+		asd_fund = asset->sm_mtg[new_mp_num][0]->asset_fund_index;
+		asd_neg_asset_flag = asset->sm_mtg[new_mp_num][0]->neg_asset_flag;
+		asd_notional_amount = asset->sm_mtg[new_mp_num][0]->notional_amt_bef_sale(t);
+		asd_market_value = asset->sm_mtg[new_mp_num][0]->mkt_val_bef_sale(t);
+		asd_cost_basis = asset->sm_mtg[new_mp_num][0]->cost_basis_bef_sale(t);
+		asd_book_value = asset->sm_mtg[new_mp_num][0]->bk_val_bef_sale(t);
+		asd_ytm = (asset->sm_mtg[new_mp_num][0]->maturity_period - t) / 12.0;
+		asd_wal = asset->sm_mtg[new_mp_num][0]->weighted_avg_life(t);
+		asd_eff_dur = asset->sm_mtg[new_mp_num][0]->eff_dur(t);
+		asd_model_name = asset->sm_mtg[new_mp_num][0]->modelName;
 		}
 	
 	if (port_defn == INVESTMENT
-		&& current_mtg_element->mkt_val_bef_sale(t) > 0)
+		&& asset->sm_mtg[new_mp_num][0]->mkt_val_bef_sale(t) > 0)
 		local_amount_invested += purch_asset_amt;
 	else if (port_defn == FORECLOSURE
 			 || port_defn == RESTRUCTURE
@@ -6220,31 +6245,31 @@ if (purch_assets_type[panum] == MORTGAGE)
 		{
 		// Force calculation of the following columns because the 
 		//   foreclosure_restructure_refinance_investment_... variables can change
-		current_mtg_element->cost_basis_bef_sale(t);
-		current_mtg_element->bk_val_bef_sale(t);
-		current_mtg_element->sm_mtg_cf->par_val_bef_sale(t);
+		asset->sm_mtg[new_mp_num][0]->cost_basis_bef_sale(t);
+		asset->sm_mtg[new_mp_num][0]->bk_val_bef_sale(t);
+		asset->sm_mtg[new_mp_num][0]->sm_mtg_cf->par_val_bef_sale(t);
 		}
 
 	if (save_assets == NO)
 		{
 		purch_assets_dur_defn[panum] = YES;
 		purch_assets_dur_calculated[panum] = YES;
-		purch_assets_dur[panum]	= current_mtg_element->dur_val(t);
+		purch_assets_dur[panum]	= asset->sm_mtg[new_mp_num][0]->dur_val(t);
 
-		seg->asset_mp_maps(MP_INACTIVE_CODE, MORTGAGE_CODE, new_mp_num);
+		seg_element->asset_mp_maps(MP_INACTIVE_CODE, MORTGAGE_CODE, new_mp_num);
 		}
 	else // if (save_assets == YES)
 		{
-		sub_port_num = xint(current_mtg_element->sub_port_id(t));
-		sale_class = current_mtg_element->sale_class_id;
-		fund_index = current_mtg_element->asset_fund_index;
+		sub_port_num = xint(asset->sm_mtg[new_mp_num][0]->sub_port_id(t));
+		sale_class = asset->sm_mtg[new_mp_num][0]->sale_class_id;
+		fund_index = asset->sm_mtg[new_mp_num][0]->asset_fund_index;
 
 		// forced calls to reduce sliding windows sizes
-		current_mtg_element->net_yld(t);
+		asset->sm_mtg[new_mp_num][0]->net_yld(t);
 	
 		// accumulate "purchase" amounts
-		local_book_value = current_mtg_element->bk_val_bef_sale(t);
-		local_accrued_interest = current_mtg_element->accr_int_bef_sale(t);
+		local_book_value = asset->sm_mtg[new_mp_num][0]->bk_val_bef_sale(t);
+		local_accrued_interest = asset->sm_mtg[new_mp_num][0]->accr_int_bef_sale(t);
 	
 		sub_port_fund_book_plus_accrued_purchases[sub_port_num][fund_index] += local_book_value + local_accrued_interest;
 		sub_port_class_fund_accrued_interest_purchases[sub_port_num][sale_class][fund_index] += local_accrued_interest;
@@ -6257,24 +6282,22 @@ else
 #if defined(__SEC_ASSET_H_)
 if (purch_assets_type[panum] == SECURITIZED_ASSET)
 	{
-	SEC_ASSET * current_sec_element;
-	new_mp_num = seg->asset_mp_maps(MP_NEXT_CODE, SEC_CODE);
-	current_sec_element = asset->sm_sec[new_mp_num];
-	current_sec_element->seg = seg;
-	current_sec_element->seg_id = seg_id;
+	new_mp_num = seg_element->asset_mp_maps(MP_NEXT_CODE, SEC_CODE);
+	asset->sm_sec[new_mp_num]->seg_element = seg_element;
+	asset->sm_sec[new_mp_num]->seg_id = seg_id;
 
-	current_sec_element->setup_purch_inv_asset(t,
+	asset->sm_sec[new_mp_num]->setup_purch_inv_asset(t,
 											   save_assets,
 											   panum,
 											   new_mp_num,
 											   purch_assets_asset_sub_port_num[panum],
 											   purch_asset_amt,
-											   seg->asset_mp_sequence_num);
+											   seg_element->asset_mp_sequence_num);
 	
-	if (current_sec_element->asset_detail_rpt_pv_flag(t))
+	if (asset->sm_sec[new_mp_num]->asset_detail_rpt_pv_flag(t))
 		{
 		PVCText << " .p. Purchasing SEC " << purch_assets_id[panum]
-			   << " |" << current_sec_element->modelName
+			   << " |" << asset->sm_sec[new_mp_num]->modelName
 			   << " in sub portfolio " << purch_assets_asset_sub_port_num[panum]
 			   << " at time " << ((inv_purch_timing == END_OF_MONTH) ? t : t+1)
 			   << " " << inv_purch_timing;
@@ -6283,47 +6306,47 @@ if (purch_assets_type[panum] == SECURITIZED_ASSET)
 
 	if (asset->asset_detail_rpt_inv_strat_flag(t))
 		{
-		asd_sequence_num = current_sec_element->sequence_id;
-		asd_identifier = current_sec_element->asset_id;
-		asd_sub_port = current_sec_element->purch_asset_sub_port;
-		asd_class = current_sec_element->sale_class_id;
-		asd_fund = current_sec_element->asset_fund_index;
-		asd_neg_asset_flag = current_sec_element->neg_asset_flag;
-		asd_notional_amount = current_sec_element->notional_amt_bef_sale(t);
-		asd_market_value = current_sec_element->mkt_val_bef_sale(t);
-		asd_cost_basis = current_sec_element->cost_basis_bef_sale(t);
-		asd_book_value = current_sec_element->bk_val_bef_sale(t);
-		asd_ytm = (current_sec_element->maturity_period - t) / 12.0;
-		asd_wal = current_sec_element->weighted_avg_life(t);
-		asd_eff_dur = current_sec_element->eff_dur(t);
-		asd_model_name = current_sec_element->modelName;
+		asd_sequence_num = asset->sm_sec[new_mp_num]->sequence_id;
+		asd_identifier = asset->sm_sec[new_mp_num]->asset_id;
+		asd_sub_port = asset->sm_sec[new_mp_num]->purch_asset_sub_port;
+		asd_class = asset->sm_sec[new_mp_num]->sale_class_id;
+		asd_fund = asset->sm_sec[new_mp_num]->asset_fund_index;
+		asd_neg_asset_flag = asset->sm_sec[new_mp_num]->neg_asset_flag;
+		asd_notional_amount = asset->sm_sec[new_mp_num]->notional_amt_bef_sale(t);
+		asd_market_value = asset->sm_sec[new_mp_num]->mkt_val_bef_sale(t);
+		asd_cost_basis = asset->sm_sec[new_mp_num]->cost_basis_bef_sale(t);
+		asd_book_value = asset->sm_sec[new_mp_num]->bk_val_bef_sale(t);
+		asd_ytm = (asset->sm_sec[new_mp_num]->maturity_period - t) / 12.0;
+		asd_wal = asset->sm_sec[new_mp_num]->weighted_avg_life(t);
+		asd_eff_dur = asset->sm_sec[new_mp_num]->eff_dur(t);
+		asd_model_name = asset->sm_sec[new_mp_num]->modelName;
 		}
 	
 	if (port_defn == INVESTMENT
-		&& current_sec_element->mkt_val_bef_sale(t) > 0)
+		&& asset->sm_sec[new_mp_num]->mkt_val_bef_sale(t) > 0)
 		local_amount_invested += purch_asset_amt;
 	
 	if (save_assets == NO)
 		{
 		purch_assets_dur_defn[panum] = YES;
 		purch_assets_dur_calculated[panum] = YES;
-		purch_assets_dur[panum]	= current_sec_element->dur_val(t);
+		purch_assets_dur[panum]	= asset->sm_sec[new_mp_num]->dur_val(t);
 	
-		seg->asset_mp_maps(MP_INACTIVE_CODE, SEC_CODE, new_mp_num);
+		seg_element->asset_mp_maps(MP_INACTIVE_CODE, SEC_CODE, new_mp_num);
 		}
 	else // if (save_assets == YES)
 		{
-		sub_port_num = xint(current_sec_element->sub_port_id(t));
-		sale_class = current_sec_element->sale_class_id;
-		fund_index = current_sec_element->asset_fund_index;
+		sub_port_num = xint(asset->sm_sec[new_mp_num]->sub_port_id(t));
+		sale_class = asset->sm_sec[new_mp_num]->sale_class_id;
+		fund_index = asset->sm_sec[new_mp_num]->asset_fund_index;
 
 		// Force call to reduce sliding windows sizes
-		current_sec_element->weighted_avg_life(t);
-		current_sec_element->net_yld(t);
+		asset->sm_sec[new_mp_num]->weighted_avg_life(t);
+		asset->sm_sec[new_mp_num]->net_yld(t);
 	
 		// Accumulate "purchase" amounts
-		local_book_value = current_sec_element->bk_val_bef_sale(t);
-		local_accrued_interest = current_sec_element->accr_int_bef_sale(t);
+		local_book_value = asset->sm_sec[new_mp_num]->bk_val_bef_sale(t);
+		local_accrued_interest = asset->sm_sec[new_mp_num]->accr_int_bef_sale(t);
 	
 		sub_port_fund_book_plus_accrued_purchases[sub_port_num][fund_index] += local_book_value + local_accrued_interest;
 		sub_port_class_fund_accrued_interest_purchases[sub_port_num][sale_class][fund_index] += local_accrued_interest;
@@ -6336,28 +6359,27 @@ else
 #if defined(__IRD_ASSET_H_)
 if (purch_assets_type[panum] == INTEREST_RATE_DERIVATIVE)
 	{
+	purch_asset_id = purch_asset_id;
 	asset->purch_asset_yrs_to_maturity = purch_ird_yrs_to_maturity;
+	purch_asset_id = purch_asset_id;
 	asset->purch_asset_mths_to_first_reset = purch_ird_mths_to_first_reset;
 
-	IRD_ASSET * current_ird_element;
+	new_mp_num = seg_element->asset_mp_maps(MP_NEXT_CODE, IRD_CODE);
+	asset->sm_ird[new_mp_num][0]->seg_element = seg_element;
+	asset->sm_ird[new_mp_num][0]->seg_id = seg_id;
 
-	new_mp_num = seg->asset_mp_maps(MP_NEXT_CODE, IRD_CODE);
-	current_ird_element = asset->sm_ird[new_mp_num];
-	current_ird_element->seg = seg;
-	current_ird_element->seg_id = seg_id;
-
-	current_ird_element->setup_purch_inv_asset(t,
+	asset->sm_ird[new_mp_num][0]->setup_purch_inv_asset(t,
 											   save_assets,
 											   panum,
 											   new_mp_num,
 											   purch_assets_asset_sub_port_num[panum],
 											   purch_asset_amt,
-											   seg->asset_mp_sequence_num);
+											   seg_element->asset_mp_sequence_num);
 	
-	if (current_ird_element->asset_detail_pv_flag(t))
+	if (asset->sm_ird[new_mp_num][0]->asset_detail_pv_flag(t))
 		{
 		PVCText << " .p. Purchasing Interest Rate Derivative" << purch_assets_id[panum]
-				<< " |" << current_ird_element->modelName
+				<< " |" << asset->sm_ird[new_mp_num][0]->modelName
 				<< " in sub portfolio " << purch_assets_asset_sub_port_num[panum]
 				<< " at time " << ((inv_purch_timing == END_OF_MONTH) ? t : t+1)
 				<< " " << inv_purch_timing;
@@ -6366,44 +6388,44 @@ if (purch_assets_type[panum] == INTEREST_RATE_DERIVATIVE)
 
 	if (asset->asset_detail_rpt_inv_strat_flag(t))
 		{
-		asd_sequence_num = current_ird_element->sequence_id;
-		asd_identifier = current_ird_element->asset_id;
-		asd_sub_port = current_ird_element->purch_asset_sub_port;
-		asd_class = current_ird_element->sale_class_id;
-		asd_fund = current_ird_element->asset_fund_index;
-		asd_neg_asset_flag = current_ird_element->neg_asset_flag;
-		asd_notional_amount = current_ird_element->notional_amt_bef_sale(t);
-		asd_market_value = current_ird_element->mkt_val_bef_sale(t);
-		asd_cost_basis = current_ird_element->cost_basis_bef_sale(t);
-		asd_book_value = current_ird_element->bk_val_bef_sale(t);
-		asd_ytm = (current_ird_element->maturity_period - t) / 12.0;
+		asd_sequence_num = asset->sm_ird[new_mp_num][0]->sequence_id;
+		asd_identifier = asset->sm_ird[new_mp_num][0]->asset_id;
+		asd_sub_port = asset->sm_ird[new_mp_num][0]->purch_asset_sub_port;
+		asd_class = asset->sm_ird[new_mp_num][0]->sale_class_id;
+		asd_fund = asset->sm_ird[new_mp_num][0]->asset_fund_index;
+		asd_neg_asset_flag = asset->sm_ird[new_mp_num][0]->neg_asset_flag;
+		asd_notional_amount = asset->sm_ird[new_mp_num][0]->notional_amt_bef_sale(t);
+		asd_market_value = asset->sm_ird[new_mp_num][0]->mkt_val_bef_sale(t);
+		asd_cost_basis = asset->sm_ird[new_mp_num][0]->cost_basis_bef_sale(t);
+		asd_book_value = asset->sm_ird[new_mp_num][0]->bk_val_bef_sale(t);
+		asd_ytm = (asset->sm_ird[new_mp_num][0]->maturity_period - t) / 12.0;
 		asd_wal = 0;
 		asd_eff_dur = 0;
-		asd_model_name = current_ird_element->modelName;
+		asd_model_name = asset->sm_ird[new_mp_num][0]->modelName;
 		}
 	
 	if (port_defn == INVESTMENT
-		&& current_ird_element->mkt_val_bef_sale(t) > 0)
+		&& asset->sm_ird[new_mp_num][0]->mkt_val_bef_sale(t) > 0)
 		local_amount_invested += purch_asset_amt;
 	
 	if (save_assets == NO
 		|| (port_defn == INVESTMENT
-			&& current_ird_element->mkt_val_bef_sale(t) < 0))
+			&& asset->sm_ird[new_mp_num][0]->mkt_val_bef_sale(t) < 0))
 		{
 		purch_assets_dur_defn[panum] = YES;
 		purch_assets_dur_calculated[panum] = YES;
 		purch_assets_dur[panum] = 0.0;
-		seg->asset_mp_maps(MP_INACTIVE_CODE, IRD_CODE, new_mp_num);
+		seg_element->asset_mp_maps(MP_INACTIVE_CODE, IRD_CODE, new_mp_num);
 		}
 	else // if (save_assets == YES)
 		{
-		sub_port_num = xint(current_ird_element->sub_port_id(t));
-		sale_class = current_ird_element->sale_class_id;
-		fund_index = current_ird_element->asset_fund_index;
+		sub_port_num = xint(asset->sm_ird[new_mp_num][0]->sub_port_id(t));
+		sale_class = asset->sm_ird[new_mp_num][0]->sale_class_id;
+		fund_index = asset->sm_ird[new_mp_num][0]->asset_fund_index;
 	
 		// Accumulate purchase amounts
-		local_book_value = current_ird_element->bk_val_bef_sale(t);
-		local_accrued_interest = current_ird_element->accr_int_bef_sale(t);
+		local_book_value = asset->sm_ird[new_mp_num][0]->bk_val_bef_sale(t);
+		local_accrued_interest = asset->sm_ird[new_mp_num][0]->accr_int_bef_sale(t);
 	
 		sub_port_fund_book_plus_accrued_purchases[sub_port_num][fund_index] += local_book_value + local_accrued_interest;
 		sub_port_class_fund_accrued_interest_purchases[sub_port_num][sale_class][fund_index] += local_accrued_interest;
@@ -6416,37 +6438,34 @@ else
 #if defined(__RE_ASSET_H_)
 if (purch_assets_type[panum] == REAL_ESTATE)
 	{
-	RE_ASSET * current_re_element;
+	new_mp_num = seg_element->asset_mp_maps(MP_NEXT_CODE, REAL_ESTATE_CODE);
+	asset->sm_re[new_mp_num]->seg_element = seg_element;
+	asset->sm_re[new_mp_num]->seg_id = seg_id;
 
-	new_mp_num = seg->asset_mp_maps(MP_NEXT_CODE, REAL_ESTATE_CODE);
-	current_re_element = asset->sm_re[new_mp_num];
-	current_re_element->seg = seg;
-	current_re_element->seg_id = seg_id;
-
-	current_re_element->setup_purch_inv_asset(t,
+	asset->sm_re[new_mp_num]->setup_purch_inv_asset(t,
 											  save_assets,
 											  panum,
 											  new_mp_num,
 											  purch_assets_asset_sub_port_num[panum],
 											  purch_asset_amt,
-											  seg->asset_mp_sequence_num);
+											  seg_element->asset_mp_sequence_num);
 	
 	if (asset->asset_detail_rpt_inv_strat_flag(t))
 		{
-		asd_sequence_num = current_re_element->sequence_id;
-		asd_identifier = current_re_element->asset_id;
-		asd_sub_port = current_re_element->purch_asset_sub_port;
-		asd_class = current_re_element->sale_class_id;
-		asd_fund = current_re_element->asset_fund_index;
-		asd_neg_asset_flag = current_re_element->neg_asset_flag;
-		asd_notional_amount = current_re_element->notional_amt_bef_sale(t);
-		asd_market_value = current_re_element->mkt_val_bef_sale(t);
-		asd_cost_basis = current_re_element->cost_basis_bef_sale(t);
-		asd_book_value = current_re_element->bk_val_bef_sale(t);
+		asd_sequence_num = asset->sm_re[new_mp_num]->sequence_id;
+		asd_identifier = asset->sm_re[new_mp_num]->asset_id;
+		asd_sub_port = asset->sm_re[new_mp_num]->purch_asset_sub_port;
+		asd_class = asset->sm_re[new_mp_num]->sale_class_id;
+		asd_fund = asset->sm_re[new_mp_num]->asset_fund_index;
+		asd_neg_asset_flag = asset->sm_re[new_mp_num]->neg_asset_flag;
+		asd_notional_amount = asset->sm_re[new_mp_num]->notional_amt_bef_sale(t);
+		asd_market_value = asset->sm_re[new_mp_num]->mkt_val_bef_sale(t);
+		asd_cost_basis = asset->sm_re[new_mp_num]->cost_basis_bef_sale(t);
+		asd_book_value = asset->sm_re[new_mp_num]->bk_val_bef_sale(t);
 		asd_ytm = 0;
 		asd_wal = 0;
 		asd_eff_dur = 0;
-		asd_model_name = current_re_element->modelName;
+		asd_model_name = asset->sm_re[new_mp_num]->modelName;
 		}
 	
 	local_amount_invested += purch_asset_amt;
@@ -6457,17 +6476,17 @@ if (purch_assets_type[panum] == REAL_ESTATE)
 		purch_assets_dur_calculated[panum] = YES;
 		purch_assets_dur[panum] = 0.0;
 	
-		seg->asset_mp_maps(MP_INACTIVE_CODE, REAL_ESTATE_CODE, new_mp_num);
+		seg_element->asset_mp_maps(MP_INACTIVE_CODE, REAL_ESTATE_CODE, new_mp_num);
 		}
 	else // if (save_assets == YES)
 		{		
-		sub_port_num = xint(current_re_element->sub_port_id(t));
-		sale_class = current_re_element->sale_class_id;
-		fund_index = current_re_element->asset_fund_index;
+		sub_port_num = xint(asset->sm_re[new_mp_num]->sub_port_id(t));
+		sale_class = asset->sm_re[new_mp_num]->sale_class_id;
+		fund_index = asset->sm_re[new_mp_num]->asset_fund_index;
 	
 		// Accumulate purchase amounts
-		local_book_value = current_re_element->bk_val_bef_sale(t);
-		local_accrued_interest = current_re_element->accr_rent_bef_sale(t);
+		local_book_value = asset->sm_re[new_mp_num]->bk_val_bef_sale(t);
+		local_accrued_interest = asset->sm_re[new_mp_num]->accr_rent_bef_sale(t);
 	
 		sub_port_fund_book_plus_accrued_purchases[sub_port_num][fund_index] += local_book_value + local_accrued_interest;
 		sub_port_class_fund_accrued_interest_purchases[sub_port_num][sale_class][fund_index] += local_accrued_interest;
@@ -6480,37 +6499,34 @@ else
 #if defined(__EQT_ASSET_H_)
 if (purch_assets_type[panum] == EQUITY)
 	{
-	EQT_ASSET * current_eqt_element;
+	new_mp_num = seg_element->asset_mp_maps(MP_NEXT_CODE, EQUITY_CODE);
+	asset->sm_eqt[new_mp_num]->seg_element = seg_element;
+	asset->sm_eqt[new_mp_num]->seg_id = seg_id;
 
-	new_mp_num = seg->asset_mp_maps(MP_NEXT_CODE, EQUITY_CODE);
-	current_eqt_element = asset->sm_eqt[new_mp_num];
-	current_eqt_element->seg = seg;
-	current_eqt_element->seg_id = seg_id;
-
-	current_eqt_element->setup_purch_inv_asset(t,
+	asset->sm_eqt[new_mp_num]->setup_purch_inv_asset(t,
 											   save_assets,
 											   panum,
 											   new_mp_num,
 											   purch_assets_asset_sub_port_num[panum],
 											   purch_asset_amt,
-											   seg->asset_mp_sequence_num);
+											   seg_element->asset_mp_sequence_num);
 
 	if (asset->asset_detail_rpt_inv_strat_flag(t))
 		{
-		asd_sequence_num = current_eqt_element->sequence_id;
-		asd_identifier = current_eqt_element->asset_id;
-		asd_sub_port = current_eqt_element->purch_asset_sub_port;
-		asd_class = current_eqt_element->sale_class_id;
-		asd_fund = current_eqt_element->asset_fund_index;
-		asd_neg_asset_flag = current_eqt_element->neg_asset_flag;
-		asd_notional_amount = current_eqt_element->notional_amt_bef_sale(t);
-		asd_market_value = current_eqt_element->mkt_val_bef_sale(t);
-		asd_cost_basis = current_eqt_element->cost_basis_bef_sale(t);
-		asd_book_value = current_eqt_element->bk_val_bef_sale(t);
+		asd_sequence_num = asset->sm_eqt[new_mp_num]->sequence_id;
+		asd_identifier = asset->sm_eqt[new_mp_num]->asset_id;
+		asd_sub_port = asset->sm_eqt[new_mp_num]->purch_asset_sub_port;
+		asd_class = asset->sm_eqt[new_mp_num]->sale_class_id;
+		asd_fund = asset->sm_eqt[new_mp_num]->asset_fund_index;
+		asd_neg_asset_flag = asset->sm_eqt[new_mp_num]->neg_asset_flag;
+		asd_notional_amount = asset->sm_eqt[new_mp_num]->notional_amt_bef_sale(t);
+		asd_market_value = asset->sm_eqt[new_mp_num]->mkt_val_bef_sale(t);
+		asd_cost_basis = asset->sm_eqt[new_mp_num]->cost_basis_bef_sale(t);
+		asd_book_value = asset->sm_eqt[new_mp_num]->bk_val_bef_sale(t);
 		asd_ytm = 0;
 		asd_wal = 0;
 		asd_eff_dur = 0;
-		asd_model_name = current_eqt_element->modelName;
+		asd_model_name = asset->sm_eqt[new_mp_num]->modelName;
 		}
 
 	local_amount_invested += purch_asset_amt;
@@ -6521,16 +6537,16 @@ if (purch_assets_type[panum] == EQUITY)
 		purch_assets_dur_calculated[panum] = YES;
 		purch_assets_dur[panum] = 0.0;
 
-		seg->asset_mp_maps(MP_INACTIVE_CODE, EQUITY_CODE, new_mp_num);
+		seg_element->asset_mp_maps(MP_INACTIVE_CODE, EQUITY_CODE, new_mp_num);
 		}
 	else // if (save_assets == YES)
 		{		
-		sub_port_num = xint(current_eqt_element->sub_port_id(t));
-		sale_class = current_eqt_element->sale_class_id;
-		fund_index = current_eqt_element->asset_fund_index;
+		sub_port_num = xint(asset->sm_eqt[new_mp_num]->sub_port_id(t));
+		sale_class = asset->sm_eqt[new_mp_num]->sale_class_id;
+		fund_index = asset->sm_eqt[new_mp_num]->asset_fund_index;
 
 		// Accumulate purchase amounts
-		local_book_value = current_eqt_element->bk_val_bef_sale(t);
+		local_book_value = asset->sm_eqt[new_mp_num]->bk_val_bef_sale(t);
 		sub_port_fund_book_plus_accrued_purchases[sub_port_num][fund_index] += local_book_value;
 		sub_port_class_fund_book_value_purchases[sub_port_num][sale_class][fund_index] += local_book_value;
 		}
@@ -6541,27 +6557,25 @@ else
 #if defined(__EIO_ASSET_H_)
 if (purch_assets_type[panum] == INDEX_OPTION)
 	{
+	purch_asset_id = purch_asset_id;
 	asset->purch_asset_yrs_to_maturity = purch_eio_yrs_to_maturity;
 
-	EIO_ASSET * current_eio_element;
-
-	new_mp_num = seg->asset_mp_maps(MP_NEXT_CODE, INDEX_OPTION_CODE);
-	current_eio_element = asset->sm_eio[new_mp_num];
-	current_eio_element->seg = seg;
-	current_eio_element->seg_id = seg_id;
+	new_mp_num = seg_element->asset_mp_maps(MP_NEXT_CODE, INDEX_OPTION_CODE);
+	asset->sm_eio[new_mp_num][0]->seg_element = seg_element;
+	asset->sm_eio[new_mp_num][0]->seg_id = seg_id;
 	
-	current_eio_element->setup_purch_inv_asset(t,
+	asset->sm_eio[new_mp_num][0]->setup_purch_inv_asset(t,
 											   save_assets,
 											   panum,
 											   new_mp_num,
 											   purch_assets_asset_sub_port_num[panum],
 											   purch_asset_amt,
-											   seg->asset_mp_sequence_num);
+											   seg_element->asset_mp_sequence_num);
 	
-	if (current_eio_element->asset_detail_pv_flag(t))
+	if (asset->sm_eio[new_mp_num][0]->asset_detail_pv_flag(t))
 		{
 		PVCText << " .p. Purchasing Index Option " << purch_assets_id[panum]
-				<< " |" << current_eio_element->modelName
+				<< " |" << asset->sm_eio[new_mp_num][0]->modelName
 				<< " in sub portfolio " << purch_assets_asset_sub_port_num[panum]
 				<< " at time " << ((inv_purch_timing == END_OF_MONTH) ? t : t+1)
 				<< " " << inv_purch_timing;
@@ -6570,24 +6584,24 @@ if (purch_assets_type[panum] == INDEX_OPTION)
 
 	if (asset->asset_detail_rpt_inv_strat_flag(t))
 		{
-		asd_sequence_num = current_eio_element->sequence_id;
-		asd_identifier = current_eio_element->asset_id;
-		asd_sub_port = current_eio_element->purch_asset_sub_port;
-		asd_class = current_eio_element->sale_class_id;
-		asd_fund = current_eio_element->asset_fund_index;
-		asd_neg_asset_flag = current_eio_element->neg_asset_flag;
-		asd_notional_amount = current_eio_element->notional_amt_bef_sale(t);
-		asd_market_value = current_eio_element->mkt_val_bef_sale(t);
-		asd_cost_basis = current_eio_element->cost_basis_bef_sale(t);
-		asd_book_value = current_eio_element->bk_val_bef_sale(t);
-		asd_ytm = (current_eio_element->maturity_period - t) / 12.0;
+		asd_sequence_num = asset->sm_eio[new_mp_num][0]->sequence_id;
+		asd_identifier = asset->sm_eio[new_mp_num][0]->asset_id;
+		asd_sub_port = asset->sm_eio[new_mp_num][0]->purch_asset_sub_port;
+		asd_class = asset->sm_eio[new_mp_num][0]->sale_class_id;
+		asd_fund = asset->sm_eio[new_mp_num][0]->asset_fund_index;
+		asd_neg_asset_flag = asset->sm_eio[new_mp_num][0]->neg_asset_flag;
+		asd_notional_amount = asset->sm_eio[new_mp_num][0]->notional_amt_bef_sale(t);
+		asd_market_value = asset->sm_eio[new_mp_num][0]->mkt_val_bef_sale(t);
+		asd_cost_basis = asset->sm_eio[new_mp_num][0]->cost_basis_bef_sale(t);
+		asd_book_value = asset->sm_eio[new_mp_num][0]->bk_val_bef_sale(t);
+		asd_ytm = (asset->sm_eio[new_mp_num][0]->maturity_period - t) / 12.0;
 		asd_wal = 0;
 		asd_eff_dur = 0;
-		asd_model_name = current_eio_element->modelName;
+		asd_model_name = asset->sm_eio[new_mp_num][0]->modelName;
 		}
 	
 	if (port_defn == INVESTMENT
-		&& current_eio_element->mkt_val_bef_sale(t) > 0)
+		&& asset->sm_eio[new_mp_num][0]->mkt_val_bef_sale(t) > 0)
 		local_amount_invested += purch_asset_amt;
 	
 	if (save_assets == NO)
@@ -6596,16 +6610,16 @@ if (purch_assets_type[panum] == INDEX_OPTION)
 		purch_assets_dur_calculated[panum] = YES;
 		purch_assets_dur[panum] = 0;
 	
-		seg->asset_mp_maps(MP_INACTIVE_CODE, INDEX_OPTION_CODE, new_mp_num);
+		seg_element->asset_mp_maps(MP_INACTIVE_CODE, INDEX_OPTION_CODE, new_mp_num);
 		}
 	else // if (save_assets == YES)
 		{
-		sub_port_num = xint(current_eio_element->sub_port_id(t));
-		sale_class = current_eio_element->sale_class_id;
-		fund_index = current_eio_element->asset_fund_index;
+		sub_port_num = xint(asset->sm_eio[new_mp_num][0]->sub_port_id(t));
+		sale_class = asset->sm_eio[new_mp_num][0]->sale_class_id;
+		fund_index = asset->sm_eio[new_mp_num][0]->asset_fund_index;
 	
 		// accumulate "purchase" amounts
-		local_book_value = current_eio_element->bk_val_bef_sale(t);
+		local_book_value = asset->sm_eio[new_mp_num][0]->bk_val_bef_sale(t);
 	
 		sub_port_fund_book_plus_accrued_purchases[sub_port_num][fund_index] += local_book_value;
 		sub_port_class_fund_book_value_purchases[sub_port_num][sale_class][fund_index] += local_book_value;
@@ -6667,7 +6681,7 @@ for (asset_sub_port = 0; asset_sub_port < asset->sm_asset_sub_port[seg_num].size
 
 if (asset->asset_detail_rpt_inv_strat_flag(t))
 	{
-	seg->SALFile << " <<< clear expected sales variables >>>" << endl;
+	seg_element->SALFile << " <<< clear expected sales variables >>>" << endl;
 	}
 
 return;
@@ -6695,7 +6709,7 @@ int col_num_market_to_book_ratio = 0;
 int col_num_unrealized_capital_gains_to_book_ratio = 0;
 int col_num_portion_of_asset_sold_rebal_sales = 0;
 
-A_SUBPORT_ASSET * current_sub_port;
+//A_SUBPORT_ASSET * current_sub_port;
 
 extreme_value_multimap.clear();
 
@@ -6726,58 +6740,56 @@ if (write_detail)
 #endif
 
 // need separate processing for each asset type
-mpmap::iterator mp_map_iter;
+map <int, long, less <int> >::iterator mp_map_iter;
 
 #if defined(__BOND_ASSET_H_)
-BOND_ASSET *bond_element;
 // Loop over bonds
 local_asset_defn = BOND_CODE;
-if (seg->bond_mp_map_active.size())
+if (seg_element->bond_mp_map_active.size())
 	{
 	col_num_asset_sub_port_num
-	= asset->sm_bond[0]->Column("sub_port_id").Number();
+	= asset->sm_bond[0][0]->Column("sub_port_id").Number();
 	col_num_dur_val
-	= asset->sm_bond[0]->Column("dur_val").Number();
+	= asset->sm_bond[0][0]->Column("dur_val").Number();
 	col_num_notional_amount
-	= asset->sm_bond[0]->Column("notional_amt").Number();
+	= asset->sm_bond[0][0]->Column("notional_amt").Number();
 	col_num_portion_of_asset_sold_planned_sales
-	= asset->sm_bond[0]->Column("sold_pct_planned").Number();
+	= asset->sm_bond[0][0]->Column("sold_pct_planned").Number();
 	col_num_market_to_book_ratio
-	= asset->sm_bond[0]->Column("mkt_to_bk_ratio").Number();
+	= asset->sm_bond[0][0]->Column("mkt_to_bk_ratio").Number();
 	col_num_unrealized_capital_gains_to_book_ratio
-	= asset->sm_bond[0]->Column("unrealzd_cap_gain_to_bk_ratio").Number();
+	= asset->sm_bond[0][0]->Column("unrealzd_cap_gain_to_bk_ratio").Number();
 
 	if (is_negative_cash_flow_sales)
 		{
 		col_num_notional_amount_before_sales
-		= asset->sm_bond[0]->Column("notional_amt_bef_neg_cash_flow_sale").Number();
+		= asset->sm_bond[0][0]->Column("notional_amt_bef_neg_cash_flow_sale").Number();
 		col_num_portion_of_asset_sold_rebal_sales
-		= asset->sm_bond[0]->Column("sold_pct_rebal").Number();
+		= asset->sm_bond[0][0]->Column("sold_pct_rebal").Number();
 		}
 	else // is rebalancing sales
 		{
 		col_num_notional_amount_before_sales
-		= asset->sm_bond[0]->Column("notional_amt_bef_rebal_sale").Number();
+		= asset->sm_bond[0][0]->Column("notional_amt_bef_rebal_sale").Number();
 		}
 	}
 
-for (mp_map_iter = seg->bond_mp_map_active.begin();
-	 mp_map_iter != seg->bond_mp_map_active.end();
+for (mp_map_iter = seg_element->bond_mp_map_active.begin();
+	 mp_map_iter != seg_element->bond_mp_map_active.end();
 	 mp_map_iter++)
 	{
 	mp = mp_map_iter->first;
-	bond_element = asset->sm_bond[mp];
 
-	if (bond_element->neg_asset_flag < 0)
+	if (asset->sm_bond[mp][0]->neg_asset_flag < 0)
 		continue;
 
-	if ((t >= max(0, bond_element->commencement_period)
-		&& bond_element->Column(col_num_notional_amount_before_sales).Value(t) < ASSET_ACTIVE_THRESHOLD))
+	if ((t >= max(0, asset->sm_bond[mp][0]->commencement_period)
+		&& asset->sm_bond[mp][0]->Column(col_num_notional_amount_before_sales).Value(t) < ASSET_ACTIVE_THRESHOLD))
 		continue;
 
-	sub_port_num = xint(bond_element->Column(col_num_asset_sub_port_num).Value(t));
-	sales_class_num = bond_element->sale_class_id;
-	asset_fund_index = bond_element->asset_fund_index;
+	sub_port_num = xint(asset->sm_bond[mp][0]->Column(col_num_asset_sub_port_num).Value(t));
+	sales_class_num = asset->sm_bond[mp][0]->sale_class_id;
+	asset_fund_index = asset->sm_bond[mp][0]->asset_fund_index;
 	current_sub_port = asset->sm_asset_sub_port[seg_num][sub_port_num][0];
 
 	if (current_sub_port->sub_ports_to_sell != 1
@@ -6786,43 +6798,43 @@ for (mp_map_iter = seg->bond_mp_map_active.begin();
 		continue;
 
 	asset_percent_remaining
-	= (1.0 - bond_element->Column(col_num_portion_of_asset_sold_planned_sales).Value(t));
+	= (1.0 - asset->sm_bond[mp][0]->Column(col_num_portion_of_asset_sold_planned_sales).Value(t));
 
 	if (is_negative_cash_flow_sales)
 		asset_percent_remaining
-		*= (1.0 - bond_element->Column(col_num_portion_of_asset_sold_rebal_sales).Value(t));
+		*= (1.0 - asset->sm_bond[mp][0]->Column(col_num_portion_of_asset_sold_rebal_sales).Value(t));
 
 	if (asset_percent_remaining > rate_ratio_threshold)
 		{
 		create_extreme_val_multimap_entry(extreme_selection,
-				bond_element->Column(col_num_market_to_book_ratio).Value(t),
-				bond_element->Column(col_num_unrealized_capital_gains_to_book_ratio).Value(t),
-				bond_element->Column(col_num_dur_val).Value(t),
-				bond_element->Column(col_num_notional_amount_before_sales).Value(t),
+				asset->sm_bond[mp][0]->Column(col_num_market_to_book_ratio).Value(t),
+				asset->sm_bond[mp][0]->Column(col_num_unrealized_capital_gains_to_book_ratio).Value(t),
+				asset->sm_bond[mp][0]->Column(col_num_dur_val).Value(t),
+				asset->sm_bond[mp][0]->Column(col_num_notional_amount_before_sales).Value(t),
 				local_asset_defn, mp);
 
 #if EXTREME_MULTIMAP_VALUES
 		if (write_detail)
 			{
 			double local_mkt_to_bk
-			= bond_element->Column(col_num_market_to_book_ratio).Value(t);
+			= asset->sm_bond[mp][0]->Column(col_num_market_to_book_ratio).Value(t);
 			double local_ucg_to_bk
-			= bond_element->Column(col_num_unrealized_capital_gains_to_book_ratio).Value(t);
+			= asset->sm_bond[mp][0]->Column(col_num_unrealized_capital_gains_to_book_ratio).Value(t);
 			double local_dur_val
-			= bond_element->Column(col_num_dur_val).Value(t);
+			= asset->sm_bond[mp][0]->Column(col_num_dur_val).Value(t);
 			double local_not_amt_bef_sales
-			= bond_element->Column(col_num_notional_amount_before_sales).Value(t);
+			= asset->sm_bond[mp][0]->Column(col_num_notional_amount_before_sales).Value(t);
 
-			seg->SALFile << " " << setw(18) << write_string(local_mkt_to_bk, 18, 15)
+			seg_element->SALFile << " " << setw(18) << write_string(local_mkt_to_bk, 18, 15)
 					     << " " << setw(18) << write_string(local_ucg_to_bk, 18, 15)
 					     << " " << setw(18) << write_string(local_dur_val, 18, 15)
 					     << " " << setw(18) << write_string(local_not_amt_bef_sales, 18, 15)
-					     << " " << setw(2) << setprecision(0) << xint(bond_element->sub_port_id(t))
-					     << " " << setw(4) << bond_element->commencement_period
-					     << " " << setw(5) << bond_element->sequence_id
-					     << " " << setw(9) << bond_element->asset_id
-					     << " |" << bond_element->modelName
-					     << " " << bond_element->port_defn
+					     << " " << setw(2) << setprecision(0) << xint(asset->sm_bond[mp][0]->sub_port_id(t))
+					     << " " << setw(4) << asset->sm_bond[mp][0]->commencement_period
+					     << " " << setw(5) << asset->sm_bond[mp][0]->sequence_id
+					     << " " << setw(9) << asset->sm_bond[mp][0]->asset_id
+					     << " |" << asset->sm_bond[mp][0]->modelName
+					     << " " << asset->sm_bond[mp][0]->port_defn
 					     << endl;
 			}
 #endif
@@ -6831,54 +6843,52 @@ for (mp_map_iter = seg->bond_mp_map_active.begin();
 #endif
 
 #if defined(__MTG_ASSET_H_)
-MTG_ASSET *mtg_element;
 local_asset_defn = MORTGAGE_CODE;
-if (seg->mtg_mp_map_active.size())
+if (seg_element->mtg_mp_map_active.size())
 	{
 	col_num_asset_sub_port_num
-	= asset->sm_mtg[0]->Column("sub_port_id").Number();
+	= asset->sm_mtg[0][0]->Column("sub_port_id").Number();
 	col_num_dur_val
-	= asset->sm_mtg[0]->Column("dur_val").Number();
+	= asset->sm_mtg[0][0]->Column("dur_val").Number();
 	col_num_notional_amount
-	= asset->sm_mtg[0]->Column("notional_amt").Number();
+	= asset->sm_mtg[0][0]->Column("notional_amt").Number();
 	col_num_portion_of_asset_sold_planned_sales
-	= asset->sm_mtg[0]->Column("sold_pct_planned").Number();
+	= asset->sm_mtg[0][0]->Column("sold_pct_planned").Number();
 	col_num_market_to_book_ratio
-	= asset->sm_mtg[0]->Column("mkt_to_bk_ratio").Number();
+	= asset->sm_mtg[0][0]->Column("mkt_to_bk_ratio").Number();
 	col_num_unrealized_capital_gains_to_book_ratio
-	= asset->sm_mtg[0]->Column("unrealzd_cap_gain_to_bk_ratio").Number();
+	= asset->sm_mtg[0][0]->Column("unrealzd_cap_gain_to_bk_ratio").Number();
 
 	if (is_negative_cash_flow_sales)
 		{
 		col_num_notional_amount_before_sales
-		= asset->sm_mtg[0]->Column("notional_amt_bef_neg_cash_flow_sale").Number();
+		= asset->sm_mtg[0][0]->Column("notional_amt_bef_neg_cash_flow_sale").Number();
 		col_num_portion_of_asset_sold_rebal_sales
-		= asset->sm_mtg[0]->Column("sold_pct_rebal").Number();
+		= asset->sm_mtg[0][0]->Column("sold_pct_rebal").Number();
 		}
 	else // is rebalancing sales
 		{
 		col_num_notional_amount_before_sales
-		= asset->sm_mtg[0]->Column("notional_amt_bef_rebal_sale").Number();
+		= asset->sm_mtg[0][0]->Column("notional_amt_bef_rebal_sale").Number();
 		}
 	}
 
-for (mp_map_iter = seg->mtg_mp_map_active.begin();
-	 mp_map_iter != seg->mtg_mp_map_active.end();
+for (mp_map_iter = seg_element->mtg_mp_map_active.begin();
+	 mp_map_iter != seg_element->mtg_mp_map_active.end();
 	 mp_map_iter++)
 	{
 	mp = mp_map_iter->first;
-	mtg_element = asset->sm_mtg[mp];
 
-	if (mtg_element->neg_asset_flag < 0)
+	if (asset->sm_mtg[mp][0]->neg_asset_flag < 0)
 		continue;
 
-	if ((t >= max(0, mtg_element->commencement_period)
-		&& mtg_element->Column(col_num_notional_amount_before_sales).Value(t) < ASSET_ACTIVE_THRESHOLD))
+	if ((t >= max(0, asset->sm_mtg[mp][0]->commencement_period)
+		&& asset->sm_mtg[mp][0]->Column(col_num_notional_amount_before_sales).Value(t) < ASSET_ACTIVE_THRESHOLD))
 		continue;
 
-	sub_port_num = xint(mtg_element->Column(col_num_asset_sub_port_num).Value(t));
-	sales_class_num = mtg_element->sale_class_id;
-	asset_fund_index = mtg_element->asset_fund_index;
+	sub_port_num = xint(asset->sm_mtg[mp][0]->Column(col_num_asset_sub_port_num).Value(t));
+	sales_class_num = asset->sm_mtg[mp][0]->sale_class_id;
+	asset_fund_index = asset->sm_mtg[mp][0]->asset_fund_index;
 	current_sub_port = asset->sm_asset_sub_port[seg_num][sub_port_num][0];
 
 	if (current_sub_port->sub_ports_to_sell != 1
@@ -6887,43 +6897,43 @@ for (mp_map_iter = seg->mtg_mp_map_active.begin();
 		continue;
 
 	asset_percent_remaining
-	= (1.0 - mtg_element->Column(col_num_portion_of_asset_sold_planned_sales).Value(t));
+	= (1.0 - asset->sm_mtg[mp][0]->Column(col_num_portion_of_asset_sold_planned_sales).Value(t));
 
 	if (is_negative_cash_flow_sales)
 		asset_percent_remaining
-		*= (1.0 - mtg_element->Column(col_num_portion_of_asset_sold_rebal_sales).Value(t));
+		*= (1.0 - asset->sm_mtg[mp][0]->Column(col_num_portion_of_asset_sold_rebal_sales).Value(t));
 
 	if (asset_percent_remaining > rate_ratio_threshold)
 		{
 		create_extreme_val_multimap_entry(extreme_selection,
-				mtg_element->mkt_to_bk_ratio(t),
-				mtg_element->unrealzd_cap_gain_to_bk_ratio(t),
-				mtg_element->dur_val(t),
-				mtg_element->notional_amt_bef_sale(t),
+				asset->sm_mtg[mp][0]->mkt_to_bk_ratio(t),
+				asset->sm_mtg[mp][0]->unrealzd_cap_gain_to_bk_ratio(t),
+				asset->sm_mtg[mp][0]->dur_val(t),
+				asset->sm_mtg[mp][0]->notional_amt_bef_sale(t),
 				local_asset_defn, mp);
 
 #if EXTREME_MULTIMAP_VALUES
 		if (write_detail)
 			{
 			double local_mkt_to_bk
-			= mtg_element->Column(col_num_market_to_book_ratio).Value(t);
+			= asset->sm_mtg[mp][0]->Column(col_num_market_to_book_ratio).Value(t);
 			double local_ucg_to_bk
-			= mtg_element->Column(col_num_unrealized_capital_gains_to_book_ratio).Value(t);
+			= asset->sm_mtg[mp][0]->Column(col_num_unrealized_capital_gains_to_book_ratio).Value(t);
 			double local_dur_val
-			= mtg_element->Column(col_num_dur_val).Value(t);
+			= asset->sm_mtg[mp][0]->Column(col_num_dur_val).Value(t);
 			double local_not_amt_bef_sales
-			= mtg_element->Column(col_num_notional_amount_before_sales).Value(t);
+			= asset->sm_mtg[mp][0]->Column(col_num_notional_amount_before_sales).Value(t);
 
-			seg->SALFile << " " << setw(18) << write_string(local_mkt_to_bk, 18, 15)
+			seg_element->SALFile << " " << setw(18) << write_string(local_mkt_to_bk, 18, 15)
 					     << " " << setw(18) << write_string(local_ucg_to_bk, 18, 15)
 					     << " " << setw(18) << write_string(local_dur_val, 18, 15)
 					     << " " << setw(18) << write_string(local_not_amt_bef_sales, 18, 15)
-					     << " " << setw(2) << setprecision(0) << xint(mtg_element->sub_port_id(t))
-					     << " " << setw(4) << mtg_element->commencement_period
-					     << " " << setw(5) << mtg_element->sequence_id
-					     << " " << setw(9) << mtg_element->asset_id
-					     << " |" << mtg_element->modelName
-					     << " " << mtg_element->port_defn
+					     << " " << setw(2) << setprecision(0) << xint(asset->sm_mtg[mp][0]->sub_port_id(t))
+					     << " " << setw(4) << asset->sm_mtg[mp][0]->commencement_period
+					     << " " << setw(5) << asset->sm_mtg[mp][0]->sequence_id
+					     << " " << setw(9) << asset->sm_mtg[mp][0]->asset_id
+					     << " |" << asset->sm_mtg[mp][0]->modelName
+					     << " " << asset->sm_mtg[mp][0]->port_defn
 					     << endl;
 			}
 #endif
@@ -6932,9 +6942,8 @@ for (mp_map_iter = seg->mtg_mp_map_active.begin();
 #endif
 
 #if defined(__SEC_ASSET_H_)
-SEC_ASSET *sec_element;
 local_asset_defn = SEC_CODE;
-if (seg->sec_mp_map_active.size())
+if (seg_element->sec_mp_map_active.size())
 	{
 	col_num_asset_sub_port_num
 	= asset->sm_sec[0]->Column("sub_port_id").Number();
@@ -6963,23 +6972,22 @@ if (seg->sec_mp_map_active.size())
 		}
 	}
 
-for (mp_map_iter = seg->sec_mp_map_active.begin();
-	 mp_map_iter != seg->sec_mp_map_active.end();
+for (mp_map_iter = seg_element->sec_mp_map_active.begin();
+	 mp_map_iter != seg_element->sec_mp_map_active.end();
 	 mp_map_iter++)
 	{
 	mp = mp_map_iter->first;
-	sec_element = asset->sm_sec[mp];
 
-	if (sec_element->neg_asset_flag < 0)
+	if (asset->sm_sec[mp]->neg_asset_flag < 0)
 		continue;
 
-	if (t >= max(0, sec_element->commencement_period)
-		&& sec_element->Column(col_num_notional_amount_before_sales).Value(t) < ASSET_ACTIVE_THRESHOLD)
+	if (t >= max(0, asset->sm_sec[mp]->commencement_period)
+		&& asset->sm_sec[mp]->Column(col_num_notional_amount_before_sales).Value(t) < ASSET_ACTIVE_THRESHOLD)
 		continue;
 
-	sub_port_num = xint(sec_element->Column(col_num_asset_sub_port_num).Value(t));
-	sales_class_num = sec_element->sale_class_id;
-	asset_fund_index = sec_element->asset_fund_index;
+	sub_port_num = xint(asset->sm_sec[mp]->Column(col_num_asset_sub_port_num).Value(t));
+	sales_class_num = asset->sm_sec[mp]->sale_class_id;
+	asset_fund_index = asset->sm_sec[mp]->asset_fund_index;
 	current_sub_port = asset->sm_asset_sub_port[seg_num][sub_port_num][0];
 
 	if (current_sub_port->sub_ports_to_sell != 1
@@ -6988,43 +6996,43 @@ for (mp_map_iter = seg->sec_mp_map_active.begin();
 		continue;
 
 	asset_percent_remaining
-	= (1.0 - sec_element->Column(col_num_portion_of_asset_sold_planned_sales).Value(t));
+	= (1.0 - asset->sm_sec[mp]->Column(col_num_portion_of_asset_sold_planned_sales).Value(t));
 
 	if (is_negative_cash_flow_sales)
 		asset_percent_remaining
-		*= (1.0 - sec_element->Column(col_num_portion_of_asset_sold_rebal_sales).Value(t));
+		*= (1.0 - asset->sm_sec[mp]->Column(col_num_portion_of_asset_sold_rebal_sales).Value(t));
 
 	if (asset_percent_remaining > SMALL_DOUBLE)
 		{
 		create_extreme_val_multimap_entry(extreme_selection,
-				sec_element->mkt_to_bk_ratio(t),
-				sec_element->unrealzd_cap_gain_to_bk_ratio(t),
-				sec_element->dur_val(t),
-				sec_element->notional_amt_bef_sale(t),
+				asset->sm_sec[mp]->mkt_to_bk_ratio(t),
+				asset->sm_sec[mp]->unrealzd_cap_gain_to_bk_ratio(t),
+				asset->sm_sec[mp]->dur_val(t),
+				asset->sm_sec[mp]->notional_amt_bef_sale(t),
 				local_asset_defn, mp);
 
 #if EXTREME_MULTIMAP_VALUES
 		if (write_detail)
 			{
 			double local_mkt_to_bk
-			= sec_element->Column(col_num_market_to_book_ratio).Value(t);
+			= asset->sm_sec[mp]->Column(col_num_market_to_book_ratio).Value(t);
 			double local_ucg_to_bk
-			= sec_element->Column(col_num_unrealized_capital_gains_to_book_ratio).Value(t);
+			= asset->sm_sec[mp]->Column(col_num_unrealized_capital_gains_to_book_ratio).Value(t);
 			double local_dur_val
-			= sec_element->Column(col_num_dur_val).Value(t);
+			= asset->sm_sec[mp]->Column(col_num_dur_val).Value(t);
 			double local_not_amt_bef_sales
-			= sec_element->Column(col_num_notional_amount_before_sales).Value(t);
+			= asset->sm_sec[mp]->Column(col_num_notional_amount_before_sales).Value(t);
 
-			seg->SALFile << " " << setw(18) << write_string(local_mkt_to_bk, 18, 15)
+			seg_element->SALFile << " " << setw(18) << write_string(local_mkt_to_bk, 18, 15)
 					     << " " << setw(18) << write_string(local_ucg_to_bk, 18, 15)
 					     << " " << setw(18) << write_string(local_dur_val, 18, 15)
 					     << " " << setw(18) << write_string(local_not_amt_bef_sales, 18, 15)
-					     << " " << setw(2) << setprecision(0) << xint(sec_element->sub_port_id(t))
-					     << " " << setw(4) << sec_element->commencement_period
-					     << " " << setw(5) << sec_element->sequence_id
-					     << " " << setw(9) << sec_element->asset_id
-					     << " |" << sec_element->modelName
-					     << " " << sec_element->port_defn
+					     << " " << setw(2) << setprecision(0) << xint(asset->sm_sec[mp]->sub_port_id(t))
+					     << " " << setw(4) << asset->sm_sec[mp]->commencement_period
+					     << " " << setw(5) << asset->sm_sec[mp]->sequence_id
+					     << " " << setw(9) << asset->sm_sec[mp]->asset_id
+					     << " |" << asset->sm_sec[mp]->modelName
+					     << " " << asset->sm_sec[mp]->port_defn
 					     << endl;
 			}
 #endif
@@ -7033,55 +7041,53 @@ for (mp_map_iter = seg->sec_mp_map_active.begin();
 #endif
 
 #if defined(__IRD_ASSET_H_)
-IRD_ASSET *ird_element;
 // Loop over interest contracts
 local_asset_defn = IRD_CODE;
-if (seg->ird_mp_map_active.size())
+if (seg_element->ird_mp_map_active.size())
 	{
 	col_num_asset_sub_port_num
-	= asset->sm_ird[0]->Column("sub_port_id").Number();
+	= asset->sm_ird[0][0]->Column("sub_port_id").Number();
 	col_num_dur_val
-	= asset->sm_ird[0]->Column("dur_val").Number();
+	= asset->sm_ird[0][0]->Column("dur_val").Number();
 	col_num_notional_amount
-	= asset->sm_ird[0]->Column("notional_amt").Number();
+	= asset->sm_ird[0][0]->Column("notional_amt").Number();
 	col_num_portion_of_asset_sold_planned_sales
-	= asset->sm_ird[0]->Column("sold_pct_planned").Number();
+	= asset->sm_ird[0][0]->Column("sold_pct_planned").Number();
 	col_num_market_to_book_ratio
-	= asset->sm_ird[0]->Column("mkt_to_bk_ratio").Number();
+	= asset->sm_ird[0][0]->Column("mkt_to_bk_ratio").Number();
 	col_num_unrealized_capital_gains_to_book_ratio
-	= asset->sm_ird[0]->Column("unrealzd_cap_gain_to_bk_ratio").Number();
+	= asset->sm_ird[0][0]->Column("unrealzd_cap_gain_to_bk_ratio").Number();
 
 	if (is_negative_cash_flow_sales)
 		{
 		col_num_notional_amount_before_sales
-		= asset->sm_ird[0]->Column("notional_amt_bef_neg_cash_flow_sale").Number();
+		= asset->sm_ird[0][0]->Column("notional_amt_bef_neg_cash_flow_sale").Number();
 		col_num_portion_of_asset_sold_rebal_sales
-		= asset->sm_ird[0]->Column("sold_pct_rebal").Number();
+		= asset->sm_ird[0][0]->Column("sold_pct_rebal").Number();
 		}
 	else // is rebalancing sales
 		{
 		col_num_notional_amount_before_sales
-		= asset->sm_ird[0]->Column("notional_amt_bef_rebal_sale").Number();
+		= asset->sm_ird[0][0]->Column("notional_amt_bef_rebal_sale").Number();
 		}
 	}
 
-for (mp_map_iter = seg->ird_mp_map_active.begin();
-	 mp_map_iter != seg->ird_mp_map_active.end();
+for (mp_map_iter = seg_element->ird_mp_map_active.begin();
+	 mp_map_iter != seg_element->ird_mp_map_active.end();
 	 mp_map_iter++)
 	{
 	mp = mp_map_iter->first;
-	ird_element = asset->sm_ird[mp];
 
-	if (ird_element->neg_asset_flag < 0)
+	if (asset->sm_ird[mp][0]->neg_asset_flag < 0)
 		continue;
 
-	if (t >= max(0, ird_element->commencement_period)
-		&& ird_element->Column(col_num_notional_amount_before_sales).Value(t) < ASSET_ACTIVE_THRESHOLD)
+	if (t >= max(0, asset->sm_ird[mp][0]->commencement_period)
+		&& asset->sm_ird[mp][0]->Column(col_num_notional_amount_before_sales).Value(t) < ASSET_ACTIVE_THRESHOLD)
 		continue;
 
-	sub_port_num = xint(ird_element->Column(col_num_asset_sub_port_num).Value(t));
-	sales_class_num = ird_element->sale_class_id;
-	asset_fund_index = ird_element->asset_fund_index;
+	sub_port_num = xint(asset->sm_ird[mp][0]->Column(col_num_asset_sub_port_num).Value(t));
+	sales_class_num = asset->sm_ird[mp][0]->sale_class_id;
+	asset_fund_index = asset->sm_ird[mp][0]->asset_fund_index;
 	current_sub_port = asset->sm_asset_sub_port[seg_num][sub_port_num][0];
 
 	if (current_sub_port->sub_ports_to_sell != 1
@@ -7090,43 +7096,43 @@ for (mp_map_iter = seg->ird_mp_map_active.begin();
 		continue;
 
 	asset_percent_remaining
-	= (1.0 - ird_element->Column(col_num_portion_of_asset_sold_planned_sales).Value(t));
+	= (1.0 - asset->sm_ird[mp][0]->Column(col_num_portion_of_asset_sold_planned_sales).Value(t));
 
 	if (is_negative_cash_flow_sales)
 		asset_percent_remaining
-		*= (1.0 - ird_element->Column(col_num_portion_of_asset_sold_rebal_sales).Value(t));
+		*= (1.0 - asset->sm_ird[mp][0]->Column(col_num_portion_of_asset_sold_rebal_sales).Value(t));
 
 	if (asset_percent_remaining > SMALL_DOUBLE)
 		{
 		create_extreme_val_multimap_entry(extreme_selection,
-				ird_element->mkt_to_bk_ratio(t),
-				ird_element->unrealzd_cap_gain_to_bk_ratio(t),
-				ird_element->dur_val(t),
-				ird_element->notional_amt_bef_sale(t),
+				asset->sm_ird[mp][0]->mkt_to_bk_ratio(t),
+				asset->sm_ird[mp][0]->unrealzd_cap_gain_to_bk_ratio(t),
+				asset->sm_ird[mp][0]->dur_val(t),
+				asset->sm_ird[mp][0]->notional_amt_bef_sale(t),
 				local_asset_defn, mp);
 
 #if EXTREME_MULTIMAP_VALUES
 		if (write_detail)
 			{
 			double local_mkt_to_bk
-			= ird_element->Column(col_num_market_to_book_ratio).Value(t);
+			= asset->sm_ird[mp][0]->Column(col_num_market_to_book_ratio).Value(t);
 			double local_ucg_to_bk
-			= ird_element->Column(col_num_unrealized_capital_gains_to_book_ratio).Value(t);
+			= asset->sm_ird[mp][0]->Column(col_num_unrealized_capital_gains_to_book_ratio).Value(t);
 			double local_dur_val
-			= ird_element->Column(col_num_dur_val).Value(t);
+			= asset->sm_ird[mp][0]->Column(col_num_dur_val).Value(t);
 			double local_not_amt_bef_sales
-			= ird_element->Column(col_num_notional_amount_before_sales).Value(t);
+			= asset->sm_ird[mp][0]->Column(col_num_notional_amount_before_sales).Value(t);
 
-			seg->SALFile << " " << setw(18) << write_string(local_mkt_to_bk, 18, 15)
+			seg_element->SALFile << " " << setw(18) << write_string(local_mkt_to_bk, 18, 15)
 					     << " " << setw(18) << write_string(local_ucg_to_bk, 18, 15)
 					     << " " << setw(18) << write_string(local_dur_val, 18, 15)
 					     << " " << setw(18) << write_string(local_not_amt_bef_sales, 18, 15)
-					     << " " << setw(2) << setprecision(0) << xint(ird_element->sub_port_id(t))
-					     << " " << setw(4) << ird_element->commencement_period
-					     << " " << setw(5) << ird_element->sequence_id
-					     << " " << setw(9) << ird_element->asset_id
-					     << " |" << ird_element->modelName
-					     << " " << ird_element->port_defn
+					     << " " << setw(2) << setprecision(0) << xint(asset->sm_ird[mp][0]->sub_port_id(t))
+					     << " " << setw(4) << asset->sm_ird[mp][0]->commencement_period
+					     << " " << setw(5) << asset->sm_ird[mp][0]->sequence_id
+					     << " " << setw(9) << asset->sm_ird[mp][0]->asset_id
+					     << " |" << asset->sm_ird[mp][0]->modelName
+					     << " " << asset->sm_ird[mp][0]->port_defn
 					     << endl;
 			}
 #endif
@@ -7135,10 +7141,9 @@ for (mp_map_iter = seg->ird_mp_map_active.begin();
 #endif
 
 #if defined(__RE_ASSET_H_)
-RE_ASSET *re_element;
 // Loop over real estate
 local_asset_defn = REAL_ESTATE_CODE;
-if (seg->re_mp_map_active.size())
+if (seg_element->re_mp_map_active.size())
 	{
 	col_num_asset_sub_port_num
 	= asset->sm_re[0]->Column("sub_port_id").Number();
@@ -7166,23 +7171,22 @@ if (seg->re_mp_map_active.size())
 		}
 	}
 
-for (mp_map_iter = seg->re_mp_map_active.begin();
-	 mp_map_iter != seg->re_mp_map_active.end();
+for (mp_map_iter = seg_element->re_mp_map_active.begin();
+	 mp_map_iter != seg_element->re_mp_map_active.end();
 	 mp_map_iter++)
 	{
 	mp = mp_map_iter->first;
-	re_element = asset->sm_re[mp];
 
-	if (re_element->neg_asset_flag < 0)
+	if (asset->sm_re[mp]->neg_asset_flag < 0)
 		continue;
 
-	if (t >= max(0, re_element->commencement_period)
-		&& re_element->Column(col_num_notional_amount_before_sales).Value(t) < ASSET_ACTIVE_THRESHOLD)
+	if (t >= max(0, asset->sm_re[mp]->commencement_period)
+		&& asset->sm_re[mp]->Column(col_num_notional_amount_before_sales).Value(t) < ASSET_ACTIVE_THRESHOLD)
 		continue;
 
-	sub_port_num = xint(re_element->Column(col_num_asset_sub_port_num).Value(t));
-	sales_class_num = re_element->sale_class_id;
-	asset_fund_index = re_element->asset_fund_index;
+	sub_port_num = xint(asset->sm_re[mp]->Column(col_num_asset_sub_port_num).Value(t));
+	sales_class_num = asset->sm_re[mp]->sale_class_id;
+	asset_fund_index = asset->sm_re[mp]->asset_fund_index;
 	current_sub_port = asset->sm_asset_sub_port[seg_num][sub_port_num][0];
 
 	if (current_sub_port->sub_ports_to_sell != 1
@@ -7191,43 +7195,43 @@ for (mp_map_iter = seg->re_mp_map_active.begin();
 		continue;
 
 	asset_percent_remaining
-	= (1.0 - re_element->Column(col_num_portion_of_asset_sold_planned_sales).Value(t));
+	= (1.0 - asset->sm_re[mp]->Column(col_num_portion_of_asset_sold_planned_sales).Value(t));
 
 	if (is_negative_cash_flow_sales)
 		asset_percent_remaining
-		*= (1.0 - re_element->Column(col_num_portion_of_asset_sold_rebal_sales).Value(t));
+		*= (1.0 - asset->sm_re[mp]->Column(col_num_portion_of_asset_sold_rebal_sales).Value(t));
 
 	if (asset_percent_remaining > SMALL_DOUBLE)
 		{
 		create_extreme_val_multimap_entry(extreme_selection,
-				re_element->Column(col_num_market_to_book_ratio).Value(t),
-				re_element->Column(col_num_unrealized_capital_gains_to_book_ratio).Value(t),
+				asset->sm_re[mp]->Column(col_num_market_to_book_ratio).Value(t),
+				asset->sm_re[mp]->Column(col_num_unrealized_capital_gains_to_book_ratio).Value(t),
 				0.0, // duration measure
-				re_element->Column(col_num_notional_amount_before_sales).Value(t),
+				asset->sm_re[mp]->Column(col_num_notional_amount_before_sales).Value(t),
 				local_asset_defn, mp);
 
 #if EXTREME_MULTIMAP_VALUES
 		if (write_detail)
 			{
 			double local_mkt_to_bk
-			= re_element->Column(col_num_market_to_book_ratio).Value(t);
+			= asset->sm_re[mp]->Column(col_num_market_to_book_ratio).Value(t);
 			double local_ucg_to_bk
-			= re_element->Column(col_num_unrealized_capital_gains_to_book_ratio).Value(t);
+			= asset->sm_re[mp]->Column(col_num_unrealized_capital_gains_to_book_ratio).Value(t);
 			double local_dur_val
 			= 0;
 			double local_not_amt_bef_sales
-			= re_element->Column(col_num_notional_amount_before_sales).Value(t);
+			= asset->sm_re[mp]->Column(col_num_notional_amount_before_sales).Value(t);
 
 			SALFile << " " << setw(18) << write_string(local_mkt_to_bk, 18, 15)
 					<< " " << setw(18) << write_string(local_ucg_to_bk, 18, 15)
 					<< " " << setw(18) << write_string(local_dur_val, 18, 15)
 					<< " " << setw(18) << write_string(local_not_amt_bef_sales, 18, 15)
-					<< " " << setw(2) << setprecision(0) << xint(re_element->sub_port_id(t))
-					<< " " << setw(4) << re_element->commencement_period
-					<< " " << setw(5) << re_element->sequence_id
-					<< " " << setw(9) << re_element->asset_id
-					<< " |" << re_element->modelName
-					<< " " << re_element->port_defn
+					<< " " << setw(2) << setprecision(0) << xint(asset->sm_re[mp]->sub_port_id(t))
+					<< " " << setw(4) << asset->sm_re[mp]->commencement_period
+					<< " " << setw(5) << asset->sm_re[mp]->sequence_id
+					<< " " << setw(9) << asset->sm_re[mp]->asset_id
+					<< " |" << asset->sm_re[mp]->modelName
+					<< " " << asset->sm_re[mp]->port_defn
 					<< endl;
 			}
 #endif
@@ -7236,10 +7240,9 @@ for (mp_map_iter = seg->re_mp_map_active.begin();
 #endif
 
 #if defined(__EQT_ASSET_H_)
-EQT_ASSET *eqt_element;
 // Loop over equities
 local_asset_defn = EQUITY_CODE;
-if (seg->eqt_mp_map_active.size())
+if (seg_element->eqt_mp_map_active.size())
 	{
 	col_num_asset_sub_port_num
 	= asset->sm_eqt[0]->Column("sub_port_id").Number();
@@ -7267,23 +7270,22 @@ if (seg->eqt_mp_map_active.size())
 		}
 	}
 
-for (mp_map_iter = seg->eqt_mp_map_active.begin();
-	 mp_map_iter != seg->eqt_mp_map_active.end();
+for (mp_map_iter = seg_element->eqt_mp_map_active.begin();
+	 mp_map_iter != seg_element->eqt_mp_map_active.end();
 	 mp_map_iter++)
 	{
 	mp = mp_map_iter->first;
-	eqt_element = asset->sm_eqt[mp];
 
-	if (eqt_element->neg_asset_flag < 0)
+	if (asset->sm_eqt[mp]->neg_asset_flag < 0)
 		continue;
 
-	if (t >= max(0, eqt_element->commencement_period)
-		&& eqt_element->Column(col_num_notional_amount_before_sales).Value(t) < ASSET_ACTIVE_THRESHOLD)
+	if (t >= max(0, asset->sm_eqt[mp]->commencement_period)
+		&& asset->sm_eqt[mp]->Column(col_num_notional_amount_before_sales).Value(t) < ASSET_ACTIVE_THRESHOLD)
 		continue;
 
-	sub_port_num = xint(eqt_element->sub_port_id(t));
-	sales_class_num = eqt_element->sale_class_id;
-	asset_fund_index = eqt_element->asset_fund_index;
+	sub_port_num = xint(asset->sm_eqt[mp]->sub_port_id(t));
+	sales_class_num = asset->sm_eqt[mp]->sale_class_id;
+	asset_fund_index = asset->sm_eqt[mp]->asset_fund_index;
 	current_sub_port = asset->sm_asset_sub_port[seg_num][sub_port_num][0];
 
 	if (current_sub_port->sub_ports_to_sell != 1
@@ -7292,43 +7294,43 @@ for (mp_map_iter = seg->eqt_mp_map_active.begin();
 		continue;
 
 	asset_percent_remaining
-	= (1.0 - eqt_element->Column(col_num_portion_of_asset_sold_planned_sales).Value(t));
+	= (1.0 - asset->sm_eqt[mp]->Column(col_num_portion_of_asset_sold_planned_sales).Value(t));
 
 	if (is_negative_cash_flow_sales)
 		asset_percent_remaining
-		*= (1.0 - eqt_element->Column(col_num_portion_of_asset_sold_rebal_sales).Value(t));
+		*= (1.0 - asset->sm_eqt[mp]->Column(col_num_portion_of_asset_sold_rebal_sales).Value(t));
 
 	if (asset_percent_remaining > SMALL_DOUBLE)
 		{
 		create_extreme_val_multimap_entry(extreme_selection,
-				eqt_element->Column(col_num_market_to_book_ratio).Value(t),
-				eqt_element->Column(col_num_unrealized_capital_gains_to_book_ratio).Value(t),
+				asset->sm_eqt[mp]->Column(col_num_market_to_book_ratio).Value(t),
+				asset->sm_eqt[mp]->Column(col_num_unrealized_capital_gains_to_book_ratio).Value(t),
 				0.0, // duration measure
-				eqt_element->Column(col_num_notional_amount_before_sales).Value(t),
+				asset->sm_eqt[mp]->Column(col_num_notional_amount_before_sales).Value(t),
 				local_asset_defn, mp);
 
 #if EXTREME_MULTIMAP_VALUES
 		if (write_detail)
 			{
 			double local_mkt_to_bk
-			= eqt_element->Column(col_num_market_to_book_ratio).Value(t);
+			= asset->sm_eqt[mp]->Column(col_num_market_to_book_ratio).Value(t);
 			double local_ucg_to_bk
-			= eqt_element->Column(col_num_unrealized_capital_gains_to_book_ratio).Value(t);
+			= asset->sm_eqt[mp]->Column(col_num_unrealized_capital_gains_to_book_ratio).Value(t);
 			double local_dur_val
 			= 0;
 			double local_not_amt_bef_sales
-			= eqt_element->Column(col_num_notional_amount_before_sales).Value(t);
+			= asset->sm_eqt[mp]->Column(col_num_notional_amount_before_sales).Value(t);
 
-			seg->SALFile << " " << setw(18) << write_string(local_mkt_to_bk, 18, 15)
+			seg_element->SALFile << " " << setw(18) << write_string(local_mkt_to_bk, 18, 15)
 					     << " " << setw(18) << write_string(local_ucg_to_bk, 18, 15)
 					     << " " << setw(18) << write_string(local_dur_val, 18, 15)
 					     << " " << setw(18) << write_string(local_not_amt_bef_sales, 18, 15)
-					     << " " << setw(2) << setprecision(0) << xint(eqt_element->sub_port_id(t))
-					     << " " << setw(4) << eqt_element->commencement_period
-					     << " " << setw(5) << eqt_element->sequence_id
-					     << " " << setw(9) << eqt_element->asset_id
-					     << " |" << eqt_element->modelName
-					     << " " << eqt_element->port_defn
+					     << " " << setw(2) << setprecision(0) << xint(asset->sm_eqt[mp]->sub_port_id(t))
+					     << " " << setw(4) << asset->sm_eqt[mp]->commencement_period
+					     << " " << setw(5) << asset->sm_eqt[mp]->sequence_id
+					     << " " << setw(9) << asset->sm_eqt[mp]->asset_id
+					     << " |" << asset->sm_eqt[mp]->modelName
+					     << " " << asset->sm_eqt[mp]->port_defn
 					     << endl;
 			}
 #endif
@@ -7338,55 +7340,53 @@ for (mp_map_iter = seg->eqt_mp_map_active.begin();
 
 
 #if defined(__EIO_ASSET_H_)
-EIO_ASSET *eio_element;
 // Loop over index options
 local_asset_defn = INDEX_OPTION_CODE;
-if (seg->eio_mp_map_active.size())
+if (seg_element->eio_mp_map_active.size())
 	{
 	col_num_asset_sub_port_num
-	= asset->sm_eio[0]->Column("sub_port_id").Number();
+	= asset->sm_eio[0][0]->Column("sub_port_id").Number();
 	col_num_dur_val
-	= asset->sm_eio[0]->Column("dur_val").Number();
+	= asset->sm_eio[0][0]->Column("dur_val").Number();
 	col_num_notional_amount
-	= asset->sm_eio[0]->Column("notional_amt").Number();
+	= asset->sm_eio[0][0]->Column("notional_amt").Number();
 	col_num_portion_of_asset_sold_planned_sales
-	= asset->sm_eio[0]->Column("sold_pct_planned").Number();
+	= asset->sm_eio[0][0]->Column("sold_pct_planned").Number();
 	col_num_market_to_book_ratio
-	= asset->sm_eio[0]->Column("mkt_to_bk_ratio").Number();
+	= asset->sm_eio[0][0]->Column("mkt_to_bk_ratio").Number();
 	col_num_unrealized_capital_gains_to_book_ratio
-	= asset->sm_eio[0]->Column("unrealzd_cap_gain_to_bk_ratio").Number();
+	= asset->sm_eio[0][0]->Column("unrealzd_cap_gain_to_bk_ratio").Number();
 
 	if (is_negative_cash_flow_sales)
 		{
 		col_num_notional_amount_before_sales
-		= asset->sm_eio[0]->Column("notional_amt_bef_neg_cash_flow_sale").Number();
+		= asset->sm_eio[0][0]->Column("notional_amt_bef_neg_cash_flow_sale").Number();
 		col_num_portion_of_asset_sold_rebal_sales
-		= asset->sm_eio[0]->Column("sold_pct_rebal").Number();
+		= asset->sm_eio[0][0]->Column("sold_pct_rebal").Number();
 		}
 	else // is rebalancing sales
 		{
 		col_num_notional_amount_before_sales
-		= asset->sm_eio[0]->Column("notional_amt_bef_rebal_sale").Number();
+		= asset->sm_eio[0][0]->Column("notional_amt_bef_rebal_sale").Number();
 		}
 	}
 
-for (mp_map_iter = seg->eio_mp_map_active.begin();
-	 mp_map_iter != seg->eio_mp_map_active.end();
+for (mp_map_iter = seg_element->eio_mp_map_active.begin();
+	 mp_map_iter != seg_element->eio_mp_map_active.end();
 	 mp_map_iter++)
 	{
 	mp = mp_map_iter->first;
-	eio_element = asset->sm_eio[mp];
 
-	if (eio_element->neg_asset_flag < 0)
+	if (asset->sm_eio[mp][0]->neg_asset_flag < 0)
 		continue;
 
-	if (t >= max(0, eio_element->commencement_period)
-			&& eio_element->Column(col_num_notional_amount_before_sales).Value(t) < ASSET_ACTIVE_THRESHOLD)
+	if (t >= max(0, asset->sm_eio[mp][0]->commencement_period)
+			&& asset->sm_eio[mp][0]->Column(col_num_notional_amount_before_sales).Value(t) < ASSET_ACTIVE_THRESHOLD)
 		continue;
 
-	sub_port_num = xint(eio_element->Column(col_num_asset_sub_port_num).Value(t));
-	sales_class_num = eio_element->sale_class_id;
-	asset_fund_index = eio_element->asset_fund_index;
+	sub_port_num = xint(asset->sm_eio[mp][0]->Column(col_num_asset_sub_port_num).Value(t));
+	sales_class_num = asset->sm_eio[mp][0]->sale_class_id;
+	asset_fund_index = asset->sm_eio[mp][0]->asset_fund_index;
 	current_sub_port = asset->sm_asset_sub_port[seg_num][sub_port_num][0];
 
 	if (current_sub_port->sub_ports_to_sell != 1
@@ -7395,43 +7395,43 @@ for (mp_map_iter = seg->eio_mp_map_active.begin();
 		continue;
 
 	asset_percent_remaining
-	= (1.0 - eio_element->Column(col_num_portion_of_asset_sold_planned_sales).Value(t));
+	= (1.0 - asset->sm_eio[mp][0]->Column(col_num_portion_of_asset_sold_planned_sales).Value(t));
 
 	if (is_negative_cash_flow_sales)
 		asset_percent_remaining
-		*= (1.0 - eio_element->Column(col_num_portion_of_asset_sold_rebal_sales).Value(t));
+		*= (1.0 - asset->sm_eio[mp][0]->Column(col_num_portion_of_asset_sold_rebal_sales).Value(t));
 
 	if (asset_percent_remaining > SMALL_DOUBLE)
 		{
 		create_extreme_val_multimap_entry(extreme_selection,
-				eio_element->Column(col_num_market_to_book_ratio).Value(t),
-				eio_element->Column(col_num_unrealized_capital_gains_to_book_ratio).Value(t),
-				eio_element->Column(col_num_dur_val).Value(t),
-				eio_element->Column(col_num_notional_amount_before_sales).Value(t),
+				asset->sm_eio[mp][0]->Column(col_num_market_to_book_ratio).Value(t),
+				asset->sm_eio[mp][0]->Column(col_num_unrealized_capital_gains_to_book_ratio).Value(t),
+				asset->sm_eio[mp][0]->Column(col_num_dur_val).Value(t),
+				asset->sm_eio[mp][0]->Column(col_num_notional_amount_before_sales).Value(t),
 				local_asset_defn, mp);
 
 #if EXTREME_MULTIMAP_VALUES
 		if (write_detail)
 			{
 			double local_mkt_to_bk
-			= eio_element->Column(col_num_market_to_book_ratio).Value(t);
+			= asset->sm_eio[mp][0]->Column(col_num_market_to_book_ratio).Value(t);
 			double local_ucg_to_bk
-			= eio_element->Column(col_num_unrealized_capital_gains_to_book_ratio).Value(t);
+			= asset->sm_eio[mp][0]->Column(col_num_unrealized_capital_gains_to_book_ratio).Value(t);
 			double local_dur_val
-			= eio_element->Column(col_num_dur_val).Value(t);
+			= asset->sm_eio[mp][0]->Column(col_num_dur_val).Value(t);
 			double local_not_amt_bef_sales
-			= eio_element->Column(col_num_notional_amount_before_sales).Value(t);
+			= asset->sm_eio[mp][0]->Column(col_num_notional_amount_before_sales).Value(t);
 
-			seg->SALFile << " " << setw(18) << write_string(local_mkt_to_bk, 18, 15)
+			seg_element->SALFile << " " << setw(18) << write_string(local_mkt_to_bk, 18, 15)
 					     << " " << setw(18) << write_string(local_ucg_to_bk, 18, 15)
 					     << " " << setw(18) << write_string(local_dur_val, 18, 15)
 					     << " " << setw(18) << write_string(local_not_amt_bef_sales, 18, 15)
-					     << " " << setw(2) << setprecision(0) << xint(eio_element->sub_port_id(t))
-					     << " " << setw(4) << eio_element->commencement_period
-					     << " " << setw(5) << eio_element->sequence_id
-					     << " " << setw(9) << eio_element->asset_id
-					     << " |" << eio_element->modelName
-					     << " " << eio_element->port_defn
+					     << " " << setw(2) << setprecision(0) << xint(asset->sm_eio[mp][0]->sub_port_id(t))
+					     << " " << setw(4) << asset->sm_eio[mp][0]->commencement_period
+					     << " " << setw(5) << asset->sm_eio[mp][0]->sequence_id
+					     << " " << setw(9) << asset->sm_eio[mp][0]->asset_id
+					     << " |" << asset->sm_eio[mp][0]->modelName
+					     << " " << asset->sm_eio[mp][0]->port_defn
 					     << endl;
 			}
 #endif
@@ -7440,10 +7440,9 @@ for (mp_map_iter = seg->eio_mp_map_active.begin();
 #endif
 
 #if defined(__EPA_ASSET_H_)
-EPA_ASSET *epa_element;
 // Loop over epas
 local_asset_defn = EPA_CODE;
-if (seg->epa_mp_map_active.size())
+if (seg_element->epa_mp_map_active.size())
 	{
 	col_num_asset_sub_port_num
 	= asset->sm_epa[0]->Column("sub_port_id").Number();
@@ -7472,22 +7471,21 @@ if (seg->epa_mp_map_active.size())
 		}
 	}
 
-for (mp_map_iter = seg->epa_mp_map_active.begin();
-	 mp_map_iter != seg->epa_mp_map_active.end();
+for (mp_map_iter = seg_element->epa_mp_map_active.begin();
+	 mp_map_iter != seg_element->epa_mp_map_active.end();
 	 mp_map_iter++)
 	{
 	mp = mp_map_iter->first;
-	epa_element = asset->sm_epa[mp];
 
-	if (epa_element->neg_asset_flag < 0)
+	if (asset->sm_epa[mp]->neg_asset_flag < 0)
 		continue;
 
-	if (epa_element->Column(col_num_notional_amount_before_sales).Value(t) < ASSET_ACTIVE_THRESHOLD)
+	if (asset->sm_epa[mp]->Column(col_num_notional_amount_before_sales).Value(t) < ASSET_ACTIVE_THRESHOLD)
 		continue;
 
-	sub_port_num = xint(epa_element->Column(col_num_asset_sub_port_num).Value(t));
-	sales_class_num = epa_element->sale_class_id;
-	asset_fund_index = epa_element->asset_fund_index;
+	sub_port_num = xint(asset->sm_epa[mp]->Column(col_num_asset_sub_port_num).Value(t));
+	sales_class_num = asset->sm_epa[mp]->sale_class_id;
+	asset_fund_index = asset->sm_epa[mp]->asset_fund_index;
 	current_sub_port = asset->sm_asset_sub_port[seg_num][sub_port_num][0];
 
 	if (current_sub_port->sub_ports_to_sell != 1
@@ -7496,43 +7494,43 @@ for (mp_map_iter = seg->epa_mp_map_active.begin();
 		continue;
 
 	asset_percent_remaining
-	= (1.0 - epa_element->Column(col_num_portion_of_asset_sold_planned_sales).Value(t));
+	= (1.0 - asset->sm_epa[mp]->Column(col_num_portion_of_asset_sold_planned_sales).Value(t));
 
 	if (is_negative_cash_flow_sales)
 		asset_percent_remaining
-		*= (1.0 - epa_element->Column(col_num_portion_of_asset_sold_rebal_sales).Value(t));
+		*= (1.0 - asset->sm_epa[mp]->Column(col_num_portion_of_asset_sold_rebal_sales).Value(t));
 
 	if (asset_percent_remaining > SMALL_DOUBLE)
 		{
 		create_extreme_val_multimap_entry(extreme_selection,
-				epa_element->Column(col_num_market_to_book_ratio).Value(t),
-				epa_element->Column(col_num_unrealized_capital_gains_to_book_ratio).Value(t),
-				epa_element->Column(col_num_dur_val).Value(t),
-				epa_element->Column(col_num_notional_amount_before_sales).Value(t),
+				asset->sm_epa[mp]->Column(col_num_market_to_book_ratio).Value(t),
+				asset->sm_epa[mp]->Column(col_num_unrealized_capital_gains_to_book_ratio).Value(t),
+				asset->sm_epa[mp]->Column(col_num_dur_val).Value(t),
+				asset->sm_epa[mp]->Column(col_num_notional_amount_before_sales).Value(t),
 				local_asset_defn, mp);
 
 #if EXTREME_MULTIMAP_VALUES
 		if (write_detail)
 			{
 			double local_mkt_to_bk
-			= epa_element->Column(col_num_market_to_book_ratio).Value(t);
+			= asset->sm_epa[mp]->Column(col_num_market_to_book_ratio).Value(t);
 			double local_ucg_to_bk
-			= epa_element->Column(col_num_unrealized_capital_gains_to_book_ratio).Value(t);
+			= asset->sm_epa[mp]->Column(col_num_unrealized_capital_gains_to_book_ratio).Value(t);
 			double local_dur_val
-			= epa_element->Column(col_num_dur_val).Value(t);
+			= asset->sm_epa[mp]->Column(col_num_dur_val).Value(t);
 			double local_not_amt_bef_sales
-			= epa_element->Column(col_num_notional_amount_before_sales).Value(t);
+			= asset->sm_epa[mp]->Column(col_num_notional_amount_before_sales).Value(t);
 
-			seg->SALFile << " " << setw(18) << write_string(local_mkt_to_bk, 18, 15)
+			seg_element->SALFile << " " << setw(18) << write_string(local_mkt_to_bk, 18, 15)
 					     << " " << setw(18) << write_string(local_ucg_to_bk, 18, 15)
 					     << " " << setw(18) << write_string(local_dur_val, 18, 15)
 					     << " " << setw(18) << write_string(local_not_amt_bef_sales, 18, 15)
-					     << " " << setw(2) << setprecision(0) << xint(epa_element->sub_port_id(t))
-					     << " " << setw(4) << epa_element->commencement_period
-					     << " " << setw(5) << epa_element->sequence_id
-					     << " " << setw(9) << epa_element->asset_id
-					     << " |" << epa_element->modelName
-					     << " " << epa_element->port_defn
+					     << " " << setw(2) << setprecision(0) << xint(asset->sm_epa[mp]->sub_port_id(t))
+					     << " " << setw(4) << asset->sm_epa[mp]->commencement_period
+					     << " " << setw(5) << asset->sm_epa[mp]->sequence_id
+					     << " " << setw(9) << asset->sm_epa[mp]->asset_id
+					     << " |" << asset->sm_epa[mp]->modelName
+					     << " " << asset->sm_epa[mp]->port_defn
 					     << endl;
 			}
 #endif
@@ -7548,16 +7546,16 @@ if (write_detail)
 	: ((extreme_selection == LONGEST_DURATION) ? "Longest Duration"
 	: ((extreme_selection == SHORTEST_DURATION) ? "Shortest Duration" : "Pro Rata")));
 
-	seg->SALFile << endl;
-	seg->SALFile << " .e. create_extreme_val_multimap - ordered -"
+	seg_element->SALFile << endl;
+	seg_element->SALFile << " .e. create_extreme_val_multimap - ordered -"
 			     << " Period=" << t
 			     << " Year=" << xint(cal_yr(t))
 			     << " Month=" << xint(cal_mth(t))
 			     << " Selection=" << extreme_type
 			     << endl;
-	seg->SALFile << " type   mp    first.key.value   second.key.value "
+	seg_element->SALFile << " type   mp    first.key.value   second.key.value "
 			     << endl;
-	seg->SALFile << " ---- ---- ------------------ ------------------ "
+	seg_element->SALFile << " ---- ---- ------------------ ------------------ "
 			     //   xxxx 9999 99999999999.999999 99999999999.999999 
 			     << endl;
 
@@ -7593,7 +7591,7 @@ if (write_detail)
 		local_1st = local_extreme_key_values.first;
 		local_2nd = local_extreme_key_values.second;
 
-		seg->SALFile << " " << setw(4) << local_asset_types[local_type]
+		seg_element->SALFile << " " << setw(4) << local_asset_types[local_type]
 				     << " " << setw(4) << local_mp
 				     << " " << setw(18) << write_string(local_1st, 18, 15)
 				     << " " << setw(18) << write_string(local_2nd, 18, 15)
@@ -7633,7 +7631,7 @@ if (selection_option == MAXIMIZE_CAPITAL_GAIN)
 
 	extreme_asset_key = make_pair(-local_mkt_to_bk_ratio, -tiebreaker_value);
 	asset_model_point = make_pair(asset_defn, model_point);
-	extreme_value_multimap.insert(evmmap::value_type(extreme_asset_key, asset_model_point));
+	extreme_value_multimap.insert(multimap <pair<double,double>, pair<int,int>, less<pair<double,double> > >::value_type(extreme_asset_key, asset_model_point));
 
 	return;
 	} 
@@ -7646,7 +7644,7 @@ if (selection_option == LONGEST_DURATION)
 	{
 	extreme_asset_key = make_pair(-local_duration_measure, -tiebreaker_value);
 	asset_model_point = make_pair(asset_defn, model_point);
-	extreme_value_multimap.insert(evmmap::value_type(extreme_asset_key, asset_model_point));
+	extreme_value_multimap.insert(multimap <pair<double,double>, pair<int,int>, less<pair<double,double> > >::value_type(extreme_asset_key, asset_model_point));
 
 	return;
 	} 
@@ -7655,18 +7653,18 @@ if (selection_option == SHORTEST_DURATION)
 	{
 	extreme_asset_key = make_pair(local_duration_measure, -tiebreaker_value);
 	asset_model_point = make_pair(asset_defn, model_point);
-	extreme_value_multimap.insert(evmmap::value_type(extreme_asset_key, asset_model_point));
+	extreme_value_multimap.insert(multimap <pair<double,double>, pair<int,int>, less<pair<double,double> > >::value_type(extreme_asset_key, asset_model_point));
 
 	return;
 	} 
 
-log_screen << "Error. Unrecognized selection option code " << (xstring)selection_option
+convert_type = selection_option;
+
+log_screen << "Error. Unrecognized selection option code " << convert_type
 		   << " in call to the create_extreme_val_multimap_entry function."
 		   << MSG_ERROR;
 
 throw FatalError("");
-
-return;
 }
 
 
@@ -7690,7 +7688,10 @@ inv_strat_closest = "Current";
 
 dur_based_on_closest_strat = dur_based_on_current_strat;
 
-if (inv_strat_shorter == inv_strat_planned)
+date_lookup = date(t);
+xstring inv_strat_planned_local = inv_strat_planned;
+
+if (inv_strat_shorter == inv_strat_planned_local)
 	try_shorter = NO;
 else
 	try_shorter = YES;
@@ -7698,7 +7699,7 @@ else
 if (try_shorter == YES)
 	{
 	if (asset->asset_detail_rpt_inv_strat_flag(t))
-		seg->SALFile << endl
+		seg_element->SALFile << endl
 					 << " <<< Duration Matching - Check Shorter Strategy >>>"
 					 << endl;
 
@@ -7717,30 +7718,30 @@ if (try_shorter == YES)
 
 	if (asset->asset_detail_rpt_inv_strat_flag(t))
 		{
-		seg->SALFile << " ... Estimated Cash Flow For Investment"
+		seg_element->SALFile << " ... Estimated Cash Flow For Investment"
 					 << endl;
-		seg->SALFile << setprecision(2);
-		seg->SALFile << " ... + " << setw(12) << cash_flow_bef_rebal_sales
+		seg_element->SALFile << setprecision(2);
+		seg_element->SALFile << " ... + " << setw(12) << cash_flow_bef_rebal_sales
 					 << "   cash flow for investment before pm"
 					 << endl;
-		seg->SALFile << " ... + " << setw(12) << pm_sales_cash_flow
+		seg_element->SALFile << " ... + " << setw(12) << pm_sales_cash_flow
 					 << (rebal_sales_completed == YES
 						 ? " + rebalancing net cash flow"
 						 : " + estimated rebalancing net cash flow")
 					 << endl;
-		seg->SALFile << " ... --------------"
+		seg_element->SALFile << " ... --------------"
 					 << endl;
-		seg->SALFile << " ... = " << setw(12) << cash_flow_for_inv
+		seg_element->SALFile << " ... = " << setw(12) << cash_flow_for_inv
 					 << " = cash flow for investment"
 					 << endl;
-		seg->SALFile << setprecision(6);
+		seg_element->SALFile << setprecision(6);
 		}
 	} // endif
 
 if (try_shorter == NO
 	|| (try_shorter == YES && cash_flow_for_inv < 0))
 	{
-	if (inv_strat_shortest == inv_strat_planned
+	if (inv_strat_shortest == inv_strat_planned_local
 		|| inv_strat_shortest == inv_strat_shorter)
 		try_shortest = NO;
 	else
@@ -7749,7 +7750,7 @@ if (try_shorter == NO
 	if (try_shortest == YES)
 		{
 		if (asset->asset_detail_rpt_inv_strat_flag(t))
-			seg->SALFile << endl
+			seg_element->SALFile << endl
 						 << " <<< Duration Matching - Check Shortest Strategy >>>"
 						 << endl;
 
@@ -7769,23 +7770,23 @@ if (try_shorter == NO
 
 		if (asset->asset_detail_rpt_inv_strat_flag(t))
 			{
-			seg->SALFile << " ... Estimated Cash Flow For Investment"
+			seg_element->SALFile << " ... Estimated Cash Flow For Investment"
 						 << endl;
-			seg->SALFile << setprecision(2);
-			seg->SALFile << " ... + " << setw(12) << cash_flow_bef_rebal_sales
+			seg_element->SALFile << setprecision(2);
+			seg_element->SALFile << " ... + " << setw(12) << cash_flow_bef_rebal_sales
 						 << "   cash flow for investment before pm"
 						 << endl;
-			seg->SALFile << " ... + " << setw(12) << pm_sales_cash_flow
+			seg_element->SALFile << " ... + " << setw(12) << pm_sales_cash_flow
 						 << (rebal_sales_completed == YES
 							 ? " + rebalancing net cash flow"
 							 : " + estimated rebalancing net cash flow")
 						 << endl;
-			seg->SALFile << " ... --------------"
+			seg_element->SALFile << " ... --------------"
 						 << endl;
-			seg->SALFile << " ... = " << setw(12) << cash_flow_for_inv
+			seg_element->SALFile << " ... = " << setw(12) << cash_flow_for_inv
 						 << " = cash flow for investment"
 						 << endl;
-			seg->SALFile << setprecision(6);
+			seg_element->SALFile << setprecision(6);
 			}
 		}   // endif
 
@@ -7794,7 +7795,7 @@ if (try_shorter == NO
 		{
 		// Planned Strategy Selected
 		if (asset->asset_detail_rpt_inv_strat_flag(t))
-			seg->SALFile << "... <<<< DM - Planned Strategy '" << inv_strat_id
+			seg_element->SALFile << "... <<<< DM - Planned Strategy '" << inv_strat_id
 						 << "' Selected. >>>> "
 						 << endl; 
 
@@ -7803,7 +7804,7 @@ if (try_shorter == NO
 	else	// Shorter strategy produced negative cash flows and
 		{	// shortest strategy produced positive cash flows, try shortest 
 		if (asset->asset_detail_rpt_inv_strat_flag(t))
-			seg->SALFile << " ... Duration Estimate For Shortest Stategy"
+			seg_element->SALFile << " ... Duration Estimate For Shortest Stategy"
 						 << endl;
 
 		duration_based_on_current_strategy
@@ -7822,21 +7823,21 @@ if (try_shorter == NO
 			}
 
 		if (duration_based_on_current_strategy <= (dur_match_tgt(t) - dur_match_tolerance(t))) 
-			{	
+			{
 			if (asset->asset_detail_rpt_inv_strat_flag(t))
-				seg->SALFile << endl
-								<< " <<< Merge Shortest With Planned >>>"
-								<< endl;
+				seg_element->SALFile << endl
+							 << " <<< Merge Shortest With Planned >>>"
+							 << endl; 
 
 			dur_match_solve_for_merge_strat(t,
-											dur_based_on_current_strat,
-											duration_based_on_current_strategy,
-											rebal_sales_completed);
+					dur_based_on_current_strat,
+					duration_based_on_current_strategy,
+					rebal_sales_completed);
 			}
 		else // Shortest outside of tolerance, run with planned or closest
 			{
 			if (asset->asset_detail_rpt_inv_strat_flag(t))
-				seg->SALFile << " ... <<<< DM - " << inv_strat_closest
+				seg_element->SALFile << " ... <<<< DM - " << inv_strat_closest
 							 << " Strategy '" << inv_strat_id
 							 << "' Selected. >>>> "
 							 << endl; 
@@ -7848,7 +7849,7 @@ if (try_shorter == NO
 else // Shorter strategy produced positive cash flows 
 	{
 	if (asset->asset_detail_rpt_inv_strat_flag(t))
-		seg->SALFile << " ... Duration Estimate For Shorter Strategy"
+		seg_element->SALFile << " ... Duration Estimate For Shorter Strategy"
 					 << endl;
 
 	duration_based_on_current_strategy
@@ -7870,7 +7871,7 @@ else // Shorter strategy produced positive cash flows
 	 <= dur_match_tolerance(t))
 	    {
 	    if (asset->asset_detail_rpt_inv_strat_flag(t))
-				seg->SALFile << " ... <<<< DM - " << inv_strat_closest
+				seg_element->SALFile << " ... <<<< DM - " << inv_strat_closest
 							 << " Strategy '" << inv_strat_id
 							 << "' Selected. >>>> "
 							 << endl; 
@@ -7880,18 +7881,18 @@ else // Shorter strategy produced positive cash flows
 	else if (duration_based_on_current_strategy <= (dur_match_tgt(t) - dur_match_tolerance(t))) 
 		{
 		if (asset->asset_detail_rpt_inv_strat_flag(t))
-			seg->SALFile << endl
-							<< " <<< Merge Shorter With Planned >>>"
-							<< endl; 
+			seg_element->SALFile << endl
+						 << " <<< Merge Shorter With Planned >>>"
+						 << endl; 
 
 		dur_match_solve_for_merge_strat(t,
-										dur_based_on_current_strat,
-										duration_based_on_current_strategy,
-										rebal_sales_completed);		
+				dur_based_on_current_strat,
+				duration_based_on_current_strategy,
+				rebal_sales_completed);
 		}
 	else // Shorter outside of tolerance, try Shortest
 		{
-		if (inv_strat_shortest == inv_strat_planned
+		if (inv_strat_shortest == inv_strat_planned_local
 			|| inv_strat_shortest == inv_strat_shorter)
 			try_shortest = NO;
 		else
@@ -7900,7 +7901,7 @@ else // Shorter strategy produced positive cash flows
 		if (try_shortest == YES)
 			{
 			if (asset->asset_detail_rpt_inv_strat_flag(t))
-				seg->SALFile << endl
+				seg_element->SALFile << endl
 							 << " <<< Duration Matching - Check Shortest Strategy >>>"
 							 << endl;
 
@@ -7922,23 +7923,23 @@ else // Shorter strategy produced positive cash flows
 
 			if (asset->asset_detail_rpt_inv_strat_flag(t))
 				{
-				seg->SALFile << " ... Estimated Cash Flow For Investment"
+				seg_element->SALFile << " ... Estimated Cash Flow For Investment"
 							 << endl;
-				seg->SALFile << setprecision(2);
-				seg->SALFile << " ... + " << setw(12) << cash_flow_bef_rebal_sales
+				seg_element->SALFile << setprecision(2);
+				seg_element->SALFile << " ... + " << setw(12) << cash_flow_bef_rebal_sales
 							 << "   cash flow for investment before pm"
 							 << endl;
-				seg->SALFile << " ... + " << setw(12) << pm_sales_cash_flow
+				seg_element->SALFile << " ... + " << setw(12) << pm_sales_cash_flow
 							 << (rebal_sales_completed == YES
 								 ? " + rebalancing net cash flow"
 								 : " + estimated rebalancing net cash flow")
 							 << endl;
-				seg->SALFile << " ... --------------"
+				seg_element->SALFile << " ... --------------"
 							 << endl;
-				seg->SALFile << " ... = " << setw(12) << cash_flow_for_inv
+				seg_element->SALFile << " ... = " << setw(12) << cash_flow_for_inv
 							 << " = cash flow for investment"
 							 << endl;
-				seg->SALFile << setprecision(6);
+				seg_element->SALFile << setprecision(6);
 				}
 			}   // endif
 
@@ -7946,7 +7947,7 @@ else // Shorter strategy produced positive cash flows
 			|| (try_shortest == YES && cash_flow_for_inv < 0)) 
 			{
 			if (asset->asset_detail_rpt_inv_strat_flag(t))
-				seg->SALFile << " ... <<<< DM - " << inv_strat_closest
+				seg_element->SALFile << " ... <<<< DM - " << inv_strat_closest
 							 << " Strategy '" << inv_strat_id
 							 << "' Selected. >>>> "
 							 << endl; 
@@ -7956,7 +7957,7 @@ else // Shorter strategy produced positive cash flows
 		else // Shortest produced positive cash flows
 			{
 			if (asset->asset_detail_rpt_inv_strat_flag(t))
-				seg->SALFile << " ... Duration Estimate For Shortest Strategy"
+				seg_element->SALFile << " ... Duration Estimate For Shortest Strategy"
 							 << endl;
 
 			duration_based_on_current_strategy
@@ -7976,19 +7977,19 @@ else // Shorter strategy produced positive cash flows
 			if (duration_based_on_current_strategy <= (dur_match_tgt(t) - dur_match_tolerance(t)))
 				{
 				if (asset->asset_detail_rpt_inv_strat_flag(t))
-					seg->SALFile << endl
-									<< " <<< Merge Shortest With Planned >>>"
-									<< endl; 
+					seg_element->SALFile << endl
+								 << " <<< Merge Shortest With Planned >>>"
+								 << endl; 
 
 				dur_match_solve_for_merge_strat(t,
-												dur_based_on_current_strat,
-												duration_based_on_current_strategy,
-												rebal_sales_completed);
+						dur_based_on_current_strat,
+						duration_based_on_current_strategy,
+						rebal_sales_completed);
 				}
 			else // Shortest outside of tolerance, choose closest
 				{
 				if (asset->asset_detail_rpt_inv_strat_flag(t))
-					seg->SALFile << " ... <<<< DM - " << inv_strat_closest
+					seg_element->SALFile << " ... <<<< DM - " << inv_strat_closest
 								 << " Strategy '" << inv_strat_id
 								 << "' Selected. >>>> "
 								 << endl; 
@@ -8023,7 +8024,10 @@ inv_strat_closest = "Current";
 
 dur_based_on_closest_strat = dur_based_on_current_strat;
 
-if (inv_strat_longer == inv_strat_planned)
+date_lookup = date(t);
+xstring inv_strat_planned_local = inv_strat_planned;
+
+if (inv_strat_longer == inv_strat_planned_local)
 	try_longer = NO;
 else
 	try_longer = YES;
@@ -8031,7 +8035,7 @@ else
 if (try_longer == YES)
 	{
 	if (asset->asset_detail_rpt_inv_strat_flag(t))
-		seg->SALFile << endl
+		seg_element->SALFile << endl
 					 << " <<< Duration Matching - Check Longer Strategy >>>"
 					 << endl;
 
@@ -8050,30 +8054,30 @@ if (try_longer == YES)
 
 	if (asset->asset_detail_rpt_inv_strat_flag(t))
 		{
-		seg->SALFile << " ... Estimated Cash Flow For Investment"
+		seg_element->SALFile << " ... Estimated Cash Flow For Investment"
 					 << endl;
-		seg->SALFile << setprecision(2);
-		seg->SALFile << " ... + " << setw(12) << cash_flow_bef_rebal_sales
+		seg_element->SALFile << setprecision(2);
+		seg_element->SALFile << " ... + " << setw(12) << cash_flow_bef_rebal_sales
 					 << "   cash flow for investment before pm"
 					 << endl;
-		seg->SALFile << " ... + " << setw(12) << pm_sales_cash_flow
+		seg_element->SALFile << " ... + " << setw(12) << pm_sales_cash_flow
 					 << (rebal_sales_completed == YES
 					 ? " + rebalancing net cash flow"
 					 : " + estimated rebalancing net cash flow")
 					 << endl;
-		seg->SALFile << " ... --------------"
+		seg_element->SALFile << " ... --------------"
 					 << endl;
-		seg->SALFile << " ... = " << setw(12) << cash_flow_for_inv
+		seg_element->SALFile << " ... = " << setw(12) << cash_flow_for_inv
 					 << " = cash flow for investment"
 					 << endl;
-		seg->SALFile << setprecision(6);
+		seg_element->SALFile << setprecision(6);
 		}
 	}   // endif
 
 if (try_longer == NO
 	|| (try_longer == YES && cash_flow_for_inv < 0))
 	{	
-	if (inv_strat_longest == inv_strat_planned
+	if (inv_strat_longest == inv_strat_planned_local
 		|| inv_strat_longest == inv_strat_longer)
 		try_longest = NO;
 	else
@@ -8082,7 +8086,7 @@ if (try_longer == NO
 	if (try_longest == YES) // Check Longest
 		{
 		if (asset->asset_detail_rpt_inv_strat_flag(t))
-			seg->SALFile << endl
+			seg_element->SALFile << endl
 						 << " <<< Duration Matching - Check Longest Strategy >>>"
 						 << endl;
 
@@ -8101,23 +8105,23 @@ if (try_longer == NO
 
 		if (asset->asset_detail_rpt_inv_strat_flag(t))
 			{
-			seg->SALFile << " ... Estimated Cash Flow For Investment"
+			seg_element->SALFile << " ... Estimated Cash Flow For Investment"
 						 << endl;
-			seg->SALFile << setprecision(2);
-			seg->SALFile << " ... + " << setw(12) << cash_flow_bef_rebal_sales
+			seg_element->SALFile << setprecision(2);
+			seg_element->SALFile << " ... + " << setw(12) << cash_flow_bef_rebal_sales
 						 << " cash flow for investment before pm"
 						 << endl;
-			seg->SALFile << " ... + " << setw(12) << pm_sales_cash_flow
+			seg_element->SALFile << " ... + " << setw(12) << pm_sales_cash_flow
 						 << (rebal_sales_completed == YES
 						 ? " + rebalancing net cash flow"
 						 : " + estimated rebalancing net cash flow")
 						 << endl;
-			seg->SALFile << " ... --------------"
+			seg_element->SALFile << " ... --------------"
 						 << endl;
-			seg->SALFile << " ... = " << setw(12) << cash_flow_for_inv
+			seg_element->SALFile << " ... = " << setw(12) << cash_flow_for_inv
 						 << " = cash flow for investment"
 						 << endl;
-			seg->SALFile << setprecision(6);
+			seg_element->SALFile << setprecision(6);
 			}
 		}   // endif
 
@@ -8126,7 +8130,7 @@ if (try_longer == NO
 		{
 		// Planned Strategy Selected
 		if (asset->asset_detail_rpt_inv_strat_flag(t))
-			seg->SALFile << "... <<<< DM - Planned Strategy '" << inv_strat_id
+			seg_element->SALFile << "... <<<< DM - Planned Strategy '" << inv_strat_id
 						 << "' Selected. >>>> "
 						 << endl;
 
@@ -8135,7 +8139,7 @@ if (try_longer == NO
 	else	// Longer strategy produced negative cash flows and 
 		{   // longest strategy produced positive cash flows, try longest
 		if (asset->asset_detail_rpt_inv_strat_flag(t))
-			seg->SALFile << " ... Duration Estimate For Longest Strategy"
+			seg_element->SALFile << " ... Duration Estimate For Longest Strategy"
 						 << endl;
 
 		duration_based_on_current_strategy
@@ -8153,11 +8157,11 @@ if (try_longer == NO
 			}
 
 		if (duration_based_on_current_strategy >= (dur_match_tgt(t) + dur_match_tolerance(t)))
-			{
+			{	
 			if (asset->asset_detail_rpt_inv_strat_flag(t))
-				seg->SALFile << endl
-								<< " <<< Merge Longest With Planned >>>"
-								<< endl;
+				seg_element->SALFile << endl
+							 << " <<< Merge Longest With Planned >>>"
+							 << endl;
 
 			dur_match_solve_for_merge_strat(t,
 											dur_based_on_current_strat,
@@ -8167,7 +8171,7 @@ if (try_longer == NO
 		else // Longest outside of tolerance, run with planned or closest
 			{		
 			if (asset->asset_detail_rpt_inv_strat_flag(t))
-				seg->SALFile << " ... <<<< DM - " << inv_strat_closest
+				seg_element->SALFile << " ... <<<< DM - " << inv_strat_closest
 							 << " Strategy '" << inv_strat_id
 							 << "' Selected. >>>> "
 							 << endl; 
@@ -8179,7 +8183,7 @@ if (try_longer == NO
 else // Longer strategy produced positive cash flows
 	{
 	if (asset->asset_detail_rpt_inv_strat_flag(t))
-		seg->SALFile << " ... Duration Estimate For Longer Strategy"
+		seg_element->SALFile << " ... Duration Estimate For Longer Strategy"
 					 << endl;
 
 	duration_based_on_current_strategy
@@ -8200,7 +8204,7 @@ else // Longer strategy produced positive cash flows
 	 <= dur_match_tolerance(t))
 	    {
 	    if (asset->asset_detail_rpt_inv_strat_flag(t))
-			seg->SALFile << " ... <<<< DM - " << inv_strat_closest
+			seg_element->SALFile << " ... <<<< DM - " << inv_strat_closest
 						 << " Strategy '" << inv_strat_id
 						 << "' Selected. >>>> "
 						 << endl; 
@@ -8210,9 +8214,9 @@ else // Longer strategy produced positive cash flows
 	else if (duration_based_on_current_strategy >= (dur_match_tgt(t) + dur_match_tolerance(t)))
 		{
 		if (asset->asset_detail_rpt_inv_strat_flag(t))
-			seg->SALFile << endl
-							<< " <<< Merge Longer With Planned >>>"
-							<< endl; 
+			seg_element->SALFile << endl
+						 << " <<< Merge Longer With Planned >>>"
+						 << endl; 
 
 		dur_match_solve_for_merge_strat(t,
 										dur_based_on_current_strat,
@@ -8221,7 +8225,7 @@ else // Longer strategy produced positive cash flows
 		}	
 	else // Longer outside of tolerance, try Longest
 		{
-		if (inv_strat_longest == inv_strat_planned
+		if (inv_strat_longest == inv_strat_planned_local
 			|| inv_strat_longest == inv_strat_longer)
 			try_longest = NO;
 		else
@@ -8230,7 +8234,7 @@ else // Longer strategy produced positive cash flows
 		if (try_longest == YES)
 			{
 			if (asset->asset_detail_rpt_inv_strat_flag(t))
-				seg->SALFile << endl
+				seg_element->SALFile << endl
 							 << " <<< Duration Matching - Check Longest Strategy >>>"
 							 << endl;
 
@@ -8249,23 +8253,23 @@ else // Longer strategy produced positive cash flows
 
 			if (asset->asset_detail_rpt_inv_strat_flag(t))
 				{
-				seg->SALFile << " ... Estimated Cash Flow For Investment"
+				seg_element->SALFile << " ... Estimated Cash Flow For Investment"
 							 << endl;
-				seg->SALFile << setprecision(2);
-				seg->SALFile << " ... + " << setw(12) << cash_flow_bef_rebal_sales
+				seg_element->SALFile << setprecision(2);
+				seg_element->SALFile << " ... + " << setw(12) << cash_flow_bef_rebal_sales
 							 << " cash flow for investment before pm"
 							 << endl;
-				seg->SALFile << " ... + " << setw(12) << pm_sales_cash_flow
+				seg_element->SALFile << " ... + " << setw(12) << pm_sales_cash_flow
 							 << (rebal_sales_completed == YES
 							 ? " + rebalancing net cash flow"
 							 : " + estimated rebalancing net cash flow")
 							 << endl;
-				seg->SALFile << " ... --------------"
+				seg_element->SALFile << " ... --------------"
 							 << endl;
-				seg->SALFile << " ... = " << setw(12) << cash_flow_for_inv
+				seg_element->SALFile << " ... = " << setw(12) << cash_flow_for_inv
 							 << " = cash flow for investment"
 							 << endl;
-				seg->SALFile << setprecision(6);
+				seg_element->SALFile << setprecision(6);
 				}
 			}   // endif
 
@@ -8273,7 +8277,7 @@ else // Longer strategy produced positive cash flows
 			|| (try_longest == YES && cash_flow_for_inv < 0))
 			{
 			if (asset->asset_detail_rpt_inv_strat_flag(t))
-				seg->SALFile << " ... <<<< DM - " << inv_strat_closest
+				seg_element->SALFile << " ... <<<< DM - " << inv_strat_closest
 							 << " Strategy '" << inv_strat_id
 							 << "' Selected. >>>> "
 							 << endl; 
@@ -8283,7 +8287,7 @@ else // Longer strategy produced positive cash flows
 		else // Longest produced positive cash flows
 			{
 			if (asset->asset_detail_rpt_inv_strat_flag(t))
-				seg->SALFile << " ... Duration Estimate For Longest Strategy"
+				seg_element->SALFile << " ... Duration Estimate For Longest Strategy"
 							 << endl;
 
 			duration_based_on_current_strategy
@@ -8302,9 +8306,9 @@ else // Longer strategy produced positive cash flows
 			if (duration_based_on_current_strategy >= (dur_match_tgt(t) + dur_match_tolerance(t)))
 				{
 				if (asset->asset_detail_rpt_inv_strat_flag(t))
-					seg->SALFile << endl
-									<< " <<< Merge Longest With Planned >>>"
-									<< endl; 
+					seg_element->SALFile << endl
+								 << " <<< Merge Longest With Planned >>>"
+								 << endl; 
 
 				dur_match_solve_for_merge_strat(t,
 												dur_based_on_current_strat,
@@ -8314,7 +8318,7 @@ else // Longer strategy produced positive cash flows
 			else // Longest outside of tolerance, choose closest
 				{
 				if (asset->asset_detail_rpt_inv_strat_flag(t))
-					seg->SALFile << " ... <<<< DM - " << inv_strat_closest
+					seg_element->SALFile << " ... <<<< DM - " << inv_strat_closest
 								 << " Strategy '" << inv_strat_id
 								 << "' Selected. >>>> "
 								 << endl; 
@@ -8361,12 +8365,6 @@ xstring alternate_strategy_distribution_method
 
 double alternate_strat_cash_pct
 = cash_tgt_pct;
-
-double alternate_strat_portfolio_sprd_adj
-= portfolio_sprd_adj_aig;  //AIG - portfolio spread adjustment
-
-double alternate_strat_dur_wtd_sprd_adj
-= dur_wtd_sprd_adj_aig;  //AIG - duration weighted spread adjustment
 
 // Initialize high /low variables. 
 if (duration_based_on_alternate_strategy < dur_match_tgt(t))
@@ -8416,12 +8414,6 @@ StrEnum::EnumValue current_strategy_distribution_method
 double current_strat_cash_pct
 = cash_tgt_pct;
 
-double current_strat_portfolio_sprd_adj
-= portfolio_sprd_adj_aig; //AIG - portfolio spread adjustment
-
-double current_strat_dur_wtd_sprd_adj
-= dur_wtd_sprd_adj_aig;  //AIG - duration weighted spread adjustment
-
 for (asset_sub_port = 0; asset_sub_port < asset->sm_asset_sub_port[seg_num].size(); asset_sub_port++)
 	{	
 	asset->sm_asset_sub_port[seg_num][asset_sub_port][0]->inv_tgt_pct_curr_strat
@@ -8457,7 +8449,7 @@ for (loop = 0; loop <= maximum_iterations + 1; loop++)
 	{
 	if (asset->asset_detail_rpt_inv_strat_flag(t))
 		{
-		seg->SALFile << endl
+		seg_element->SALFile << endl
 					 << " ... Begin Merge Strategy: Loop=" << loop
 					 << " Loop_Tolerance=" << loop_tolerance
 					 << " Max_Iterations=" << maximum_iterations
@@ -8565,19 +8557,7 @@ for (loop = 0; loop <= maximum_iterations + 1; loop++)
 		  * current_strategy_factor
 		  + alternate_strat_cash_pct
 			* alternate_strategy_factor;
-
-		portfolio_sprd_adj_aig  //AIG - portfolio spread adjustment
-		= current_strat_portfolio_sprd_adj
-		  * current_strategy_factor
-		  + alternate_strat_portfolio_sprd_adj
-			* alternate_strategy_factor;
 		  
-		dur_wtd_sprd_adj_aig  //AIG - duration weighted spread adjustment
-		= current_strat_dur_wtd_sprd_adj
-		  * current_strategy_factor
-		  + alternate_strat_dur_wtd_sprd_adj
-			* alternate_strategy_factor;
-
 		for (asset_sub_port = 0; asset_sub_port < asset->sm_asset_sub_port[seg_num].size(); asset_sub_port++)
 			{
 			asset->sm_asset_sub_port[seg_num][asset_sub_port][0]->inv_tgt_pct
@@ -8586,30 +8566,11 @@ for (loop = 0; loop <= maximum_iterations + 1; loop++)
 			  + asset->sm_asset_sub_port[seg_num][asset_sub_port][0]->inv_tgt_pct_dur_match
 				* alternate_strategy_factor;
 
-			// 20210607 STW: import IA Prod v3.0 RSD v2 change and wrap it with a flag. The code has not been tested yet.
-			if(ia_prod_v3_rsd_2_aig == YES)
-			{
-				// 20210604 STW: similar to normalizing factor, the following weight should not be merged if there are no purchase assets in the sub portfolio for one of the strategies
-				// However, if both are assets are not selected then the weight should not be assigned value
-				// ^ operator in c++ represents an exclusive or (not both not neither)
-				if (fabs(asset->sm_asset_sub_port[seg_num][asset_sub_port][0]->purch_asset_weight_sum_curr_strat - 1.0) > rate_ratio_threshold
-					^ fabs(asset->sm_asset_sub_port[seg_num][asset_sub_port][0]->purch_asset_weight_sum_dur_match - 1.0) > rate_ratio_threshold)
-					asset->sm_asset_sub_port[seg_num][asset_sub_port][0]->purch_asset_weight_sum = 1.0;
-				else			
-					asset->sm_asset_sub_port[seg_num][asset_sub_port][0]->purch_asset_weight_sum
-					= asset->sm_asset_sub_port[seg_num][asset_sub_port][0]->purch_asset_weight_sum_curr_strat
-					  * current_strategy_factor
-					  + asset->sm_asset_sub_port[seg_num][asset_sub_port][0]->purch_asset_weight_sum_dur_match
-						* alternate_strategy_factor;
-			}
-			else
-			{
-				asset->sm_asset_sub_port[seg_num][asset_sub_port][0]->purch_asset_weight_sum
-				= asset->sm_asset_sub_port[seg_num][asset_sub_port][0]->purch_asset_weight_sum_curr_strat
-					* current_strategy_factor
-					+ asset->sm_asset_sub_port[seg_num][asset_sub_port][0]->purch_asset_weight_sum_dur_match
-					* alternate_strategy_factor;
-			}
+			asset->sm_asset_sub_port[seg_num][asset_sub_port][0]->purch_asset_weight_sum
+			= asset->sm_asset_sub_port[seg_num][asset_sub_port][0]->purch_asset_weight_sum_curr_strat
+			  * current_strategy_factor
+			  + asset->sm_asset_sub_port[seg_num][asset_sub_port][0]->purch_asset_weight_sum_dur_match
+				* alternate_strategy_factor;
 
 			// If there are no purchase assets in the sub portfolio for one of the strategies, then don't merge the weights. Just set to 1.0
 			if (fabs(asset->sm_asset_sub_port[seg_num][asset_sub_port][0]->purch_asset_weight_sum_normalzd_curr_strat - 1.0) > rate_ratio_threshold
@@ -8642,37 +8603,11 @@ for (loop = 0; loop <= maximum_iterations + 1; loop++)
 				purch_assets_asset_sub_port_num[panum]
 				= purch_assets_sub_port_num_alt_strat[panum];
 
-
-			// 20210607 STW: import IA Prod v3.0 RSD v2 change and wrap it with a flag. The code has not been tested yet.
-			if(ia_prod_v3_rsd_2_aig == YES)
-			{
-				// 20210602 STW: quick fix for weighting logic to take care of normalization
-				if (asset->sm_asset_sub_port[seg_num][purch_assets_asset_sub_port_num[panum]][0]->purch_asset_weight_sum_curr_strat == 0)
-				{
-					purch_assets_weight[panum] = purch_assets_weight_alt_strat[panum];
-				}
-				else if(asset->sm_asset_sub_port[seg_num][purch_assets_asset_sub_port_num[panum]][0]->purch_asset_weight_sum_dur_match == 0)
-				{
-					purch_assets_weight[panum] = purch_assets_weight_current_strat[panum];
-				}
-				else
-				// end of condition added by HYH 05/24/2021 per instruction from Josh @ WTW's email
-				{
-					purch_assets_weight[panum]
-					= purch_assets_weight_current_strat[panum] 
-					  * current_strategy_factor
-					  + purch_assets_weight_alt_strat[panum] 
-						* alternate_strategy_factor;
-				}
-			}
-			else
-			{
-				purch_assets_weight[panum]
-				= purch_assets_weight_current_strat[panum] 
-				  * current_strategy_factor
-				  + purch_assets_weight_alt_strat[panum] 
-					* alternate_strategy_factor;
-			}
+			purch_assets_weight[panum]
+			= purch_assets_weight_current_strat[panum] 
+			  * current_strategy_factor
+			  + purch_assets_weight_alt_strat[panum] 
+				* alternate_strategy_factor;
 			} // end for over panum
 
 		if (loop < maximum_iterations)
@@ -8693,16 +8628,16 @@ for (loop = 0; loop <= maximum_iterations + 1; loop++)
 
 			if (asset->asset_detail_rpt_inv_strat_flag(t))
 				{
-				seg->SALFile << "Estimated Cash Flow For Investment" << endl;
-				seg->SALFile << setprecision(2);
-				seg->SALFile << "CashFlowBefRebalSales," << setw(12) << cash_flow_bef_rebal_sales << endl;
-				seg->SALFile << (rebal_sales_completed == YES
+				seg_element->SALFile << "Estimated Cash Flow For Investment" << endl;
+				seg_element->SALFile << setprecision(2);
+				seg_element->SALFile << "CashFlowBefRebalSales," << setw(12) << cash_flow_bef_rebal_sales << endl;
+				seg_element->SALFile << (rebal_sales_completed == YES
 							 ? "(+) RebalSalesNetCashFlow,"
 							 : "(+) EstRebalSalesNetCashFlow,")
 						     << setw(12) << rebal_sales_cash_flow  << endl;
-				seg->SALFile << ",--------------" << endl;
-				seg->SALFile << "CashFlowForInv," << setw(12) << cash_flow_for_inv << endl;
-				seg->SALFile << setprecision(6);
+				seg_element->SALFile << ",--------------" << endl;
+				seg_element->SALFile << "CashFlowForInv," << setw(12) << cash_flow_for_inv << endl;
+				seg_element->SALFile << setprecision(6);
 				}
 
 			duration_based_on_current_strategy
@@ -8731,32 +8666,35 @@ for (loop = 0; loop <= maximum_iterations + 1; loop++)
 		int asset_sub_port;
 		int panum;
 		xstring asset_purpose_abbreviation;
+		
+		date_lookup = date(t);
+		xstring inv_strat_planned_local = inv_strat_planned;
 
-		seg->SALFile << setprecision(18);
-		seg->SALFile << "Merge Strategy Summary" << endl;
-		seg->SALFile << "Planned Strategy:,"
+		seg_element->SALFile << setprecision(6);
+		seg_element->SALFile << "Merge Strategy Summary" << endl;
+		seg_element->SALFile << "Planned Strategy:,"
 					 << "Cash% =," << setw(9) << current_strat_cash_pct << ","
-					 << "Factor =," << setw(21) << current_strategy_factor << ","
-					 << "Label =," << inv_strat_planned << endl;
-		seg->SALFile << "Alternate Strategy:,"
+					 << "Factor =," << setw(9) << current_strategy_factor << ","
+					 << "Label =," << inv_strat_planned_local << endl;
+		seg_element->SALFile << "Alternate Strategy:,"
 					 << "Cash% =," << setw(9) << alternate_strat_cash_pct << ","
-					 << "Factor =," << setw(21) << alternate_strategy_factor << ","
+					 << "Factor =," << setw(9) << alternate_strategy_factor << ","
 					 << "Label =," << alternate_strategy_label << endl;
-		seg->SALFile << "Merge Strategy:,"
+		seg_element->SALFile << "Merge Strategy:,"
 					 << "Cash% =,"  << setw(9) << cash_tgt_pct << ","
 					 << "Distribution Method =," << alternate_strategy_distribution_method << endl;
-		seg->SALFile << "Durations:,"
+		seg_element->SALFile << "Durations:,"
 					 << "Low =," << low_duration << ","
 					 << "Merge =," << duration_based_on_merge_strategy << ","
 					 << "High =," << high_duration << endl;
-		seg->SALFile << "Factors:,"
+		seg_element->SALFile << "Factors:,"
 		             << "Low =," << low_current_factor << ","
 					 << "Merge =," << current_strategy_factor << ","
 					 << "High =," << high_current_factor << ","
 					 << "Preliminary =," << preliminary_current_strategy_factor	 << endl;
 
-		seg->SALFile << ",Merge,Merge,Merge,Alternate,Alternate,Alternate,Planned,Planned,Planned" << endl;
-		seg->SALFile << "SubPort,Percent,TotWghts,NormWghts,Percent,TotWghts,NormWghts,Percent,TotWghts,NormWghts" << endl;
+		seg_element->SALFile << ",Merge,Merge,Merge,Alternate,Alternate,Alternate,Planned,Planned,Planned" << endl;
+		seg_element->SALFile << "SubPort,Percent,TotWghts,NormWghts,Percent,TotWghts,NormWghts,Percent,TotWghts,NormWghts" << endl;
 
 		for(asset_sub_port = 0; asset_sub_port < asset->sm_asset_sub_port[seg_num].size(); asset_sub_port++)
 			{
@@ -8767,8 +8705,8 @@ for (loop = 0; loop <= maximum_iterations + 1; loop++)
 				|| asset->sm_asset_sub_port[seg_num][asset_sub_port][0]->inv_tgt_pct_curr_strat
 				|| asset->sm_asset_sub_port[seg_num][asset_sub_port][0]->purch_asset_weight_sum_curr_strat)
 				{
-				seg->SALFile << setprecision(6);
-				seg->SALFile << setw(3) << asset_sub_port << ","
+				seg_element->SALFile << setprecision(6);
+				seg_element->SALFile << setw(3) << asset_sub_port << ","
 							 << setw(9) << asset->sm_asset_sub_port[seg_num][asset_sub_port][0]->inv_tgt_pct << ","
 							 << setw(9) << asset->sm_asset_sub_port[seg_num][asset_sub_port][0]->purch_asset_weight_sum << ","
 							 << setw(9) << asset->sm_asset_sub_port[seg_num][asset_sub_port][0]->purch_asset_weight_sum_normalzd << ","
@@ -8782,8 +8720,8 @@ for (loop = 0; loop <= maximum_iterations + 1; loop++)
 				}
 			} // end for over asset_sub_port
 
-		seg->SALFile << ",Merge,Merge,Merge,Alternate,Alternate,Planned,Planned" << endl;
-		seg->SALFile << "PurchAssetNum,SubPort,WtW/ISubPort,AssetPurp,SubPort,WtW/ISubPort,SubPort,WtW/ISubPort" << endl;
+		seg_element->SALFile << ",Merge,Merge,Merge,Alternate,Alternate,Planned,Planned" << endl;
+		seg_element->SALFile << "PurchAssetNum,SubPort,WtW/ISubPort,AssetPurp,SubPort,WtW/ISubPort,SubPort,WtW/ISubPort" << endl;
 
 		for (panum = 0; panum < purch_asset_max_num; panum++)
 			{
@@ -8799,7 +8737,7 @@ for (loop = 0; loop <= maximum_iterations + 1; loop++)
 				else
 					asset_purpose_abbreviation = "Unknown";
 
-				seg->SALFile << "     "
+				seg_element->SALFile << "     "
 							 << setw(3) << panum << ","
 							 << setw(3) << purch_assets_asset_sub_port_num [panum] << ","
 							 << setw(9) << purch_assets_weight [panum] << ","
@@ -8863,7 +8801,7 @@ int fund_index = 0;
 int column_num_notional_amount = 0;
 int column_num_notional_amount_before_sales = 0;
 
-A_SUBPORT_ASSET * current_sub_port = NULL;
+current_sub_port = NULL;
 
 bool initialize_market_sales_values = false;
 
@@ -8943,68 +8881,66 @@ for (sub_port_num = 0; sub_port_num < asset->sm_asset_sub_port[seg_num].size(); 
 #endif
 
 // now calculate initial amounts
-mpmap::iterator mp_map_iter;
+map <int, long, less <int> >::iterator mp_map_iter;
 
 #if defined(__BOND_ASSET_H_)
-BOND_ASSET *current_bond_element;
-if (seg->bond_mp_map_active.size() > 0)
+if (seg_element->bond_mp_map_active.size() > 0)
 	{
-	column_num_accrued_interest = asset->sm_bond[0]->Column(xstring_initial_accrued_interest).Number();
-	column_num_book_value = asset->sm_bond[0]->Column(xstring_initial_book_value).Number();
-	column_num_notional_amount = asset->sm_bond[0]->Column("notional_amt").Number();
-	column_num_notional_amount_before_sales = asset->sm_bond[0]->Column("notional_amt_bef_sale").Number();
+	column_num_accrued_interest = asset->sm_bond[0][0]->Column(xstring_initial_accrued_interest).Number();
+	column_num_book_value = asset->sm_bond[0][0]->Column(xstring_initial_book_value).Number();
+	column_num_notional_amount = asset->sm_bond[0][0]->Column("notional_amt").Number();
+	column_num_notional_amount_before_sales = asset->sm_bond[0][0]->Column("notional_amt_bef_sale").Number();
 
 	if (initialize_market_sales_values)
 		{
-		column_num_market_value = asset->sm_bond[0]->Column(xstring_initial_market_value).Number();
-		column_num_unrealized_capital_gains = asset->sm_bond[0]->Column(xstring_initial_unrealized_capital_gains).Number();
+		column_num_market_value = asset->sm_bond[0][0]->Column(xstring_initial_market_value).Number();
+		column_num_unrealized_capital_gains = asset->sm_bond[0][0]->Column(xstring_initial_unrealized_capital_gains).Number();
 		}
 
-	for (mp_map_iter = seg->bond_mp_map_active.begin();
-		 mp_map_iter != seg->bond_mp_map_active.end();
+	for (mp_map_iter = seg_element->bond_mp_map_active.begin();
+		 mp_map_iter != seg_element->bond_mp_map_active.end();
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		current_bond_element = asset->sm_bond[mp];
 
 		if (sum_type == SUM_OVER_POSITIVE
-			&& current_bond_element->neg_asset_flag < 0)
+			&& asset->sm_bond[mp][0]->neg_asset_flag < 0)
 			continue;
 
 		if (sum_type == SUM_OVER_NEGATIVE
-			&& current_bond_element->neg_asset_flag > 0)
+			&& asset->sm_bond[mp][0]->neg_asset_flag > 0)
 			continue;
 
-		if ((tee > max(0, current_bond_element->commencement_period)
-			 && current_bond_element->Column(column_num_notional_amount).Value(tee-1) < ASSET_ACTIVE_THRESHOLD)
-			|| (tee == current_bond_element->commencement_period
-				&& current_bond_element->Column(column_num_notional_amount_before_sales).Value(tee) < ASSET_ACTIVE_THRESHOLD))
+		if ((tee > max(0, asset->sm_bond[mp][0]->commencement_period)
+			 && asset->sm_bond[mp][0]->Column(column_num_notional_amount).Value(tee-1) < ASSET_ACTIVE_THRESHOLD)
+			|| (tee == asset->sm_bond[mp][0]->commencement_period
+				&& asset->sm_bond[mp][0]->Column(column_num_notional_amount_before_sales).Value(tee) < ASSET_ACTIVE_THRESHOLD))
 			continue;
 
-		sub_port_num = xint(current_bond_element->sub_port_id(t));
-		sale_class = current_bond_element->sale_class_id;
-		fund_index = current_bond_element->asset_fund_index;
-		local_pct_to_use = current_bond_element->pct_to_use;
+		sub_port_num = xint(asset->sm_bond[mp][0]->sub_port_id(t));
+		sale_class = asset->sm_bond[mp][0]->sale_class_id;
+		fund_index = asset->sm_bond[mp][0]->asset_fund_index;
+		local_pct_to_use = asset->sm_bond[mp][0]->pct_to_use;
 
 		sub_port_class_fund_assets_present[sub_port_num][sale_class][fund_index]
 		= 1;
 
 		sub_port_class_fund_initial_book_value[sub_port_num][sale_class][fund_index]
-		+= current_bond_element->Column(column_num_book_value).Value(t)
+		+= asset->sm_bond[mp][0]->Column(column_num_book_value).Value(t)
 		   * local_pct_to_use;
 
 		sub_port_class_fund_initial_accrued_interest[sub_port_num][sale_class][fund_index]
-		+= current_bond_element->Column(column_num_accrued_interest).Value(t)
+		+= asset->sm_bond[mp][0]->Column(column_num_accrued_interest).Value(t)
 		   * local_pct_to_use;
 
 		if (initialize_market_sales_values)
 			{
 			sub_port_class_fund_initial_market_value[sub_port_num][sale_class][fund_index]
-			+= current_bond_element->Column(column_num_market_value).Value(t)
+			+= asset->sm_bond[mp][0]->Column(column_num_market_value).Value(t)
 			   * local_pct_to_use;
 
 			sub_port_class_fund_initial_unrealized_capital_gains[sub_port_num][sale_class][fund_index]
-			+= current_bond_element->Column(column_num_unrealized_capital_gains).Value(t)
+			+= asset->sm_bond[mp][0]->Column(column_num_unrealized_capital_gains).Value(t)
 			   * local_pct_to_use;
 			}
 
@@ -9017,28 +8953,28 @@ if (seg->bond_mp_map_active.size() > 0)
 					<< " " << setw(1) << sale_class
 					<< " " << setw(1) << fund_index
 					<< " " << setw(16) << setprecision(6)
-						<< current_bond_element->Column(column_num_accrued_interest).Value(t)
+						<< asset->sm_bond[mp][0]->Column(column_num_accrued_interest).Value(t)
 							* local_pct_to_use
 					<< " " << setw(16) << setprecision(6)
-						<< current_bond_element->Column(column_num_book_value).Value(t)
+						<< asset->sm_bond[mp][0]->Column(column_num_book_value).Value(t)
 							* local_pct_to_use;
 			if (initialize_market_sales_values)
 				log_screen << " " << setw(16) << setprecision(6)
-							<< current_bond_element->Column(column_num_market_value).Value(t)
+							<< asset->sm_bond[mp][0]->Column(column_num_market_value).Value(t)
 								* local_pct_to_use
 						<< " " << setw(12) << setprecision(8)
-							<< current_bond_element->mkt_to_bk_ratio(t)
+							<< asset->sm_bond[mp][0]->mkt_to_bk_ratio(t)
 								* local_pct_to_use
 						<< " " << setw(12) << setprecision(8)
-							<< current_bond_element->unrealzd_cap_gain_to_bk_ratio(t)
+							<< asset->sm_bond[mp][0]->unrealzd_cap_gain_to_bk_ratio(t)
 								* local_pct_to_use;
 			else
 				log_screen << " " << setw(16) << setprecision(6) << 0.0
 						<< " " << setw(12) << setprecision(8) << 0.0
 						<< " " << setw(12) << setprecision(8) << 0.0;
-			log_screen << " " << setw(10) << current_bond_element->asset_id
-					<< " |" << current_bond_element->modelName
-					<< " " << current_bond_element->port_defn
+			log_screen << " " << setw(10) << asset->sm_bond[mp][0]->asset_id
+					<< " |" << asset->sm_bond[mp][0]->modelName
+					<< " " << asset->sm_bond[mp][0]->port_defn
 					<< MSG_ERROR;
 			}
 #endif
@@ -9047,65 +8983,63 @@ if (seg->bond_mp_map_active.size() > 0)
 #endif
 
 #if defined(__MTG_ASSET_H_)
-MTG_ASSET *current_mtg_element;
-if (seg->mtg_mp_map_active.size() > 0)
+if (seg_element->mtg_mp_map_active.size() > 0)
 	{
-	column_num_accrued_interest = asset->sm_mtg[0]->Column(xstring_initial_accrued_interest).Number();
-	column_num_book_value = asset->sm_mtg[0]->Column(xstring_initial_book_value).Number();
-	column_num_notional_amount = asset->sm_mtg[0]->Column("notional_amt").Number();
-	column_num_notional_amount_before_sales = asset->sm_mtg[0]->Column("notional_amt_bef_sale").Number();
+	column_num_accrued_interest = asset->sm_mtg[0][0]->Column(xstring_initial_accrued_interest).Number();
+	column_num_book_value = asset->sm_mtg[0][0]->Column(xstring_initial_book_value).Number();
+	column_num_notional_amount = asset->sm_mtg[0][0]->Column("notional_amt").Number();
+	column_num_notional_amount_before_sales = asset->sm_mtg[0][0]->Column("notional_amt_bef_sale").Number();
 
 	if (initialize_market_sales_values)
 		{
-		column_num_market_value = asset->sm_mtg[0]->Column(xstring_initial_market_value).Number();
-		column_num_unrealized_capital_gains = asset->sm_mtg[0]->Column(xstring_initial_unrealized_capital_gains).Number();
+		column_num_market_value = asset->sm_mtg[0][0]->Column(xstring_initial_market_value).Number();
+		column_num_unrealized_capital_gains = asset->sm_mtg[0][0]->Column(xstring_initial_unrealized_capital_gains).Number();
 		}
 
-	for (mp_map_iter = seg->mtg_mp_map_active.begin();
-		 mp_map_iter != seg->mtg_mp_map_active.end();
+	for (mp_map_iter = seg_element->mtg_mp_map_active.begin();
+		 mp_map_iter != seg_element->mtg_mp_map_active.end();
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		current_mtg_element = asset->sm_mtg[mp];
 
 		if (sum_type == SUM_OVER_POSITIVE
-			&& current_mtg_element->neg_asset_flag < 0)
+			&& asset->sm_mtg[mp][0]->neg_asset_flag < 0)
 			continue;
 
 		if (sum_type == SUM_OVER_NEGATIVE
-			&& current_mtg_element->neg_asset_flag > 0)
+			&& asset->sm_mtg[mp][0]->neg_asset_flag > 0)
 			continue;
 
-		if ((tee > max(0, current_mtg_element->commencement_period)
-			 && current_mtg_element->Column(column_num_notional_amount).Value(tee-1) < ASSET_ACTIVE_THRESHOLD)
-			|| (tee == current_mtg_element->commencement_period
-				&& current_mtg_element->Column(column_num_notional_amount_before_sales).Value(tee) < ASSET_ACTIVE_THRESHOLD))
+		if ((tee > max(0, asset->sm_mtg[mp][0]->commencement_period)
+			 && asset->sm_mtg[mp][0]->Column(column_num_notional_amount).Value(tee-1) < ASSET_ACTIVE_THRESHOLD)
+			|| (tee == asset->sm_mtg[mp][0]->commencement_period
+				&& asset->sm_mtg[mp][0]->Column(column_num_notional_amount_before_sales).Value(tee) < ASSET_ACTIVE_THRESHOLD))
 			continue;
 
-		sub_port_num = xint(current_mtg_element->sub_port_id(t));
-		sale_class = current_mtg_element->sale_class_id;
-		fund_index = current_mtg_element->asset_fund_index;
-		local_pct_to_use = current_mtg_element->pct_to_use;
+		sub_port_num = xint(asset->sm_mtg[mp][0]->sub_port_id(t));
+		sale_class = asset->sm_mtg[mp][0]->sale_class_id;
+		fund_index = asset->sm_mtg[mp][0]->asset_fund_index;
+		local_pct_to_use = asset->sm_mtg[mp][0]->pct_to_use;
 
 		sub_port_class_fund_assets_present[sub_port_num][sale_class][fund_index]
 		= 1;
 
 		sub_port_class_fund_initial_book_value[sub_port_num][sale_class][fund_index]
-		+= current_mtg_element->Column(column_num_book_value).Value(t)
+		+= asset->sm_mtg[mp][0]->Column(column_num_book_value).Value(t)
 		   * local_pct_to_use;
 
 		sub_port_class_fund_initial_accrued_interest[sub_port_num][sale_class][fund_index]
-		+= current_mtg_element->Column(column_num_accrued_interest).Value(t)
+		+= asset->sm_mtg[mp][0]->Column(column_num_accrued_interest).Value(t)
 		   * local_pct_to_use;
 
 		if (initialize_market_sales_values)
 			{
 			sub_port_class_fund_initial_market_value[sub_port_num][sale_class][fund_index]
-			+= current_mtg_element->Column(column_num_market_value).Value(t)
+			+= asset->sm_mtg[mp][0]->Column(column_num_market_value).Value(t)
 			   * local_pct_to_use;
 
 			sub_port_class_fund_initial_unrealized_capital_gains[sub_port_num][sale_class][fund_index]
-			+= current_mtg_element->Column(column_num_unrealized_capital_gains).Value(t)
+			+= asset->sm_mtg[mp][0]->Column(column_num_unrealized_capital_gains).Value(t)
 			   * local_pct_to_use;
 			}
 
@@ -9118,28 +9052,28 @@ if (seg->mtg_mp_map_active.size() > 0)
 					<< " " << setw(1) << sale_class
 					<< " " << setw(1) << fund_index
 					<< " " << setw(16) << setprecision(6)
-						<< current_mtg_element->Column(column_num_accrued_interest).Value(t)
+						<< asset->sm_mtg[mp][0]->Column(column_num_accrued_interest).Value(t)
 							* local_pct_to_use
 					<< " " << setw(16) << setprecision(6)
-						<< current_mtg_element->Column(column_num_book_value).Value(t)
+						<< asset->sm_mtg[mp][0]->Column(column_num_book_value).Value(t)
 							* local_pct_to_use;
 			if (initialize_market_sales_values)
 				log_screen << " " << setw(16) << setprecision(6)
-							<< current_mtg_element->Column(column_num_market_value).Value(t)
+							<< asset->sm_mtg[mp][0]->Column(column_num_market_value).Value(t)
 								* local_pct_to_use
 						<< " " << setw(12) << setprecision(8)
-							<< current_mtg_element->mkt_to_bk_ratio(t)
+							<< asset->sm_mtg[mp][0]->mkt_to_bk_ratio(t)
 								* local_pct_to_use
 						<< " " << setw(12) << setprecision(8)
-							<< current_mtg_element->unrealzd_cap_gain_to_bk_ratio(t)
+							<< asset->sm_mtg[mp][0]->unrealzd_cap_gain_to_bk_ratio(t)
 								* local_pct_to_use;
 			else
 				log_screen << " " << setw(16) << setprecision(6) << 0.0
 						<< " " << setw(12) << setprecision(8) << 0.0
 						<< " " << setw(12) << setprecision(8) << 0.0;
-			log_screen << " " << setw(10) << current_mtg_element->asset_id
-					<< " |" << current_mtg_element->modelName
-					<< " " << current_mtg_element->port_defn
+			log_screen << " " << setw(10) << asset->sm_mtg[mp][0]->asset_id
+					<< " |" << asset->sm_mtg[mp][0]->modelName
+					<< " " << asset->sm_mtg[mp][0]->port_defn
 					<< MSG_ERROR;
 			}
 #endif
@@ -9148,8 +9082,7 @@ if (seg->mtg_mp_map_active.size() > 0)
 #endif
 
 #if defined(__SEC_ASSET_H_)
-SEC_ASSET *current_sec_element;
-if (seg->sec_mp_map_active.size() > 0)
+if (seg_element->sec_mp_map_active.size() > 0)
 	{
 	column_num_accrued_interest = asset->sm_sec[0]->Column(xstring_initial_accrued_interest).Number();
 	column_num_book_value = asset->sm_sec[0]->Column(xstring_initial_book_value).Number();
@@ -9162,51 +9095,50 @@ if (seg->sec_mp_map_active.size() > 0)
 		column_num_unrealized_capital_gains = asset->sm_sec[0]->Column(xstring_initial_unrealized_capital_gains).Number();
 		}
 
-	for (mp_map_iter = seg->sec_mp_map_active.begin();
-		 mp_map_iter != seg->sec_mp_map_active.end();
+	for (mp_map_iter = seg_element->sec_mp_map_active.begin();
+		 mp_map_iter != seg_element->sec_mp_map_active.end();
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		current_sec_element = asset->sm_sec[mp];
 
 		if (sum_type == SUM_OVER_POSITIVE
-			&& current_sec_element->neg_asset_flag < 0)
+			&& asset->sm_sec[mp]->neg_asset_flag < 0)
 			continue;
 
 		if (sum_type == SUM_OVER_NEGATIVE
-			&& current_sec_element->neg_asset_flag > 0)
+			&& asset->sm_sec[mp]->neg_asset_flag > 0)
 			continue;
 
-		if ((tee > max(0, current_sec_element->commencement_period)
-			 && current_sec_element->Column(column_num_notional_amount).Value(tee-1) < ASSET_ACTIVE_THRESHOLD)
-			|| (tee == current_sec_element->commencement_period
-				&& current_sec_element->Column(column_num_notional_amount_before_sales).Value(tee) < ASSET_ACTIVE_THRESHOLD))
+		if ((tee > max(0, asset->sm_sec[mp]->commencement_period)
+			 && asset->sm_sec[mp]->Column(column_num_notional_amount).Value(tee-1) < ASSET_ACTIVE_THRESHOLD)
+			|| (tee == asset->sm_sec[mp]->commencement_period
+				&& asset->sm_sec[mp]->Column(column_num_notional_amount_before_sales).Value(tee) < ASSET_ACTIVE_THRESHOLD))
 			continue;
 
-		sub_port_num = xint(current_sec_element->sub_port_id(t));
-		sale_class = current_sec_element->sale_class_id;
-		fund_index = current_sec_element->asset_fund_index;
-		local_pct_to_use = current_sec_element->pct_to_use;
+		sub_port_num = xint(asset->sm_sec[mp]->sub_port_id(t));
+		sale_class = asset->sm_sec[mp]->sale_class_id;
+		fund_index = asset->sm_sec[mp]->asset_fund_index;
+		local_pct_to_use = asset->sm_sec[mp]->pct_to_use;
 
 		sub_port_class_fund_assets_present[sub_port_num][sale_class][fund_index]
 		= 1;
 
 		sub_port_class_fund_initial_book_value[sub_port_num][sale_class][fund_index]
-		+= current_sec_element->Column(column_num_book_value).Value(t)
+		+= asset->sm_sec[mp]->Column(column_num_book_value).Value(t)
 		   * local_pct_to_use;
 
 		sub_port_class_fund_initial_accrued_interest[sub_port_num][sale_class][fund_index]
-		+= current_sec_element->Column(column_num_accrued_interest).Value(t)
+		+= asset->sm_sec[mp]->Column(column_num_accrued_interest).Value(t)
 		   * local_pct_to_use;
 
 		if (initialize_market_sales_values)
 			{
 			sub_port_class_fund_initial_market_value[sub_port_num][sale_class][fund_index]
-			+= current_sec_element->Column(column_num_market_value).Value(t)
+			+= asset->sm_sec[mp]->Column(column_num_market_value).Value(t)
 			   * local_pct_to_use;
 
 			sub_port_class_fund_initial_unrealized_capital_gains[sub_port_num][sale_class][fund_index]
-			+= current_sec_element->Column(column_num_unrealized_capital_gains).Value(t)
+			+= asset->sm_sec[mp]->Column(column_num_unrealized_capital_gains).Value(t)
 			   * local_pct_to_use;
 			}
 
@@ -9219,28 +9151,28 @@ if (seg->sec_mp_map_active.size() > 0)
 					<< " " << setw(1) << sale_class
 					<< " " << setw(1) << fund_index
 					<< " " << setw(16) << setprecision(6)
-						<< current_sec_element->Column(column_num_accrued_interest).Value(t)
+						<< asset->sm_sec[mp]->Column(column_num_accrued_interest).Value(t)
 							* local_pct_to_use
 					<< " " << setw(16) << setprecision(6)
-						<< current_sec_element->Column(column_num_book_value).Value(t)
+						<< asset->sm_sec[mp]->Column(column_num_book_value).Value(t)
 							* local_pct_to_use;
 			if (initialize_market_sales_values)
 				log_screen << " " << setw(16) << setprecision(6)
-							<< current_sec_element->Column(column_num_market_value).Value(t)
+							<< asset->sm_sec[mp]->Column(column_num_market_value).Value(t)
 								* local_pct_to_use
 						<< " " << setw(12) << setprecision(8)
-							<< current_sec_element->mkt_to_bk_ratio(t)
+							<< asset->sm_sec[mp]->mkt_to_bk_ratio(t)
 								* local_pct_to_use
 						<< " " << setw(12) << setprecision(8)
-							<< current_sec_element->unrealzd_cap_gain_to_bk_ratio(t)
+							<< asset->sm_sec[mp]->unrealzd_cap_gain_to_bk_ratio(t)
 								* local_pct_to_use;
 			else
 				log_screen << " " << setw(16) << setprecision(6) << 0.0
 						<< " " << setw(12) << setprecision(8) << 0.0
 						<< " " << setw(12) << setprecision(8) << 0.0;
-			log_screen << " " << setw(10) << current_sec_element->asset_id
-					<< " |" << current_sec_element->modelName
-					<< " " << current_sec_element->port_defn
+			log_screen << " " << setw(10) << asset->sm_sec[mp]->asset_id
+					<< " |" << asset->sm_sec[mp]->modelName
+					<< " " << asset->sm_sec[mp]->port_defn
 					<< MSG_ERROR;
 			}
 #endif
@@ -9249,65 +9181,63 @@ if (seg->sec_mp_map_active.size() > 0)
 #endif
 
 #if defined(__IRD_ASSET_H_)
-IRD_ASSET *current_ird_element;
-if (seg->ird_mp_map_active.size() > 0)
+if (seg_element->ird_mp_map_active.size() > 0)
 	{
-	column_num_accrued_interest = asset->sm_ird[0]->Column(xstring_initial_accrued_interest).Number();
-	column_num_book_value = asset->sm_ird[0]->Column(xstring_initial_book_value).Number();
-	column_num_notional_amount = asset->sm_ird[0]->Column("notional_amt").Number();
-	column_num_notional_amount_before_sales = asset->sm_ird[0]->Column("notional_amt_bef_sale").Number();
+	column_num_accrued_interest = asset->sm_ird[0][0]->Column(xstring_initial_accrued_interest).Number();
+	column_num_book_value = asset->sm_ird[0][0]->Column(xstring_initial_book_value).Number();
+	column_num_notional_amount = asset->sm_ird[0][0]->Column("notional_amt").Number();
+	column_num_notional_amount_before_sales = asset->sm_ird[0][0]->Column("notional_amt_bef_sale").Number();
 
 	if (initialize_market_sales_values)
 		{
-		column_num_market_value = asset->sm_ird[0]->Column(xstring_initial_market_value).Number();
-		column_num_unrealized_capital_gains = asset->sm_ird[0]->Column(xstring_initial_unrealized_capital_gains).Number();
+		column_num_market_value = asset->sm_ird[0][0]->Column(xstring_initial_market_value).Number();
+		column_num_unrealized_capital_gains = asset->sm_ird[0][0]->Column(xstring_initial_unrealized_capital_gains).Number();
 		}
 
-	for (mp_map_iter = seg->ird_mp_map_active.begin();
-		 mp_map_iter != seg->ird_mp_map_active.end();
+	for (mp_map_iter = seg_element->ird_mp_map_active.begin();
+		 mp_map_iter != seg_element->ird_mp_map_active.end();
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		current_ird_element = asset->sm_ird[mp];
 
 		if (sum_type == SUM_OVER_POSITIVE
-			&& current_ird_element->neg_asset_flag < 0)
+			&& asset->sm_ird[mp][0]->neg_asset_flag < 0)
 			continue;
 
 		if (sum_type == SUM_OVER_NEGATIVE
-			&& current_ird_element->neg_asset_flag > 0)
+			&& asset->sm_ird[mp][0]->neg_asset_flag > 0)
 			continue;
 
-		if ((tee > max(0, current_ird_element->commencement_period)
-			 && current_ird_element->Column(column_num_notional_amount).Value(tee-1) < ASSET_ACTIVE_THRESHOLD)
-			|| (tee == current_ird_element->commencement_period
-				&& current_ird_element->Column(column_num_notional_amount_before_sales).Value(tee) < ASSET_ACTIVE_THRESHOLD))
+		if ((tee > max(0, asset->sm_ird[mp][0]->commencement_period)
+			 && asset->sm_ird[mp][0]->Column(column_num_notional_amount).Value(tee-1) < ASSET_ACTIVE_THRESHOLD)
+			|| (tee == asset->sm_ird[mp][0]->commencement_period
+				&& asset->sm_ird[mp][0]->Column(column_num_notional_amount_before_sales).Value(tee) < ASSET_ACTIVE_THRESHOLD))
 			continue;
 
-		sub_port_num = xint(current_ird_element->sub_port_id(t));
-		sale_class = current_ird_element->sale_class_id;
-		fund_index = current_ird_element->asset_fund_index;
-		local_pct_to_use = current_ird_element->pct_to_use;
+		sub_port_num = xint(asset->sm_ird[mp][0]->sub_port_id(t));
+		sale_class = asset->sm_ird[mp][0]->sale_class_id;
+		fund_index = asset->sm_ird[mp][0]->asset_fund_index;
+		local_pct_to_use = asset->sm_ird[mp][0]->pct_to_use;
 
 		sub_port_class_fund_assets_present[sub_port_num][sale_class][fund_index]
 		= 1;
 
 		sub_port_class_fund_initial_book_value[sub_port_num][sale_class][fund_index]
-		+= current_ird_element->Column(column_num_book_value).Value(t)
+		+= asset->sm_ird[mp][0]->Column(column_num_book_value).Value(t)
 		   * local_pct_to_use;
 
 		sub_port_class_fund_initial_accrued_interest[sub_port_num][sale_class][fund_index]
-		+= current_ird_element->Column(column_num_accrued_interest).Value(t)
+		+= asset->sm_ird[mp][0]->Column(column_num_accrued_interest).Value(t)
 		   * local_pct_to_use;
 
 		if (initialize_market_sales_values)
 			{
 			sub_port_class_fund_initial_market_value[sub_port_num][sale_class][fund_index]
-			+= current_ird_element->Column(column_num_market_value).Value(t)
+			+= asset->sm_ird[mp][0]->Column(column_num_market_value).Value(t)
 			   * local_pct_to_use;
 
 			sub_port_class_fund_initial_unrealized_capital_gains[sub_port_num][sale_class][fund_index]
-			+= current_ird_element->Column(column_num_unrealized_capital_gains).Value(t)
+			+= asset->sm_ird[mp][0]->Column(column_num_unrealized_capital_gains).Value(t)
 			   * local_pct_to_use;
 			}
 
@@ -9320,28 +9250,28 @@ if (seg->ird_mp_map_active.size() > 0)
 					<< " " << setw(1) << sale_class
 					<< " " << setw(1) << fund_index
 					<< " " << setw(16) << setprecision(6)
-						<< current_ird_element->Column(column_num_accrued_interest).Value(t)
+						<< asset->sm_ird[mp][0]->Column(column_num_accrued_interest).Value(t)
 							* local_pct_to_use
 					<< " " << setw(16) << setprecision(6)
-						<< current_ird_element->Column(column_num_book_value).Value(t)
+						<< asset->sm_ird[mp][0]->Column(column_num_book_value).Value(t)
 							* local_pct_to_use;
 			if (initialize_market_sales_values)
 				log_screen << " " << setw(16) << setprecision(6)
-							<< current_ird_element->Column(column_num_market_value).Value(t)
+							<< asset->sm_ird[mp][0]->Column(column_num_market_value).Value(t)
 								* local_pct_to_use
 						<< " " << setw(12) << setprecision(8)
-							<< current_ird_element->mkt_to_bk_ratio(t)
+							<< asset->sm_ird[mp][0]->mkt_to_bk_ratio(t)
 								* local_pct_to_use
 						<< " " << setw(12) << setprecision(8)
-							<< current_ird_element->unrealzd_cap_gain_to_bk_ratio(t)
+							<< asset->sm_ird[mp][0]->unrealzd_cap_gain_to_bk_ratio(t)
 								* local_pct_to_use;
 			else
 				log_screen << " " << setw(16) << setprecision(6) << 0.0
 						<< " " << setw(12) << setprecision(8) << 0.0
 						<< " " << setw(12) << setprecision(8) << 0.0;
-			log_screen << " " << setw(10) << current_ird_element->asset_id
-					<< " |" << current_ird_element->modelName
-					<< " " << current_ird_element->port_defn
+			log_screen << " " << setw(10) << asset->sm_ird[mp][0]->asset_id
+					<< " |" << asset->sm_ird[mp][0]->modelName
+					<< " " << asset->sm_ird[mp][0]->port_defn
 					<< MSG_ERROR;
 			}
 #endif
@@ -9350,8 +9280,7 @@ if (seg->ird_mp_map_active.size() > 0)
 #endif
 
 #if defined(__RE_ASSET_H_)
-RE_ASSET *current_re_element;
-if (seg->re_mp_map_active.size() > 0)
+if (seg_element->re_mp_map_active.size() > 0)
 	{
 	column_num_accrued_rent = asset->sm_re[0]->Column(xstring_initial_accrued_rent).Number();
 	column_num_book_value = asset->sm_re[0]->Column(xstring_initial_book_value).Number();
@@ -9364,51 +9293,50 @@ if (seg->re_mp_map_active.size() > 0)
 		column_num_unrealized_capital_gains = asset->sm_re[0]->Column(xstring_initial_unrealized_capital_gains).Number();
 		}
 
-	for (mp_map_iter = seg->re_mp_map_active.begin();
-		 mp_map_iter != seg->re_mp_map_active.end();
+	for (mp_map_iter = seg_element->re_mp_map_active.begin();
+		 mp_map_iter != seg_element->re_mp_map_active.end();
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		current_re_element = asset->sm_re[mp];
 
 		if (sum_type == SUM_OVER_POSITIVE
-			&& current_re_element->neg_asset_flag < 0)
+			&& asset->sm_re[mp]->neg_asset_flag < 0)
 			continue;
 
 		if (sum_type == SUM_OVER_NEGATIVE
-			&& current_re_element->neg_asset_flag > 0)
+			&& asset->sm_re[mp]->neg_asset_flag > 0)
 			continue;
 
-		if ((tee > max(0, current_re_element->commencement_period)
-			 && current_re_element->Column(column_num_notional_amount).Value(tee-1) < ASSET_ACTIVE_THRESHOLD)
-			|| (tee == current_re_element->commencement_period
-				&& current_re_element->Column(column_num_notional_amount_before_sales).Value(tee) < ASSET_ACTIVE_THRESHOLD))
+		if ((tee > max(0, asset->sm_re[mp]->commencement_period)
+			 && asset->sm_re[mp]->Column(column_num_notional_amount).Value(tee-1) < ASSET_ACTIVE_THRESHOLD)
+			|| (tee == asset->sm_re[mp]->commencement_period
+				&& asset->sm_re[mp]->Column(column_num_notional_amount_before_sales).Value(tee) < ASSET_ACTIVE_THRESHOLD))
 			continue;
 
-		sub_port_num = xint(current_re_element->sub_port_id(t));
-		sale_class = current_re_element->sale_class_id;
-		fund_index = current_re_element->asset_fund_index;
-		local_pct_to_use = current_re_element->pct_to_use;
+		sub_port_num = xint(asset->sm_re[mp]->sub_port_id(t));
+		sale_class = asset->sm_re[mp]->sale_class_id;
+		fund_index = asset->sm_re[mp]->asset_fund_index;
+		local_pct_to_use = asset->sm_re[mp]->pct_to_use;
 
 		sub_port_class_fund_assets_present[sub_port_num][sale_class][fund_index]
 		= 1;
 
 		sub_port_class_fund_initial_book_value[sub_port_num][sale_class][fund_index]
-		+= current_re_element->Column(column_num_book_value).Value(t)
+		+= asset->sm_re[mp]->Column(column_num_book_value).Value(t)
 		   * local_pct_to_use;
 
 		sub_port_class_fund_initial_accrued_interest[sub_port_num][sale_class][fund_index]
-		+= current_re_element->Column(column_num_accrued_rent).Value(t)
+		+= asset->sm_re[mp]->Column(column_num_accrued_rent).Value(t)
 		   * local_pct_to_use;
 
 		if (initialize_market_sales_values)
 			{
 			sub_port_class_fund_initial_market_value[sub_port_num][sale_class][fund_index]
-			+= current_re_element->Column(column_num_market_value).Value(t)
+			+= asset->sm_re[mp]->Column(column_num_market_value).Value(t)
 			   * local_pct_to_use;
 
 			sub_port_class_fund_initial_unrealized_capital_gains[sub_port_num][sale_class][fund_index]
-			+= current_re_element->Column(column_num_unrealized_capital_gains).Value(t)
+			+= asset->sm_re[mp]->Column(column_num_unrealized_capital_gains).Value(t)
 			   * local_pct_to_use;
 			}
 
@@ -9421,28 +9349,28 @@ if (seg->re_mp_map_active.size() > 0)
 					<< " " << setw(1) << sale_class
 					<< " " << setw(1) << fund_index
 					<< " " << setw(16) << setprecision(6)
-						<< current_re_element->Column(column_num_accrued_rent).Value(t)
+						<< asset->sm_re[mp]->Column(column_num_accrued_rent).Value(t)
 							* local_pct_to_use
 					<< " " << setw(16) << setprecision(6)
-						<< current_re_element->Column(column_num_book_value).Value(t)
+						<< asset->sm_re[mp]->Column(column_num_book_value).Value(t)
 							* local_pct_to_use;
 			if (initialize_market_sales_values)
 				log_screen << " " << setw(16) << setprecision(6)
-							<< current_re_element->Column(column_num_market_value).Value(t)
+							<< asset->sm_re[mp]->Column(column_num_market_value).Value(t)
 								* local_pct_to_use
 						<< " " << setw(12) << setprecision(8)
-							<< current_re_element->mkt_to_bk_ratio(t)
+							<< asset->sm_re[mp]->mkt_to_bk_ratio(t)
 								* local_pct_to_use
 						<< " " << setw(12) << setprecision(8)
-							<< current_re_element->unrealzd_cap_gain_to_bk_ratio(t)
+							<< asset->sm_re[mp]->unrealzd_cap_gain_to_bk_ratio(t)
 								* local_pct_to_use;
 			else
 				log_screen << " " << setw(16) << setprecision(6) << 0.0
 						<< " " << setw(12) << setprecision(8) << 0.0
 						<< " " << setw(12) << setprecision(8) << 0.0;
-			log_screen << " " << setw(10) << current_re_element->asset_id
-					<< " |" << current_re_element->modelName
-					<< " " << current_re_element->port_defn
+			log_screen << " " << setw(10) << asset->sm_re[mp]->asset_id
+					<< " |" << asset->sm_re[mp]->modelName
+					<< " " << asset->sm_re[mp]->port_defn
 					<< MSG_ERROR;
 			}
 #endif
@@ -9451,8 +9379,7 @@ if (seg->re_mp_map_active.size() > 0)
 #endif
 
 #if defined(__EQT_ASSET_H_)
-EQT_ASSET *current_eqt_element;
-if (seg->eqt_mp_map_active.size() > 0)
+if (seg_element->eqt_mp_map_active.size() > 0)
 	{
 	column_num_book_value = asset->sm_eqt[0]->Column(xstring_initial_book_value).Number();
 	column_num_market_value = asset->sm_eqt[0]->Column(xstring_initial_market_value).Number();
@@ -9460,47 +9387,46 @@ if (seg->eqt_mp_map_active.size() > 0)
 	column_num_notional_amount_before_sales = asset->sm_eqt[0]->Column("notional_amt_bef_sale").Number();
 	column_num_unrealized_capital_gains = asset->sm_eqt[0]->Column(xstring_initial_unrealized_capital_gains).Number();
 
-	for (mp_map_iter = seg->eqt_mp_map_active.begin();
-		 mp_map_iter != seg->eqt_mp_map_active.end();
+	for (mp_map_iter = seg_element->eqt_mp_map_active.begin();
+		 mp_map_iter != seg_element->eqt_mp_map_active.end();
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		current_eqt_element = asset->sm_eqt[mp];
 
 		if (sum_type == SUM_OVER_POSITIVE
-			&& current_eqt_element->neg_asset_flag < 0)
+			&& asset->sm_eqt[mp]->neg_asset_flag < 0)
 			continue;
 
 		if (sum_type == SUM_OVER_NEGATIVE
-			&& current_eqt_element->neg_asset_flag > 0)
+			&& asset->sm_eqt[mp]->neg_asset_flag > 0)
 			continue;
 
-		if ((tee > max(0, current_eqt_element->commencement_period)
-			 && current_eqt_element->Column(column_num_notional_amount).Value(tee-1) < ASSET_ACTIVE_THRESHOLD)
-			|| (tee == current_eqt_element->commencement_period
-				&& current_eqt_element->Column(column_num_notional_amount_before_sales).Value(tee) < ASSET_ACTIVE_THRESHOLD))
+		if ((tee > max(0, asset->sm_eqt[mp]->commencement_period)
+			 && asset->sm_eqt[mp]->Column(column_num_notional_amount).Value(tee-1) < ASSET_ACTIVE_THRESHOLD)
+			|| (tee == asset->sm_eqt[mp]->commencement_period
+				&& asset->sm_eqt[mp]->Column(column_num_notional_amount_before_sales).Value(tee) < ASSET_ACTIVE_THRESHOLD))
 			continue;
 
-		sub_port_num = xint(current_eqt_element->sub_port_id(t));
-		sale_class = current_eqt_element->sale_class_id;
-		fund_index = current_eqt_element->asset_fund_index;
-		local_pct_to_use = current_eqt_element->pct_to_use;
+		sub_port_num = xint(asset->sm_eqt[mp]->sub_port_id(t));
+		sale_class = asset->sm_eqt[mp]->sale_class_id;
+		fund_index = asset->sm_eqt[mp]->asset_fund_index;
+		local_pct_to_use = asset->sm_eqt[mp]->pct_to_use;
 
 		sub_port_class_fund_assets_present[sub_port_num][sale_class][fund_index]
 		= 1;
 
 		sub_port_class_fund_initial_book_value[sub_port_num][sale_class][fund_index]
-		+= current_eqt_element->Column(column_num_book_value).Value(t)
+		+= asset->sm_eqt[mp]->Column(column_num_book_value).Value(t)
 		   * local_pct_to_use;
 
 		if (initialize_market_sales_values)
 			{
 			sub_port_class_fund_initial_market_value[sub_port_num][sale_class][fund_index]
-			+= current_eqt_element->Column(column_num_market_value).Value(t)
+			+= asset->sm_eqt[mp]->Column(column_num_market_value).Value(t)
 			   * local_pct_to_use;
 
 			sub_port_class_fund_initial_unrealized_capital_gains[sub_port_num][sale_class][fund_index]
-			+= current_eqt_element->Column(column_num_unrealized_capital_gains).Value(t)
+			+= asset->sm_eqt[mp]->Column(column_num_unrealized_capital_gains).Value(t)
 			   * local_pct_to_use;
 			}
 
@@ -9514,25 +9440,25 @@ if (seg->eqt_mp_map_active.size() > 0)
 					<< " " << setw(1) << fund_index
 					<< " " << setw(16) << setprecision(6) << 0.0
 					<< " " << setw(16) << setprecision(6)
-						<< current_eqt_element->Column(column_num_book_value).Value(t)
+						<< asset->sm_eqt[mp]->Column(column_num_book_value).Value(t)
 							* local_pct_to_use;
 			if (initialize_market_sales_values)
 				log_screen << " " << setw(16) << setprecision(6)
-							<< current_eqt_element->Column(column_num_market_value).Value(t)
+							<< asset->sm_eqt[mp]->Column(column_num_market_value).Value(t)
 								* local_pct_to_use
 						<< " " << setw(12) << setprecision(8)
-							<< current_eqt_element->mkt_to_bk_ratio(t)
+							<< asset->sm_eqt[mp]->mkt_to_bk_ratio(t)
 								* local_pct_to_use
 						<< " " << setw(12) << setprecision(8)
-							<< current_eqt_element->unrealzd_cap_gain_to_bk_ratio(t)
+							<< asset->sm_eqt[mp]->unrealzd_cap_gain_to_bk_ratio(t)
 								* local_pct_to_use;
 			else
 				log_screen << " " << setw(16) << setprecision(6) << 0.0
 						<< " " << setw(12) << setprecision(8) << 0.0
 						<< " " << setw(12) << setprecision(8) << 0.0;
-			log_screen << " " << setw(10) << current_eqt_element->asset_id
-					<< " |" << current_eqt_element->modelName
-					<< " " << current_eqt_element->port_defn
+			log_screen << " " << setw(10) << asset->sm_eqt[mp]->asset_id
+					<< " |" << asset->sm_eqt[mp]->modelName
+					<< " " << asset->sm_eqt[mp]->port_defn
 					<< MSG_ERROR;
 			}
 #endif
@@ -9541,60 +9467,58 @@ if (seg->eqt_mp_map_active.size() > 0)
 #endif
 
 #if defined(__EIO_ASSET_H_)
-EIO_ASSET *current_eio_element;
-if (seg->eio_mp_map_active.size() > 0)
+if (seg_element->eio_mp_map_active.size() > 0)
 	{
-	column_num_book_value = asset->sm_eio[0]->Column(xstring_initial_book_value).Number();
-	column_num_notional_amount = asset->sm_eio[0]->Column("notional_amt").Number();
-	column_num_notional_amount_before_sales = asset->sm_eio[0]->Column("notional_amt_bef_sale").Number();
+	column_num_book_value = asset->sm_eio[0][0]->Column(xstring_initial_book_value).Number();
+	column_num_notional_amount = asset->sm_eio[0][0]->Column("notional_amt").Number();
+	column_num_notional_amount_before_sales = asset->sm_eio[0][0]->Column("notional_amt_bef_sale").Number();
 
 	if (initialize_market_sales_values)
 		{
-		column_num_market_value = asset->sm_eio[0]->Column(xstring_initial_market_value).Number();
-		column_num_unrealized_capital_gains = asset->sm_eio[0]->Column(xstring_initial_unrealized_capital_gains).Number();
+		column_num_market_value = asset->sm_eio[0][0]->Column(xstring_initial_market_value).Number();
+		column_num_unrealized_capital_gains = asset->sm_eio[0][0]->Column(xstring_initial_unrealized_capital_gains).Number();
 		}
 
-	for (mp_map_iter = seg->eio_mp_map_active.begin();
-		 mp_map_iter != seg->eio_mp_map_active.end();
+	for (mp_map_iter = seg_element->eio_mp_map_active.begin();
+		 mp_map_iter != seg_element->eio_mp_map_active.end();
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		current_eio_element = asset->sm_eio[mp];
 
 		if (sum_type == SUM_OVER_POSITIVE
-			&& current_eio_element->neg_asset_flag < 0)
+			&& asset->sm_eio[mp][0]->neg_asset_flag < 0)
 			continue;
 
 		if (sum_type == SUM_OVER_NEGATIVE
-			&& current_eio_element->neg_asset_flag > 0)
+			&& asset->sm_eio[mp][0]->neg_asset_flag > 0)
 			continue;
 
-		if ((tee > max(0, current_eio_element->commencement_period)
-			 && current_eio_element->Column(column_num_notional_amount).Value(tee-1) < ASSET_ACTIVE_THRESHOLD)
-			|| (tee == current_eio_element->commencement_period
-				&& current_eio_element->Column(column_num_notional_amount_before_sales).Value(tee) < ASSET_ACTIVE_THRESHOLD))
+		if ((tee > max(0, asset->sm_eio[mp][0]->commencement_period)
+			 && asset->sm_eio[mp][0]->Column(column_num_notional_amount).Value(tee-1) < ASSET_ACTIVE_THRESHOLD)
+			|| (tee == asset->sm_eio[mp][0]->commencement_period
+				&& asset->sm_eio[mp][0]->Column(column_num_notional_amount_before_sales).Value(tee) < ASSET_ACTIVE_THRESHOLD))
 			continue;
 
-		sub_port_num = xint(current_eio_element->sub_port_id(t));
-		sale_class = current_eio_element->sale_class_id;
-		fund_index = current_eio_element->asset_fund_index;
-		local_pct_to_use = current_eio_element->pct_to_use;
+		sub_port_num = xint(asset->sm_eio[mp][0]->sub_port_id(t));
+		sale_class = asset->sm_eio[mp][0]->sale_class_id;
+		fund_index = asset->sm_eio[mp][0]->asset_fund_index;
+		local_pct_to_use = asset->sm_eio[mp][0]->pct_to_use;
 
 		sub_port_class_fund_assets_present[sub_port_num][sale_class][fund_index]
 		= 1;
 
 		sub_port_class_fund_initial_book_value[sub_port_num][sale_class][fund_index]
-		+= current_eio_element->Column(column_num_book_value).Value(t)
+		+= asset->sm_eio[mp][0]->Column(column_num_book_value).Value(t)
 		   * local_pct_to_use;
 
 		if (initialize_market_sales_values)
 			{
 			sub_port_class_fund_initial_market_value[sub_port_num][sale_class][fund_index]
-			+= current_eio_element->Column(column_num_market_value).Value(t)
+			+= asset->sm_eio[mp][0]->Column(column_num_market_value).Value(t)
 			   * local_pct_to_use;
 
 			sub_port_class_fund_initial_unrealized_capital_gains[sub_port_num][sale_class][fund_index]
-			+= current_eio_element->Column(column_num_unrealized_capital_gains).Value(t)
+			+= asset->sm_eio[mp][0]->Column(column_num_unrealized_capital_gains).Value(t)
 			   * local_pct_to_use;
 			}
 
@@ -9608,25 +9532,25 @@ if (seg->eio_mp_map_active.size() > 0)
 					<< " " << setw(1) << fund_index
 					<< " " << setw(16) << setprecision(6) << 0.0
 					<< " " << setw(16) << setprecision(6)
-						<< current_eio_element->Column(column_num_book_value).Value(t)
+						<< asset->sm_eio[mp][0]->Column(column_num_book_value).Value(t)
 							* local_pct_to_use;
 			if (initialize_market_sales_values)
 				log_screen << " " << setw(16) << setprecision(6)
-							<< current_eio_element->Column(column_num_market_value).Value(t)
+							<< asset->sm_eio[mp][0]->Column(column_num_market_value).Value(t)
 								* local_pct_to_use
 						<< " " << setw(12) << setprecision(8)
-							<< current_eio_element->mkt_to_bk_ratio(t)
+							<< asset->sm_eio[mp][0]->mkt_to_bk_ratio(t)
 								* local_pct_to_use
 						<< " " << setw(12) << setprecision(8)
-							<< current_eio_element->unrealzd_cap_gain_to_bk_ratio(t)
+							<< asset->sm_eio[mp][0]->unrealzd_cap_gain_to_bk_ratio(t)
 								* local_pct_to_use;
 			else
 				log_screen << " " << setw(16) << setprecision(6) << 0.0
 						<< " " << setw(12) << setprecision(8) << 0.0
 						<< " " << setw(12) << setprecision(8) << 0.0;
-			log_screen << " " << setw(10) << current_eio_element->asset_id
-					<< " |" << current_eio_element->modelName
-					<< " " << current_eio_element->port_defn
+			log_screen << " " << setw(10) << asset->sm_eio[mp][0]->asset_id
+					<< " |" << asset->sm_eio[mp][0]->modelName
+					<< " " << asset->sm_eio[mp][0]->port_defn
 					<< MSG_ERROR;
 			}
 #endif
@@ -9635,8 +9559,7 @@ if (seg->eio_mp_map_active.size() > 0)
 #endif
 
 #if defined(__EPA_ASSET_H_)
-EPA_ASSET *current_epa_element;
-if (seg->epa_mp_map_active.size() > 0)
+if (seg_element->epa_mp_map_active.size() > 0)
 	{
 	column_num_accrued_interest = asset->sm_epa[0]->Column(xstring_initial_accrued_interest).Number();
 	column_num_book_value = asset->sm_epa[0]->Column(xstring_initial_book_value).Number();
@@ -9649,48 +9572,47 @@ if (seg->epa_mp_map_active.size() > 0)
 		column_num_unrealized_capital_gains = asset->sm_epa[0]->Column(xstring_initial_unrealized_capital_gains).Number();
 		}
 
-	for (mp_map_iter = seg->epa_mp_map_active.begin();
-		 mp_map_iter != seg->epa_mp_map_active.end();
+	for (mp_map_iter = seg_element->epa_mp_map_active.begin();
+		 mp_map_iter != seg_element->epa_mp_map_active.end();
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		current_epa_element = asset->sm_epa[mp];
 
 		if (sum_type == SUM_OVER_POSITIVE
-			&& current_epa_element->neg_asset_flag < 0)
+			&& asset->sm_epa[mp]->neg_asset_flag < 0)
 			continue;
 
 		if (sum_type == SUM_OVER_NEGATIVE
-			&& current_epa_element->neg_asset_flag > 0)
+			&& asset->sm_epa[mp]->neg_asset_flag > 0)
 			continue;
 
-		if (current_epa_element->Column(column_num_notional_amount).Value(tee-1) < ASSET_ACTIVE_THRESHOLD)
+		if (asset->sm_epa[mp]->Column(column_num_notional_amount).Value(tee-1) < ASSET_ACTIVE_THRESHOLD)
 			continue;
 
-		sub_port_num = xint(current_epa_element->sub_port_id(t));
-		sale_class = current_epa_element->sale_class_id;
-		fund_index = current_epa_element->asset_fund_index;
-		local_pct_to_use = current_epa_element->pct_to_use;
+		sub_port_num = xint(asset->sm_epa[mp]->sub_port_id(t));
+		sale_class = asset->sm_epa[mp]->sale_class_id;
+		fund_index = asset->sm_epa[mp]->asset_fund_index;
+		local_pct_to_use = asset->sm_epa[mp]->pct_to_use;
 
 		sub_port_class_fund_assets_present[sub_port_num][sale_class][fund_index]
 		= 1;
 
 		sub_port_class_fund_initial_book_value[sub_port_num][sale_class][fund_index]
-		+= current_epa_element->Column(column_num_book_value).Value(t)
+		+= asset->sm_epa[mp]->Column(column_num_book_value).Value(t)
 		   * local_pct_to_use;
 
 		sub_port_class_fund_initial_accrued_interest[sub_port_num][sale_class][fund_index]
-		+= current_epa_element->Column(column_num_accrued_interest).Value(t)
+		+= asset->sm_epa[mp]->Column(column_num_accrued_interest).Value(t)
 		   * local_pct_to_use;
 
 		if (initialize_market_sales_values)
 			{
 			sub_port_class_fund_initial_market_value[sub_port_num][sale_class][fund_index]
-			+= current_epa_element->Column(column_num_market_value).Value(t)
+			+= asset->sm_epa[mp]->Column(column_num_market_value).Value(t)
 			   * local_pct_to_use;
 
 			sub_port_class_fund_initial_unrealized_capital_gains[sub_port_num][sale_class][fund_index]
-			+= current_epa_element->Column(column_num_unrealized_capital_gains).Value(t)
+			+= asset->sm_epa[mp]->Column(column_num_unrealized_capital_gains).Value(t)
 			   * local_pct_to_use;
 			}
 
@@ -9704,28 +9626,28 @@ if (seg->epa_mp_map_active.size() > 0)
 					<< " " << setw(1) << fund_index
 					<< " " << setw(16) << setprecision(6) << 0.0
 					<< " " << setw(16) << setprecision(6)
-					<< current_bond_element->Column(column_num_accrued_interest).Value(t)
+					<< asset->sm_bond[mp][0]->Column(column_num_accrued_interest).Value(t)
 						* local_pct_to_use
 					<< " " << setw(16) << setprecision(6)
-					<< current_epa_element->Column(column_num_book_value).Value(t)
+					<< asset->sm_epa[mp]->Column(column_num_book_value).Value(t)
 						* local_pct_to_use;
 			if (initialize_market_sales_values)
 				log_screen << " " << setw(16) << setprecision(6)
-							<< current_epa_element->Column(column_num_market_value).Value(t)
+							<< asset->sm_epa[mp]->Column(column_num_market_value).Value(t)
 								* local_pct_to_use
 						<< " " << setw(12) << setprecision(8)
-							<< current_epa_element->mkt_to_bk_ratio(t)
+							<< asset->sm_epa[mp]->mkt_to_bk_ratio(t)
 								* local_pct_to_use
 						<< " " << setw(12) << setprecision(8)
-							<< current_epa_element->unrealzd_cap_gain_to_bk_ratio(t)
+							<< asset->sm_epa[mp]->unrealzd_cap_gain_to_bk_ratio(t)
 								* local_pct_to_use;
 			else
 				log_screen << " " << setw(16) << setprecision(6) << 0.0
 						<< " " << setw(12) << setprecision(8) << 0.0
 						<< " " << setw(12) << setprecision(8) << 0.0;
-			log_screen << " " << setw(10) << current_epa_element->asset_id
-					<< " |" << current_epa_element->modelName
-					<< " " << current_epa_element->port_defn
+			log_screen << " " << setw(10) << asset->sm_epa[mp]->asset_id
+					<< " |" << asset->sm_epa[mp]->modelName
+					<< " " << asset->sm_epa[mp]->port_defn
 					<< MSG_ERROR;
 			}
 #endif
@@ -9763,15 +9685,18 @@ bool INVSTRAT_ASSET::inv_strat_select(int t, StrEnum::EnumValue strategy_type, b
 
 bool valid_strategy = true;
 
+date_lookup = date(t);
+xstring inv_strat_planned_local = inv_strat_planned;
+
 if ((t == prior_strategy_selected_t && strategy_type == prior_strategy_type) // Have already processed selection
-	|| t == NO_AVG) // for asset data checks
+	|| t == 0) // for asset data checks
 	return valid_strategy;
 
 // Ensure negative cash flow strategy for current period is selected
 if (strategy_type == NEGATIVE)
 	neg_cash_flow_strat_set(t);	
 
-if (inv_strat_planned == "NONE"
+if (inv_strat_planned_local == "NONE"
 	&& strategy_type != NEGATIVE)
 	{
 	if (strategy_type == CURRENT)
@@ -9801,32 +9726,35 @@ else if (strategy_type == LONGEST)
 	inv_strat_id = inv_strat_longest;
 
 // Lookup key is inv_strat_id
+inv_strat_id = inv_strat_id;
 cash_tgt_pct = inv_strat_cash_tgt_pct;
-portfolio_sprd_adj_aig = inv_strat_portfolio_sprd_adj_aig;  //AIG - portfolio spread adjustment
-dur_wtd_sprd_adj_aig = inv_strat_dur_wtd_sprd_adj_aig;  //AIG - duration weighted spread adjustment
 
+inv_strat_id = inv_strat_id;
 asset_sub_port_distribn_defn = inv_strat_distribn_defn;
+
+inv_strat_id = inv_strat_id;
+port_sprd_adj_crbg = inv_strat_port_sprd_adj_crbg;  //CRBG - portfolio spread adjustment
+
+inv_strat_id = inv_strat_id;
+dur_wtd_sprd_adj_crbg = inv_strat_dur_wtd_sprd_adj_crbg;  //CRBG - duration weighted spread adjustment
 
 double inv_tgt_pct_total = 0.0;
 
 // Set asset sub portfolio target percentages using current investment strategy
-// 20191021 STW: fix compiler error while converting from RAFM 2.6 to RAFM 2.8
-int sub_port_num;
+int sub_port_num = 0;
+
 for (sub_port_num = 0; sub_port_num < asset->sm_asset_sub_port[seg_num].size(); sub_port_num++)
 	{
 	if (asset->sm_asset_sub_port[seg_num][sub_port_num][0]->port_defn != INVESTMENT)
 		continue;
 	
 	asset_sub_port_id = company->sm_asset->asset_sub_ports[sub_port_num];
+	
+	inv_strat_id = inv_strat_id;
 	asset->sm_asset_sub_port[seg_num][sub_port_num][0]->inv_tgt_pct = asset_sub_port_inv_tgt_pct;
+
 	inv_tgt_pct_total += asset->sm_asset_sub_port[seg_num][sub_port_num][0]->inv_tgt_pct;
 	}
-
-	/*log_screen<<"t= "<<t
-	<<" cash_tgt_pct= "<<cash_tgt_pct
-	<<" inv_tgt_pct_total= "<<inv_tgt_pct_total
-	<<" rate_ratio_threshold= "<<rate_ratio_threshold
-	<<MSG_USER;*/
 
 // Normalize percentages if needed
 if (cash_tgt_pct < 1.0 
@@ -9851,7 +9779,6 @@ if (cash_tgt_pct < 1.0
 			          + inv_strat_id + "; percentages have been normalized.";
 						
 			log_screen << message << MSG_ERROR;
-			makeRunLogYellow();
 			}
 		}
 	else
@@ -9869,7 +9796,7 @@ if (purch_asset_max_num > 0)
 warnings = warnings || warnings2;
 
 if (asset->asset_detail_rpt_inv_strat_flag(t)
-	&& t != ((int) NO_AVG)) // Suppress output during validate_asset_data
+	&& t != 0) // Suppress output during validate_asset_data
 	{
 	xstring strategy_type_string;
 
@@ -9888,7 +9815,7 @@ if (asset->asset_detail_rpt_inv_strat_flag(t)
 	else
 		strategy_type_string = "Undefined";
 
-	seg->SALFile << endl << "Selected" << strategy_type_string
+	seg_element->SALFile << endl << "Selected" << strategy_type_string
 				 << "Strat," << inv_strat_id
 				 << endl;
 	}
@@ -9903,15 +9830,18 @@ void INVSTRAT_ASSET::inv_strat_set(int t)
 {
 // This function selects either the economic or planned set of investment strategies.
 if (t == prior_strategy_set_t // Have already processed selection for this month
-	|| t == NO_AVG) // For asset data checks
+	|| t == 0) // For asset data checks
 	return;
 
 prior_strategy_set_t = t;
 
+seg_id = seg_id;
+int inv_strat_economic_tests_local = inv_strat_economic_tests;
+
 // Test economic investment strategies
-if (inv_strat_economic_tests > 0)
+if (inv_strat_economic_tests_local > 0)
 	{
-	for (inv_strat_economic_test_num = 1; inv_strat_economic_test_num <= inv_strat_economic_tests; inv_strat_economic_test_num++)
+	for (inv_strat_economic_test_num = 1; inv_strat_economic_test_num <= inv_strat_economic_tests_local; inv_strat_economic_test_num++)
 		{
 		double test_rate_1 = 0.0;
 		double test_rate_2 = 0.0;
@@ -9919,34 +9849,58 @@ if (inv_strat_economic_tests > 0)
 		double total_rate_2 = 0.0;
 		double compare_rate = 0.0;
 
-		for (int month = 1; month <= inv_strat_economic_mths; month++)
+		inv_strat_economic_test_num = inv_strat_economic_test_num;
+		int inv_strat_economic_mths_local = inv_strat_economic_mths;
+
+		inv_strat_economic_test_num = inv_strat_economic_test_num;
+		double inv_strat_economic_rate_1_term_local = inv_strat_economic_rate_1_term;
+
+		inv_strat_economic_test_num = inv_strat_economic_test_num;
+		double inv_strat_economic_rate_2_term_local = inv_strat_economic_rate_2_term;
+
+		inv_strat_economic_test_num = inv_strat_economic_test_num;
+		double inv_strat_economic_lag_mths_local = inv_strat_economic_lag_mths;
+
+		inv_strat_economic_test_num = inv_strat_economic_test_num;
+		StrEnum::EnumValue inv_strat_economic_test_defn_local = inv_strat_economic_test_defn;
+
+		inv_strat_economic_test_num = inv_strat_economic_test_num;
+		StrEnum::EnumValue inv_strat_economic_test_calc_defn_local = inv_strat_economic_test_calc_defn;
+
+		inv_strat_economic_test_num = inv_strat_economic_test_num;
+		StrEnum::EnumValue inv_strat_economic_compare_defn_local = inv_strat_economic_compare_defn;
+
+		inv_strat_economic_test_num = inv_strat_economic_test_num;
+		double inv_strat_economic_fixed_test_val_local = inv_strat_economic_fixed_test_val;
+
+		for (int month = 1; month <= inv_strat_economic_mths_local; month++)
 			{
-			if (inv_strat_economic_rate_1_term > rate_ratio_threshold)
+			if (inv_strat_economic_rate_1_term_local > rate_ratio_threshold)
 				test_rate_1
 				= rates->get_int_rate(t - month + 1,
 				        "Govt",
 				        GET_YIELD_RATE,
-						inv_strat_economic_rate_1_term,
+						inv_strat_economic_rate_1_term_local,
 						0,
 						NOMINAL_SEMIANNUAL,
-						NO_SHIFT,0);//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+						NO_SHIFT);
 
-			if (inv_strat_economic_rate_2_term > rate_ratio_threshold)
+			if (inv_strat_economic_rate_2_term_local > rate_ratio_threshold)
 				test_rate_2
-				= rates->get_int_rate(t - month - inv_strat_economic_lag_mths + 1,
+				= rates->get_int_rate(t - month - inv_strat_economic_lag_mths_local + 1,
 				        "Govt",
 				        GET_YIELD_RATE,
-						inv_strat_economic_rate_2_term,
+						inv_strat_economic_rate_2_term_local,
 						0,
 						NOMINAL_SEMIANNUAL,
-						NO_SHIFT,0);//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+						NO_SHIFT);
 
-			if (inv_strat_economic_test_defn == AVERAGE_RATE)
+			if (inv_strat_economic_test_defn_local == AVERAGE_RATE)
 				{
 				total_rate_1 += test_rate_1;				
 				total_rate_2 += test_rate_2;
 				}
-			else if (inv_strat_economic_test_defn == MINIMUM_RATE)
+			else if (inv_strat_economic_test_defn_local == MINIMUM_RATE)
 				{
 				if (month == 1)
 					{
@@ -9959,57 +9913,72 @@ if (inv_strat_economic_tests > 0)
 					total_rate_2 = min(test_rate_2, total_rate_2);
 					}
 				}
-			else if (inv_strat_economic_test_defn == MAXIMUM_RATE)
+			else if (inv_strat_economic_test_defn_local == MAXIMUM_RATE)
 				{
 				total_rate_1 = max(test_rate_1, total_rate_1);				
 				total_rate_2 = max(test_rate_2, total_rate_2);
 				}
 			} // End monthly loop
 			
-		if (inv_strat_economic_test_defn == AVERAGE_RATE)
+		if (inv_strat_economic_test_defn_local == AVERAGE_RATE)
 			{
-			total_rate_1 /= inv_strat_economic_mths;				
-			total_rate_2 /= inv_strat_economic_mths;
+			total_rate_1 /= inv_strat_economic_mths_local;				
+			total_rate_2 /= inv_strat_economic_mths_local;
 			}
 		
-		if (inv_strat_economic_test_calc_defn == SUBTRACTION)
+		if (inv_strat_economic_test_calc_defn_local == SUBTRACTION)
 			compare_rate = total_rate_1 - total_rate_2;
-		else if ((inv_strat_economic_test_calc_defn == DIVISION
+		else if ((inv_strat_economic_test_calc_defn_local == DIVISION
 		         && fabs(total_rate_2) > rate_ratio_threshold))
 			compare_rate = total_rate_1 / total_rate_2;
 			
-		if ((inv_strat_economic_compare_defn == GREATER_THAN
-		     && compare_rate <= inv_strat_economic_fixed_test_val)
-		    || (inv_strat_economic_compare_defn == LESS_THAN
-		        && compare_rate >= inv_strat_economic_fixed_test_val))
+		if ((inv_strat_economic_compare_defn_local == GREATER_THAN
+		     && compare_rate <= inv_strat_economic_fixed_test_val_local)
+		    || (inv_strat_economic_compare_defn_local == LESS_THAN
+		        && compare_rate >= inv_strat_economic_fixed_test_val_local))
 			continue; // Test failed
 		
 		// Test passed, set active strategy from this economic test
+		inv_strat_economic_test_num = inv_strat_economic_test_num;
 		inv_strat_current = inv_strat_economic_planned;
 		
+		inv_strat_economic_test_num = inv_strat_economic_test_num;
 		dur_match_tgt_incr = inv_strat_economic_dur_match_tgt_incr;
 		
+		inv_strat_economic_test_num = inv_strat_economic_test_num;
 		dur_match_tolerance_incr = inv_strat_economic_dur_match_tolerance_incr;
 				
-		if (inv_strat_economic_shorter == "NONE")
+		inv_strat_economic_test_num = inv_strat_economic_test_num;
+		xstring inv_strat_economic_shorter_local = inv_strat_economic_shorter;
+
+		inv_strat_economic_test_num = inv_strat_economic_test_num;
+		xstring inv_strat_economic_shortest_local = inv_strat_economic_shortest;
+
+		inv_strat_economic_test_num = inv_strat_economic_test_num;
+		xstring inv_strat_economic_longer_local = inv_strat_economic_longer;
+
+		inv_strat_economic_test_num = inv_strat_economic_test_num;
+		xstring inv_strat_economic_longest_local = inv_strat_economic_longest;
+
+		if (inv_strat_economic_shorter_local == "NONE")
 			inv_strat_shorter = inv_strat_current;
 		else
-			inv_strat_shorter = inv_strat_economic_shorter;
+			inv_strat_shorter = inv_strat_economic_shorter_local;
 		
-		if (inv_strat_economic_shortest == "NONE")
+		if (inv_strat_economic_shortest_local == "NONE")
 			inv_strat_shortest = inv_strat_current;
 		else
-			inv_strat_shortest = inv_strat_economic_shortest;
+			inv_strat_shortest = inv_strat_economic_shortest_local;
 		
-		if (inv_strat_economic_longer == "NONE")
+		if (inv_strat_economic_longer_local == "NONE")
 			inv_strat_longer = inv_strat_current;
 		else
-			inv_strat_longer = inv_strat_economic_longer;
+			inv_strat_longer = inv_strat_economic_longer_local;
 		
-		if (inv_strat_economic_longest == "NONE")
+		if (inv_strat_economic_longest_local == "NONE")
 			inv_strat_longest = inv_strat_current;
 		else
-			inv_strat_longest = inv_strat_economic_longest;
+			inv_strat_longest = inv_strat_economic_longest_local;
 		
 		return;
 		} // End economic strategy conditions test
@@ -10019,27 +9988,40 @@ if (inv_strat_economic_tests > 0)
 dur_match_tgt_incr = 0.0;
 dur_match_tolerance_incr = 0.0;
 
+date_lookup = date(t);
 inv_strat_current = inv_strat_planned;
 
-if (inv_strat_planned_shorter == "NONE")
+date_lookup = date(t);
+xstring inv_strat_planned_shorter_local = inv_strat_planned_shorter;
+
+date_lookup = date(t);
+xstring inv_strat_planned_shortest_local = inv_strat_planned_shortest;
+
+date_lookup = date(t);
+xstring inv_strat_planned_longer_local = inv_strat_planned_longer;
+
+date_lookup = date(t);
+xstring inv_strat_planned_longest_local = inv_strat_planned_longest;
+
+if (inv_strat_planned_shorter_local == "NONE")
 	inv_strat_shorter = inv_strat_current;
 else
-	inv_strat_shorter = inv_strat_planned_shorter;
+	inv_strat_shorter = inv_strat_planned_shorter_local;
 	
-if (inv_strat_planned_shortest == "NONE")
+if (inv_strat_planned_shortest_local == "NONE")
 	inv_strat_shortest = inv_strat_current;
 else
-	inv_strat_shortest = inv_strat_planned_shortest;
+	inv_strat_shortest = inv_strat_planned_shortest_local;
 	
-if (inv_strat_planned_longer == "NONE")
+if (inv_strat_planned_longer_local == "NONE")
 	inv_strat_longer = inv_strat_current;
 else
-	inv_strat_longer = inv_strat_planned_longer;
+	inv_strat_longer = inv_strat_planned_longer_local;
 	
-if (inv_strat_planned_longest == "NONE")
+if (inv_strat_planned_longest_local == "NONE")
 	inv_strat_longest = inv_strat_current;
 else
-	inv_strat_longest = inv_strat_planned_longest;
+	inv_strat_longest = inv_strat_planned_longest_local;
 
 return;
 }
@@ -10051,18 +10033,21 @@ void INVSTRAT_ASSET::neg_cash_flow_strat_set(int t)
 {
 // This function selects either the economic or planned set of negative cash flow strategies.
 if (t == prior_neg_cash_flow_strategy_set_t // Have already processed selection for this month
-	|| t == NO_AVG) // For asset data checks
+	|| t == 0) // For asset data checks
 	return;
 
 prior_neg_cash_flow_strategy_set_t = t;
 
 bool economic_strategy_selected = false;
 
+seg_id = seg_id;
+int neg_cash_flow_strat_economic_tests_local = neg_cash_flow_strat_economic_tests;
+
 // Test Economic negative cash flow strategies
 // Test economic investment strategies
-if (neg_cash_flow_strat_economic_tests > 0)
+if (neg_cash_flow_strat_economic_tests_local > 0)
 	{
-	for (neg_cash_flow_strat_economic_test_num = 1; neg_cash_flow_strat_economic_test_num <= neg_cash_flow_strat_economic_tests; neg_cash_flow_strat_economic_test_num++)
+	for (neg_cash_flow_strat_economic_test_num = 1; neg_cash_flow_strat_economic_test_num <= neg_cash_flow_strat_economic_tests_local; neg_cash_flow_strat_economic_test_num++)
 		{
 		double test_rate_1 = 0.0;
 		double test_rate_2 = 0.0;
@@ -10070,34 +10055,58 @@ if (neg_cash_flow_strat_economic_tests > 0)
 		double total_rate_2 = 0.0;
 		double compare_rate = 0.0;
 
-		for (int month = 1; month <= neg_cash_flow_strat_economic_mths; month++)
+		neg_cash_flow_strat_economic_test_num = neg_cash_flow_strat_economic_test_num;
+		int neg_cash_flow_strat_economic_mths_local = neg_cash_flow_strat_economic_mths;
+
+		neg_cash_flow_strat_economic_test_num = neg_cash_flow_strat_economic_test_num;
+		double neg_cash_flow_strat_economic_rate_1_term_local = neg_cash_flow_strat_economic_rate_1_term;
+
+		neg_cash_flow_strat_economic_test_num = neg_cash_flow_strat_economic_test_num;
+		double neg_cash_flow_strat_economic_rate_2_term_local = neg_cash_flow_strat_economic_rate_2_term;
+
+		neg_cash_flow_strat_economic_test_num = neg_cash_flow_strat_economic_test_num;		
+		double neg_cash_flow_strat_economic_fixed_test_val_local = neg_cash_flow_strat_economic_fixed_test_val;
+
+		neg_cash_flow_strat_economic_test_num = neg_cash_flow_strat_economic_test_num;		
+		double neg_cash_flow_strat_economic_lag_mths_local = neg_cash_flow_strat_economic_lag_mths;
+
+		neg_cash_flow_strat_economic_test_num = neg_cash_flow_strat_economic_test_num;		
+		StrEnum::EnumValue neg_cash_flow_strat_economic_compare_defn_local = neg_cash_flow_strat_economic_compare_defn;
+
+		neg_cash_flow_strat_economic_test_num = neg_cash_flow_strat_economic_test_num;		
+		StrEnum::EnumValue neg_cash_flow_strat_economic_test_defn_local = neg_cash_flow_strat_economic_test_defn;
+
+		neg_cash_flow_strat_economic_test_num = neg_cash_flow_strat_economic_test_num;		
+		StrEnum::EnumValue neg_cash_flow_strat_economic_test_calc_defn_local = neg_cash_flow_strat_economic_test_calc_defn;
+
+		for (int month = 1; month <= neg_cash_flow_strat_economic_mths_local; month++)
 			{
-			if (neg_cash_flow_strat_economic_rate_1_term > rate_ratio_threshold)
+			if (neg_cash_flow_strat_economic_rate_1_term_local > rate_ratio_threshold)
 				test_rate_1
 				= rates->get_int_rate(t - month + 1,
 				        "Govt",
 				        GET_YIELD_RATE,
-						neg_cash_flow_strat_economic_rate_1_term,
+						neg_cash_flow_strat_economic_rate_1_term_local,
 						0,
 						NOMINAL_SEMIANNUAL,
-						NO_SHIFT,0);//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+						NO_SHIFT);
 
-			if (neg_cash_flow_strat_economic_rate_2_term > rate_ratio_threshold)
+			if (neg_cash_flow_strat_economic_rate_2_term_local > rate_ratio_threshold)
 				test_rate_2
-				= rates->get_int_rate(t - month - neg_cash_flow_strat_economic_lag_mths + 1,
+				= rates->get_int_rate(t - month - neg_cash_flow_strat_economic_lag_mths_local + 1,
 				        "Govt",
 				        GET_YIELD_RATE,
-						neg_cash_flow_strat_economic_rate_2_term,
+						neg_cash_flow_strat_economic_rate_2_term_local,
 						0,
 						NOMINAL_SEMIANNUAL,
-						NO_SHIFT,0);//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+						NO_SHIFT);
 
-			if (neg_cash_flow_strat_economic_test_defn == AVERAGE_RATE)
+			if (neg_cash_flow_strat_economic_test_defn_local == AVERAGE_RATE)
 				{
 				total_rate_1 += test_rate_1;				
 				total_rate_2 += test_rate_2;
 				}
-			else if (neg_cash_flow_strat_economic_test_defn == MINIMUM_RATE)
+			else if (neg_cash_flow_strat_economic_test_defn_local == MINIMUM_RATE)
 				{
 				if (month == 1)
 					{
@@ -10110,43 +10119,62 @@ if (neg_cash_flow_strat_economic_tests > 0)
 					total_rate_2 = min(test_rate_2, total_rate_2);
 					}
 				}
-			else if (neg_cash_flow_strat_economic_test_defn == MAXIMUM_RATE)
+			else if (neg_cash_flow_strat_economic_test_defn_local == MAXIMUM_RATE)
 				{
 				total_rate_1 = max(test_rate_1, total_rate_1);				
 				total_rate_2 = max(test_rate_2, total_rate_2);
 				}
 			} // End monthly loop
 			
-		if (neg_cash_flow_strat_economic_test_defn == AVERAGE_RATE)
+		if (neg_cash_flow_strat_economic_test_defn_local == AVERAGE_RATE)
 			{
-			total_rate_1 /= neg_cash_flow_strat_economic_mths;				
-			total_rate_2 /= neg_cash_flow_strat_economic_mths;
+			total_rate_1 /= neg_cash_flow_strat_economic_mths_local;				
+			total_rate_2 /= neg_cash_flow_strat_economic_mths_local;
 			}
 		
-		if (neg_cash_flow_strat_economic_test_calc_defn == SUBTRACTION)
+		if (neg_cash_flow_strat_economic_test_calc_defn_local == SUBTRACTION)
 			compare_rate = total_rate_1 - total_rate_2;
-		else if ((neg_cash_flow_strat_economic_test_calc_defn == DIVISION
+		else if ((neg_cash_flow_strat_economic_test_calc_defn_local == DIVISION
 		         && fabs(total_rate_2) > rate_ratio_threshold))
 			compare_rate = total_rate_1 / total_rate_2;
 			
-		if ((neg_cash_flow_strat_economic_compare_defn == GREATER_THAN
-		     && compare_rate <= neg_cash_flow_strat_economic_fixed_test_val)
-		    || (neg_cash_flow_strat_economic_compare_defn == LESS_THAN
-		        && compare_rate >= neg_cash_flow_strat_economic_fixed_test_val))
+		if ((neg_cash_flow_strat_economic_compare_defn_local == GREATER_THAN
+		     && compare_rate <= neg_cash_flow_strat_economic_fixed_test_val_local)
+		    || (neg_cash_flow_strat_economic_compare_defn_local == LESS_THAN
+		        && compare_rate >= neg_cash_flow_strat_economic_fixed_test_val_local))
 			continue; // Test failed
 		
 		// Test passed, set active negative cash flow strategy from this economic test and break
 		economic_strategy_selected = true;
+		neg_cash_flow_strat_economic_test_num = neg_cash_flow_strat_economic_test_num;
 		neg_cash_flow_strat = neg_cash_flow_strat_economic;
+		
+		neg_cash_flow_strat_economic_test_num = neg_cash_flow_strat_economic_test_num;
 		neg_cash_flow_cash_bal_defn = neg_cash_flow_strat_economic_cash_bal_defn;
+		
+		neg_cash_flow_strat_economic_test_num = neg_cash_flow_strat_economic_test_num;
 		neg_cash_flow_cash_thresh_pct = neg_cash_flow_strat_economic_cash_thresh_pct;
+		
+		neg_cash_flow_strat_economic_test_num = neg_cash_flow_strat_economic_test_num;
 		neg_cash_flow_cash_thresh_addn = neg_cash_flow_strat_economic_cash_thresh_addn;
+		
+		neg_cash_flow_strat_economic_test_num = neg_cash_flow_strat_economic_test_num;
 		neg_cash_flow_neg_assets = neg_cash_flow_strat_economic_neg_assets;
 		inv_strat_neg = neg_cash_flow_neg_assets;
+		
+		neg_cash_flow_strat_economic_test_num = neg_cash_flow_strat_economic_test_num;
 		neg_cash_flow_sale_selection_defn = neg_cash_flow_strat_economic_sale_selection_defn;
+		
+		neg_cash_flow_strat_economic_test_num = neg_cash_flow_strat_economic_test_num;
 		neg_cash_flow_sale_priority_avail_for_sale = neg_cash_flow_strat_economic_sale_priority_avail_for_sale;
+		
+		neg_cash_flow_strat_economic_test_num = neg_cash_flow_strat_economic_test_num;
 		neg_cash_flow_sale_priority_trading = neg_cash_flow_strat_economic_sale_priority_trading;
+		
+		neg_cash_flow_strat_economic_test_num = neg_cash_flow_strat_economic_test_num;
 		neg_cash_flow_sale_priority_held_to_maturity = neg_cash_flow_strat_economic_sale_priority_held_to_maturity;
+		
+		neg_cash_flow_strat_economic_test_num = neg_cash_flow_strat_economic_test_num;
 		neg_cash_flow_sale_priority_not_assigned = neg_cash_flow_strat_economic_sale_priority_not_assigned;
 
 		break;
@@ -10156,16 +10184,35 @@ if (neg_cash_flow_strat_economic_tests > 0)
 // If economic tests failed, set strategy to planned strategy
 if (!economic_strategy_selected)
 	{
+	date_lookup = date(t);
 	neg_cash_flow_strat = neg_cash_flow_strat_planned;
+	
+	date_lookup = date(t);
 	neg_cash_flow_cash_bal_defn = neg_cash_flow_strat_planned_cash_bal_defn;
+	
+	date_lookup = date(t);
 	neg_cash_flow_cash_thresh_pct = neg_cash_flow_strat_planned_cash_thresh_pct;
+	
+	date_lookup = date(t);
 	neg_cash_flow_cash_thresh_addn = neg_cash_flow_strat_planned_cash_thresh_addn;
+	
+	date_lookup = date(t);
 	neg_cash_flow_neg_assets = neg_cash_flow_strat_planned_neg_assets;
 	inv_strat_neg = neg_cash_flow_neg_assets;
+	
+	date_lookup = date(t);
 	neg_cash_flow_sale_selection_defn = neg_cash_flow_strat_planned_sale_selection_defn;
+	
+	date_lookup = date(t);
 	neg_cash_flow_sale_priority_avail_for_sale = neg_cash_flow_strat_planned_sale_priority_avail_for_sale;
+	
+	date_lookup = date(t);
 	neg_cash_flow_sale_priority_trading = neg_cash_flow_strat_planned_sale_priority_trading;
+	
+	date_lookup = date(t);
 	neg_cash_flow_sale_priority_held_to_maturity = neg_cash_flow_strat_planned_sale_priority_held_to_maturity;
+	
+	date_lookup = date(t);
 	neg_cash_flow_sale_priority_not_assigned = neg_cash_flow_strat_planned_sale_priority_not_assigned;
 	}
 
@@ -10181,7 +10228,7 @@ neg_cash_flow_sale_class_priority[3] = neg_cash_flow_sale_priority_trading;
 neg_cash_flow_sale_class_priority[4] = neg_cash_flow_sale_priority_held_to_maturity;
 
 if (asset->asset_detail_rpt_inv_strat_flag(t))
-	seg->SALFile << endl
+	seg_element->SALFile << endl
 				 << "Negative Cash Flow Strategy Selected" << endl 
 				 << "Strategy," << neg_cash_flow_strat << endl 
 				 << "CashBalDefn," << neg_cash_flow_cash_bal_defn << endl 
@@ -10206,11 +10253,13 @@ int panum;
 int asset_sub_port;
 bool normalizn_needed = false;
 bool warnings = false;
-A_SUBPORT_ASSET * a_subport_element;
 
 // Reset arrays
-asset->sm_asset_sub_port[seg_num][ALL][0]->purch_asset_weight_sum = 0.0;
-asset->sm_asset_sub_port[seg_num][ALL][0]->purch_asset_weight_sum_normalzd = 0.0;
+for (asset_sub_port = 0; asset_sub_port < asset->sm_asset_sub_port[seg_num].size(); asset_sub_port++)
+	{
+	asset->sm_asset_sub_port[seg_num][asset_sub_port][0]->purch_asset_weight_sum = 0.0;
+	asset->sm_asset_sub_port[seg_num][asset_sub_port][0]->purch_asset_weight_sum_normalzd = 0.0;
+	}
 
 // Sum purchase asset weights into assigned asset sub portfolios
 for (panum = 0; panum < purch_asset_max_num; panum++)
@@ -10220,12 +10269,14 @@ for (panum = 0; panum < purch_asset_max_num; panum++)
 	
 	asset_sub_port = purch_assets_asset_sub_port_num[panum];
 
+	inv_strat_id = inv_strat_id;
 	purch_asset_id = purch_assets_id[panum];
+	xstring purch_asset_sub_port_id_local = purch_asset_sub_port_id;
 
 	if (asset_sub_port <= -1)
 		throw FatalError("Purchase asset " + purch_asset_id
 		                 + " is assigned to asset sub portfolio "
-		                 + purch_asset_sub_port_id
+		                 + purch_asset_sub_port_id_local
 		                 + ", which is not defined. Please correct definitions.");
 	
 	a_subport_element = asset->sm_asset_sub_port[seg_num][asset_sub_port][0];
@@ -10239,7 +10290,7 @@ for (panum = 0; panum < purch_asset_max_num; panum++)
 	else // Asset sub portfolio not for purchase assets
 		throw FatalError("Purchase asset " + purch_asset_id
 		                 + " has portfolio definition = Investment, but is assigned to asset sub portfolio "
-		                 + purch_asset_sub_port_id
+		                 + purch_asset_sub_port_id_local
 		                 + ", which is not defined for purchase assets. Please correct definitions.");		
 	}
 
@@ -10261,7 +10312,6 @@ for (asset_sub_port = 0; asset_sub_port < asset->sm_asset_sub_port[seg_num].size
 	          + "; weights have been normalized.";
 						
 			log_screen << message << MSG_ERROR;
-			makeRunLogYellow();			
 			}
 		
 		normalizn_needed = true;
@@ -10308,15 +10358,14 @@ for (asset_sub_port = 0; asset_sub_port < asset->sm_asset_sub_port[seg_num].size
 			{
 			xstring message;
 			warnings = true;
-			makeRunLogYellow();
 			message = "Warning: For investment strategy '" + inv_strat_id
 					+ "' the normalized sub portfolio percentage (" + xstring(a_subport_element->inv_tgt_pct)
 					+ ")\n ... for asset sub portfolio '" + a_subport_element->sub_port_id
 					+ "' is positive but no purchase assets have been defined for this asset sub portfolio."
 					+ "\n ... Amounts allocated to this sub portfolio are invested in the interim cash account_id.";
 			log_screen << message << MSG_ERROR;
-			if (seg->SALFile)
-				seg->SALFile << endl << message;
+			if (seg_element->SALFile)
+				seg_element->SALFile << endl << message;
 			}
 
 		a_subport_element->purch_asset_weight_sum_normalzd = 1.0;
@@ -10353,9 +10402,14 @@ double asset_sub_port_percentage_for_selected_strategy = 0.0;
 static SmartArray <double> sub_port_target_percentage;
 static SmartArray <double> sub_port_percent_of_book_value;
 bool is_sell_assets = (sell_assets == YES);
+int sub_port_number = 0;
 
-total_investment_sub_port_percents 
-= asset->sm_asset_sub_port[seg_num][SUM][0]->inv_tgt_pct;
+seg_id = seg_id;
+StrEnum::EnumValue rebal_sale_selection_defn_local = rebal_sale_selection_defn;
+
+for (sub_port_number = 0; sub_port_number < asset->sm_asset_sub_port[seg_num].size(); sub_port_number++)
+	total_investment_sub_port_percents 
+	+= asset->sm_asset_sub_port[seg_num][sub_port_number][0]->inv_tgt_pct;
 
 if (sub_port_target_percentage.size() < asset->sm_asset_sub_port[seg_num].size())
 	sub_port_target_percentage.resize(asset->sm_asset_sub_port[seg_num].size());
@@ -10363,7 +10417,8 @@ if (sub_port_target_percentage.size() < asset->sm_asset_sub_port[seg_num].size()
 if (sub_port_percent_of_book_value.size() < asset->sm_asset_sub_port[seg_num].size())
 	sub_port_percent_of_book_value.resize(asset->sm_asset_sub_port[seg_num].size());
 
-asset->sm_asset_sub_port[seg_num][ALL][0]->sub_ports_to_sell = 0;
+for (sub_port_number = 0; sub_port_number < asset->sm_asset_sub_port[seg_num].size(); sub_port_number++)
+	asset->sm_asset_sub_port[seg_num][sub_port_number][0]->sub_ports_to_sell = 0;
 
 for (class_priority_level = 1;
 	 class_priority_level <= rebal_sales_priority_class_max;
@@ -10455,7 +10510,7 @@ for (class_priority_level = 1;
 				net_cash_from_sales
 				+= sell_assets_control(t, sell_assets,
 				                       REBALANCING_SALES,
-				                       rebal_sale_selection_defn,
+				                       rebal_sale_selection_defn_local,
 				                       excess_over_target);
 
 				asset->sm_asset_sub_port[seg_num][asset_sub_port][0]->sub_ports_to_sell = 0;
@@ -10483,19 +10538,28 @@ int fund_index_max_for_sales = 0;
 double total_investment_sub_port_percents = 0.0;
 double turnover_rate_freq = 0.0;
 double net_cash_from_sales = 0.0;
+int sub_port_number = 0;
 
-total_investment_sub_port_percents
-= asset->sm_asset_sub_port[seg_num][SUM][0]->inv_tgt_pct;
+seg_id = seg_id;
+StrEnum::EnumValue rebal_freq_local = rebal_freq;
+seg_id = seg_id;
+int yrs_to_inv_mthly_local = yrs_to_inv_mthly;
+seg_id = seg_id;
+int yrs_to_inv_qtrly_local = yrs_to_inv_qtrly;
+
+for (sub_port_number = 0; sub_port_number < asset->sm_asset_sub_port[seg_num].size(); sub_port_number++)
+	total_investment_sub_port_percents
+	+= asset->sm_asset_sub_port[seg_num][sub_port_number][0]->inv_tgt_pct;
 
 if (!(inv_eom_flag(t)
-	  && rebal_freq != NOT_APPLICABLE
+	  && rebal_freq_local != NOT_APPLICABLE
 	  && asset_sub_port_distribn_defn == BOOK
 	  && mths_to_rebal(t) == 0))
 	{
 	if (dur_match_flag(t))
 		initialize_sale_and_inv_vars_eom(t);
 		
-	return NO_AVG;
+	return 0.0;
 	}
 
 initialize_sale_and_inv_vars_eom(t);
@@ -10510,29 +10574,29 @@ if (asset->asset_detail_rpt_inv_strat_flag(t)
 	asset_detail_rpt_individual_sale(t, HEADER);
 	}
 
-if (rebal_freq == MONTHLY
-	|| (rebal_freq == AT_ASSET_FREQUENCY
+if (rebal_freq_local == MONTHLY
+	|| (rebal_freq_local == AT_ASSET_FREQUENCY
 		&& asset->mkt_val_calc_freq == MONTHLY))
 	turnover_rate_freq = 12;
 
-else if (rebal_freq == QUARTERLY
-		 || (rebal_freq == AT_ASSET_FREQUENCY
+else if (rebal_freq_local == QUARTERLY
+		 || (rebal_freq_local == AT_ASSET_FREQUENCY
 			 && asset->mkt_val_calc_freq == QUARTERLY_MAR_JUN_SEP_DEC_))
 	turnover_rate_freq = 4;
 
-else if (rebal_freq == SEMIANNUALLY
-		 || (rebal_freq == AT_ASSET_FREQUENCY
+else if (rebal_freq_local == SEMIANNUALLY
+		 || (rebal_freq_local == AT_ASSET_FREQUENCY
 			 && asset->mkt_val_calc_freq == SEMIANNUALLY_JUN_DEC_))
 	turnover_rate_freq = 2;
 else
 	turnover_rate_freq = 1;
 
-if ((cal_yr_relative(t) > yrs_to_inv_mthly) 
-	&& (cal_yr_relative(t) <= (yrs_to_inv_mthly + yrs_to_inv_qtrly))
+if ((cal_yr_relative(t) > yrs_to_inv_mthly_local) 
+	&& (cal_yr_relative(t) <= (yrs_to_inv_mthly_local + yrs_to_inv_qtrly_local))
 	&& turnover_rate_freq == 12)
 	turnover_rate_freq = 4;
 
-if (cal_yr_relative(t) > (yrs_to_inv_mthly + yrs_to_inv_qtrly))
+if (cal_yr_relative(t) > (yrs_to_inv_mthly_local + yrs_to_inv_qtrly_local))
 	turnover_rate_freq = 1;
 
 for (int fund_index = 0; fund_index < MAXIMUM_NUMBER_OF_ASSET_FUNDS; fund_index++)
@@ -10560,8 +10624,8 @@ double net_cash_from_sales = 0.0;
 
 if (!pba_valn_flag)
 	{
-	if (seg->corp_seg_flag
-		|| (!tcm_flag && seg->business_seg_flag))
+	if (seg_element->corp_seg_flag
+		|| (!tcm_flag && seg_element->business_seg_flag))
 		{
 		if (!imr_flag && !avr_flag)
 			marginal_distribn_rate = company->distribn_pct_distrib_earnings;
@@ -10610,7 +10674,7 @@ return net_cash_from_sales;
 #line 1 "sell_assets_extreme_value.INVSTRAT_ASSET.for"                                                                                   
 double INVSTRAT_ASSET::sell_assets_extreme_value(int t, StrEnum::EnumValue sell_assets, StrEnum::EnumValue sales_type, StrEnum::EnumValue extreme_selection, double cash_required, double capital_gains_cash_factor_for_sales)
 {
-evmmap::iterator evmmap_iter;
+multimap <pair<double,double>, pair<int,int>, less<pair<double,double> > >::iterator evmmap_iter;
 int selected_asset_defn = 0;
 int mp = 0;
 int selected_mp = 0;
@@ -10639,8 +10703,6 @@ bool is_rebal_sales = (sales_type == REBALANCING_SALES);
 
 pair<int,int> next_extreme_asset;
 
-A_SUBPORT_ASSET * current_sub_port;
-
 remaining_cash_required = cash_required;
 
 create_extreme_val_multimap(t, sales_type, extreme_selection);
@@ -10660,36 +10722,34 @@ while (remaining_cash_required > model_point_amount_threshold)
 #if defined(__BOND_ASSET_H_)
 	if (selected_asset_defn == BOND_CODE)
 		{
-		BOND_ASSET *bond_element;
 		mp = selected_mp;
-		bond_element = asset->sm_bond[mp];
-		sub_port_num = xint(bond_element->sub_port_id(t));
-		sales_class_num = bond_element->sale_class_id; 
-		asset_fund_index = bond_element->asset_fund_index; 
+		sub_port_num = xint(asset->sm_bond[mp][0]->sub_port_id(t));
+		sales_class_num = asset->sm_bond[mp][0]->sale_class_id; 
+		asset_fund_index = asset->sm_bond[mp][0]->asset_fund_index; 
 		current_sub_port = asset->sm_asset_sub_port[seg_num][sub_port_num][0];
-		local_pct_to_use = bond_element->pct_to_use;
+		local_pct_to_use = asset->sm_bond[mp][0]->pct_to_use;
 
 		if (is_rebal_sales)
 			{
 			book_value_available
-			= bond_element->bk_val_bef_rebal_sale(t);
+			= asset->sm_bond[mp][0]->bk_val_bef_rebal_sale(t);
 			accrued_interest_available
-			= bond_element->accr_int_bef_rebal_sale(t);
+			= asset->sm_bond[mp][0]->accr_int_bef_rebal_sale(t);
 			market_value_available
-			= bond_element->mkt_val_bef_rebal_sale(t);
+			= asset->sm_bond[mp][0]->mkt_val_bef_rebal_sale(t);
 			unrealized_capital_gains_available
-			= bond_element->unrealzd_cap_gain_bef_rebal_sale(t);
+			= asset->sm_bond[mp][0]->unrealzd_cap_gain_bef_rebal_sale(t);
 			}
 		else
 			{
 			book_value_available
-			= bond_element->bk_val_bef_neg_cash_flow_sale(t);
+			= asset->sm_bond[mp][0]->bk_val_bef_neg_cash_flow_sale(t);
 			accrued_interest_available
-			= bond_element->accr_int_bef_neg_cash_flow_sale(t);
+			= asset->sm_bond[mp][0]->accr_int_bef_neg_cash_flow_sale(t);
 			market_value_available
-			= bond_element->mkt_val_bef_neg_cash_flow_sale(t);
+			= asset->sm_bond[mp][0]->mkt_val_bef_neg_cash_flow_sale(t);
 			unrealized_capital_gains_available
-			= bond_element->unrealzd_cap_gain_bef_neg_cash_flow_sale(t);
+			= asset->sm_bond[mp][0]->unrealzd_cap_gain_bef_neg_cash_flow_sale(t);
 			}
 
 		if (sales_type == REBALANCING_SALES)
@@ -10749,17 +10809,21 @@ while (remaining_cash_required > model_point_amount_threshold)
 		= accrued_interest_available
 		  * local_pct_to_use
 		  * percent_of_asset_to_sell;
-
+	
 		if (sell_assets == YES)
-			{
+			{		
 			if (is_rebal_sales)
-				col_num
-				= bond_element->Column("sold_pct_rebal").Number();
+				{
+				asset->sm_bond[mp][0]->sold_pct_rebal_value = percent_of_asset_to_sell;
+				asset->sm_bond[mp][0]->sold_pct_rebal(t);
+				asset->sm_bond[mp][0]->sold_pct_rebal_value = 0.0;
+				}
 			else
-				col_num
-				= bond_element->Column("sold_pct_neg_cash_flow").Number();
-
-			bond_element->Column(col_num).SetValue(t, percent_of_asset_to_sell);
+				{
+				asset->sm_bond[mp][0]->sold_pct_neg_cash_flow_value = percent_of_asset_to_sell;
+				asset->sm_bond[mp][0]->sold_pct_neg_cash_flow(t);
+				asset->sm_bond[mp][0]->sold_pct_neg_cash_flow_value = 0.0;
+				}
 
 			market_sold
 			= market_value_available
@@ -10784,15 +10848,15 @@ while (remaining_cash_required > model_point_amount_threshold)
 			sub_port_fund_expected_book_plus_accrued_sold[sub_port_num][asset_fund_index]
 			+= book_sold + accrued_sold;
 
-			if (bond_element->neg_asset_flag > 0)
+			if (asset->sm_bond[mp][0]->neg_asset_flag > 0)
 				{
 				expected_mkt_val_for_dur_sale
-				+= bond_element->mkt_val_for_dur_bef_rebal_sale(t)
+				+= asset->sm_bond[mp][0]->mkt_val_for_dur_bef_rebal_sale(t)
 				   * local_pct_to_use
 				   * percent_of_asset_to_sell;
 
 				expected_mkt_val_times_dur_sale
-				+= bond_element->mkt_val_times_dur_bef_rebal_sale(t)
+				+= asset->sm_bond[mp][0]->mkt_val_times_dur_bef_rebal_sale(t)
 				   * local_pct_to_use
 				   * percent_of_asset_to_sell;
 				}
@@ -10816,15 +10880,15 @@ while (remaining_cash_required > model_point_amount_threshold)
 			capital_gain = market_sold - book_sold;
 
 			asset_detail_rpt_individual_sale(t, ASSET_DATA,
-					bond_element->sequence_id,
-					bond_element->asset_id,
+					asset->sm_bond[mp][0]->sequence_id,
+					asset->sm_bond[mp][0]->asset_id,
 					sub_port_num, sales_class_num, asset_fund_index,
 					percent_of_asset_to_sell,
 					net_cash_from_asset_sale,
 					book_sold, accrued_sold,
 					market_sold, capital_gain,
 					unrealized_capital_gain_released,
-					bond_element->dur_val(t));
+					asset->sm_bond[mp][0]->dur_val(t));
 			}
 		} // endif selected_asset_defn == BOND_CODE
 
@@ -10833,36 +10897,34 @@ while (remaining_cash_required > model_point_amount_threshold)
 #if defined(__MTG_ASSET_H_)
 	if (selected_asset_defn == MORTGAGE_CODE)
 		{
-		MTG_ASSET *mtg_element;
 		mp = selected_mp;
-		mtg_element = asset->sm_mtg[mp];
-		sub_port_num = xint(mtg_element->sub_port_id(t));
-		sales_class_num = mtg_element->sale_class_id; 
-		asset_fund_index = mtg_element->asset_fund_index; 
+		sub_port_num = xint(asset->sm_mtg[mp][0]->sub_port_id(t));
+		sales_class_num = asset->sm_mtg[mp][0]->sale_class_id; 
+		asset_fund_index = asset->sm_mtg[mp][0]->asset_fund_index; 
 		current_sub_port = asset->sm_asset_sub_port[seg_num][sub_port_num][0];
-		local_pct_to_use = mtg_element->pct_to_use;
+		local_pct_to_use = asset->sm_mtg[mp][0]->pct_to_use;
 
 		if (is_rebal_sales)
 			{
 			book_value_available
-			= mtg_element->bk_val_bef_rebal_sale(t);
+			= asset->sm_mtg[mp][0]->bk_val_bef_rebal_sale(t);
 			accrued_interest_available
-			= mtg_element->accr_int_bef_rebal_sale(t);
+			= asset->sm_mtg[mp][0]->accr_int_bef_rebal_sale(t);
 			market_value_available
-			= mtg_element->mkt_val_bef_rebal_sale(t);
+			= asset->sm_mtg[mp][0]->mkt_val_bef_rebal_sale(t);
 			unrealized_capital_gains_available
-			= mtg_element->unrealzd_cap_gain_bef_rebal_sale(t);
+			= asset->sm_mtg[mp][0]->unrealzd_cap_gain_bef_rebal_sale(t);
 			}
 		else	
 			{
 			book_value_available
-			= mtg_element->bk_val_bef_neg_cash_flow_sale(t);
+			= asset->sm_mtg[mp][0]->bk_val_bef_neg_cash_flow_sale(t);
 			accrued_interest_available
-			= mtg_element->accr_int_bef_neg_cash_flow_sale(t);
+			= asset->sm_mtg[mp][0]->accr_int_bef_neg_cash_flow_sale(t);
 			market_value_available
-			= mtg_element->mkt_val_bef_neg_cash_flow_sale(t);
+			= asset->sm_mtg[mp][0]->mkt_val_bef_neg_cash_flow_sale(t);
 			unrealized_capital_gains_available
-			= mtg_element->unrealzd_cap_gain_bef_neg_cash_flow_sale(t);
+			= asset->sm_mtg[mp][0]->unrealzd_cap_gain_bef_neg_cash_flow_sale(t);
 			}
 
 		if (sales_type == REBALANCING_SALES)
@@ -10924,13 +10986,17 @@ while (remaining_cash_required > model_point_amount_threshold)
 		if (sell_assets == YES)
 			{
 			if (is_rebal_sales)
-				col_num
-				= mtg_element->Column("sold_pct_rebal").Number();
+				{
+				asset->sm_mtg[mp][0]->sold_pct_rebal_value = percent_of_asset_to_sell;
+				asset->sm_mtg[mp][0]->sold_pct_rebal(t);
+				asset->sm_mtg[mp][0]->sold_pct_rebal_value = 0.0;
+				}
 			else
-				col_num
-				= mtg_element->Column("sold_pct_neg_cash_flow").Number();
-
-			mtg_element->Column(col_num).SetValue(t, percent_of_asset_to_sell);
+				{
+				asset->sm_mtg[mp][0]->sold_pct_neg_cash_flow_value = percent_of_asset_to_sell;
+				asset->sm_mtg[mp][0]->sold_pct_neg_cash_flow(t);
+				asset->sm_mtg[mp][0]->sold_pct_neg_cash_flow_value = 0.0;
+				}
 
 			market_sold = market_value_available
 						  * local_pct_to_use
@@ -10953,15 +11019,15 @@ while (remaining_cash_required > model_point_amount_threshold)
 			sub_port_fund_expected_book_plus_accrued_sold[sub_port_num][asset_fund_index]
 			+= book_sold + accrued_sold;
 
-			if (mtg_element->neg_asset_flag > 0)
+			if (asset->sm_mtg[mp][0]->neg_asset_flag > 0)
 				{
 				expected_mkt_val_for_dur_sale
-				+= mtg_element->mkt_val_for_dur_bef_rebal_sale(t)
+				+= asset->sm_mtg[mp][0]->mkt_val_for_dur_bef_rebal_sale(t)
 				   * local_pct_to_use
 				   * percent_of_asset_to_sell;
 
 				expected_mkt_val_times_dur_sale
-				+= mtg_element->mkt_val_times_dur_bef_rebal_sale(t)
+				+= asset->sm_mtg[mp][0]->mkt_val_times_dur_bef_rebal_sale(t)
 				   * local_pct_to_use
 				   * percent_of_asset_to_sell;
 				}
@@ -10985,15 +11051,15 @@ while (remaining_cash_required > model_point_amount_threshold)
 			capital_gain = market_sold - book_sold;
 
 			asset_detail_rpt_individual_sale(t, ASSET_DATA,
-					mtg_element->sequence_id,
-					mtg_element->asset_id,
+					asset->sm_mtg[mp][0]->sequence_id,
+					asset->sm_mtg[mp][0]->asset_id,
 					sub_port_num, sales_class_num, asset_fund_index,
 					percent_of_asset_to_sell,
 					net_cash_from_asset_sale,
 					book_sold, accrued_sold,
 					market_sold, capital_gain,
 					unrealized_capital_gain_released,
-					mtg_element->dur_val(t));
+					asset->sm_mtg[mp][0]->dur_val(t));
 			}
 		}
 
@@ -11002,36 +11068,34 @@ while (remaining_cash_required > model_point_amount_threshold)
 #if defined(__SEC_ASSET_H_)
 	if (selected_asset_defn == SEC_CODE)
 		{
-		SEC_ASSET *sec_element;
 		mp = selected_mp;
-		sec_element = asset->sm_sec[mp];
-		sub_port_num = xint(sec_element->sub_port_id(t));
-		sales_class_num = sec_element->sale_class_id; 
-		asset_fund_index = sec_element->asset_fund_index; 
+		sub_port_num = xint(asset->sm_sec[mp]->sub_port_id(t));
+		sales_class_num = asset->sm_sec[mp]->sale_class_id; 
+		asset_fund_index = asset->sm_sec[mp]->asset_fund_index; 
 		current_sub_port = asset->sm_asset_sub_port[seg_num][sub_port_num][0];
-		local_pct_to_use = sec_element->pct_to_use;
+		local_pct_to_use = asset->sm_sec[mp]->pct_to_use;
 
 		if (is_rebal_sales)
 			{
 			book_value_available
-			= sec_element->bk_val_bef_rebal_sale(t);
+			= asset->sm_sec[mp]->bk_val_bef_rebal_sale(t);
 			accrued_interest_available
-			= sec_element->accr_int_bef_rebal_sale(t);
+			= asset->sm_sec[mp]->accr_int_bef_rebal_sale(t);
 			market_value_available
-			= sec_element->mkt_val_bef_rebal_sale(t);
+			= asset->sm_sec[mp]->mkt_val_bef_rebal_sale(t);
 			unrealized_capital_gains_available
-			= sec_element->unrealzd_cap_gain_bef_rebal_sale(t);
+			= asset->sm_sec[mp]->unrealzd_cap_gain_bef_rebal_sale(t);
 			}
 		else
 			{
 			book_value_available
-			= sec_element->bk_val_bef_neg_cash_flow_sale(t);
+			= asset->sm_sec[mp]->bk_val_bef_neg_cash_flow_sale(t);
 			accrued_interest_available
-			= sec_element->accr_int_bef_neg_cash_flow_sale(t);
+			= asset->sm_sec[mp]->accr_int_bef_neg_cash_flow_sale(t);
 			market_value_available
-			= sec_element->mkt_val_bef_neg_cash_flow_sale(t);
+			= asset->sm_sec[mp]->mkt_val_bef_neg_cash_flow_sale(t);
 			unrealized_capital_gains_available
-			= sec_element->unrealzd_cap_gain_bef_neg_cash_flow_sale(t);
+			= asset->sm_sec[mp]->unrealzd_cap_gain_bef_neg_cash_flow_sale(t);
 			}
 
 		if (sales_type == REBALANCING_SALES)
@@ -11093,13 +11157,17 @@ while (remaining_cash_required > model_point_amount_threshold)
 		if (sell_assets == YES)
 			{
 			if (is_rebal_sales)
-				col_num
-				= sec_element->Column("sold_pct_rebal").Number();
+				{
+				asset->sm_sec[mp]->sold_pct_rebal_value = percent_of_asset_to_sell;
+				asset->sm_sec[mp]->sold_pct_rebal(t);
+				asset->sm_sec[mp]->sold_pct_rebal_value = 0.0;
+				}
 			else
-				col_num
-				= sec_element->Column("sold_pct_neg_cash_flow").Number();
-
-			sec_element->Column(col_num).SetValue(t, percent_of_asset_to_sell);
+				{
+				asset->sm_sec[mp]->sold_pct_neg_cash_flow_value = percent_of_asset_to_sell;
+				asset->sm_sec[mp]->sold_pct_neg_cash_flow(t);
+				asset->sm_sec[mp]->sold_pct_neg_cash_flow_value = 0.0;
+				}
 
 			market_sold = market_value_available
 						  * local_pct_to_use
@@ -11122,15 +11190,15 @@ while (remaining_cash_required > model_point_amount_threshold)
 			sub_port_fund_expected_book_plus_accrued_sold[sub_port_num][asset_fund_index]
 			+= book_sold + accrued_sold;
 
-			if (sec_element->neg_asset_flag > 0)
+			if (asset->sm_sec[mp]->neg_asset_flag > 0)
 				{
 				expected_mkt_val_for_dur_sale
-				+= sec_element->mkt_val_for_dur_bef_rebal_sale(t)
+				+= asset->sm_sec[mp]->mkt_val_for_dur_bef_rebal_sale(t)
 				   * local_pct_to_use
 				   * percent_of_asset_to_sell;
 
 				expected_mkt_val_times_dur_sale
-				+= sec_element->mkt_val_times_dur_bef_rebal_sale(t)
+				+= asset->sm_sec[mp]->mkt_val_times_dur_bef_rebal_sale(t)
 				   * local_pct_to_use
 				   * percent_of_asset_to_sell;
 				}
@@ -11154,15 +11222,15 @@ while (remaining_cash_required > model_point_amount_threshold)
 			capital_gain = market_sold - book_sold;
 
 			asset_detail_rpt_individual_sale(t, ASSET_DATA,
-					sec_element->sequence_id,
-					sec_element->asset_id,
+					asset->sm_sec[mp]->sequence_id,
+					asset->sm_sec[mp]->asset_id,
 					sub_port_num, sales_class_num, asset_fund_index,
 					percent_of_asset_to_sell,
 					net_cash_from_asset_sale,
 					book_sold, accrued_sold,
 					market_sold, capital_gain,
 					unrealized_capital_gain_released,
-					sec_element->dur_val(t));
+					asset->sm_sec[mp]->dur_val(t));
 			}
 		}
 
@@ -11171,36 +11239,34 @@ while (remaining_cash_required > model_point_amount_threshold)
 #if defined(__IRD_ASSET_H_)
 	if (selected_asset_defn == IRD_CODE)
 		{
-		IRD_ASSET *ird_element;
 		mp = selected_mp;
-		ird_element = asset->sm_ird[mp];
-		sales_class_num = ird_element->sale_class_id; 
-		asset_fund_index = ird_element->asset_fund_index; 
-		sub_port_num = xint(ird_element->sub_port_id(t));
+		sales_class_num = asset->sm_ird[mp][0]->sale_class_id; 
+		asset_fund_index = asset->sm_ird[mp][0]->asset_fund_index; 
+		sub_port_num = xint(asset->sm_ird[mp][0]->sub_port_id(t));
 		current_sub_port = asset->sm_asset_sub_port[seg_num][sub_port_num][0];
-		local_pct_to_use = ird_element->pct_to_use;
+		local_pct_to_use = asset->sm_ird[mp][0]->pct_to_use;
 
 		if (is_rebal_sales)
 			{
 			book_value_available
-			= ird_element->bk_val_bef_rebal_sale(t);
+			= asset->sm_ird[mp][0]->bk_val_bef_rebal_sale(t);
 			accrued_interest_available
-			= ird_element->accr_int_bef_rebal_sale(t);
+			= asset->sm_ird[mp][0]->accr_int_bef_rebal_sale(t);
 			market_value_available
-			= ird_element->mkt_val_bef_rebal_sale(t);
+			= asset->sm_ird[mp][0]->mkt_val_bef_rebal_sale(t);
 			unrealized_capital_gains_available
-			= ird_element->unrealzd_cap_gain_bef_rebal_sale(t);
+			= asset->sm_ird[mp][0]->unrealzd_cap_gain_bef_rebal_sale(t);
 			}
 		else
 			{
 			book_value_available
-			= ird_element->bk_val_bef_neg_cash_flow_sale(t);
+			= asset->sm_ird[mp][0]->bk_val_bef_neg_cash_flow_sale(t);
 			accrued_interest_available
-			= ird_element->accr_int_bef_neg_cash_flow_sale(t);
+			= asset->sm_ird[mp][0]->accr_int_bef_neg_cash_flow_sale(t);
 			market_value_available
-			= ird_element->mkt_val_bef_neg_cash_flow_sale(t);
+			= asset->sm_ird[mp][0]->mkt_val_bef_neg_cash_flow_sale(t);
 			unrealized_capital_gains_available
-			= ird_element->unrealzd_cap_gain_bef_neg_cash_flow_sale(t);
+			= asset->sm_ird[mp][0]->unrealzd_cap_gain_bef_neg_cash_flow_sale(t);
 			}
 
 		if (sales_type == REBALANCING_SALES)
@@ -11262,13 +11328,17 @@ while (remaining_cash_required > model_point_amount_threshold)
 		if (sell_assets == YES)
 			{
 			if (is_rebal_sales)
-				col_num
-				= ird_element->Column("sold_pct_rebal").Number();
+				{
+				asset->sm_ird[mp][0]->sold_pct_rebal_value = percent_of_asset_to_sell;
+				asset->sm_ird[mp][0]->sold_pct_rebal(t);
+				asset->sm_ird[mp][0]->sold_pct_rebal_value = 0.0;
+				}
 			else
-				col_num
-				= ird_element->Column("sold_pct_neg_cash_flow").Number();
-
-			ird_element->Column(col_num).SetValue(t, percent_of_asset_to_sell);
+				{
+				asset->sm_ird[mp][0]->sold_pct_neg_cash_flow_value = percent_of_asset_to_sell;
+				asset->sm_ird[mp][0]->sold_pct_neg_cash_flow(t);
+				asset->sm_ird[mp][0]->sold_pct_neg_cash_flow_value = 0.0;
+				}
 
 			market_sold
 			= market_value_available
@@ -11293,15 +11363,15 @@ while (remaining_cash_required > model_point_amount_threshold)
 			sub_port_fund_expected_book_plus_accrued_sold[sub_port_num][asset_fund_index]
 			+= book_sold + accrued_sold;
 
-			if (ird_element->neg_asset_flag > 0)
+			if (asset->sm_ird[mp][0]->neg_asset_flag > 0)
 				{
 				expected_mkt_val_for_dur_sale
-				+= ird_element->mkt_val_for_dur_bef_rebal_sale(t)
+				+= asset->sm_ird[mp][0]->mkt_val_for_dur_bef_rebal_sale(t)
 				   * local_pct_to_use
 				   * percent_of_asset_to_sell;
 
 				expected_mkt_val_times_dur_sale
-				+= ird_element->mkt_val_times_dur_bef_rebal_sale(t)
+				+= asset->sm_ird[mp][0]->mkt_val_times_dur_bef_rebal_sale(t)
 				   * local_pct_to_use
 				   * percent_of_asset_to_sell;
 				}
@@ -11325,15 +11395,15 @@ while (remaining_cash_required > model_point_amount_threshold)
 			capital_gain = market_sold - book_sold;
 
 			asset_detail_rpt_individual_sale(t, ASSET_DATA,
-					ird_element->sequence_id,
-					ird_element->asset_id,
+					asset->sm_ird[mp][0]->sequence_id,
+					asset->sm_ird[mp][0]->asset_id,
 					sub_port_num, sales_class_num, asset_fund_index,
 					percent_of_asset_to_sell,
 					net_cash_from_asset_sale,
 					book_sold, accrued_sold,
 					market_sold, capital_gain,
 					unrealized_capital_gain_released,
-					ird_element->dur_val(t));
+					asset->sm_ird[mp][0]->dur_val(t));
 			}
 		}
 
@@ -11342,36 +11412,34 @@ while (remaining_cash_required > model_point_amount_threshold)
 #if defined(__RE_ASSET_H_)
 	if (selected_asset_defn == REAL_ESTATE_CODE)
 		{
-		RE_ASSET *re_element;
 		mp = selected_mp;
-		re_element = asset->sm_re[mp];
-		sub_port_num = xint(re_element->sub_port_id(t));
-		sales_class_num = re_element->sale_class_id; 
-		asset_fund_index = re_element->asset_fund_index; 
+		sub_port_num = xint(asset->sm_re[mp]->sub_port_id(t));
+		sales_class_num = asset->sm_re[mp]->sale_class_id; 
+		asset_fund_index = asset->sm_re[mp]->asset_fund_index; 
 		current_sub_port = asset->sm_asset_sub_port[seg_num][sub_port_num][0];
-		local_pct_to_use = re_element->pct_to_use;
+		local_pct_to_use = asset->sm_re[mp]->pct_to_use;
 
 		if (is_rebal_sales)
 			{
 			book_value_available
-			= re_element->bk_val_bef_rebal_sale(t);
+			= asset->sm_re[mp]->bk_val_bef_rebal_sale(t);
 			accrued_rent_available
-			= re_element->accr_rent_bef_rebal_sale(t);
+			= asset->sm_re[mp]->accr_rent_bef_rebal_sale(t);
 			market_value_available
-			= re_element->mkt_val_bef_rebal_sale(t);
+			= asset->sm_re[mp]->mkt_val_bef_rebal_sale(t);
 			unrealized_capital_gains_available
-			= re_element->unrealzd_cap_gain_bef_rebal_sale(t);
+			= asset->sm_re[mp]->unrealzd_cap_gain_bef_rebal_sale(t);
 			}
 		else
 			{
 			book_value_available
-			= re_element->bk_val_bef_neg_cash_flow_sale(t);
+			= asset->sm_re[mp]->bk_val_bef_neg_cash_flow_sale(t);
 			accrued_rent_available
-			= re_element->accr_rent_bef_rebal_sale(t);
+			= asset->sm_re[mp]->accr_rent_bef_rebal_sale(t);
 			market_value_available
-			= re_element->mkt_val_bef_neg_cash_flow_sale(t);
+			= asset->sm_re[mp]->mkt_val_bef_neg_cash_flow_sale(t);
 			unrealized_capital_gains_available
-			= re_element->unrealzd_cap_gain_bef_neg_cash_flow_sale(t);
+			= asset->sm_re[mp]->unrealzd_cap_gain_bef_neg_cash_flow_sale(t);
 			}
 
 		if (sales_type == REBALANCING_SALES)
@@ -11433,13 +11501,17 @@ while (remaining_cash_required > model_point_amount_threshold)
 		if (sell_assets == YES)
 			{
 			if (is_rebal_sales)
-				col_num
-				= re_element->Column("sold_pct_rebal").Number();
+				{
+				asset->sm_re[mp]->sold_pct_rebal_value = percent_of_asset_to_sell;
+				asset->sm_re[mp]->sold_pct_rebal(t);
+				asset->sm_re[mp]->sold_pct_rebal_value = 0.0;
+				}
 			else
-				col_num
-				= re_element->Column("sold_pct_neg_cash_flow").Number();
-
-			re_element->Column(col_num).SetValue(t, percent_of_asset_to_sell);
+				{
+				asset->sm_re[mp]->sold_pct_neg_cash_flow_value = percent_of_asset_to_sell;
+				asset->sm_re[mp]->sold_pct_neg_cash_flow(t);
+				asset->sm_re[mp]->sold_pct_neg_cash_flow_value = 0.0;
+				}
 
 			market_sold
 			= market_value_available
@@ -11483,8 +11555,8 @@ while (remaining_cash_required > model_point_amount_threshold)
 			capital_gain = market_sold - book_sold;
 
 			asset_detail_rpt_individual_sale(t, ASSET_DATA,
-					re_element->sequence_id,
-					re_element->asset_id,
+					asset->sm_re[mp]->sequence_id,
+					asset->sm_re[mp]->asset_id,
 					sub_port_num, sales_class_num, asset_fund_index,
 					percent_of_asset_to_sell,
 					net_cash_from_asset_sale,
@@ -11501,32 +11573,30 @@ while (remaining_cash_required > model_point_amount_threshold)
 #if defined(__EQT_ASSET_H_)
 	if (selected_asset_defn == EQUITY_CODE)
 		{
-		EQT_ASSET *eqt_element;
 		mp = selected_mp;
-		eqt_element = asset->sm_eqt[mp];
-		sub_port_num = xint(eqt_element->sub_port_id(t));
-		sales_class_num = eqt_element->sale_class_id; 
-		asset_fund_index = eqt_element->asset_fund_index; 
+		sub_port_num = xint(asset->sm_eqt[mp]->sub_port_id(t));
+		sales_class_num = asset->sm_eqt[mp]->sale_class_id; 
+		asset_fund_index = asset->sm_eqt[mp]->asset_fund_index; 
 		current_sub_port = asset->sm_asset_sub_port[seg_num][sub_port_num][0];
-		local_pct_to_use = eqt_element->pct_to_use;
+		local_pct_to_use = asset->sm_eqt[mp]->pct_to_use;
 
 		if (is_rebal_sales)
 			{
 			book_value_available
-			= eqt_element->bk_val_bef_rebal_sale(t);
+			= asset->sm_eqt[mp]->bk_val_bef_rebal_sale(t);
 			market_value_available
-			= eqt_element->mkt_val_bef_rebal_sale(t);
+			= asset->sm_eqt[mp]->mkt_val_bef_rebal_sale(t);
 			unrealized_capital_gains_available
-			= eqt_element->unrealzd_cap_gain_bef_rebal_sale(t);
+			= asset->sm_eqt[mp]->unrealzd_cap_gain_bef_rebal_sale(t);
 			}
 		else
 			{
 			book_value_available
-			= eqt_element->bk_val_bef_neg_cash_flow_sale(t);
+			= asset->sm_eqt[mp]->bk_val_bef_neg_cash_flow_sale(t);
 			market_value_available
-			= eqt_element->mkt_val_bef_neg_cash_flow_sale(t);
+			= asset->sm_eqt[mp]->mkt_val_bef_neg_cash_flow_sale(t);
 			unrealized_capital_gains_available
-			= eqt_element->unrealzd_cap_gain_bef_neg_cash_flow_sale(t);
+			= asset->sm_eqt[mp]->unrealzd_cap_gain_bef_neg_cash_flow_sale(t);
 			}
 
 		if (sales_type == REBALANCING_SALES)
@@ -11585,13 +11655,17 @@ while (remaining_cash_required > model_point_amount_threshold)
 		if (sell_assets == YES)
 			{
 			if (is_rebal_sales)
-				col_num
-				= eqt_element->Column("sold_pct_rebal").Number();
+				{
+				asset->sm_eqt[mp]->sold_pct_rebal_value = percent_of_asset_to_sell;
+				asset->sm_eqt[mp]->sold_pct_rebal(t);
+				asset->sm_eqt[mp]->sold_pct_rebal_value = 0.0;
+				}
 			else
-				col_num
-				= eqt_element->Column("sold_pct_neg_cash_flow").Number();
-
-			eqt_element->Column(col_num).SetValue(t, percent_of_asset_to_sell);
+				{
+				asset->sm_eqt[mp]->sold_pct_neg_cash_flow_value = percent_of_asset_to_sell;
+				asset->sm_eqt[mp]->sold_pct_neg_cash_flow(t);
+				asset->sm_eqt[mp]->sold_pct_neg_cash_flow_value = 0.0;
+				}
 
 			market_sold
 			= market_value_available
@@ -11635,8 +11709,8 @@ while (remaining_cash_required > model_point_amount_threshold)
 			capital_gain = market_sold - book_sold;
 
 			asset_detail_rpt_individual_sale(t, ASSET_DATA,
-					eqt_element->sequence_id,
-					eqt_element->asset_id,
+					asset->sm_eqt[mp]->sequence_id,
+					asset->sm_eqt[mp]->asset_id,
 					sub_port_num, sales_class_num, asset_fund_index,
 					percent_of_asset_to_sell,
 					net_cash_from_asset_sale,
@@ -11652,32 +11726,30 @@ while (remaining_cash_required > model_point_amount_threshold)
 #if defined(__EIO_ASSET_H_)
 	if (selected_asset_defn == INDEX_OPTION_CODE)
 		{
-		EIO_ASSET *eio_element;
 		mp = selected_mp;
-		eio_element = asset->sm_eio[mp];
-		sub_port_num = xint(eio_element->sub_port_id(t));
-		sales_class_num = eio_element->sale_class_id; 
-		asset_fund_index = eio_element->asset_fund_index; 
+		sub_port_num = xint(asset->sm_eio[mp][0]->sub_port_id(t));
+		sales_class_num = asset->sm_eio[mp][0]->sale_class_id; 
+		asset_fund_index = asset->sm_eio[mp][0]->asset_fund_index; 
 		current_sub_port = asset->sm_asset_sub_port[seg_num][sub_port_num][0];
-		local_pct_to_use = eio_element->pct_to_use;
+		local_pct_to_use = asset->sm_eio[mp][0]->pct_to_use;
 
 		if (is_rebal_sales)
 			{
 			book_value_available
-			= eio_element->bk_val_bef_rebal_sale(t);
+			= asset->sm_eio[mp][0]->bk_val_bef_rebal_sale(t);
 			market_value_available
-			= eio_element->mkt_val_bef_rebal_sale(t);
+			= asset->sm_eio[mp][0]->mkt_val_bef_rebal_sale(t);
 			unrealized_capital_gains_available
-				= eio_element->unrealzd_cap_gain_bef_rebal_sale(t);
+				= asset->sm_eio[mp][0]->unrealzd_cap_gain_bef_rebal_sale(t);
 			}
 		else	
 			{
 			book_value_available
-			= eio_element->bk_val_bef_neg_cash_flow_sale(t);
+			= asset->sm_eio[mp][0]->bk_val_bef_neg_cash_flow_sale(t);
 			market_value_available
-			= eio_element->mkt_val_bef_neg_cash_flow_sale(t);
+			= asset->sm_eio[mp][0]->mkt_val_bef_neg_cash_flow_sale(t);
 			unrealized_capital_gains_available
-			= eio_element->unrealzd_cap_gain_bef_neg_cash_flow_sale(t);
+			= asset->sm_eio[mp][0]->unrealzd_cap_gain_bef_neg_cash_flow_sale(t);
 			}
 
 		if (sales_type == REBALANCING_SALES)
@@ -11734,13 +11806,17 @@ while (remaining_cash_required > model_point_amount_threshold)
 		if (sell_assets == YES)
 			{
 			if (is_rebal_sales)
-				col_num
-				= eio_element->Column("sold_pct_rebal").Number();
+				{
+				asset->sm_eio[mp][0]->sold_pct_rebal_value = percent_of_asset_to_sell;
+				asset->sm_eio[mp][0]->sold_pct_rebal(t);
+				asset->sm_eio[mp][0]->sold_pct_rebal_value = 0.0;
+				}
 			else
-				col_num
-				= eio_element->Column("sold_pct_neg_cash_flow").Number();
-
-			eio_element->Column(col_num).SetValue(t, percent_of_asset_to_sell);
+				{
+				asset->sm_eio[mp][0]->sold_pct_neg_cash_flow_value = percent_of_asset_to_sell;
+				asset->sm_eio[mp][0]->sold_pct_neg_cash_flow(t);
+				asset->sm_eio[mp][0]->sold_pct_neg_cash_flow_value = 0.0;
+				}
 
 			market_sold
 			= market_value_available
@@ -11784,15 +11860,15 @@ while (remaining_cash_required > model_point_amount_threshold)
 			capital_gain = market_sold - book_sold;
 
 			asset_detail_rpt_individual_sale(t, ASSET_DATA,
-					eio_element->sequence_id,
-					eio_element->asset_id,
+					asset->sm_eio[mp][0]->sequence_id,
+					asset->sm_eio[mp][0]->asset_id,
 					sub_port_num, sales_class_num, asset_fund_index,
 					percent_of_asset_to_sell,
 					net_cash_from_asset_sale,
 					book_sold, 0.0, // accrued_sold
 					market_sold, capital_gain,
 					unrealized_capital_gain_released,
-					eio_element->dur_val(t));
+					asset->sm_eio[mp][0]->dur_val(t));
 			}
 		}
 
@@ -11801,36 +11877,34 @@ while (remaining_cash_required > model_point_amount_threshold)
 #if defined(__EPA_ASSET_H_)
 	if (selected_asset_defn == EPA_CODE)
 		{
-		EPA_ASSET *epa_element;
 		mp = selected_mp;
-		epa_element = asset->sm_epa[mp];
-		sub_port_num = xint(epa_element->sub_port_id(t));
-		sales_class_num = epa_element->sale_class_id; 
-		asset_fund_index = epa_element->asset_fund_index; 
+		sub_port_num = xint(asset->sm_epa[mp]->sub_port_id(t));
+		sales_class_num = asset->sm_epa[mp]->sale_class_id; 
+		asset_fund_index = asset->sm_epa[mp]->asset_fund_index; 
 		current_sub_port = asset->sm_asset_sub_port[seg_num][sub_port_num][0];
-		local_pct_to_use = epa_element->pct_to_use;
+		local_pct_to_use = asset->sm_epa[mp]->pct_to_use;
 
 		if (is_rebal_sales)
 			{
 			book_value_available
-			= epa_element->bk_val_bef_rebal_sale(t);
+			= asset->sm_epa[mp]->bk_val_bef_rebal_sale(t);
 			accrued_interest_available
-			= epa_element->accr_int_bef_rebal_sale(t);
+			= asset->sm_epa[mp]->accr_int_bef_rebal_sale(t);
 			market_value_available
-			= epa_element->mkt_val_bef_rebal_sale(t);
+			= asset->sm_epa[mp]->mkt_val_bef_rebal_sale(t);
 			unrealized_capital_gains_available
-				= epa_element->unrealzd_cap_gain_bef_rebal_sale(t);
+				= asset->sm_epa[mp]->unrealzd_cap_gain_bef_rebal_sale(t);
 			}
 		else	
 			{
 			book_value_available
-			= epa_element->bk_val_bef_neg_cash_flow_sale(t);
+			= asset->sm_epa[mp]->bk_val_bef_neg_cash_flow_sale(t);
 			accrued_interest_available
-			= epa_element->accr_int_bef_neg_cash_flow_sale(t);
+			= asset->sm_epa[mp]->accr_int_bef_neg_cash_flow_sale(t);
 			market_value_available
-			= epa_element->mkt_val_bef_neg_cash_flow_sale(t);
+			= asset->sm_epa[mp]->mkt_val_bef_neg_cash_flow_sale(t);
 			unrealized_capital_gains_available
-			= epa_element->unrealzd_cap_gain_bef_neg_cash_flow_sale(t);
+			= asset->sm_epa[mp]->unrealzd_cap_gain_bef_neg_cash_flow_sale(t);
 			}
 
 		if (sales_type == REBALANCING_SALES)
@@ -11894,13 +11968,17 @@ while (remaining_cash_required > model_point_amount_threshold)
 		if (sell_assets == YES)
 			{
 			if (is_rebal_sales)
-				col_num
-				= epa_element->Column("sold_pct_rebal").Number();
+				{
+				asset->sm_epa[mp]->sold_pct_rebal_value = percent_of_asset_to_sell;
+				asset->sm_epa[mp]->sold_pct_rebal(t);
+				asset->sm_epa[mp]->sold_pct_rebal_value = 0.0;
+				}
 			else
-				col_num
-				= epa_element->Column("sold_pct_neg_cash_flow").Number();
-
-			epa_element->Column(col_num).SetValue(t, percent_of_asset_to_sell);
+				{
+				asset->sm_epa[mp]->sold_pct_neg_cash_flow_value = percent_of_asset_to_sell;
+				asset->sm_epa[mp]->sold_pct_neg_cash_flow(t);
+				asset->sm_epa[mp]->sold_pct_neg_cash_flow_value = 0.0;
+				}
 
 			market_sold
 			= market_value_available
@@ -11925,15 +12003,15 @@ while (remaining_cash_required > model_point_amount_threshold)
 			sub_port_fund_expected_book_plus_accrued_sold[sub_port_num][asset_fund_index]
 			+= book_sold + accrued_sold;
 
-			if (epa_element->neg_asset_flag > 0)
+			if (asset->sm_epa[mp]->neg_asset_flag > 0)
 				{
 				expected_mkt_val_for_dur_sale
-				+= epa_element->mkt_val_for_dur_bef_rebal_sale(t)
+				+= asset->sm_epa[mp]->mkt_val_for_dur_bef_rebal_sale(t)
 				   * local_pct_to_use
 				   * percent_of_asset_to_sell;
 
 				expected_mkt_val_times_dur_sale
-				+= epa_element->mkt_val_times_dur_bef_rebal_sale(t)
+				+= asset->sm_epa[mp]->mkt_val_times_dur_bef_rebal_sale(t)
 				   * local_pct_to_use
 				   * percent_of_asset_to_sell;
 				}
@@ -11957,15 +12035,15 @@ while (remaining_cash_required > model_point_amount_threshold)
 			capital_gain = market_sold - book_sold;
 
 			asset_detail_rpt_individual_sale(t, ASSET_DATA,
-					epa_element->sequence_id,
-					epa_element->asset_id,
+					asset->sm_epa[mp]->sequence_id,
+					asset->sm_epa[mp]->asset_id,
 					sub_port_num, sales_class_num, asset_fund_index,
 					percent_of_asset_to_sell,
 					net_cash_from_asset_sale,
 					book_sold, accrued_sold,
 					market_sold, capital_gain,
 					unrealized_capital_gain_released,
-					epa_element->dur_val(t));
+					asset->sm_epa[mp]->dur_val(t));
 			}
 		}
 
@@ -11994,7 +12072,7 @@ return notional_amount;
 
 
 #line 1 "sell_assets_hedges.INVSTRAT_ASSET.for"                                                                                   
-double INVSTRAT_ASSET::sell_assets_hedges(int t, mpmap &eio_mp_map_active, double hedge_notional_amt, double liab_notional_amt, xstring hedge_grp_code)
+double INVSTRAT_ASSET::sell_assets_hedges(int t, map <int, long, less <int> > &eio_mp_map_active, double hedge_notional_amt, double liab_notional_amt, xstring hedge_grp_code)
 {
 int cal_yr = xint(this->cal_yr(t));
 int cal_mth = xint(this->cal_mth(t));
@@ -12032,13 +12110,13 @@ if (fabs(hedge_notional_amt) < aggregate_amount_threshold)
 
 if (asset->asset_detail_rpt_inv_strat_flag(t))
 	{
-	seg->SALFile << endl;
-	seg->SALFile << "Hedge Sales"
+	seg_element->SALFile << endl;
+	seg_element->SALFile << "Hedge Sales"
 			     << " Period=" << t
 			     << " Year=" << cal_yr
 			     << " Month=" << cal_mth
 			     << endl;
-	seg->SALFile << "Hedge Group," << hedge_grp_code
+	seg_element->SALFile << "Hedge Group," << hedge_grp_code
 			<< endl;
 
 	asset_detail_rpt_individual_sale(t, HEADER);
@@ -12053,8 +12131,8 @@ double cap_gains_cash_factor_for_sales = 1.0;
 
 if (!pba_valn_flag)
 	{
-	if (seg->corp_seg_flag
-		|| (!tcm_flag && seg->business_seg_flag))
+	if (seg_element->corp_seg_flag
+		|| (!tcm_flag && seg_element->business_seg_flag))
 		{
 		if (!imr_flag && !avr_flag)
 			marginal_distribn_rate = company->distribn_pct_distrib_earnings;
@@ -12073,31 +12151,29 @@ if (!pba_valn_flag)
 		}
 	}
 
-mpmap::iterator mp_map_iter;
+map <int, long, less <int> >::iterator mp_map_iter;
 
 #if defined(__EIO_ASSET_H_)
-EIO_ASSET *current_eio_element;
-
 	// loop over index options
 if (!eio_mp_map_active.empty())
 	{
 	col_num_notional_amount
-	= asset->sm_eio[0]->Column("notional_amt").Number();
+	= asset->sm_eio[0][0]->Column("notional_amt").Number();
 	col_num_portion_of_asset_sold_planned_sales
-	= asset->sm_eio[0]->Column("sold_pct_planned").Number();
+	= asset->sm_eio[0][0]->Column("sold_pct_planned").Number();
 	col_num_asset_sub_port_num
-	= asset->sm_eio[0]->Column("sub_port_id").Number();
+	= asset->sm_eio[0][0]->Column("sub_port_id").Number();
 	col_num_bk_val_bef_sale
-	= asset->sm_eio[0]->Column("bk_val_bef_fund_match_sale").Number();
+	= asset->sm_eio[0][0]->Column("bk_val_bef_fund_match_sale").Number();
 	col_num_mkt_val_bef_sale
-	= asset->sm_eio[0]->Column("mkt_val_bef_fund_match_sale").Number();
+	= asset->sm_eio[0][0]->Column("mkt_val_bef_fund_match_sale").Number();
 	col_num_unrealzd_cap_gain_bef_sale
-	= asset->sm_eio[0]->Column("unrealzd_cap_gain_bef_fund_match_sale").Number();
+	= asset->sm_eio[0][0]->Column("unrealzd_cap_gain_bef_fund_match_sale").Number();
 	col_num_notional_amt_bef_sale
-	= asset->sm_eio[0]->Column("notional_amt_bef_fund_match_sale").Number();
+	= asset->sm_eio[0][0]->Column("notional_amt_bef_fund_match_sale").Number();
 
 	col_num_portion_of_asset_sold
-	= asset->sm_eio[0]->Column("sold_pct_fund_match").Number();
+	= asset->sm_eio[0][0]->Column("sold_pct_fund_match").Number();
 	}
 
 for (mp_map_iter = eio_mp_map_active.begin();
@@ -12105,28 +12181,27 @@ for (mp_map_iter = eio_mp_map_active.begin();
 	 mp_map_iter++)
 	{
 	mp = mp_map_iter->first;
-	current_eio_element = asset->sm_eio[mp];
 
-	if (current_eio_element->asset_fund_index != HEDGING_FUND_INDEX
-		|| current_eio_element->notional_amt(t - 1) < ASSET_ACTIVE_THRESHOLD)
+	if (asset->sm_eio[mp][0]->asset_fund_index != HEDGING_FUND_INDEX
+		|| asset->sm_eio[mp][0]->notional_amt(t - 1) < ASSET_ACTIVE_THRESHOLD)
 		continue;
 
 	asset_pct_remaining
-	= (1.0 - current_eio_element->Column(col_num_portion_of_asset_sold_planned_sales).Value(t));
-	sub_port_num = xint(current_eio_element->Column(col_num_asset_sub_port_num).Value(t));
-	sales_class_num = current_eio_element->sale_class_id;
+	= (1.0 - asset->sm_eio[mp][0]->Column(col_num_portion_of_asset_sold_planned_sales).Value(t));
+	sub_port_num = xint(asset->sm_eio[mp][0]->Column(col_num_asset_sub_port_num).Value(t));
+	sales_class_num = asset->sm_eio[mp][0]->sale_class_id;
 
 	if (asset_pct_remaining < rate_ratio_threshold)
 		continue;
 
-	local_pct_to_use = current_eio_element->pct_to_use;
+	local_pct_to_use = asset->sm_eio[mp][0]->pct_to_use;
 
 	// Adjust to use market value for book value and cost basis so we return the full market value as the cash from sale
 	// Required because we assume that all hedge adjustment are through the hedge_cost calculations 
 	net_cash_from_asset_sale
-	= expected_sale_cash(current_eio_element->Column(col_num_mkt_val_bef_sale).Value(t),
+	= expected_sale_cash(asset->sm_eio[mp][0]->Column(col_num_mkt_val_bef_sale).Value(t),
 	                     0.0,
-	                     current_eio_element->Column(col_num_mkt_val_bef_sale).Value(t),
+	                     asset->sm_eio[mp][0]->Column(col_num_mkt_val_bef_sale).Value(t),
 	                     0.0,
 	                     cap_gains_cash_factor_for_sales)
 	  * local_pct_to_use
@@ -12135,37 +12210,39 @@ for (mp_map_iter = eio_mp_map_active.begin();
 	net_cash_from_sales
 	+= net_cash_from_asset_sale;
 
-	current_eio_element->Column(col_num_portion_of_asset_sold).SetValue(t, asset_pct_to_sell);
+	asset->sm_eio[mp][0]->sold_pct_fund_match_value = asset_pct_to_sell;
+	asset->sm_eio[mp][0]->Column(col_num_portion_of_asset_sold).Value(t);
+	asset->sm_eio[mp][0]->sold_pct_fund_match_value = 0.0;
 
 	notional_sold
-	= current_eio_element->Column(col_num_notional_amt_bef_sale).Value(t)
+	= asset->sm_eio[mp][0]->Column(col_num_notional_amt_bef_sale).Value(t)
 	  * local_pct_to_use
 	  * asset_pct_to_sell;
 
 	if (asset->asset_detail_rpt_inv_strat_flag(t))
 		{
 		asd_bv_sold
-		= current_eio_element->Column(col_num_bk_val_bef_sale).Value(t)
+		= asset->sm_eio[mp][0]->Column(col_num_bk_val_bef_sale).Value(t)
 		  * local_pct_to_use
 		  * asset_pct_to_sell;
 		
 		asd_accrued_sold = 0;
 		
 		asd_mv_sold
-		= current_eio_element->Column(col_num_mkt_val_bef_sale).Value(t)
+		= asset->sm_eio[mp][0]->Column(col_num_mkt_val_bef_sale).Value(t)
 		  * local_pct_to_use
 		  * asset_pct_to_sell;
 		
 		asd_cap_gain = asd_mv_sold - asd_bv_sold;
 		
 		asd_ucg_released
-		= current_eio_element->Column(col_num_unrealzd_cap_gain_bef_sale).Value(t)
+		= asset->sm_eio[mp][0]->Column(col_num_unrealzd_cap_gain_bef_sale).Value(t)
 		  * local_pct_to_use
 		  * asset_pct_to_sell;
 
 		asset_detail_rpt_individual_sale(t, ASSET_DATA,
-				current_eio_element->sequence_id,
-				current_eio_element->asset_id,
+				asset->sm_eio[mp][0]->sequence_id,
+				asset->sm_eio[mp][0]->asset_id,
 				sub_port_num, 
 				sales_class_num, 
 				HEDGING_FUND_INDEX,
@@ -12174,7 +12251,7 @@ for (mp_map_iter = eio_mp_map_active.begin();
 				asd_bv_sold, asd_accrued_sold,
 				asd_mv_sold, asd_cap_gain,
 				asd_ucg_released,
-				current_eio_element->dur_val(t));
+				asset->sm_eio[mp][0]->dur_val(t));
 		}
 	} // end_for over mp
 #endif
@@ -12188,7 +12265,6 @@ return net_cash_from_sales;
 double INVSTRAT_ASSET::sell_assets_planned_and_min_size(int t, double capital_gains_cash_factor_for_sales)
 {
 int mp = 0;
-int col_num = -1;
 double net_cash_from_asset_sale = 0.0;
 double net_cash_from_sales = 0.0;
 double asd_bv_sold = 0.0;
@@ -12196,41 +12272,36 @@ double asd_accrued_sold = 0.0;
 double asd_mv_sold = 0.0;
 double asd_cap_gain = 0.0;
 double asd_ucg_released = 0.0;
-mpmap::iterator mp_map_iter;
+map <int, long, less <int> >::iterator mp_map_iter;
 
 #if defined(__BOND_ASSET_H_)
-BOND_ASSET *current_bond_element;
-
-if (seg->bond_mp_map_active.size())
-	col_num
-	= asset->sm_bond[0]->Column("sold_pct_planned").Number();
-
-for (mp_map_iter = seg->bond_mp_map_active.begin();
-	 mp_map_iter != seg->bond_mp_map_active.end();
+for (mp_map_iter = seg_element->bond_mp_map_active.begin();
+	 mp_map_iter != seg_element->bond_mp_map_active.end();
 	 mp_map_iter++)
 	{
 	mp = mp_map_iter->first;
-	current_bond_element = asset->sm_bond[mp];
 
-	if (current_bond_element->neg_asset_flag < 0)
+	if (asset->sm_bond[mp][0]->neg_asset_flag < 0)
 		continue;
 	
-	if (current_bond_element->notional_amt(t - 1) < ASSET_ACTIVE_THRESHOLD)
+	if (asset->sm_bond[mp][0]->notional_amt(t - 1) < ASSET_ACTIVE_THRESHOLD)
 		continue;
 
-	if (current_bond_element->commencement_period <= t
-		&& (t == current_bond_element->planned_sale_period
-			|| current_bond_element->asset_min_size_sale_flag(t) == 1))
+	if (asset->sm_bond[mp][0]->commencement_period <= t
+		&& (t == asset->sm_bond[mp][0]->planned_sale_period
+			|| asset->sm_bond[mp][0]->asset_min_size_sale_flag(t) == 1))
 		{
 		net_cash_from_asset_sale
-		= expected_sale_cash(current_bond_element->bk_val_bef_sale(t),
-		                     current_bond_element->accr_int_bef_sale(t),
-		                     current_bond_element->mkt_val_bef_sale(t),
-		                     current_bond_element->unrealzd_cap_gain_bef_sale(t),
+		= expected_sale_cash(asset->sm_bond[mp][0]->bk_val_bef_sale(t),
+		                     asset->sm_bond[mp][0]->accr_int_bef_sale(t),
+		                     asset->sm_bond[mp][0]->mkt_val_bef_sale(t),
+		                     asset->sm_bond[mp][0]->unrealzd_cap_gain_bef_sale(t),
 		                     capital_gains_cash_factor_for_sales)
-		  * current_bond_element->pct_to_use;
+		  * asset->sm_bond[mp][0]->pct_to_use;
 
-		current_bond_element->Column(col_num).SetValue(t, 1.0);
+		asset->sm_bond[mp][0]->sold_pct_planned_value = 1.0;
+		asset->sm_bond[mp][0]->sold_pct_planned(t);
+		asset->sm_bond[mp][0]->sold_pct_planned_value = 0.0;
 
 		net_cash_from_sales
 		+= net_cash_from_asset_sale;
@@ -12238,29 +12309,29 @@ for (mp_map_iter = seg->bond_mp_map_active.begin();
 		if (asset->asset_detail_rpt_inv_strat_flag(t))
 			{
 			asd_bv_sold
-			= current_bond_element->bk_val_bef_sale(t)
-			  * current_bond_element->pct_to_use;
+			= asset->sm_bond[mp][0]->bk_val_bef_sale(t)
+			  * asset->sm_bond[mp][0]->pct_to_use;
 			
 			asd_accrued_sold
-			= current_bond_element->accr_int_bef_sale(t)
-			  * current_bond_element->pct_to_use;
+			= asset->sm_bond[mp][0]->accr_int_bef_sale(t)
+			  * asset->sm_bond[mp][0]->pct_to_use;
 			
 			asd_mv_sold
-			= current_bond_element->mkt_val_bef_sale(t)
-			  * current_bond_element->pct_to_use;
+			= asset->sm_bond[mp][0]->mkt_val_bef_sale(t)
+			  * asset->sm_bond[mp][0]->pct_to_use;
 			
 			asd_cap_gain = asd_mv_sold - asd_bv_sold;
 			
 			asd_ucg_released
-			= current_bond_element->unrealzd_cap_gain_bef_sale(t)
-			  * current_bond_element->pct_to_use;
+			= asset->sm_bond[mp][0]->unrealzd_cap_gain_bef_sale(t)
+			  * asset->sm_bond[mp][0]->pct_to_use;
 
 			asset_detail_rpt_individual_sale(t, ASSET_DATA,
-					current_bond_element->sequence_id,
-					current_bond_element->asset_id,
-					current_bond_element->sub_port_id(t),
-					current_bond_element->sale_class_id,
-					current_bond_element->asset_fund_index,
+					asset->sm_bond[mp][0]->sequence_id,
+					asset->sm_bond[mp][0]->asset_id,
+					asset->sm_bond[mp][0]->sub_port_id(t),
+					asset->sm_bond[mp][0]->sale_class_id,
+					asset->sm_bond[mp][0]->asset_fund_index,
 					1.0,
 					net_cash_from_asset_sale,
 					asd_bv_sold,
@@ -12268,47 +12339,42 @@ for (mp_map_iter = seg->bond_mp_map_active.begin();
 					asd_mv_sold,
 					asd_cap_gain,
 					asd_ucg_released,
-					current_bond_element->dur_val(t));
+					asset->sm_bond[mp][0]->dur_val(t));
 			}
 		}
 	}
 #endif
 
 #if defined(__MTG_ASSET_H_)
-MTG_ASSET *current_mtg_element;
-
-if (seg->mtg_mp_map_active.size())
-	col_num
-	= asset->sm_mtg[0]->Column("sold_pct_planned").Number();
-
-for (mp_map_iter = seg->mtg_mp_map_active.begin();
-	 mp_map_iter != seg->mtg_mp_map_active.end();
+for (mp_map_iter = seg_element->mtg_mp_map_active.begin();
+	 mp_map_iter != seg_element->mtg_mp_map_active.end();
 	 mp_map_iter++)
 	{
 	mp = mp_map_iter->first;
-	current_mtg_element = asset->sm_mtg[mp];
 
-	if (current_mtg_element->neg_asset_flag < 0)
+	if (asset->sm_mtg[mp][0]->neg_asset_flag < 0)
 		continue;
 
-	if ((t > current_mtg_element->commencement_period 
+	if ((t > asset->sm_mtg[mp][0]->commencement_period 
 		// allow for inclusion of restructure, foreclosure, refinance assets
-		&& current_mtg_element->notional_amt(t - 1) < ASSET_ACTIVE_THRESHOLD))
+		&& asset->sm_mtg[mp][0]->notional_amt(t - 1) < ASSET_ACTIVE_THRESHOLD))
 		continue;
 
-	if (current_mtg_element->commencement_period <= t
-		&& (t == current_mtg_element->planned_sale_period
-			|| current_mtg_element->asset_min_size_sale_flag(t) == 1))
+	if (asset->sm_mtg[mp][0]->commencement_period <= t
+		&& (t == asset->sm_mtg[mp][0]->planned_sale_period
+			|| asset->sm_mtg[mp][0]->asset_min_size_sale_flag(t) == 1))
 		{
 		net_cash_from_asset_sale
-		= expected_sale_cash(current_mtg_element->bk_val_bef_sale(t),
-		                     current_mtg_element->accr_int_bef_sale(t),
-		                     current_mtg_element->mkt_val_bef_sale(t),
-		                     current_mtg_element->unrealzd_cap_gain_bef_sale(t),
+		= expected_sale_cash(asset->sm_mtg[mp][0]->bk_val_bef_sale(t),
+		                     asset->sm_mtg[mp][0]->accr_int_bef_sale(t),
+		                     asset->sm_mtg[mp][0]->mkt_val_bef_sale(t),
+		                     asset->sm_mtg[mp][0]->unrealzd_cap_gain_bef_sale(t),
 		                     capital_gains_cash_factor_for_sales)
-		  * current_mtg_element->pct_to_use;
+		  * asset->sm_mtg[mp][0]->pct_to_use;
 
-		current_mtg_element->Column(col_num).SetValue(t, 1.0);
+		asset->sm_mtg[mp][0]->sold_pct_planned_value = 1.0;
+		asset->sm_mtg[mp][0]->sold_pct_planned(t);
+		asset->sm_mtg[mp][0]->sold_pct_planned_value = 0.0;
 
 		net_cash_from_sales
 		+= net_cash_from_asset_sale;
@@ -12316,29 +12382,29 @@ for (mp_map_iter = seg->mtg_mp_map_active.begin();
 		if (asset->asset_detail_rpt_inv_strat_flag(t))
 			{
 			asd_bv_sold
-			= current_mtg_element->bk_val_bef_sale(t)
-			  * current_mtg_element->pct_to_use;
+			= asset->sm_mtg[mp][0]->bk_val_bef_sale(t)
+			  * asset->sm_mtg[mp][0]->pct_to_use;
 			
 			asd_accrued_sold
-			= current_mtg_element->accr_int_bef_sale(t)
-			  * current_mtg_element->pct_to_use;
+			= asset->sm_mtg[mp][0]->accr_int_bef_sale(t)
+			  * asset->sm_mtg[mp][0]->pct_to_use;
 			
 			asd_mv_sold
-			= current_mtg_element->mkt_val_bef_sale(t)
-			  * current_mtg_element->pct_to_use;
+			= asset->sm_mtg[mp][0]->mkt_val_bef_sale(t)
+			  * asset->sm_mtg[mp][0]->pct_to_use;
 			
 			asd_cap_gain = asd_mv_sold - asd_bv_sold;
 			
 			asd_ucg_released
-			= current_mtg_element->unrealzd_cap_gain_bef_sale(t)
-			  * current_mtg_element->pct_to_use;
+			= asset->sm_mtg[mp][0]->unrealzd_cap_gain_bef_sale(t)
+			  * asset->sm_mtg[mp][0]->pct_to_use;
 
 			asset_detail_rpt_individual_sale(t, ASSET_DATA,
-					current_mtg_element->sequence_id,
-					current_mtg_element->asset_id,
-					current_mtg_element->sub_port_id(t),
-					current_mtg_element->sale_class_id,
-					current_mtg_element->asset_fund_index,
+					asset->sm_mtg[mp][0]->sequence_id,
+					asset->sm_mtg[mp][0]->asset_id,
+					asset->sm_mtg[mp][0]->sub_port_id(t),
+					asset->sm_mtg[mp][0]->sale_class_id,
+					asset->sm_mtg[mp][0]->asset_fund_index,
 					1.0,
 					net_cash_from_asset_sale,
 					asd_bv_sold,
@@ -12346,45 +12412,40 @@ for (mp_map_iter = seg->mtg_mp_map_active.begin();
 					asd_mv_sold,
 					asd_cap_gain,
 					asd_ucg_released,
-					current_mtg_element->dur_val(t));
+					asset->sm_mtg[mp][0]->dur_val(t));
 			}
 		}
 	}
 #endif
 
 #if defined(__SEC_ASSET_H_)
-SEC_ASSET *current_sec_element;
-
-if (seg->sec_mp_map_active.size())
-	col_num
-	= asset->sm_sec[0]->Column("sold_pct_planned").Number();
-
-for (mp_map_iter = seg->sec_mp_map_active.begin();
-	 mp_map_iter != seg->sec_mp_map_active.end();
+for (mp_map_iter = seg_element->sec_mp_map_active.begin();
+	 mp_map_iter != seg_element->sec_mp_map_active.end();
 	 mp_map_iter++)
 	{
 	mp = mp_map_iter->first;
-	current_sec_element = asset->sm_sec[mp];
 
-	if (current_sec_element->neg_asset_flag < 0)
+	if (asset->sm_sec[mp]->neg_asset_flag < 0)
 		continue;
 
-	if (current_sec_element->notional_amt(t - 1) < ASSET_ACTIVE_THRESHOLD)
+	if (asset->sm_sec[mp]->notional_amt(t - 1) < ASSET_ACTIVE_THRESHOLD)
 		continue;
 
-	if (current_sec_element->commencement_period <= t
-		&& (t == current_sec_element->planned_sale_period
-			|| current_sec_element->asset_min_size_sale_flag(t) == 1))
+	if (asset->sm_sec[mp]->commencement_period <= t
+		&& (t == asset->sm_sec[mp]->planned_sale_period
+			|| asset->sm_sec[mp]->asset_min_size_sale_flag(t) == 1))
 		{
 		net_cash_from_asset_sale
-		= expected_sale_cash(current_sec_element->bk_val_bef_sale(t),
-		                     current_sec_element->accr_int_bef_sale(t),
-		                     current_sec_element->mkt_val_bef_sale(t),
-		                     current_sec_element->unrealzd_cap_gain_bef_sale(t),
+		= expected_sale_cash(asset->sm_sec[mp]->bk_val_bef_sale(t),
+		                     asset->sm_sec[mp]->accr_int_bef_sale(t),
+		                     asset->sm_sec[mp]->mkt_val_bef_sale(t),
+		                     asset->sm_sec[mp]->unrealzd_cap_gain_bef_sale(t),
 		                     capital_gains_cash_factor_for_sales)
-		  * current_sec_element->pct_to_use;
+		  * asset->sm_sec[mp]->pct_to_use;
 
-		current_sec_element->Column(col_num).SetValue(t, 1.0);
+		asset->sm_sec[mp]->sold_pct_planned_value = 1.0;
+		asset->sm_sec[mp]->sold_pct_planned(t);
+		asset->sm_sec[mp]->sold_pct_planned_value = 0.0;
 
 		net_cash_from_sales
 		+= net_cash_from_asset_sale;
@@ -12392,29 +12453,29 @@ for (mp_map_iter = seg->sec_mp_map_active.begin();
 		if (asset->asset_detail_rpt_inv_strat_flag(t))
 			{
 			asd_bv_sold
-			= current_sec_element->bk_val_bef_sale(t)
-			  * current_sec_element->pct_to_use;
+			= asset->sm_sec[mp]->bk_val_bef_sale(t)
+			  * asset->sm_sec[mp]->pct_to_use;
 			
 			asd_accrued_sold
-			= current_sec_element->accr_int_bef_sale(t)
-			  * current_sec_element->pct_to_use;
+			= asset->sm_sec[mp]->accr_int_bef_sale(t)
+			  * asset->sm_sec[mp]->pct_to_use;
 			
 			asd_mv_sold
-			= current_sec_element->mkt_val_bef_sale(t)
-			  * current_sec_element->pct_to_use;
+			= asset->sm_sec[mp]->mkt_val_bef_sale(t)
+			  * asset->sm_sec[mp]->pct_to_use;
 			
 			asd_cap_gain = asd_mv_sold - asd_bv_sold;
 			
 			asd_ucg_released
-			= current_sec_element->unrealzd_cap_gain_bef_sale(t)
-			  * current_sec_element->pct_to_use;
+			= asset->sm_sec[mp]->unrealzd_cap_gain_bef_sale(t)
+			  * asset->sm_sec[mp]->pct_to_use;
 
 			asset_detail_rpt_individual_sale(t, ASSET_DATA,
-					current_sec_element->sequence_id,
-					current_sec_element->asset_id,
-					current_sec_element->sub_port_id(t),
-					current_sec_element->sale_class_id,
-					current_sec_element->asset_fund_index,
+					asset->sm_sec[mp]->sequence_id,
+					asset->sm_sec[mp]->asset_id,
+					asset->sm_sec[mp]->sub_port_id(t),
+					asset->sm_sec[mp]->sale_class_id,
+					asset->sm_sec[mp]->asset_fund_index,
 					1.0,
 					net_cash_from_asset_sale,
 					asd_bv_sold,
@@ -12422,75 +12483,70 @@ for (mp_map_iter = seg->sec_mp_map_active.begin();
 					asd_mv_sold,
 					asd_cap_gain,
 					asd_ucg_released,
-					current_sec_element->dur_val(t));
+					asset->sm_sec[mp]->dur_val(t));
 			}
 		}
 	}
 #endif
 
 #if defined(__IRD_ASSET_H_)
-IRD_ASSET *current_ird_element;
-
-if (seg->ird_mp_map_active.size())
-	col_num
-	= asset->sm_ird[0]->Column("sold_pct_planned").Number();
-
-for (mp_map_iter = seg->ird_mp_map_active.begin();
-	 mp_map_iter != seg->ird_mp_map_active.end();
+for (mp_map_iter = seg_element->ird_mp_map_active.begin();
+	 mp_map_iter != seg_element->ird_mp_map_active.end();
 	 mp_map_iter++)
 	{
 	mp = mp_map_iter->first;
-	current_ird_element = asset->sm_ird[mp];
 
-	if (current_ird_element->neg_asset_flag < 0)
+	if (asset->sm_ird[mp][0]->neg_asset_flag < 0)
 		continue;
 
-	if (current_ird_element->notional_amt(t - 1) < ASSET_ACTIVE_THRESHOLD)
+	if (asset->sm_ird[mp][0]->notional_amt(t - 1) < ASSET_ACTIVE_THRESHOLD)
 		continue;
 
-	if ((current_ird_element->commencement_period <= t
-		&& (t == current_ird_element->planned_sale_period
-			|| current_ird_element->asset_min_size_sale_flag(t) == 1)))
+	if ((asset->sm_ird[mp][0]->commencement_period <= t
+		&& (t == asset->sm_ird[mp][0]->planned_sale_period
+			|| asset->sm_ird[mp][0]->asset_min_size_sale_flag(t) == 1)))
 		{
 		net_cash_from_asset_sale
-		= expected_sale_cash(current_ird_element->bk_val_bef_sale(t),
-		                     current_ird_element->accr_int_bef_sale(t),
-		                     current_ird_element->mkt_val_bef_sale(t),
-		                     current_ird_element->unrealzd_cap_gain_bef_sale(t),
+		= expected_sale_cash(asset->sm_ird[mp][0]->bk_val_bef_sale(t),
+		                     asset->sm_ird[mp][0]->accr_int_bef_sale(t),
+		                     asset->sm_ird[mp][0]->mkt_val_bef_sale(t),
+		                     asset->sm_ird[mp][0]->unrealzd_cap_gain_bef_sale(t),
 		                     capital_gains_cash_factor_for_sales)
-		  * current_ird_element->pct_to_use;
+		  * asset->sm_ird[mp][0]->pct_to_use;
 
 		net_cash_from_sales
 		+= net_cash_from_asset_sale;
 
-		current_ird_element->Column(col_num).SetValue(t, 1.0);
+		asset->sm_ird[mp][0]->sold_pct_planned_value = 1.0;
+		asset->sm_ird[mp][0]->sold_pct_planned(t);
+		asset->sm_ird[mp][0]->sold_pct_planned_value = 0.0;
 
 		if (asset->asset_detail_rpt_inv_strat_flag(t))
 			{
 			asd_bv_sold
-			= current_ird_element->bk_val_bef_sale(t)
-			  * current_ird_element->pct_to_use;
+			= asset->sm_ird[mp][0]->bk_val_bef_sale(t)
+			  * asset->sm_ird[mp][0]->pct_to_use;
 			
 			asd_accrued_sold
-			= current_ird_element->accr_int_bef_sale(t)
-			  * current_ird_element->pct_to_use;
+			= asset->sm_ird[mp][0]->accr_int_bef_sale(t)
+			  * asset->sm_ird[mp][0]->pct_to_use;
 			
 			asd_mv_sold
-			= current_ird_element->mkt_val_bef_sale(t)
-			  * current_ird_element->pct_to_use;
+			= asset->sm_ird[mp][0]->mkt_val_bef_sale(t)
+			  * asset->sm_ird[mp][0]->pct_to_use;
 			
 			asd_cap_gain = asd_mv_sold - asd_bv_sold;
 			
 			asd_ucg_released
-			= current_ird_element->unrealzd_cap_gain_bef_sale(t)
-			  * current_ird_element->pct_to_use;
+			= asset->sm_ird[mp][0]->unrealzd_cap_gain_bef_sale(t)
+			  * asset->sm_ird[mp][0]->pct_to_use;
 
 			asset_detail_rpt_individual_sale(t, ASSET_DATA,
-					current_ird_element->sequence_id,
-					current_ird_element->asset_id,
-					current_ird_element->sub_port_id(t),
-					current_ird_element->sale_class_id,
-					current_ird_element->asset_fund_index,
+					asset->sm_ird[mp][0]->sequence_id,
+					asset->sm_ird[mp][0]->asset_id,
+					asset->sm_ird[mp][0]->sub_port_id(t),
+					asset->sm_ird[mp][0]->sale_class_id,
+					asset->sm_ird[mp][0]->asset_fund_index,
 					1.0,
 					net_cash_from_asset_sale,
 					asd_bv_sold,
@@ -12498,45 +12554,40 @@ for (mp_map_iter = seg->ird_mp_map_active.begin();
 					asd_mv_sold,
 					asd_cap_gain,
 					asd_ucg_released,
-					current_ird_element->dur_val(t));
+					asset->sm_ird[mp][0]->dur_val(t));
 			}
 		}
 	}
 #endif
 
 #if defined(__RE_ASSET_H_)
-RE_ASSET *current_re_element;
-
-if (seg->re_mp_map_active.size())
-	col_num
-	= asset->sm_re[0]->Column("sold_pct_planned").Number();
-
-for (mp_map_iter = seg->re_mp_map_active.begin();
-	 mp_map_iter != seg->re_mp_map_active.end();
+for (mp_map_iter = seg_element->re_mp_map_active.begin();
+	 mp_map_iter != seg_element->re_mp_map_active.end();
 	 mp_map_iter++)
 	{
 	mp = mp_map_iter->first;
-	current_re_element = asset->sm_re[mp];
 
-	if (current_re_element->neg_asset_flag < 0)
+	if (asset->sm_re[mp]->neg_asset_flag < 0)
 		continue;
 
-	if (current_re_element->notional_amt(t - 1) < ASSET_ACTIVE_THRESHOLD)
+	if (asset->sm_re[mp]->notional_amt(t - 1) < ASSET_ACTIVE_THRESHOLD)
 		continue;
 
-	if ((current_re_element->commencement_period <= t
-		&& (t == current_re_element->planned_sale_period
-			|| current_re_element->asset_min_size_sale_flag(t) == 1)))
+	if ((asset->sm_re[mp]->commencement_period <= t
+		&& (t == asset->sm_re[mp]->planned_sale_period
+			|| asset->sm_re[mp]->asset_min_size_sale_flag(t) == 1)))
 		{
 		net_cash_from_asset_sale
-		= expected_sale_cash(current_re_element->bk_val_bef_sale(t),
-		                     current_re_element->accr_rent_bef_sale(t),
-		                     current_re_element->mkt_val_bef_sale(t),
-		                     current_re_element->unrealzd_cap_gain_bef_sale(t),
+		= expected_sale_cash(asset->sm_re[mp]->bk_val_bef_sale(t),
+		                     asset->sm_re[mp]->accr_rent_bef_sale(t),
+		                     asset->sm_re[mp]->mkt_val_bef_sale(t),
+		                     asset->sm_re[mp]->unrealzd_cap_gain_bef_sale(t),
 		                     capital_gains_cash_factor_for_sales)
-		  * current_re_element->pct_to_use;
+		  * asset->sm_re[mp]->pct_to_use;
 
-		current_re_element->Column(col_num).SetValue(t, 1.0);
+		asset->sm_re[mp]->sold_pct_planned_value = 1.0;
+		asset->sm_re[mp]->sold_pct_planned(t);
+		asset->sm_re[mp]->sold_pct_planned_value = 0.0;
 
 		net_cash_from_sales
 		+= net_cash_from_asset_sale;
@@ -12544,29 +12595,29 @@ for (mp_map_iter = seg->re_mp_map_active.begin();
 		if (asset->asset_detail_rpt_inv_strat_flag(t))
 			{
 			asd_bv_sold
-			= current_re_element->bk_val_bef_sale(t)
-			  * current_re_element->pct_to_use;
+			= asset->sm_re[mp]->bk_val_bef_sale(t)
+			  * asset->sm_re[mp]->pct_to_use;
 			
 			asd_accrued_sold
-			= current_re_element->accr_rent_bef_sale(t)
-			  * current_re_element->pct_to_use;
+			= asset->sm_re[mp]->accr_rent_bef_sale(t)
+			  * asset->sm_re[mp]->pct_to_use;
 			
 			asd_mv_sold
-			= current_re_element->mkt_val_bef_sale(t)
-			  * current_re_element->pct_to_use;
+			= asset->sm_re[mp]->mkt_val_bef_sale(t)
+			  * asset->sm_re[mp]->pct_to_use;
 			
 			asd_cap_gain = asd_mv_sold - asd_bv_sold;
 			
 			asd_ucg_released
-			= current_re_element->unrealzd_cap_gain_bef_sale(t)
-			  * current_re_element->pct_to_use;
+			= asset->sm_re[mp]->unrealzd_cap_gain_bef_sale(t)
+			  * asset->sm_re[mp]->pct_to_use;
 
 			asset_detail_rpt_individual_sale(t, ASSET_DATA,
-					current_re_element->sequence_id,
-					current_re_element->asset_id,
-					current_re_element->sub_port_id(t),
-					current_re_element->sale_class_id,
-					current_re_element->asset_fund_index,
+					asset->sm_re[mp]->sequence_id,
+					asset->sm_re[mp]->asset_id,
+					asset->sm_re[mp]->sub_port_id(t),
+					asset->sm_re[mp]->sale_class_id,
+					asset->sm_re[mp]->asset_fund_index,
 					1.0,
 					net_cash_from_asset_sale,
 					asd_bv_sold,
@@ -12581,38 +12632,33 @@ for (mp_map_iter = seg->re_mp_map_active.begin();
 #endif
 
 #if defined(__EQT_ASSET_H_)
-EQT_ASSET *current_eqt_element;
-
-if (seg->eqt_mp_map_active.size())
-	col_num
-	= asset->sm_eqt[0]->Column("sold_pct_planned").Number();
-
-for (mp_map_iter = seg->eqt_mp_map_active.begin();
-	 mp_map_iter != seg->eqt_mp_map_active.end();
+for (mp_map_iter = seg_element->eqt_mp_map_active.begin();
+	 mp_map_iter != seg_element->eqt_mp_map_active.end();
 	 mp_map_iter++)
 	{
 	mp = mp_map_iter->first;
-	current_eqt_element = asset->sm_eqt[mp];
 
-	if (current_eqt_element->neg_asset_flag < 0)
+	if (asset->sm_eqt[mp]->neg_asset_flag < 0)
 		continue;
 
-	if (current_eqt_element->notional_amt(t - 1) < ASSET_ACTIVE_THRESHOLD)
+	if (asset->sm_eqt[mp]->notional_amt(t - 1) < ASSET_ACTIVE_THRESHOLD)
 		continue;
 
-	if ((current_eqt_element->commencement_period <= t
-		&& (t == current_eqt_element->planned_sale_period
-			|| current_eqt_element->asset_min_size_sale_flag(t) == 1)))
+	if ((asset->sm_eqt[mp]->commencement_period <= t
+		&& (t == asset->sm_eqt[mp]->planned_sale_period
+			|| asset->sm_eqt[mp]->asset_min_size_sale_flag(t) == 1)))
 		{
 		net_cash_from_asset_sale
-		= expected_sale_cash(current_eqt_element->bk_val_bef_sale(t),
+		= expected_sale_cash(asset->sm_eqt[mp]->bk_val_bef_sale(t),
 		                     0.0,
-		                     current_eqt_element->mkt_val_bef_sale(t),
-		                     current_eqt_element->unrealzd_cap_gain_bef_sale(t),
+		                     asset->sm_eqt[mp]->mkt_val_bef_sale(t),
+		                     asset->sm_eqt[mp]->unrealzd_cap_gain_bef_sale(t),
 		                     capital_gains_cash_factor_for_sales)
-		  * current_eqt_element->pct_to_use;
+		  * asset->sm_eqt[mp]->pct_to_use;
 
-		current_eqt_element->Column(col_num).SetValue(t, 1.0);
+		asset->sm_eqt[mp]->sold_pct_planned_value = 1.0;
+		asset->sm_eqt[mp]->sold_pct_planned(t);
+		asset->sm_eqt[mp]->sold_pct_planned_value = 0.0;
 
 		net_cash_from_sales
 		+= net_cash_from_asset_sale;
@@ -12620,27 +12666,27 @@ for (mp_map_iter = seg->eqt_mp_map_active.begin();
 		if (asset->asset_detail_rpt_inv_strat_flag(t))
 			{
 			asd_bv_sold
-			= current_eqt_element->bk_val_bef_sale(t)
-			  * current_eqt_element->pct_to_use;
+			= asset->sm_eqt[mp]->bk_val_bef_sale(t)
+			  * asset->sm_eqt[mp]->pct_to_use;
 			
 			asd_accrued_sold = 0.0;
 			
 			asd_mv_sold
-			= current_eqt_element->mkt_val_bef_sale(t)
-			  * current_eqt_element->pct_to_use;
+			= asset->sm_eqt[mp]->mkt_val_bef_sale(t)
+			  * asset->sm_eqt[mp]->pct_to_use;
 			
 			asd_cap_gain = asd_mv_sold - asd_bv_sold;
 			
 			asd_ucg_released
-			= current_eqt_element->unrealzd_cap_gain_bef_sale(t)
-			  * current_eqt_element->pct_to_use;
+			= asset->sm_eqt[mp]->unrealzd_cap_gain_bef_sale(t)
+			  * asset->sm_eqt[mp]->pct_to_use;
 
 			asset_detail_rpt_individual_sale(t, ASSET_DATA,
-					current_eqt_element->sequence_id,
-					current_eqt_element->asset_id,
-					current_eqt_element->sub_port_id(t),
-					current_eqt_element->sale_class_id,
-					current_eqt_element->asset_fund_index,
+					asset->sm_eqt[mp]->sequence_id,
+					asset->sm_eqt[mp]->asset_id,
+					asset->sm_eqt[mp]->sub_port_id(t),
+					asset->sm_eqt[mp]->sale_class_id,
+					asset->sm_eqt[mp]->asset_fund_index,
 					1.0,
 					net_cash_from_asset_sale,
 					asd_bv_sold,
@@ -12655,38 +12701,33 @@ for (mp_map_iter = seg->eqt_mp_map_active.begin();
 #endif
 
 #if defined(__EIO_ASSET_H_)
-EIO_ASSET *current_eio_element;
-
-if (seg->eio_mp_map_active.size())
-	col_num
-	= asset->sm_eio[0]->Column("sold_pct_planned").Number();
-
-for (mp_map_iter = seg->eio_mp_map_active.begin();
-	 mp_map_iter != seg->eio_mp_map_active.end();
+for (mp_map_iter = seg_element->eio_mp_map_active.begin();
+	 mp_map_iter != seg_element->eio_mp_map_active.end();
 	 mp_map_iter++)
 	{
 	mp = mp_map_iter->first;
-	current_eio_element = asset->sm_eio[mp];
 
-	if (current_eio_element->neg_asset_flag < 0)
+	if (asset->sm_eio[mp][0]->neg_asset_flag < 0)
 		continue;
 
-	if (current_eio_element->notional_amt(t - 1) < ASSET_ACTIVE_THRESHOLD)
+	if (asset->sm_eio[mp][0]->notional_amt(t - 1) < ASSET_ACTIVE_THRESHOLD)
 		continue;
 
-	if ((current_eio_element->commencement_period <= t
-		&& (t == current_eio_element->planned_sale_period
-			|| current_eio_element->asset_min_size_sale_flag(t) == 1)))
+	if ((asset->sm_eio[mp][0]->commencement_period <= t
+		&& (t == asset->sm_eio[mp][0]->planned_sale_period
+			|| asset->sm_eio[mp][0]->asset_min_size_sale_flag(t) == 1)))
 		{
 		net_cash_from_asset_sale
-		= expected_sale_cash(current_eio_element->bk_val_bef_sale(t),
+		= expected_sale_cash(asset->sm_eio[mp][0]->bk_val_bef_sale(t),
 		                     0.0,
-		                     current_eio_element->mkt_val_bef_sale(t),
-		                     current_eio_element->unrealzd_cap_gain_bef_sale(t),
+		                     asset->sm_eio[mp][0]->mkt_val_bef_sale(t),
+		                     asset->sm_eio[mp][0]->unrealzd_cap_gain_bef_sale(t),
 		                     capital_gains_cash_factor_for_sales)
-		  * current_eio_element->pct_to_use;
+		  * asset->sm_eio[mp][0]->pct_to_use;
 
-		current_eio_element->Column(col_num).SetValue(t, 1.0);
+		asset->sm_eio[mp][0]->sold_pct_planned_value = 1.0;
+		asset->sm_eio[mp][0]->sold_pct_planned(t);
+		asset->sm_eio[mp][0]->sold_pct_planned_value = 0.0;
 
 		net_cash_from_sales
 		+= net_cash_from_asset_sale;
@@ -12694,27 +12735,27 @@ for (mp_map_iter = seg->eio_mp_map_active.begin();
 		if (asset->asset_detail_rpt_inv_strat_flag(t))
 			{
 			asd_bv_sold
-			= current_eio_element->bk_val_bef_sale(t)
-			  * current_eio_element->pct_to_use;
+			= asset->sm_eio[mp][0]->bk_val_bef_sale(t)
+			  * asset->sm_eio[mp][0]->pct_to_use;
 			
 			asd_accrued_sold = 0;
 			
 			asd_mv_sold
-			= current_eio_element->mkt_val_bef_sale(t)
-			  * current_eio_element->pct_to_use;
+			= asset->sm_eio[mp][0]->mkt_val_bef_sale(t)
+			  * asset->sm_eio[mp][0]->pct_to_use;
 			
 			asd_cap_gain = asd_mv_sold - asd_bv_sold;
 			
 			asd_ucg_released
-			= current_eio_element->unrealzd_cap_gain_bef_sale(t)
-			  * current_eio_element->pct_to_use;
+			= asset->sm_eio[mp][0]->unrealzd_cap_gain_bef_sale(t)
+			  * asset->sm_eio[mp][0]->pct_to_use;
 
 			asset_detail_rpt_individual_sale(t, ASSET_DATA,
-					current_eio_element->sequence_id,
-					current_eio_element->asset_id,
-					current_eio_element->sub_port_id(t),
-					current_eio_element->sale_class_id,
-					current_eio_element->asset_fund_index,
+					asset->sm_eio[mp][0]->sequence_id,
+					asset->sm_eio[mp][0]->asset_id,
+					asset->sm_eio[mp][0]->sub_port_id(t),
+					asset->sm_eio[mp][0]->sale_class_id,
+					asset->sm_eio[mp][0]->asset_fund_index,
 					1.0,
 					net_cash_from_asset_sale,
 					asd_bv_sold,
@@ -12722,44 +12763,39 @@ for (mp_map_iter = seg->eio_mp_map_active.begin();
 					asd_mv_sold,
 					asd_cap_gain,
 					asd_ucg_released,
-					current_eio_element->dur_val(t));
+					asset->sm_eio[mp][0]->dur_val(t));
 			}
 		}
 	}
 #endif
 
 #if defined(__EPA_ASSET_H_)
-EPA_ASSET *current_epa_element;
-
-if (seg->epa_mp_map_active.size())
-	col_num
-	= asset->sm_epa[0]->Column("sold_pct_planned").Number();
-
-for (mp_map_iter = seg->epa_mp_map_active.begin();
-	 mp_map_iter != seg->epa_mp_map_active.end();
+for (mp_map_iter = seg_element->epa_mp_map_active.begin();
+	 mp_map_iter != seg_element->epa_mp_map_active.end();
 	 mp_map_iter++)
 	{
 	mp = mp_map_iter->first;
-	current_epa_element = asset->sm_epa[mp];
 
-	if (current_epa_element->neg_asset_flag < 0)
+	if (asset->sm_epa[mp]->neg_asset_flag < 0)
 		continue;
 
-	if (current_epa_element->notional_amt(t - 1) < ASSET_ACTIVE_THRESHOLD)
+	if (asset->sm_epa[mp]->notional_amt(t - 1) < ASSET_ACTIVE_THRESHOLD)
 		continue;
 
-	if (t == current_epa_element->planned_sale_period
-		|| current_epa_element->asset_min_size_sale_flag(t) == 1)
+	if (t == asset->sm_epa[mp]->planned_sale_period
+		|| asset->sm_epa[mp]->asset_min_size_sale_flag(t) == 1)
 		{
 		net_cash_from_asset_sale
-		= expected_sale_cash(current_epa_element->bk_val_bef_sale(t),
-		                     current_epa_element->accr_int_bef_sale(t),
-		                     current_epa_element->mkt_val_bef_sale(t),
-		                     current_epa_element->unrealzd_cap_gain_bef_sale(t),
+		= expected_sale_cash(asset->sm_epa[mp]->bk_val_bef_sale(t),
+		                     asset->sm_epa[mp]->accr_int_bef_sale(t),
+		                     asset->sm_epa[mp]->mkt_val_bef_sale(t),
+		                     asset->sm_epa[mp]->unrealzd_cap_gain_bef_sale(t),
 		                     capital_gains_cash_factor_for_sales)
-		  * current_epa_element->pct_to_use;
+		  * asset->sm_epa[mp]->pct_to_use;
 
-		current_epa_element->Column(col_num).SetValue(t, 1.0);
+		asset->sm_epa[mp]->sold_pct_planned_value = 1.0;
+		asset->sm_epa[mp]->sold_pct_planned(t);
+		asset->sm_epa[mp]->sold_pct_planned_value = 0.0;
 
 		net_cash_from_sales
 		+= net_cash_from_asset_sale;
@@ -12767,29 +12803,29 @@ for (mp_map_iter = seg->epa_mp_map_active.begin();
 		if (asset->asset_detail_rpt_inv_strat_flag(t))
 			{
 			asd_bv_sold
-			= current_epa_element->bk_val_bef_sale(t)
-			  * current_epa_element->pct_to_use;
+			= asset->sm_epa[mp]->bk_val_bef_sale(t)
+			  * asset->sm_epa[mp]->pct_to_use;
 			
 			asd_accrued_sold 
-			= current_epa_element->accr_int_bef_sale(t)
-			  * current_epa_element->pct_to_use;
+			= asset->sm_epa[mp]->accr_int_bef_sale(t)
+			  * asset->sm_epa[mp]->pct_to_use;
 			
 			asd_mv_sold
-			= current_epa_element->mkt_val_bef_sale(t)
-			  * current_epa_element->pct_to_use;
+			= asset->sm_epa[mp]->mkt_val_bef_sale(t)
+			  * asset->sm_epa[mp]->pct_to_use;
 			
 			asd_cap_gain = asd_mv_sold - asd_bv_sold;
 			
 			asd_ucg_released
-			= current_epa_element->unrealzd_cap_gain_bef_sale(t)
-			  * current_epa_element->pct_to_use;
+			= asset->sm_epa[mp]->unrealzd_cap_gain_bef_sale(t)
+			  * asset->sm_epa[mp]->pct_to_use;
 
 			asset_detail_rpt_individual_sale(t, ASSET_DATA,
-					current_epa_element->sequence_id,
-					current_epa_element->asset_id,
-					current_epa_element->sub_port_id(t),
-					current_epa_element->sale_class_id,
-					current_epa_element->asset_fund_index,
+					asset->sm_epa[mp]->sequence_id,
+					asset->sm_epa[mp]->asset_id,
+					asset->sm_epa[mp]->sub_port_id(t),
+					asset->sm_epa[mp]->sale_class_id,
+					asset->sm_epa[mp]->asset_fund_index,
 					1.0,
 					net_cash_from_asset_sale,
 					asd_bv_sold,
@@ -12797,7 +12833,7 @@ for (mp_map_iter = seg->epa_mp_map_active.begin();
 					asd_mv_sold,
 					asd_cap_gain,
 					asd_ucg_released,
-					current_epa_element->dur_val(t));
+					asset->sm_epa[mp]->dur_val(t));
 			}
 		}
 	}
@@ -12852,7 +12888,7 @@ int col_num_unrealized_capital_gains_before_sales = 0;
 int col_num_mkt_val_for_dur_bef_rebal_sale = 0;
 int col_num_mkt_val_times_dur_bef_rebal_sale = 0;
 
-A_SUBPORT_ASSET * current_sub_port = NULL;
+current_sub_port = NULL;
 
 remaining_cash_required = cash_required;
 
@@ -12906,80 +12942,78 @@ if (remaining_cash_required > model_point_amount_threshold)
 		pct_to_sell_prelim
 		= remaining_cash_required / estimated_net_cash_from_sale;
 
-	mpmap::iterator mp_map_iter;
+	map <int, long, less <int> >::iterator mp_map_iter;
 
 	#if defined(__BOND_ASSET_H_)
-	BOND_ASSET *bond_element;
 	// loop over bonds
-	if (seg->bond_mp_map_active.size())
+	if (seg_element->bond_mp_map_active.size())
 		{
 		col_num_asset_sub_port_num
-		= asset->sm_bond[0]->Column("sub_port_id").Number();
+		= asset->sm_bond[0][0]->Column("sub_port_id").Number();
 		col_num_include_in_duration_matching
-		= asset->sm_bond[0]->Column("dur_match_flag").Number();
+		= asset->sm_bond[0][0]->Column("dur_match_flag").Number();
 		col_num_notional_amount
-		= asset->sm_bond[0]->Column("notional_amt").Number();
+		= asset->sm_bond[0][0]->Column("notional_amt").Number();
 		col_num_portion_of_asset_sold_planned_sales
-		= asset->sm_bond[0]->Column("sold_pct_planned").Number();
+		= asset->sm_bond[0][0]->Column("sold_pct_planned").Number();
 
 		if (is_rebal_sales)
 			{
 			col_num_accrued_interest_before_sales
-			= asset->sm_bond[0]->Column("accr_int_bef_rebal_sale").Number();
+			= asset->sm_bond[0][0]->Column("accr_int_bef_rebal_sale").Number();
 			col_num_book_value_before_sales
-			= asset->sm_bond[0]->Column("bk_val_bef_rebal_sale").Number();
+			= asset->sm_bond[0][0]->Column("bk_val_bef_rebal_sale").Number();
 			col_num_market_value_before_sales
-			= asset->sm_bond[0]->Column("mkt_val_bef_rebal_sale").Number();
+			= asset->sm_bond[0][0]->Column("mkt_val_bef_rebal_sale").Number();
 			col_num_notional_amount_before_sales
-			= asset->sm_bond[0]->Column("notional_amt_bef_rebal_sale").Number();
+			= asset->sm_bond[0][0]->Column("notional_amt_bef_rebal_sale").Number();
 			col_num_portion_of_asset_sold_sales
-			= asset->sm_bond[0]->Column("sold_pct_rebal").Number();
+			= asset->sm_bond[0][0]->Column("sold_pct_rebal").Number();
 			col_num_unrealized_capital_gains_before_sales
-			= asset->sm_bond[0]->Column("unrealzd_cap_gain_bef_rebal_sale").Number();
+			= asset->sm_bond[0][0]->Column("unrealzd_cap_gain_bef_rebal_sale").Number();
 
 			col_num_mkt_val_for_dur_bef_rebal_sale
-			= asset->sm_bond[0]->Column("mkt_val_for_dur_bef_rebal_sale").Number();
+			= asset->sm_bond[0][0]->Column("mkt_val_for_dur_bef_rebal_sale").Number();
 			col_num_mkt_val_times_dur_bef_rebal_sale
-			= asset->sm_bond[0]->Column("mkt_val_times_dur_bef_rebal_sale").Number();
+			= asset->sm_bond[0][0]->Column("mkt_val_times_dur_bef_rebal_sale").Number();
 			}
 		else // negative cash flow sales
 			{
 			col_num_accrued_interest_before_sales
-			= asset->sm_bond[0]->Column("accr_int_bef_neg_cash_flow_sale").Number();
+			= asset->sm_bond[0][0]->Column("accr_int_bef_neg_cash_flow_sale").Number();
 			col_num_book_value_before_sales
-			= asset->sm_bond[0]->Column("bk_val_bef_neg_cash_flow_sale").Number();
+			= asset->sm_bond[0][0]->Column("bk_val_bef_neg_cash_flow_sale").Number();
 			col_num_market_value_before_sales
-			= asset->sm_bond[0]->Column("mkt_val_bef_neg_cash_flow_sale").Number();
+			= asset->sm_bond[0][0]->Column("mkt_val_bef_neg_cash_flow_sale").Number();
 			col_num_notional_amount_before_sales
-			= asset->sm_bond[0]->Column("notional_amt_bef_neg_cash_flow_sale").Number();
+			= asset->sm_bond[0][0]->Column("notional_amt_bef_neg_cash_flow_sale").Number();
 			col_num_portion_of_asset_sold_sales
-			= asset->sm_bond[0]->Column("sold_pct_neg_cash_flow").Number();
+			= asset->sm_bond[0][0]->Column("sold_pct_neg_cash_flow").Number();
 			col_num_portion_of_asset_sold_rebal_sales
-			= asset->sm_bond[0]->Column("sold_pct_rebal").Number();
+			= asset->sm_bond[0][0]->Column("sold_pct_rebal").Number();
 			col_num_unrealized_capital_gains_before_sales
-			= asset->sm_bond[0]->Column("unrealzd_cap_gain_bef_neg_cash_flow_sale").Number();
+			= asset->sm_bond[0][0]->Column("unrealzd_cap_gain_bef_neg_cash_flow_sale").Number();
 			}
 		}
 
-	for (mp_map_iter = seg->bond_mp_map_active.begin();
-		 mp_map_iter != seg->bond_mp_map_active.end();
+	for (mp_map_iter = seg_element->bond_mp_map_active.begin();
+		 mp_map_iter != seg_element->bond_mp_map_active.end();
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		bond_element = asset->sm_bond[mp];
 
-		if (bond_element->neg_asset_flag < 0)
+		if (asset->sm_bond[mp][0]->neg_asset_flag < 0)
 			continue;
 
-		if ((t > max(0, bond_element->commencement_period)
-			 && bond_element->Column(col_num_notional_amount).Value(t - 1) < ASSET_ACTIVE_THRESHOLD)
-			|| (t == bond_element->commencement_period
-				&& bond_element->Column(col_num_notional_amount_before_sales).Value(t) < ASSET_ACTIVE_THRESHOLD))
+		if ((t > max(0, asset->sm_bond[mp][0]->commencement_period)
+			 && asset->sm_bond[mp][0]->Column(col_num_notional_amount).Value(t - 1) < ASSET_ACTIVE_THRESHOLD)
+			|| (t == asset->sm_bond[mp][0]->commencement_period
+				&& asset->sm_bond[mp][0]->Column(col_num_notional_amount_before_sales).Value(t) < ASSET_ACTIVE_THRESHOLD))
 			continue;
 
-		sub_port_num = xint(bond_element->Column(col_num_asset_sub_port_num).Value(t));
-		sales_class_num = bond_element->sale_class_id;
-		asset_fund_index = bond_element->asset_fund_index;
+		sub_port_num = xint(asset->sm_bond[mp][0]->Column(col_num_asset_sub_port_num).Value(t));
+		sales_class_num = asset->sm_bond[mp][0]->sale_class_id;
+		asset_fund_index = asset->sm_bond[mp][0]->asset_fund_index;
 		current_sub_port = asset->sm_asset_sub_port[seg_num][sub_port_num][0];
 
 		if (current_sub_port->sub_ports_to_sell != 1
@@ -12988,26 +13022,26 @@ if (remaining_cash_required > model_point_amount_threshold)
 			continue;
 
 		asset_percent_remaining
-		= (1.0 - bond_element->Column(col_num_portion_of_asset_sold_planned_sales).Value(t));
+		= (1.0 - asset->sm_bond[mp][0]->Column(col_num_portion_of_asset_sold_planned_sales).Value(t));
 
 		if (is_negative_cash_flow_sales)
 			asset_percent_remaining
-			*= (1.0 - bond_element->Column(col_num_portion_of_asset_sold_rebal_sales).Value(t));
+			*= (1.0 - asset->sm_bond[mp][0]->Column(col_num_portion_of_asset_sold_rebal_sales).Value(t));
 
 		if (asset_percent_remaining < rate_ratio_threshold)
 			continue;
 
 		current_sub_port = asset->sm_asset_sub_port[seg_num][sub_port_num][0];
-		local_pct_to_use = bond_element->pct_to_use;
+		local_pct_to_use = asset->sm_bond[mp][0]->pct_to_use;
 
 		book_value_available
-		= bond_element->Column(col_num_book_value_before_sales).Value(t);
+		= asset->sm_bond[mp][0]->Column(col_num_book_value_before_sales).Value(t);
 		accrued_interest_available
-		= bond_element->Column(col_num_accrued_interest_before_sales).Value(t);
+		= asset->sm_bond[mp][0]->Column(col_num_accrued_interest_before_sales).Value(t);
 		market_value_available
-		= bond_element->Column(col_num_market_value_before_sales).Value(t);
+		= asset->sm_bond[mp][0]->Column(col_num_market_value_before_sales).Value(t);
 		unrealized_capital_gains_available
-		= bond_element->Column(col_num_unrealized_capital_gains_before_sales).Value(t);
+		= asset->sm_bond[mp][0]->Column(col_num_unrealized_capital_gains_before_sales).Value(t);
 
 		if (fabs(book_value_available
 				 * local_pct_to_use
@@ -13042,7 +13076,9 @@ if (remaining_cash_required > model_point_amount_threshold)
 
 		if (sell_assets == YES)
 			{
-			bond_element->Column(col_num_portion_of_asset_sold_sales).SetValue(t, percent_of_asset_to_sell);
+			asset->sm_bond[mp][0]->sold_pct_neg_cash_flow_value = percent_of_asset_to_sell;
+			asset->sm_bond[mp][0]->Column(col_num_portion_of_asset_sold_sales).Value(t);
+			asset->sm_bond[mp][0]->sold_pct_neg_cash_flow_value = 0.0;
 
 			market_sold
 			= market_value_available
@@ -13067,15 +13103,15 @@ if (remaining_cash_required > model_point_amount_threshold)
 			sub_port_fund_expected_book_plus_accrued_sold[sub_port_num][asset_fund_index]
 			+= book_sold + accrued_sold;
 
-			if (bond_element->neg_asset_flag > 0)
+			if (asset->sm_bond[mp][0]->neg_asset_flag > 0)
 				{
 				expected_mkt_val_for_dur_sale
-				+= bond_element->mkt_val_for_dur_bef_rebal_sale(t)
+				+= asset->sm_bond[mp][0]->mkt_val_for_dur_bef_rebal_sale(t)
 				   * local_pct_to_use
 				   * percent_of_asset_to_sell;
 
 				expected_mkt_val_times_dur_sale
-				+= bond_element->mkt_val_times_dur_bef_rebal_sale(t)
+				+= asset->sm_bond[mp][0]->mkt_val_times_dur_bef_rebal_sale(t)
 				   * local_pct_to_use
 				   * percent_of_asset_to_sell;
 				}
@@ -13099,15 +13135,15 @@ if (remaining_cash_required > model_point_amount_threshold)
 			capital_gain = market_sold - book_sold;
 
 			asset_detail_rpt_individual_sale(t, ASSET_DATA,
-					bond_element->sequence_id,
-					bond_element->asset_id,
+					asset->sm_bond[mp][0]->sequence_id,
+					asset->sm_bond[mp][0]->asset_id,
 					sub_port_num, sales_class_num, asset_fund_index,
 					percent_of_asset_to_sell,
 					net_cash_from_asset_sale,
 					book_sold, accrued_sold,
 					market_sold, capital_gain,
 					unrealized_capital_gain_released,
-					bond_element->dur_val(t));
+					asset->sm_bond[mp][0]->dur_val(t));
 			}
 
 		percent_of_asset_to_sell = 0.0;
@@ -13115,77 +13151,75 @@ if (remaining_cash_required > model_point_amount_threshold)
 	#endif
 
 	#if defined(__MTG_ASSET_H_)
-	MTG_ASSET *mtg_element;
 	// loop over mortgages
-	if (seg->mtg_mp_map_active.size())
+	if (seg_element->mtg_mp_map_active.size())
 		{
 		col_num_asset_sub_port_num
-		= asset->sm_mtg[0]->Column("sub_port_id").Number();
+		= asset->sm_mtg[0][0]->Column("sub_port_id").Number();
 		col_num_include_in_duration_matching
-		= asset->sm_mtg[0]->Column("dur_match_flag").Number();
+		= asset->sm_mtg[0][0]->Column("dur_match_flag").Number();
 		col_num_notional_amount
-		= asset->sm_mtg[0]->Column("notional_amt").Number();
+		= asset->sm_mtg[0][0]->Column("notional_amt").Number();
 		col_num_portion_of_asset_sold_planned_sales
-		= asset->sm_mtg[0]->Column("sold_pct_planned").Number();
+		= asset->sm_mtg[0][0]->Column("sold_pct_planned").Number();
 
 		if (is_rebal_sales)
 			{
 			col_num_accrued_interest_before_sales
-			= asset->sm_mtg[0]->Column("accr_int_bef_rebal_sale").Number();
+			= asset->sm_mtg[0][0]->Column("accr_int_bef_rebal_sale").Number();
 			col_num_book_value_before_sales
-			= asset->sm_mtg[0]->Column("bk_val_bef_rebal_sale").Number();
+			= asset->sm_mtg[0][0]->Column("bk_val_bef_rebal_sale").Number();
 			col_num_market_value_before_sales
-			= asset->sm_mtg[0]->Column("mkt_val_bef_rebal_sale").Number();
+			= asset->sm_mtg[0][0]->Column("mkt_val_bef_rebal_sale").Number();
 			col_num_notional_amount_before_sales
-			= asset->sm_mtg[0]->Column("notional_amt_bef_rebal_sale").Number();
+			= asset->sm_mtg[0][0]->Column("notional_amt_bef_rebal_sale").Number();
 			col_num_portion_of_asset_sold_sales
-			= asset->sm_mtg[0]->Column("sold_pct_rebal").Number();
+			= asset->sm_mtg[0][0]->Column("sold_pct_rebal").Number();
 			col_num_unrealized_capital_gains_before_sales
-			= asset->sm_mtg[0]->Column("unrealzd_cap_gain_bef_rebal_sale").Number();
+			= asset->sm_mtg[0][0]->Column("unrealzd_cap_gain_bef_rebal_sale").Number();
 
 			col_num_mkt_val_for_dur_bef_rebal_sale
-			= asset->sm_mtg[0]->Column("mkt_val_for_dur_bef_rebal_sale").Number();
+			= asset->sm_mtg[0][0]->Column("mkt_val_for_dur_bef_rebal_sale").Number();
 			col_num_mkt_val_times_dur_bef_rebal_sale
-			= asset->sm_mtg[0]->Column("mkt_val_times_dur_bef_rebal_sale").Number();
+			= asset->sm_mtg[0][0]->Column("mkt_val_times_dur_bef_rebal_sale").Number();
 			}
 		else // negative cash flow sales
 			{
 			col_num_accrued_interest_before_sales
-			= asset->sm_mtg[0]->Column("accr_int_bef_neg_cash_flow_sale").Number();
+			= asset->sm_mtg[0][0]->Column("accr_int_bef_neg_cash_flow_sale").Number();
 			col_num_book_value_before_sales
-			= asset->sm_mtg[0]->Column("bk_val_bef_neg_cash_flow_sale").Number();
+			= asset->sm_mtg[0][0]->Column("bk_val_bef_neg_cash_flow_sale").Number();
 			col_num_market_value_before_sales
-			= asset->sm_mtg[0]->Column("mkt_val_bef_neg_cash_flow_sale").Number();
+			= asset->sm_mtg[0][0]->Column("mkt_val_bef_neg_cash_flow_sale").Number();
 			col_num_notional_amount_before_sales
-			= asset->sm_mtg[0]->Column("notional_amt_bef_neg_cash_flow_sale").Number();
+			= asset->sm_mtg[0][0]->Column("notional_amt_bef_neg_cash_flow_sale").Number();
 			col_num_portion_of_asset_sold_sales
-			= asset->sm_mtg[0]->Column("sold_pct_neg_cash_flow").Number();
+			= asset->sm_mtg[0][0]->Column("sold_pct_neg_cash_flow").Number();
 			col_num_portion_of_asset_sold_rebal_sales
-			= asset->sm_mtg[0]->Column("sold_pct_rebal").Number();
+			= asset->sm_mtg[0][0]->Column("sold_pct_rebal").Number();
 			col_num_unrealized_capital_gains_before_sales
-			= asset->sm_mtg[0]->Column("unrealzd_cap_gain_bef_neg_cash_flow_sale").Number();
+			= asset->sm_mtg[0][0]->Column("unrealzd_cap_gain_bef_neg_cash_flow_sale").Number();
 			}
 		}
 
-	for (mp_map_iter = seg->mtg_mp_map_active.begin();
-		 mp_map_iter != seg->mtg_mp_map_active.end();
+	for (mp_map_iter = seg_element->mtg_mp_map_active.begin();
+		 mp_map_iter != seg_element->mtg_mp_map_active.end();
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		mtg_element = asset->sm_mtg[mp];
 
-		if (mtg_element->neg_asset_flag < 0)
+		if (asset->sm_mtg[mp][0]->neg_asset_flag < 0)
 			continue;
 
-		if ((t > max(0, mtg_element->commencement_period)
-			 && mtg_element->Column(col_num_notional_amount).Value(t - 1) < ASSET_ACTIVE_THRESHOLD)
-			|| (t == mtg_element->commencement_period
-				&& mtg_element->Column(col_num_notional_amount_before_sales).Value(t) < ASSET_ACTIVE_THRESHOLD))
+		if ((t > max(0, asset->sm_mtg[mp][0]->commencement_period)
+			 && asset->sm_mtg[mp][0]->Column(col_num_notional_amount).Value(t - 1) < ASSET_ACTIVE_THRESHOLD)
+			|| (t == asset->sm_mtg[mp][0]->commencement_period
+				&& asset->sm_mtg[mp][0]->Column(col_num_notional_amount_before_sales).Value(t) < ASSET_ACTIVE_THRESHOLD))
 			continue;
 
-		sub_port_num = xint(mtg_element->Column(col_num_asset_sub_port_num).Value(t));
-		sales_class_num = mtg_element->sale_class_id;
-		asset_fund_index = mtg_element->asset_fund_index;
+		sub_port_num = xint(asset->sm_mtg[mp][0]->Column(col_num_asset_sub_port_num).Value(t));
+		sales_class_num = asset->sm_mtg[mp][0]->sale_class_id;
+		asset_fund_index = asset->sm_mtg[mp][0]->asset_fund_index;
 		current_sub_port = asset->sm_asset_sub_port[seg_num][sub_port_num][0];
 
 		if (current_sub_port->sub_ports_to_sell != 1
@@ -13194,27 +13228,27 @@ if (remaining_cash_required > model_point_amount_threshold)
 			continue;
 
 		asset_percent_remaining
-		= (1.0 - mtg_element->Column(col_num_portion_of_asset_sold_planned_sales).Value(t));
+		= (1.0 - asset->sm_mtg[mp][0]->Column(col_num_portion_of_asset_sold_planned_sales).Value(t));
 
 		if (is_negative_cash_flow_sales)
 			asset_percent_remaining
-			*= (1.0 - mtg_element->Column(col_num_portion_of_asset_sold_rebal_sales).Value(t));
+			*= (1.0 - asset->sm_mtg[mp][0]->Column(col_num_portion_of_asset_sold_rebal_sales).Value(t));
 
 		if (asset_percent_remaining  < rate_ratio_threshold)
 			continue;
 
 			{
 			current_sub_port = asset->sm_asset_sub_port[seg_num][sub_port_num][0];
-			local_pct_to_use = mtg_element->pct_to_use;
+			local_pct_to_use = asset->sm_mtg[mp][0]->pct_to_use;
 
 			book_value_available
-			= mtg_element->Column(col_num_book_value_before_sales).Value(t);
+			= asset->sm_mtg[mp][0]->Column(col_num_book_value_before_sales).Value(t);
 			accrued_interest_available
-			= mtg_element->Column(col_num_accrued_interest_before_sales).Value(t);
+			= asset->sm_mtg[mp][0]->Column(col_num_accrued_interest_before_sales).Value(t);
 			market_value_available
-			= mtg_element->Column(col_num_market_value_before_sales).Value(t);
+			= asset->sm_mtg[mp][0]->Column(col_num_market_value_before_sales).Value(t);
 			unrealized_capital_gains_available
-			= mtg_element->Column(col_num_unrealized_capital_gains_before_sales).Value(t);
+			= asset->sm_mtg[mp][0]->Column(col_num_unrealized_capital_gains_before_sales).Value(t);
 
 			if (fabs(book_value_available
 					 * local_pct_to_use
@@ -13249,7 +13283,9 @@ if (remaining_cash_required > model_point_amount_threshold)
 
 			if (sell_assets == YES)
 				{
-				mtg_element->Column(col_num_portion_of_asset_sold_sales).SetValue(t, percent_of_asset_to_sell);
+				asset->sm_mtg[mp][0]->sold_pct_neg_cash_flow_value = percent_of_asset_to_sell;
+				asset->sm_mtg[mp][0]->Column(col_num_portion_of_asset_sold_sales).Value(t);
+				asset->sm_mtg[mp][0]->sold_pct_neg_cash_flow_value = 0.0;
 
 				market_sold
 				= market_value_available
@@ -13274,15 +13310,15 @@ if (remaining_cash_required > model_point_amount_threshold)
 				sub_port_fund_expected_book_plus_accrued_sold[sub_port_num][asset_fund_index]
 				+= book_sold + accrued_sold;
 
-				if (mtg_element->neg_asset_flag > 0)
+				if (asset->sm_mtg[mp][0]->neg_asset_flag > 0)
 					{
 					expected_mkt_val_for_dur_sale
-					+= mtg_element->mkt_val_for_dur_bef_rebal_sale(t)
+					+= asset->sm_mtg[mp][0]->mkt_val_for_dur_bef_rebal_sale(t)
 					   * local_pct_to_use
 					   * percent_of_asset_to_sell;
 
 					expected_mkt_val_times_dur_sale
-					+= mtg_element->mkt_val_times_dur_bef_rebal_sale(t)
+					+= asset->sm_mtg[mp][0]->mkt_val_times_dur_bef_rebal_sale(t)
 					   * local_pct_to_use
 					   * percent_of_asset_to_sell;
 					}
@@ -13306,15 +13342,15 @@ if (remaining_cash_required > model_point_amount_threshold)
 				capital_gain = market_sold - book_sold;
 
 				asset_detail_rpt_individual_sale(t, ASSET_DATA,
-						mtg_element->sequence_id,
-						mtg_element->asset_id,
+						asset->sm_mtg[mp][0]->sequence_id,
+						asset->sm_mtg[mp][0]->asset_id,
 						sub_port_num, sales_class_num, asset_fund_index,
 						percent_of_asset_to_sell,
 						net_cash_from_asset_sale,
 						book_sold, accrued_sold,
 						market_sold, capital_gain,
 						unrealized_capital_gain_released,
-						mtg_element->dur_val(t));
+						asset->sm_mtg[mp][0]->dur_val(t));
 				}
 			} // endif (asset_percent_remaining > 0.0)
 
@@ -13323,9 +13359,8 @@ if (remaining_cash_required > model_point_amount_threshold)
 	#endif
 
 	#if defined(__SEC_ASSET_H_)
-	SEC_ASSET *sec_element;
 	// loop over secs
-	if (seg->sec_mp_map_active.size())
+	if (seg_element->sec_mp_map_active.size())
 		{
 		col_num_asset_sub_port_num
 		= asset->sm_sec[0]->Column("sub_port_id").Number();
@@ -13375,25 +13410,24 @@ if (remaining_cash_required > model_point_amount_threshold)
 			}
 		}
 
-	for (mp_map_iter = seg->sec_mp_map_active.begin();
-		 mp_map_iter != seg->sec_mp_map_active.end();
+	for (mp_map_iter = seg_element->sec_mp_map_active.begin();
+		 mp_map_iter != seg_element->sec_mp_map_active.end();
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		sec_element = asset->sm_sec[mp];
 
-		if (sec_element->neg_asset_flag < 0)
+		if (asset->sm_sec[mp]->neg_asset_flag < 0)
 			continue;
 
-		if ((t > max(0, sec_element->commencement_period)
-			 && sec_element->Column(col_num_notional_amount).Value(t - 1) < ASSET_ACTIVE_THRESHOLD)
-			|| (t == sec_element->commencement_period
-				&& sec_element->Column(col_num_notional_amount_before_sales).Value(t) < ASSET_ACTIVE_THRESHOLD))
+		if ((t > max(0, asset->sm_sec[mp]->commencement_period)
+			 && asset->sm_sec[mp]->Column(col_num_notional_amount).Value(t - 1) < ASSET_ACTIVE_THRESHOLD)
+			|| (t == asset->sm_sec[mp]->commencement_period
+				&& asset->sm_sec[mp]->Column(col_num_notional_amount_before_sales).Value(t) < ASSET_ACTIVE_THRESHOLD))
 			continue;
 
-		sub_port_num = xint(sec_element->Column(col_num_asset_sub_port_num).Value(t));
-		sales_class_num = sec_element->sale_class_id;
-		asset_fund_index = sec_element->asset_fund_index;
+		sub_port_num = xint(asset->sm_sec[mp]->Column(col_num_asset_sub_port_num).Value(t));
+		sales_class_num = asset->sm_sec[mp]->sale_class_id;
+		asset_fund_index = asset->sm_sec[mp]->asset_fund_index;
 		current_sub_port = asset->sm_asset_sub_port[seg_num][sub_port_num][0];
 
 		if (current_sub_port->sub_ports_to_sell != 1
@@ -13402,26 +13436,26 @@ if (remaining_cash_required > model_point_amount_threshold)
 			continue;
 
 		asset_percent_remaining
-		= (1.0 - sec_element->Column(col_num_portion_of_asset_sold_planned_sales).Value(t));
+		= (1.0 - asset->sm_sec[mp]->Column(col_num_portion_of_asset_sold_planned_sales).Value(t));
 
 		if (is_negative_cash_flow_sales)
 			asset_percent_remaining
-			*= (1.0 - sec_element->Column(col_num_portion_of_asset_sold_rebal_sales).Value(t));
+			*= (1.0 - asset->sm_sec[mp]->Column(col_num_portion_of_asset_sold_rebal_sales).Value(t));
 
 		if (asset_percent_remaining < SMALL_DOUBLE)
 			continue;
 
 		current_sub_port = asset->sm_asset_sub_port[seg_num][sub_port_num][0];
-		local_pct_to_use = sec_element->pct_to_use;
+		local_pct_to_use = asset->sm_sec[mp]->pct_to_use;
 
 		book_value_available
-		= sec_element->Column(col_num_book_value_before_sales).Value(t);
+		= asset->sm_sec[mp]->Column(col_num_book_value_before_sales).Value(t);
 		accrued_interest_available
-		= sec_element->Column(col_num_accrued_interest_before_sales).Value(t);
+		= asset->sm_sec[mp]->Column(col_num_accrued_interest_before_sales).Value(t);
 		market_value_available
-		= sec_element->Column(col_num_market_value_before_sales).Value(t);
+		= asset->sm_sec[mp]->Column(col_num_market_value_before_sales).Value(t);
 		unrealized_capital_gains_available
-		= sec_element->Column(col_num_unrealized_capital_gains_before_sales).Value(t);
+		= asset->sm_sec[mp]->Column(col_num_unrealized_capital_gains_before_sales).Value(t);
 
 		if (fabs(book_value_available
 				 * local_pct_to_use
@@ -13456,7 +13490,9 @@ if (remaining_cash_required > model_point_amount_threshold)
 
 		if (sell_assets == YES)
 			{
-			sec_element->Column(col_num_portion_of_asset_sold_sales).SetValue(t, percent_of_asset_to_sell);
+			asset->sm_sec[mp]->sold_pct_neg_cash_flow_value = percent_of_asset_to_sell;
+			asset->sm_sec[mp]->Column(col_num_portion_of_asset_sold_sales).Value(t);
+			asset->sm_sec[mp]->sold_pct_neg_cash_flow_value = 0.0;
 
 			market_sold
 			= market_value_available
@@ -13481,15 +13517,15 @@ if (remaining_cash_required > model_point_amount_threshold)
 			sub_port_fund_expected_book_plus_accrued_sold[sub_port_num][asset_fund_index]
 			+= book_sold + accrued_sold;
 
-			if (sec_element->neg_asset_flag > 0)
+			if (asset->sm_sec[mp]->neg_asset_flag > 0)
 				{
 				expected_mkt_val_for_dur_sale
-				+= sec_element->mkt_val_for_dur_bef_rebal_sale(t)
+				+= asset->sm_sec[mp]->mkt_val_for_dur_bef_rebal_sale(t)
 				   * local_pct_to_use
 				   * percent_of_asset_to_sell;
 
 				expected_mkt_val_times_dur_sale
-				+= sec_element->mkt_val_times_dur_bef_rebal_sale(t)
+				+= asset->sm_sec[mp]->mkt_val_times_dur_bef_rebal_sale(t)
 				   * local_pct_to_use
 				   * percent_of_asset_to_sell;
 				}
@@ -13513,15 +13549,15 @@ if (remaining_cash_required > model_point_amount_threshold)
 			capital_gain = market_sold - book_sold;
 
 			asset_detail_rpt_individual_sale(t, ASSET_DATA,
-					sec_element->sequence_id,
-					sec_element->asset_id,
+					asset->sm_sec[mp]->sequence_id,
+					asset->sm_sec[mp]->asset_id,
 					sub_port_num, sales_class_num, asset_fund_index,
 					percent_of_asset_to_sell,
 					net_cash_from_asset_sale,
 					book_sold, accrued_sold,
 					market_sold, capital_gain,
 					unrealized_capital_gain_released,
-					sec_element->dur_val(t));
+					asset->sm_sec[mp]->dur_val(t));
 			}
 
 		percent_of_asset_to_sell = 0.0;
@@ -13529,77 +13565,75 @@ if (remaining_cash_required > model_point_amount_threshold)
 	#endif
 
 	#if defined(__IRD_ASSET_H_)
-	IRD_ASSET *ird_element;
 	// loop over interest contracts
-	if (seg->ird_mp_map_active.size())
+	if (seg_element->ird_mp_map_active.size())
 		{
 		col_num_asset_sub_port_num
-		= asset->sm_ird[0]->Column("sub_port_id").Number();
+		= asset->sm_ird[0][0]->Column("sub_port_id").Number();
 		col_num_include_in_duration_matching
-		= asset->sm_ird[0]->Column("dur_match_flag").Number();
+		= asset->sm_ird[0][0]->Column("dur_match_flag").Number();
 		col_num_notional_amount
-		= asset->sm_ird[0]->Column("notional_amt").Number();
+		= asset->sm_ird[0][0]->Column("notional_amt").Number();
 		col_num_portion_of_asset_sold_planned_sales
-		= asset->sm_ird[0]->Column("sold_pct_planned").Number();
+		= asset->sm_ird[0][0]->Column("sold_pct_planned").Number();
 
 		if (is_rebal_sales)
 			{
 			col_num_accrued_interest_before_sales
-			= asset->sm_ird[0]->Column("accr_int_bef_rebal_sale").Number();
+			= asset->sm_ird[0][0]->Column("accr_int_bef_rebal_sale").Number();
 			col_num_book_value_before_sales
-			= asset->sm_ird[0]->Column("bk_val_bef_rebal_sale").Number();
+			= asset->sm_ird[0][0]->Column("bk_val_bef_rebal_sale").Number();
 			col_num_market_value_before_sales
-			= asset->sm_ird[0]->Column("mkt_val_bef_rebal_sale").Number();
+			= asset->sm_ird[0][0]->Column("mkt_val_bef_rebal_sale").Number();
 			col_num_notional_amount_before_sales
-			= asset->sm_ird[0]->Column("notional_amt_bef_rebal_sale").Number();
+			= asset->sm_ird[0][0]->Column("notional_amt_bef_rebal_sale").Number();
 			col_num_portion_of_asset_sold_sales
-			= asset->sm_ird[0]->Column("sold_pct_rebal").Number();
+			= asset->sm_ird[0][0]->Column("sold_pct_rebal").Number();
 			col_num_unrealized_capital_gains_before_sales
-			= asset->sm_ird[0]->Column("unrealzd_cap_gain_bef_rebal_sale").Number();
+			= asset->sm_ird[0][0]->Column("unrealzd_cap_gain_bef_rebal_sale").Number();
 
 			col_num_mkt_val_for_dur_bef_rebal_sale
-			= asset->sm_ird[0]->Column("mkt_val_for_dur_bef_rebal_sale").Number();
+			= asset->sm_ird[0][0]->Column("mkt_val_for_dur_bef_rebal_sale").Number();
 			col_num_mkt_val_times_dur_bef_rebal_sale
-			= asset->sm_ird[0]->Column("mkt_val_times_dur_bef_rebal_sale").Number();
+			= asset->sm_ird[0][0]->Column("mkt_val_times_dur_bef_rebal_sale").Number();
 			}
 		else // negative cash flow sales
 			{
 			col_num_accrued_interest_before_sales
-			= asset->sm_ird[0]->Column("accr_int_bef_neg_cash_flow_sale").Number();
+			= asset->sm_ird[0][0]->Column("accr_int_bef_neg_cash_flow_sale").Number();
 			col_num_book_value_before_sales
-			= asset->sm_ird[0]->Column("bk_val_bef_neg_cash_flow_sale").Number();
+			= asset->sm_ird[0][0]->Column("bk_val_bef_neg_cash_flow_sale").Number();
 			col_num_market_value_before_sales
-			= asset->sm_ird[0]->Column("mkt_val_bef_neg_cash_flow_sale").Number();
+			= asset->sm_ird[0][0]->Column("mkt_val_bef_neg_cash_flow_sale").Number();
 			col_num_notional_amount_before_sales
-			= asset->sm_ird[0]->Column("notional_amt_bef_neg_cash_flow_sale").Number();
+			= asset->sm_ird[0][0]->Column("notional_amt_bef_neg_cash_flow_sale").Number();
 			col_num_portion_of_asset_sold_sales
-			= asset->sm_ird[0]->Column("sold_pct_neg_cash_flow").Number();
+			= asset->sm_ird[0][0]->Column("sold_pct_neg_cash_flow").Number();
 			col_num_portion_of_asset_sold_rebal_sales
-			= asset->sm_ird[0]->Column("sold_pct_rebal").Number();
+			= asset->sm_ird[0][0]->Column("sold_pct_rebal").Number();
 			col_num_unrealized_capital_gains_before_sales
-			= asset->sm_ird[0]->Column("unrealzd_cap_gain_bef_neg_cash_flow_sale").Number();
+			= asset->sm_ird[0][0]->Column("unrealzd_cap_gain_bef_neg_cash_flow_sale").Number();
 			}
 		}
 
-	for (mp_map_iter = seg->ird_mp_map_active.begin();
-		 mp_map_iter != seg->ird_mp_map_active.end();
+	for (mp_map_iter = seg_element->ird_mp_map_active.begin();
+		 mp_map_iter != seg_element->ird_mp_map_active.end();
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		ird_element = asset->sm_ird[mp];
 
-		if (ird_element->neg_asset_flag < 0)
+		if (asset->sm_ird[mp][0]->neg_asset_flag < 0)
 			continue;
 
-		if ((t > max(0, ird_element->commencement_period)
-			 && ird_element->Column(col_num_notional_amount).Value(t - 1) < ASSET_ACTIVE_THRESHOLD)
-			|| (t == ird_element->commencement_period
-				&& ird_element->Column(col_num_notional_amount_before_sales).Value(t) < ASSET_ACTIVE_THRESHOLD))
+		if ((t > max(0, asset->sm_ird[mp][0]->commencement_period)
+			 && asset->sm_ird[mp][0]->Column(col_num_notional_amount).Value(t - 1) < ASSET_ACTIVE_THRESHOLD)
+			|| (t == asset->sm_ird[mp][0]->commencement_period
+				&& asset->sm_ird[mp][0]->Column(col_num_notional_amount_before_sales).Value(t) < ASSET_ACTIVE_THRESHOLD))
 			continue;
 
-		sub_port_num = xint(ird_element->Column(col_num_asset_sub_port_num).Value(t));
-		sales_class_num = ird_element->sale_class_id;
-		asset_fund_index = ird_element->asset_fund_index;
+		sub_port_num = xint(asset->sm_ird[mp][0]->Column(col_num_asset_sub_port_num).Value(t));
+		sales_class_num = asset->sm_ird[mp][0]->sale_class_id;
+		asset_fund_index = asset->sm_ird[mp][0]->asset_fund_index;
 		current_sub_port = asset->sm_asset_sub_port[seg_num][sub_port_num][0];
 
 		if (current_sub_port->sub_ports_to_sell != 1
@@ -13608,26 +13642,26 @@ if (remaining_cash_required > model_point_amount_threshold)
 			continue;
 
 		asset_percent_remaining
-		= (1.0 - ird_element->Column(col_num_portion_of_asset_sold_planned_sales).Value(t));
+		= (1.0 - asset->sm_ird[mp][0]->Column(col_num_portion_of_asset_sold_planned_sales).Value(t));
 
 		if (is_negative_cash_flow_sales)
 			asset_percent_remaining
-			*= (1.0 - ird_element->Column(col_num_portion_of_asset_sold_rebal_sales).Value(t));
+			*= (1.0 - asset->sm_ird[mp][0]->Column(col_num_portion_of_asset_sold_rebal_sales).Value(t));
 
 		if (asset_percent_remaining < SMALL_DOUBLE)
 			continue;
 
 		current_sub_port = asset->sm_asset_sub_port[seg_num][sub_port_num][0];
-		local_pct_to_use = ird_element->pct_to_use;
+		local_pct_to_use = asset->sm_ird[mp][0]->pct_to_use;
 
 		book_value_available
-		= ird_element->Column(col_num_book_value_before_sales).Value(t);
+		= asset->sm_ird[mp][0]->Column(col_num_book_value_before_sales).Value(t);
 		accrued_interest_available
-		= ird_element->Column(col_num_accrued_interest_before_sales).Value(t);
+		= asset->sm_ird[mp][0]->Column(col_num_accrued_interest_before_sales).Value(t);
 		market_value_available
-		= ird_element->Column(col_num_market_value_before_sales).Value(t);
+		= asset->sm_ird[mp][0]->Column(col_num_market_value_before_sales).Value(t);
 		unrealized_capital_gains_available
-		= ird_element->Column(col_num_unrealized_capital_gains_before_sales).Value(t);
+		= asset->sm_ird[mp][0]->Column(col_num_unrealized_capital_gains_before_sales).Value(t);
 
 		if (fabs(book_value_available
 				 * local_pct_to_use
@@ -13662,7 +13696,9 @@ if (remaining_cash_required > model_point_amount_threshold)
 
 		if (sell_assets == YES)
 			{
-			ird_element->Column(col_num_portion_of_asset_sold_sales).SetValue(t, percent_of_asset_to_sell);
+			asset->sm_ird[mp][0]->sold_pct_neg_cash_flow_value = percent_of_asset_to_sell;
+			asset->sm_ird[mp][0]->Column(col_num_portion_of_asset_sold_sales).Value(t);
+			asset->sm_ird[mp][0]->sold_pct_neg_cash_flow_value = 0.0;
 
 			market_sold
 			= market_value_available
@@ -13687,15 +13723,15 @@ if (remaining_cash_required > model_point_amount_threshold)
 			sub_port_fund_expected_book_plus_accrued_sold[sub_port_num][asset_fund_index]
 			+= book_sold + accrued_sold;
 
-			if (ird_element->neg_asset_flag > 0)
+			if (asset->sm_ird[mp][0]->neg_asset_flag > 0)
 				{
 				expected_mkt_val_for_dur_sale
-				+= ird_element->mkt_val_for_dur_bef_rebal_sale(t)
+				+= asset->sm_ird[mp][0]->mkt_val_for_dur_bef_rebal_sale(t)
 				   * local_pct_to_use
 				   * percent_of_asset_to_sell;
 
 				expected_mkt_val_times_dur_sale
-				+= ird_element->mkt_val_times_dur_bef_rebal_sale(t)
+				+= asset->sm_ird[mp][0]->mkt_val_times_dur_bef_rebal_sale(t)
 				   * local_pct_to_use
 				   * percent_of_asset_to_sell;
 				}
@@ -13719,15 +13755,15 @@ if (remaining_cash_required > model_point_amount_threshold)
 			capital_gain = market_sold - book_sold;
 
 			asset_detail_rpt_individual_sale(t, ASSET_DATA,
-					ird_element->sequence_id,
-					ird_element->asset_id,
+					asset->sm_ird[mp][0]->sequence_id,
+					asset->sm_ird[mp][0]->asset_id,
 					sub_port_num, sales_class_num, asset_fund_index,
 					percent_of_asset_to_sell,
 					net_cash_from_asset_sale,
 					book_sold, accrued_sold,
 					market_sold, capital_gain,
 					unrealized_capital_gain_released,
-					ird_element->dur_val(t));
+					asset->sm_ird[mp][0]->dur_val(t));
 			}
 
 		percent_of_asset_to_sell = 0.0;
@@ -13735,9 +13771,8 @@ if (remaining_cash_required > model_point_amount_threshold)
 	#endif
 
 	#if defined(__RE_ASSET_H_)
-	RE_ASSET *re_element;
 	// loop over real estate
-	if (seg->re_mp_map_active.size())
+	if (seg_element->re_mp_map_active.size())
 		{
 		col_num_asset_sub_port_num
 		= asset->sm_re[0]->Column("sub_port_id").Number();
@@ -13787,25 +13822,24 @@ if (remaining_cash_required > model_point_amount_threshold)
 			}
 		}
 
-	for (mp_map_iter = seg->re_mp_map_active.begin();
-		 mp_map_iter != seg->re_mp_map_active.end();
+	for (mp_map_iter = seg_element->re_mp_map_active.begin();
+		 mp_map_iter != seg_element->re_mp_map_active.end();
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		re_element = asset->sm_re[mp];
 
-		if (re_element->neg_asset_flag < 0)
+		if (asset->sm_re[mp]->neg_asset_flag < 0)
 			continue;
 
-		if ((t > max(0, re_element->commencement_period)
-			 && re_element->Column(col_num_notional_amount).Value(t - 1) < ASSET_ACTIVE_THRESHOLD)
-			|| (t == re_element->commencement_period
-				&& re_element->Column(col_num_notional_amount_before_sales).Value(t) < ASSET_ACTIVE_THRESHOLD))
+		if ((t > max(0, asset->sm_re[mp]->commencement_period)
+			 && asset->sm_re[mp]->Column(col_num_notional_amount).Value(t - 1) < ASSET_ACTIVE_THRESHOLD)
+			|| (t == asset->sm_re[mp]->commencement_period
+				&& asset->sm_re[mp]->Column(col_num_notional_amount_before_sales).Value(t) < ASSET_ACTIVE_THRESHOLD))
 			continue;
 
-		sub_port_num = xint(re_element->Column(col_num_asset_sub_port_num).Value(t));
-		sales_class_num = re_element->sale_class_id;
-		asset_fund_index = re_element->asset_fund_index;
+		sub_port_num = xint(asset->sm_re[mp]->Column(col_num_asset_sub_port_num).Value(t));
+		sales_class_num = asset->sm_re[mp]->sale_class_id;
+		asset_fund_index = asset->sm_re[mp]->asset_fund_index;
 		current_sub_port = asset->sm_asset_sub_port[seg_num][sub_port_num][0];
 
 		if (current_sub_port->sub_ports_to_sell != 1
@@ -13814,26 +13848,26 @@ if (remaining_cash_required > model_point_amount_threshold)
 			continue;
 
 		asset_percent_remaining
-		= (1.0 - re_element->Column(col_num_portion_of_asset_sold_planned_sales).Value(t));
+		= (1.0 - asset->sm_re[mp]->Column(col_num_portion_of_asset_sold_planned_sales).Value(t));
 
 		if (is_negative_cash_flow_sales)
 			asset_percent_remaining
-			*= (1.0 - re_element->Column(col_num_portion_of_asset_sold_rebal_sales).Value(t));
+			*= (1.0 - asset->sm_re[mp]->Column(col_num_portion_of_asset_sold_rebal_sales).Value(t));
 
 		if (asset_percent_remaining < SMALL_DOUBLE)
 			continue;
 
 		current_sub_port = asset->sm_asset_sub_port[seg_num][sub_port_num][0];
-		local_pct_to_use = re_element->pct_to_use;
+		local_pct_to_use = asset->sm_re[mp]->pct_to_use;
 
 		book_value_available
-		= re_element->Column(col_num_book_value_before_sales).Value(t);
+		= asset->sm_re[mp]->Column(col_num_book_value_before_sales).Value(t);
 		accrued_rent_available
-		= re_element->Column(col_num_accrued_interest_before_sales).Value(t);
+		= asset->sm_re[mp]->Column(col_num_accrued_interest_before_sales).Value(t);
 		market_value_available
-		= re_element->Column(col_num_market_value_before_sales).Value(t);
+		= asset->sm_re[mp]->Column(col_num_market_value_before_sales).Value(t);
 		unrealized_capital_gains_available
-		= re_element->Column(col_num_unrealized_capital_gains_before_sales).Value(t);
+		= asset->sm_re[mp]->Column(col_num_unrealized_capital_gains_before_sales).Value(t);
 
 		if (fabs(book_value_available
 				 * local_pct_to_use
@@ -13868,7 +13902,9 @@ if (remaining_cash_required > model_point_amount_threshold)
 
 		if (sell_assets == YES)
 			{
-			re_element->Column(col_num_portion_of_asset_sold_sales).SetValue(t, percent_of_asset_to_sell);
+			asset->sm_re[mp]->sold_pct_neg_cash_flow_value = percent_of_asset_to_sell;
+			asset->sm_re[mp]->Column(col_num_portion_of_asset_sold_sales).Value(t);
+			asset->sm_re[mp]->sold_pct_neg_cash_flow_value = 0.0;
 
 			market_sold
 			= market_value_available
@@ -13912,8 +13948,8 @@ if (remaining_cash_required > model_point_amount_threshold)
 			capital_gain = market_sold - book_sold;
 
 			asset_detail_rpt_individual_sale(t, ASSET_DATA,
-					re_element->sequence_id,
-					re_element->asset_id,
+					asset->sm_re[mp]->sequence_id,
+					asset->sm_re[mp]->asset_id,
 					sub_port_num, sales_class_num, asset_fund_index,
 					percent_of_asset_to_sell,
 					net_cash_from_asset_sale,
@@ -13928,9 +13964,8 @@ if (remaining_cash_required > model_point_amount_threshold)
 	#endif
 
 	#if defined(__EQT_ASSET_H_)
-	EQT_ASSET *eqt_element;
 	// loop over equities
-	if (seg->eqt_mp_map_active.size())
+	if (seg_element->eqt_mp_map_active.size())
 		{
 		col_num_asset_sub_port_num
 		= asset->sm_eqt[0]->Column("sub_port_id").Number();
@@ -13976,25 +14011,24 @@ if (remaining_cash_required > model_point_amount_threshold)
 			}
 		}
 
-	for (mp_map_iter = seg->eqt_mp_map_active.begin();
-		 mp_map_iter != seg->eqt_mp_map_active.end();
+	for (mp_map_iter = seg_element->eqt_mp_map_active.begin();
+		 mp_map_iter != seg_element->eqt_mp_map_active.end();
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		eqt_element = asset->sm_eqt[mp];
 
-		if (eqt_element->neg_asset_flag < 0)
+		if (asset->sm_eqt[mp]->neg_asset_flag < 0)
 			continue;
 
-		if ((t > max(0, eqt_element->commencement_period)
-			 && eqt_element->Column(col_num_notional_amount).Value(t - 1) < ASSET_ACTIVE_THRESHOLD)
-			|| (t == eqt_element->commencement_period
-				&& eqt_element->Column(col_num_notional_amount_before_sales).Value(t) < ASSET_ACTIVE_THRESHOLD))
+		if ((t > max(0, asset->sm_eqt[mp]->commencement_period)
+			 && asset->sm_eqt[mp]->Column(col_num_notional_amount).Value(t - 1) < ASSET_ACTIVE_THRESHOLD)
+			|| (t == asset->sm_eqt[mp]->commencement_period
+				&& asset->sm_eqt[mp]->Column(col_num_notional_amount_before_sales).Value(t) < ASSET_ACTIVE_THRESHOLD))
 			continue;
 
-		sub_port_num = xint(eqt_element->sub_port_id(t));
-		sales_class_num = eqt_element->sale_class_id;
-		asset_fund_index = eqt_element->asset_fund_index;
+		sub_port_num = xint(asset->sm_eqt[mp]->sub_port_id(t));
+		sales_class_num = asset->sm_eqt[mp]->sale_class_id;
+		asset_fund_index = asset->sm_eqt[mp]->asset_fund_index;
 		current_sub_port = asset->sm_asset_sub_port[seg_num][sub_port_num][0];
 
 		if (current_sub_port->sub_ports_to_sell != 1
@@ -14003,24 +14037,24 @@ if (remaining_cash_required > model_point_amount_threshold)
 			continue;
 
 		asset_percent_remaining
-		= (1.0 - eqt_element->Column(col_num_portion_of_asset_sold_planned_sales).Value(t));
+		= (1.0 - asset->sm_eqt[mp]->Column(col_num_portion_of_asset_sold_planned_sales).Value(t));
 
 		if (is_negative_cash_flow_sales)
 			asset_percent_remaining
-			*= (1.0 - eqt_element->Column(col_num_portion_of_asset_sold_rebal_sales).Value(t));
+			*= (1.0 - asset->sm_eqt[mp]->Column(col_num_portion_of_asset_sold_rebal_sales).Value(t));
 
 		if (asset_percent_remaining < SMALL_DOUBLE)
 			continue;
 
 		current_sub_port = asset->sm_asset_sub_port[seg_num][sub_port_num][0];
-		local_pct_to_use = eqt_element->pct_to_use;
+		local_pct_to_use = asset->sm_eqt[mp]->pct_to_use;
 
 		book_value_available
-		= eqt_element->Column(col_num_book_value_before_sales).Value(t);
+		= asset->sm_eqt[mp]->Column(col_num_book_value_before_sales).Value(t);
 		market_value_available
-		= eqt_element->Column(col_num_market_value_before_sales).Value(t);
+		= asset->sm_eqt[mp]->Column(col_num_market_value_before_sales).Value(t);
 		unrealized_capital_gains_available
-		= eqt_element->Column(col_num_unrealized_capital_gains_before_sales).Value(t);
+		= asset->sm_eqt[mp]->Column(col_num_unrealized_capital_gains_before_sales).Value(t);
 
 		if (fabs(book_value_available
 				 * local_pct_to_use
@@ -14050,7 +14084,9 @@ if (remaining_cash_required > model_point_amount_threshold)
 
 		if (sell_assets == YES)
 			{
-			eqt_element->Column(col_num_portion_of_asset_sold_sales).SetValue(t, percent_of_asset_to_sell);
+			asset->sm_eqt[mp]->sold_pct_neg_cash_flow_value = percent_of_asset_to_sell;
+			asset->sm_eqt[mp]->Column(col_num_portion_of_asset_sold_sales).Value(t);
+			asset->sm_eqt[mp]->sold_pct_neg_cash_flow_value = 0.0;
 
 			market_sold
 			= market_value_available
@@ -14094,8 +14130,8 @@ if (remaining_cash_required > model_point_amount_threshold)
 			capital_gain = market_sold - book_sold;
 
 			asset_detail_rpt_individual_sale(t, ASSET_DATA,
-					eqt_element->sequence_id,
-					eqt_element->asset_id,
+					asset->sm_eqt[mp]->sequence_id,
+					asset->sm_eqt[mp]->asset_id,
 					sub_port_num, sales_class_num, asset_fund_index,
 					percent_of_asset_to_sell,
 					net_cash_from_asset_sale,
@@ -14110,73 +14146,71 @@ if (remaining_cash_required > model_point_amount_threshold)
 	#endif
 
 	#if defined(__EIO_ASSET_H_)
-	EIO_ASSET *eio_element;
 	// loop over index options
-	if (seg->eio_mp_map_active.size())
+	if (seg_element->eio_mp_map_active.size())
 		{
 		col_num_asset_sub_port_num
-		= asset->sm_eio[0]->Column("sub_port_id").Number();
+		= asset->sm_eio[0][0]->Column("sub_port_id").Number();
 		col_num_include_in_duration_matching
-		= asset->sm_eio[0]->Column("dur_match_flag").Number();
+		= asset->sm_eio[0][0]->Column("dur_match_flag").Number();
 		col_num_notional_amount
-		= asset->sm_eio[0]->Column("notional_amt").Number();
+		= asset->sm_eio[0][0]->Column("notional_amt").Number();
 		col_num_portion_of_asset_sold_planned_sales
-		= asset->sm_eio[0]->Column("sold_pct_planned").Number();
+		= asset->sm_eio[0][0]->Column("sold_pct_planned").Number();
 
 		if (is_rebal_sales)
 			{
 			col_num_book_value_before_sales
-			= asset->sm_eio[0]->Column("bk_val_bef_rebal_sale").Number();
+			= asset->sm_eio[0][0]->Column("bk_val_bef_rebal_sale").Number();
 			col_num_market_value_before_sales
-			= asset->sm_eio[0]->Column("mkt_val_bef_rebal_sale").Number();
+			= asset->sm_eio[0][0]->Column("mkt_val_bef_rebal_sale").Number();
 			col_num_notional_amount_before_sales
-			= asset->sm_eio[0]->Column("notional_amt_bef_rebal_sale").Number();
+			= asset->sm_eio[0][0]->Column("notional_amt_bef_rebal_sale").Number();
 			col_num_portion_of_asset_sold_sales
-			= asset->sm_eio[0]->Column("sold_pct_rebal").Number();
+			= asset->sm_eio[0][0]->Column("sold_pct_rebal").Number();
 			col_num_unrealized_capital_gains_before_sales
-			= asset->sm_eio[0]->Column("unrealzd_cap_gain_bef_rebal_sale").Number();
+			= asset->sm_eio[0][0]->Column("unrealzd_cap_gain_bef_rebal_sale").Number();
 
 			col_num_mkt_val_for_dur_bef_rebal_sale
-			= asset->sm_eio[0]->Column("mkt_val_for_dur_bef_rebal_sale").Number();
+			= asset->sm_eio[0][0]->Column("mkt_val_for_dur_bef_rebal_sale").Number();
 			col_num_mkt_val_times_dur_bef_rebal_sale
-			= asset->sm_eio[0]->Column("mkt_val_times_dur_bef_rebal_sale").Number();
+			= asset->sm_eio[0][0]->Column("mkt_val_times_dur_bef_rebal_sale").Number();
 			}
 		else // negative cash flow sales
 			{
 			col_num_book_value_before_sales
-			= asset->sm_eio[0]->Column("bk_val_bef_neg_cash_flow_sale").Number();
+			= asset->sm_eio[0][0]->Column("bk_val_bef_neg_cash_flow_sale").Number();
 			col_num_market_value_before_sales
-			= asset->sm_eio[0]->Column("mkt_val_bef_neg_cash_flow_sale").Number();
+			= asset->sm_eio[0][0]->Column("mkt_val_bef_neg_cash_flow_sale").Number();
 			col_num_notional_amount_before_sales
-			= asset->sm_eio[0]->Column("notional_amt_bef_neg_cash_flow_sale").Number();
+			= asset->sm_eio[0][0]->Column("notional_amt_bef_neg_cash_flow_sale").Number();
 			col_num_portion_of_asset_sold_sales
-			= asset->sm_eio[0]->Column("sold_pct_neg_cash_flow").Number();
+			= asset->sm_eio[0][0]->Column("sold_pct_neg_cash_flow").Number();
 			col_num_portion_of_asset_sold_rebal_sales
-			= asset->sm_eio[0]->Column("sold_pct_rebal").Number();
+			= asset->sm_eio[0][0]->Column("sold_pct_rebal").Number();
 			col_num_unrealized_capital_gains_before_sales
-			= asset->sm_eio[0]->Column("unrealzd_cap_gain_bef_neg_cash_flow_sale").Number();
+			= asset->sm_eio[0][0]->Column("unrealzd_cap_gain_bef_neg_cash_flow_sale").Number();
 			}
 		}
 
-	for (mp_map_iter = seg->eio_mp_map_active.begin();
-		 mp_map_iter != seg->eio_mp_map_active.end();
+	for (mp_map_iter = seg_element->eio_mp_map_active.begin();
+		 mp_map_iter != seg_element->eio_mp_map_active.end();
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		eio_element = asset->sm_eio[mp];
 
-		if (eio_element->neg_asset_flag < 0)
+		if (asset->sm_eio[mp][0]->neg_asset_flag < 0)
 			continue;
 
-		if ((t > max(0, eio_element->commencement_period)
-			 && eio_element->Column(col_num_notional_amount).Value(t - 1) < ASSET_ACTIVE_THRESHOLD)
-			|| (t == eio_element->commencement_period
-				&& eio_element->Column(col_num_notional_amount_before_sales).Value(t) < ASSET_ACTIVE_THRESHOLD))
+		if ((t > max(0, asset->sm_eio[mp][0]->commencement_period)
+			 && asset->sm_eio[mp][0]->Column(col_num_notional_amount).Value(t - 1) < ASSET_ACTIVE_THRESHOLD)
+			|| (t == asset->sm_eio[mp][0]->commencement_period
+				&& asset->sm_eio[mp][0]->Column(col_num_notional_amount_before_sales).Value(t) < ASSET_ACTIVE_THRESHOLD))
 			continue;
 
-		sub_port_num = xint(eio_element->Column(col_num_asset_sub_port_num).Value(t));
-		sales_class_num = eio_element->sale_class_id;
-		asset_fund_index = eio_element->asset_fund_index;
+		sub_port_num = xint(asset->sm_eio[mp][0]->Column(col_num_asset_sub_port_num).Value(t));
+		sales_class_num = asset->sm_eio[mp][0]->sale_class_id;
+		asset_fund_index = asset->sm_eio[mp][0]->asset_fund_index;
 		current_sub_port = asset->sm_asset_sub_port[seg_num][sub_port_num][0];
 
 		if (current_sub_port->sub_ports_to_sell != 1
@@ -14185,7 +14219,7 @@ if (remaining_cash_required > model_point_amount_threshold)
 			continue;
 
 		asset_percent_remaining
-		= (1.0 - eio_element->Column(col_num_portion_of_asset_sold_planned_sales).Value(t));
+		= (1.0 - asset->sm_eio[mp][0]->Column(col_num_portion_of_asset_sold_planned_sales).Value(t));
 
 		if (is_negative_cash_flow_sales)
 			continue;//Hedge should not be sold to cover negative cash flows
@@ -14194,14 +14228,14 @@ if (remaining_cash_required > model_point_amount_threshold)
 			continue;
 
 		current_sub_port = asset->sm_asset_sub_port[seg_num][sub_port_num][0];
-		local_pct_to_use = eio_element->pct_to_use;
+		local_pct_to_use = asset->sm_eio[mp][0]->pct_to_use;
 
 		book_value_available
-		= eio_element->Column(col_num_book_value_before_sales).Value(t);
+		= asset->sm_eio[mp][0]->Column(col_num_book_value_before_sales).Value(t);
 		market_value_available
-		= eio_element->Column(col_num_market_value_before_sales).Value(t);
+		= asset->sm_eio[mp][0]->Column(col_num_market_value_before_sales).Value(t);
 		unrealized_capital_gains_available
-		= eio_element->Column(col_num_unrealized_capital_gains_before_sales).Value(t);
+		= asset->sm_eio[mp][0]->Column(col_num_unrealized_capital_gains_before_sales).Value(t);
 
 		if (fabs(book_value_available
 				 * local_pct_to_use
@@ -14230,7 +14264,9 @@ if (remaining_cash_required > model_point_amount_threshold)
 
 		if (sell_assets == YES)
 			{
-			eio_element->Column(col_num_portion_of_asset_sold_sales).SetValue(t, percent_of_asset_to_sell);
+			asset->sm_eio[mp][0]->sold_pct_neg_cash_flow_value = percent_of_asset_to_sell;
+			asset->sm_eio[mp][0]->Column(col_num_portion_of_asset_sold_sales).Value(t);
+			asset->sm_eio[mp][0]->sold_pct_neg_cash_flow_value = 0.0;
 
 			market_sold
 			= market_value_available
@@ -14274,15 +14310,15 @@ if (remaining_cash_required > model_point_amount_threshold)
 			capital_gain = market_sold - book_sold;
 
 			asset_detail_rpt_individual_sale(t, ASSET_DATA,
-					eio_element->sequence_id,
-					eio_element->asset_id,
+					asset->sm_eio[mp][0]->sequence_id,
+					asset->sm_eio[mp][0]->asset_id,
 					sub_port_num, sales_class_num, asset_fund_index,
 					percent_of_asset_to_sell,
 					net_cash_from_asset_sale,
 					book_sold, 0.0, // accrued_sold
 					market_sold, capital_gain,
 					unrealized_capital_gain_released,
-					eio_element->dur_val(t));
+					asset->sm_eio[mp][0]->dur_val(t));
 			}
 
 		percent_of_asset_to_sell = 0.0;
@@ -14290,9 +14326,8 @@ if (remaining_cash_required > model_point_amount_threshold)
 	#endif
 
 	#if defined(__EPA_ASSET_H_)
-	EPA_ASSET *epa_element;
 	// loop over epas
-	if (seg->epa_mp_map_active.size())
+	if (seg_element->epa_mp_map_active.size())
 		{
 		col_num_asset_sub_port_num
 		= asset->sm_epa[0]->Column("sub_port_id").Number();
@@ -14342,22 +14377,21 @@ if (remaining_cash_required > model_point_amount_threshold)
 			}
 		}
 
-	for (mp_map_iter = seg->epa_mp_map_active.begin();
-		 mp_map_iter != seg->epa_mp_map_active.end();
+	for (mp_map_iter = seg_element->epa_mp_map_active.begin();
+		 mp_map_iter != seg_element->epa_mp_map_active.end();
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		epa_element = asset->sm_epa[mp];
 
-		if (epa_element->neg_asset_flag < 0)
+		if (asset->sm_epa[mp]->neg_asset_flag < 0)
 			continue;
 
-		if (epa_element->Column(col_num_notional_amount).Value(t - 1) < ASSET_ACTIVE_THRESHOLD)
+		if (asset->sm_epa[mp]->Column(col_num_notional_amount).Value(t - 1) < ASSET_ACTIVE_THRESHOLD)
 			continue;
 
-		sub_port_num = xint(epa_element->Column(col_num_asset_sub_port_num).Value(t));
-		sales_class_num = epa_element->sale_class_id;
-		asset_fund_index = epa_element->asset_fund_index;
+		sub_port_num = xint(asset->sm_epa[mp]->Column(col_num_asset_sub_port_num).Value(t));
+		sales_class_num = asset->sm_epa[mp]->sale_class_id;
+		asset_fund_index = asset->sm_epa[mp]->asset_fund_index;
 		current_sub_port = asset->sm_asset_sub_port[seg_num][sub_port_num][0];
 
 		if (current_sub_port->sub_ports_to_sell != 1
@@ -14366,26 +14400,26 @@ if (remaining_cash_required > model_point_amount_threshold)
 			continue;
 
 		asset_percent_remaining
-		= (1.0 - epa_element->Column(col_num_portion_of_asset_sold_planned_sales).Value(t));
+		= (1.0 - asset->sm_epa[mp]->Column(col_num_portion_of_asset_sold_planned_sales).Value(t));
 
 		if (is_negative_cash_flow_sales)
 			asset_percent_remaining
-			*= (1.0 - epa_element->Column(col_num_portion_of_asset_sold_rebal_sales).Value(t));
+			*= (1.0 - asset->sm_epa[mp]->Column(col_num_portion_of_asset_sold_rebal_sales).Value(t));
 
 		if (asset_percent_remaining < SMALL_DOUBLE)
 			continue;
 
 		current_sub_port = asset->sm_asset_sub_port[seg_num][sub_port_num][0];
-		local_pct_to_use = epa_element->pct_to_use;
+		local_pct_to_use = asset->sm_epa[mp]->pct_to_use;
 
 		book_value_available
-		= epa_element->Column(col_num_book_value_before_sales).Value(t);
+		= asset->sm_epa[mp]->Column(col_num_book_value_before_sales).Value(t);
 		accrued_interest_available
-		= epa_element->Column(col_num_accrued_interest_before_sales).Value(t);
+		= asset->sm_epa[mp]->Column(col_num_accrued_interest_before_sales).Value(t);
 		market_value_available
-		= epa_element->Column(col_num_market_value_before_sales).Value(t);
+		= asset->sm_epa[mp]->Column(col_num_market_value_before_sales).Value(t);
 		unrealized_capital_gains_available
-		= epa_element->Column(col_num_unrealized_capital_gains_before_sales).Value(t);
+		= asset->sm_epa[mp]->Column(col_num_unrealized_capital_gains_before_sales).Value(t);
 
 		if (fabs(book_value_available
 				 * local_pct_to_use
@@ -14419,7 +14453,9 @@ if (remaining_cash_required > model_point_amount_threshold)
 
 		if (sell_assets == YES)
 			{
-			epa_element->Column(col_num_portion_of_asset_sold_sales).SetValue(t, percent_of_asset_to_sell);
+			asset->sm_epa[mp]->sold_pct_neg_cash_flow_value = percent_of_asset_to_sell;
+			asset->sm_epa[mp]->Column(col_num_portion_of_asset_sold_sales).Value(t);
+			asset->sm_epa[mp]->sold_pct_neg_cash_flow_value = 0.0;
 
 			market_sold
 			= market_value_available
@@ -14444,15 +14480,15 @@ if (remaining_cash_required > model_point_amount_threshold)
 			sub_port_fund_expected_book_plus_accrued_sold[sub_port_num][asset_fund_index]
 			+= book_sold + accrued_sold;
 
-			if (epa_element->neg_asset_flag > 0)
+			if (asset->sm_epa[mp]->neg_asset_flag > 0)
 				{
 				expected_mkt_val_for_dur_sale
-				+= epa_element->mkt_val_for_dur_bef_rebal_sale(t)
+				+= asset->sm_epa[mp]->mkt_val_for_dur_bef_rebal_sale(t)
 				   * local_pct_to_use
 				   * percent_of_asset_to_sell;
 
 				expected_mkt_val_times_dur_sale
-				+= epa_element->mkt_val_times_dur_bef_rebal_sale(t)
+				+= asset->sm_epa[mp]->mkt_val_times_dur_bef_rebal_sale(t)
 				   * local_pct_to_use
 				   * percent_of_asset_to_sell;
 				}
@@ -14476,15 +14512,15 @@ if (remaining_cash_required > model_point_amount_threshold)
 			capital_gain = market_sold - book_sold;
 
 			asset_detail_rpt_individual_sale(t, ASSET_DATA,
-					epa_element->sequence_id,
-					epa_element->asset_id,
+					asset->sm_epa[mp]->sequence_id,
+					asset->sm_epa[mp]->asset_id,
 					sub_port_num, sales_class_num, asset_fund_index,
 					percent_of_asset_to_sell,
 					net_cash_from_asset_sale,
 					book_sold, accrued_sold,
 					market_sold, capital_gain,
 					unrealized_capital_gain_released,
-					epa_element->dur_val(t));
+					asset->sm_epa[mp]->dur_val(t));
 			}
 
 		percent_of_asset_to_sell = 0.0;
@@ -14504,7 +14540,7 @@ void INVSTRAT_ASSET::set_asset_defn(StrEnum::EnumValue strategy_type)
 // "Investment"
 // "Hedging"
 
-purchmap::iterator purchmap_iter;
+map <xstring, int, less<xstring> >::iterator purchmap_iter;
 xstring purchmap_index;
 xstring asset_sub_port_name;
 int panum;
@@ -14539,6 +14575,8 @@ for (row = 0; row < purch_bond_assets.size(); row++)
 		&& ((purchmap_iter = purchmap_investment.find(purchmap_index))
 			 != purchmap_investment.end()))
 		{ // Lookup key is purch_asset_id
+		inv_strat_id = inv_strat_id;
+		purch_asset_id = purch_bond_assets[row];
 		asset_sub_port_name = purch_asset_sub_port_id;
 
 		if ((asset->asset_sub_port_map_iter = asset->asset_sub_port_map.find(asset_sub_port_name))
@@ -14546,6 +14584,9 @@ for (row = 0; row < purch_bond_assets.size(); row++)
 			{
 			panum = purchmap_iter->second;
 			purch_assets_asset_sub_port_num[panum] = asset->asset_sub_port_map_iter->second;				
+			
+			inv_strat_id = inv_strat_id;
+			purch_asset_id = purch_bond_assets[row];
 			purch_assets_weight[panum] = purch_asset_weight;
 			}
 		} // end "Investment"
@@ -14567,6 +14608,8 @@ for (row = 0; row < purch_mtg_assets.size(); row++)
 		&& ((purchmap_iter = purchmap_investment.find(purchmap_index))
 			 != purchmap_investment.end()))
 		{ // Lookup key is purch_asset_id
+		inv_strat_id = inv_strat_id;
+		purch_asset_id = purch_asset_id;
 		asset_sub_port_name = purch_asset_sub_port_id;
 
 		if ((asset->asset_sub_port_map_iter = asset->asset_sub_port_map.find(asset_sub_port_name))
@@ -14574,6 +14617,9 @@ for (row = 0; row < purch_mtg_assets.size(); row++)
 			{
 			panum = purchmap_iter->second;
 			purch_assets_asset_sub_port_num[panum] = asset->asset_sub_port_map_iter->second;				
+
+			inv_strat_id = inv_strat_id;
+			purch_asset_id = purch_asset_id;
 			purch_assets_weight[panum] = purch_asset_weight;
 			}
 		} // end "Investment"
@@ -14623,13 +14669,18 @@ for (row = 0; row < purch_ird_assets.size(); row++)
 		&& ((purchmap_iter = purchmap_investment.find(purchmap_index))
 			 != purchmap_investment.end()))
 		{ // Lookup key is purch_asset_id
+		inv_strat_id = inv_strat_id;
+		purch_asset_id = purch_asset_id;
 		asset_sub_port_name = purch_asset_sub_port_id;
 
 		if ((asset->asset_sub_port_map_iter = asset->asset_sub_port_map.find(asset_sub_port_name))
 			 != asset->asset_sub_port_map.end())
 			{
 			panum = purchmap_iter->second;
-			purch_assets_asset_sub_port_num[panum] = asset->asset_sub_port_map_iter->second;				
+			purch_assets_asset_sub_port_num[panum] = asset->asset_sub_port_map_iter->second;		
+			
+			inv_strat_id = inv_strat_id;
+			purch_asset_id = purch_asset_id;
 			purch_assets_weight[panum] = purch_asset_weight;
 			}
 		} // end "Investment"
@@ -14641,6 +14692,8 @@ for (row = 0; row < purch_ird_assets.size(); row++)
 		// Since there is no table mapping hedging assets to purchase asset sub portfolios,	
 		// must assign purchase asset to asset sub portfolios to find number
 		panum = purchmap_iter->second;
+
+		purch_asset_id = purch_asset_id;
 		purch_assets_asset_sub_port_num[panum]
 		= asset->asset_sub_port_assign(0, 1 /*new_asset*/, "Interest Rate Derivative", HEDGING,
 		                               purch_ird_category_id, 0, 0, -1);   
@@ -14719,6 +14772,8 @@ for (row = 0; row < purch_eio_assets.size(); row++)
 		&& ((purchmap_iter = purchmap_investment.find(purchmap_index))
 			 != purchmap_investment.end()))
 		{ // Lookup key is purch_asset_id
+		inv_strat_id = inv_strat_id;
+		purch_asset_id = purch_asset_id;
 		asset_sub_port_name = purch_asset_sub_port_id;
 
 		if ((asset->asset_sub_port_map_iter = asset->asset_sub_port_map.find(asset_sub_port_name))
@@ -14726,6 +14781,9 @@ for (row = 0; row < purch_eio_assets.size(); row++)
 			{
 			panum = purchmap_iter->second;
 			purch_assets_asset_sub_port_num[panum] = asset->asset_sub_port_map_iter->second;				
+
+			inv_strat_id = inv_strat_id;
+			purch_asset_id = purch_asset_id;
 			purch_assets_weight[panum] = purch_asset_weight;
 			}
 		} // end "Investment"
@@ -14737,6 +14795,7 @@ for (row = 0; row < purch_eio_assets.size(); row++)
 		// Since there is no table mapping hedging assets to purchase asset sub portfolios,	
 		// must assign purchase asset to asset sub portfolios to find number
 		panum = purchmap_iter->second;
+		purch_asset_id = purch_asset_id;
 		purch_assets_asset_sub_port_num[panum]
 		= asset->asset_sub_port_assign(0, 1 /*new_asset*/, "Index Option", HEDGING,
 		                               purch_eio_category_id, 0, 0, -1);   
@@ -14770,11 +14829,13 @@ switch (type)
 	case BOND:
 		purch_asset_id = purch_assets_id[panum] = identifier;
 		purch_assets_mp_grp_tag[panum] = purch_bond_grp_id;
+		purch_asset_id = purch_assets_id[panum] = identifier;
 		purch_assets_port_defn[panum] = purch_bond_port_defn;
 		break;
 	case MORTGAGE:
 		purch_asset_id = purch_assets_id[panum] = identifier;
 		purch_assets_mp_grp_tag[panum] = purch_mtg_grp_id;
+		purch_asset_id = purch_assets_id[panum] = identifier;
 		purch_assets_port_defn[panum] = purch_mtg_port_defn;
 		break;
 	case SECURITIZED_ASSET:
@@ -14785,6 +14846,7 @@ switch (type)
 	case INTEREST_RATE_DERIVATIVE:
 		purch_asset_id = purch_assets_id[panum] = identifier;
 		purch_assets_mp_grp_tag[panum] = purch_ird_grp_id;
+		purch_asset_id = purch_assets_id[panum] = identifier;
 		purch_assets_port_defn[panum] = purch_ird_port_defn;
 		break;
 	case REAL_ESTATE:
@@ -14800,6 +14862,7 @@ switch (type)
 	case INDEX_OPTION:
 		purch_asset_id = purch_assets_id[panum] = identifier;
 		purch_assets_mp_grp_tag[panum] = purch_eio_grp_id;
+		purch_asset_id = purch_assets_id[panum] = identifier;
 		purch_assets_port_defn[panum] = purch_eio_port_defn;
 		break;
 	default:
@@ -14847,7 +14910,6 @@ if (type == BOND || type == MORTGAGE || type == INTEREST_RATE_DERIVATIVE)
 		if (issue_warning_pmt_freq_vs_maturity_period)
 			{
 			issue_warning_pmt_freq_vs_maturity_period  = false;
-			makeRunLogYellow();
 			log_screen << "Warning. The payment mode of some investment bond, mortgage or"
 					<< " interest rate derivative is incompatible with its years to maturity."
 					<< MSG_ERROR;
@@ -14857,7 +14919,7 @@ if (type == BOND || type == MORTGAGE || type == INTEREST_RATE_DERIVATIVE)
 					<< get_string_of_enum_val(pmt_mode)
 					<< "' with " << setprecision(3) << yrs_to_maturity
 					<< " years to maturity."
-					<< MSG_ERROR;
+					<< MSG_ERROR;			
 			}
 		}
 	}
@@ -14884,7 +14946,7 @@ if (!initialize_purch_asset_maps) // Only perform this action once
 
 initialize_purch_asset_maps = false;
 
-purchmap::iterator purchmap_iter;
+map <xstring, int, less<xstring> >::iterator purchmap_iter;
 	
 // Create purchase asset vectors
 purch_bond_assets.resize(0);
@@ -14896,33 +14958,59 @@ purch_eqt_assets.resize(0);
 purch_eio_assets.resize(0);
 
 #if defined(__BOND_ASSET_H_)
-if (purch_bond_assets_selected != "NONE")
-	split_string_usl(purch_bond_assets_selected.c_str(), purch_bond_assets, ",");//WTW - Gen2 - split_tring internal RAFM function
+{
+seg_id = seg_id;
+xstring purch_bond_assets_selected_local = purch_bond_assets_selected;
+
+if (purch_bond_assets_selected_local != "NONE")
+	split_string_usl(purch_bond_assets_selected_local.c_str(), purch_bond_assets, ",");
+}
 #endif
+{
 #if defined(__MTG_ASSET_H_)
-if (purch_mtg_assets_selected != "NONE")
-	split_string_usl(purch_mtg_assets_selected.c_str(), purch_mtg_assets, ",");//WTW - Gen2 - split_tring internal RAFM function
+seg_id = seg_id;
+xstring purch_mtg_assets_selected_local = purch_mtg_assets_selected;
+
+if (purch_mtg_assets_selected_local != "NONE")
+	split_string_usl(purch_mtg_assets_selected_local.c_str(), purch_mtg_assets, ",");
 #endif
+}
+{
 #if defined(__SEC_ASSET_H_)
 if (purch_sec_assets_selected != "NONE")
-	split_string_usl(purch_sec_assets_selected.c_str(), purch_sec_assets, ",");//WTW - Gen2 - split_tring internal RAFM function
+	split_string_usl(purch_sec_assets_selected.c_str(), purch_sec_assets, ",");
 #endif
+}
+{
 #if defined(__IRD_ASSET_H_)
-if (purch_ird_assets_selected != "NONE")
-	split_string_usl(purch_ird_assets_selected.c_str(), purch_ird_assets, ",");//WTW - Gen2 - split_tring internal RAFM function
+seg_id = seg_id;
+xstring purch_ird_assets_selected_local = purch_ird_assets_selected;
+
+if (purch_ird_assets_selected_local != "NONE")
+	split_string_usl(purch_ird_assets_selected_local.c_str(), purch_ird_assets, ",");
 #endif
+}
+{
 #if defined(__RE_ASSET_H_)
 if (purch_re_assets_selected != "NONE")
-	split_string_usl(purch_re_assets_selected.c_str(), purch_re_assets, ",");//WTW - Gen2 - split_tring internal RAFM function
+	split_string_usl(purch_re_assets_selected.c_str(), purch_re_assets, ",");
 #endif
+}
+{
 #if defined(__EQT_ASSET_H_)
 if (purch_eqt_assets_selected != "NONE")
-	split_string_usl(purch_eqt_assets_selected.c_str(), purch_eqt_assets, ",");//WTW - Gen2 - split_tring internal RAFM function
+	split_string_usl(purch_eqt_assets_selected.c_str(), purch_eqt_assets, ",");
 #endif
+}
+{
 #if defined(__EIO_ASSET_H_)
-if (purch_eio_assets_selected != "NONE")
-	split_string_usl(purch_eio_assets_selected.c_str(), purch_eio_assets, ",");//WTW - Gen2 - split_tring internal RAFM function
+seg_id = seg_id;
+xstring purch_eio_assets_selected_local = purch_eio_assets_selected;
+
+if (purch_eio_assets_selected_local != "NONE")
+	split_string_usl(purch_eio_assets_selected_local.c_str(), purch_eio_assets, ",");
 #endif
+}
 
 purch_asset_max_num
 = purch_bond_assets.size()
@@ -14965,16 +15053,24 @@ purch_assets_mths_to_maturity.resize(purch_asset_max_num);
 for (mp = 1; mp <= purch_bond_assets.size(); mp++)
 	{
 	purch_asset_id = purch_bond_assets[mp - 1];
+	int purch_bond_yrs_to_maturity_local = purch_bond_yrs_to_maturity;
+	purch_asset_id = purch_bond_assets[mp - 1];
+	StrEnum::EnumValue purch_bond_pmt_mode_local = purch_bond_pmt_mode;
+	
 	panum += set_purch_asset_defn(panum, mp, BOND, purch_asset_id, 
-								  purch_bond_pmt_mode, purch_bond_yrs_to_maturity, 0);
+								  purch_bond_pmt_mode_local, purch_bond_yrs_to_maturity_local, 0);
 	}
 #endif
 #if defined(__MTG_ASSET_H_)
 for (mp = 1; mp <= purch_mtg_assets.size(); mp++)
 	{
 	purch_asset_id = purch_mtg_assets[mp - 1];
+	int purch_mtg_yrs_to_maturity_local = purch_mtg_yrs_to_maturity;
+	purch_asset_id = purch_mtg_assets[mp - 1];
+	StrEnum::EnumValue purch_mtg_pmt_mode_local = purch_mtg_pmt_mode;
+
 	panum += set_purch_asset_defn(panum, mp, MORTGAGE, purch_asset_id, 
-								  purch_mtg_pmt_mode, purch_mtg_yrs_to_maturity, 0);
+								  purch_mtg_pmt_mode_local, purch_mtg_yrs_to_maturity_local, 0);
 	}
 #endif
 #if defined(__SEC_ASSET_H_)
@@ -14989,8 +15085,15 @@ for (mp = 1; mp <= purch_sec_assets.size(); mp++)
 for (mp = 1; mp <= purch_ird_assets.size(); mp++)
 	{
 	purch_asset_id = purch_ird_assets[mp - 1];
+	int purch_ird_yrs_to_maturity_local = purch_ird_yrs_to_maturity;
+	purch_asset_id = purch_ird_assets[mp - 1];
+	StrEnum::EnumValue purch_ird_rate_1_pmt_mode_local = purch_ird_rate_1_pmt_mode;
+	purch_asset_id = purch_ird_assets[mp - 1];
+	int purch_ird_mths_to_first_reset_local = purch_ird_mths_to_first_reset;
+
+	purch_asset_id = purch_ird_assets[mp - 1];
 	panum += set_purch_asset_defn(panum, mp, INTEREST_RATE_DERIVATIVE, purch_asset_id, 
-	                              purch_ird_rate_1_pmt_mode, purch_ird_yrs_to_maturity, purch_ird_mths_to_first_reset);	 
+	                              purch_ird_rate_1_pmt_mode_local, purch_ird_yrs_to_maturity_local, purch_ird_mths_to_first_reset_local);	 
 	}
 #endif
 #if defined(__RE_ASSET_H_)
@@ -15013,40 +15116,42 @@ for (mp = 1; mp <= purch_eqt_assets.size(); mp++)
 for (mp = 1; mp <= purch_eio_assets.size(); mp++)
 	{
 	purch_asset_id = purch_eio_assets[mp - 1];
+	int purch_eio_yrs_to_maturity_local = purch_eio_yrs_to_maturity;
+
 	panum += set_purch_asset_defn(panum, mp, INDEX_OPTION, purch_asset_id, 
-	                              UNDEFINED, purch_eio_yrs_to_maturity, 0);	 
+	                              UNDEFINED, purch_eio_yrs_to_maturity_local, 0);	 
 	}
 #endif
 
-// Write map to seg->SALFile
-if (seg->SALFile)
+// Write map to seg_element->SALFile
+if (seg_element->SALFile)
 	{
-	seg->SALFile << endl
+	seg_element->SALFile << endl
 				 << "purchmap_investment size," << purchmap_investment.size() 
 				 << endl;
 
 	if (purchmap_investment.size() > 0)
 		{
-		seg->SALFile << endl
+		seg_element->SALFile << endl
 					 << "purchmap_investment summary:" << endl
 					 << "model:id,purchmap_index,mths_to_maturity" << endl;
 
 		for (purchmap_iter = purchmap_investment.begin();
 			 purchmap_iter != purchmap_investment.end();
 			 purchmap_iter++)
-			seg->SALFile << purchmap_iter->first << ","
+			seg_element->SALFile << purchmap_iter->first << ","
 						 << purchmap_iter->second << ","
 						 << purch_assets_mths_to_maturity[purchmap_iter->second]
 						 << endl;
 		}
 
-	seg->SALFile << endl
+	seg_element->SALFile << endl
 				 << "purchmap_hedging size," << purchmap_hedging.size()
 				 << endl;
 
 	if (purchmap_hedging.size() > 0)
 		{
-		seg->SALFile << "purchmap_hedging summary:"
+		seg_element->SALFile << "purchmap_hedging summary:"
 					 << endl
 					 << "model:id,purchmap_index,mths_to_maturity"
 					 << endl;
@@ -15054,7 +15159,7 @@ if (seg->SALFile)
 		for (purchmap_iter = purchmap_hedging.begin();
 			 purchmap_iter != purchmap_hedging.end();
 			 purchmap_iter++)
-			seg->SALFile << purchmap_iter->first << ","
+			seg_element->SALFile << purchmap_iter->first << ","
 						 << purchmap_iter->second << ","
 						 << purch_assets_mths_to_maturity[purchmap_iter->second]
 						 << endl;
@@ -15068,6 +15173,634 @@ return;
 }
 
 
+
+#line 1 "write_bond_state_of_world_header_mp.INVSTRAT_ASSET.for"                                                                                   
+void INVSTRAT_ASSET::write_bond_state_of_world_header_mp(void)
+{
+#if defined(__BOND_ASSET_H_)
+static bool bond_header_first_time = true;
+
+xstring data_file_name_local = replaceWildcards(asset->sm_bond[0][0]->data_file_name);
+
+xstring bond_state_of_world_file
+= xstring(data_file_name_local(0 , data_file_name_local.find("_" + xstring(proj_set_loop_num) + "_" + xstring(proj_set_sub_loop_num) + ".csv")))
+  + "_" + xstring(proj_set_loop_num) + "_" + xstring(proj_set_sub_loop_num + 1) + ".csv";
+
+// Remove any old file
+if (bond_header_first_time)
+	{
+	bond_header_first_time = false;
+
+	struct stat buffer;
+	int stat_val = stat(bond_state_of_world_file.c_str(), &buffer);
+
+	// Delete existing file, so a new file can be created
+	if (stat_val == 0)
+		remove(bond_state_of_world_file);
+	}
+ 
+if (!bond_state_of_world_header_mp_output.is_open())
+	{
+   	bond_state_of_world_header_mp_output.setf(ios::fixed);
+	bond_state_of_world_header_mp_output.precision(12);
+	bond_state_of_world_header_mp_output.open(bond_state_of_world_file);
+
+	// Write header
+	bond_state_of_world_header_mp_output			// Values from inforce mp
+	<< "group" << ","						// col 0 = get_base_group_name(group)
+    << "seg_id_mp" << ","					// col 1 = seg_id
+	<< "asset_id_mp" << ","					// col 2 = asset_id
+	<< "use_mp" << ","						// col 3 = use_mp
+	<< "category_id_mp" << ","				// col 4 = category_id
+	<< "port_defn_mp" << ","				// col 5 = get_string_of_enum_val(port_defn)
+	<< "sale_class_mp" << ","				// col 6 = get_string_of_enum_val(sale_class)
+	<< "issue_date_mp" << ","				// col 7 = issue_date
+	<< "maturity_date_mp" << ","			// col 8 = maturity_date
+	<< "planned_sale_date_mp" << ","		// col 9 = planned_sale_date
+	<< "init_par_val_mp" << ","				// col 10 = notional_amt(last_proj_period)
+	<< "init_cost_basis_mp" << ","			// col 11 = cost_basis(last_proj_period)
+	<< "init_bk_val_mp" << ","				// col 12 = bk_val(last_proj_period)
+	<< "init_mkt_val_mp" << ","				// col 13 = mkt_val(last_proj_period)
+	<< "pmt_mode_mp" << ","					// col 14 = get_string_of_enum_val(pmt_mode)
+	<< "init_pmt_rate_mp" << ","			// col 15 = sm_bond_cf->pmt_rate(last_proj_period)
+	<< "par_val_at_issue_mp" << ","			// col 16 = par_val_at_issue
+	<< "taxable_pct_mp" << ","				// col 17 = taxable_pct
+	<< "call_opt_first_date_mp" << ","		// col 18 = call_opt_first_date
+	<< "call_price_defn_mp" << ","			// col 19 = get_string_of_enum_val(call_price_defn)
+	<< "call_defn_mp" << ","				// col 20 = get_string_of_enum_val(call_defn)
+	<< "yld_maint_addn_mp" << ","			// col 21 = yld_maint_addn
+	<< "put_opt_first_date_mp" << ","		// col 22 = put_opt_first_date
+	<< "put_defn_mp" << ","					// col 23 = get_string_of_enum_val(put_defn)
+	<< "sinking_fund_defn_mp" << ","		// col 24 = get_string_of_enum_val(sinking_fund_defn)
+	<< "adj_reset_category_id_mp" << ","	// col 25 = adj_reset_category_id
+	<< "adj_reset_scen_yr_mp" << ","		// col 26 = adj_reset_scen_yr
+	<< "adj_reset_scen_mult_mp" << ","		// col 27 = adj_reset_scen_mult
+	<< "adj_reset_renewal_addn_mp" << ","	// col 28 = adj_reset_renewal_addn
+	<< "adj_next_reset_date_mp" << ","		// col 29 = adj_next_reset_date
+	<< "adj_reset_mths_mp" << ","			// col 30 = adj_reset_mths
+	<< "adj_max_incr_per_reset_mp" << ","	// col 31 = adj_max_incr_per_reset
+	<< "adj_max_decr_per_reset_mp" << ","	// col 32 = adj_max_decr_per_reset
+	<< "adj_min_rate_mp" << ","				// col 33 = adj_min_rate
+	<< "adj_max_rate_mp" << ","				// col 34 = adj_max_rate
+	<< "avr_contribn_pct_mp" << ","			// col 35 = avr_contribn_pct
+	<< "avr_max_pct_mp" << ","				// col 36 = avr_max_pct
+	<< "avr_obj_pct_mp" << ","				// col 37 = avr_obj_pct
+	<< "rbc_c1_pct_mp" << ","				// col 38 = rbc_c1_pct
+	<< "unique_id_mp" << endl;				// col 39 = unique_id_mp
+	}
+
+bond_state_of_world_header_mp_output.close();
+#endif
+
+return;
+}
+
+
+
+#line 1 "write_eio_state_of_world_header_mp.INVSTRAT_ASSET.for"                                                                                   
+void INVSTRAT_ASSET::write_eio_state_of_world_header_mp(void)
+{
+#if defined(__EIO_ASSET_H_)
+static bool eio_header_first_time = true;
+
+xstring data_file_name_local = replaceWildcards(asset->sm_eio[0][0]->data_file_name);
+
+xstring eio_state_of_world_file
+= xstring(data_file_name_local(0 , data_file_name_local.find("_" + xstring(proj_set_loop_num) + "_" + xstring(proj_set_sub_loop_num) + ".csv")))
+  + "_" + xstring(proj_set_loop_num) + "_" + xstring(proj_set_sub_loop_num + 1) + ".csv";
+
+// Remove any old file
+if (eio_header_first_time)
+	{
+	eio_header_first_time = false;
+
+	struct stat buffer;
+	int stat_val = stat(eio_state_of_world_file.c_str(), &buffer);
+
+	// Delete existing file, so a new file can be created
+	if (stat_val == 0)
+		remove(eio_state_of_world_file);
+	}
+ 
+if (!eio_state_of_world_header_mp_output.is_open())
+	{
+   	eio_state_of_world_header_mp_output.setf(ios::fixed);
+	eio_state_of_world_header_mp_output.precision(12);
+	eio_state_of_world_header_mp_output.open(eio_state_of_world_file);
+
+	// Write header
+	eio_state_of_world_header_mp_output			// Values from inforce mp
+	<< "group" << ","							// col 0 = get_base_group_name(group)
+    << "seg_id_mp" << ","						// col 1 = seg_id
+	<< "asset_id_mp" << ","						// col 2 = asset_id
+	<< "use_mp" << ","							// col 3 = use_mp
+	<< "hdg_grp_code_mp" << ","					// col 4 = hdg_grp_code
+	<< "asset_index_mp" << ","					// col 5 = asset_index
+	<< "category_id_mp" << ","					// col 6 = category_id
+	<< "port_defn_mp" << ","					// col 7 = get_string_of_enum_val(port_defn)
+	<< "sale_class_mp" << ","					// col 8 = get_string_of_enum_val(sale_class)
+	<< "maturity_date_mp" << ","				// col 9 = maturity_date
+	<< "planned_sale_date_mp" << ","			// col 10 = planned_sale_date
+	<< "init_cost_basis_mp" << ","				// col 11 = cost_basis(last_proj_period)
+	<< "init_bk_val_mp" << ","					// col 12 = bk_val(last_proj_period)
+	<< "init_mkt_val_mp" << ","					// col 13 = mkt_val(last_proj_period)
+	<< "init_index_units_owned_mp" << ","		// col 14 = index_units_owned(last_proj_period)
+	<< "init_index_val_mp" << ","				// col 15 = index_val(last_proj_period)
+	<< "opt_strike_price_mp" << ","				// col 16 = opt_strike_price
+	<< "index_val_at_issue_mp" << ","			// col 17 = index_val_at_issue
+	<< "payout_index_max_mp" << ","				// col 18 = payout_index_max
+	<< "opt_defn_mp" << ","						// col 19 = get_string_of_enum_val(opt_defn)
+	<< "index_scen_mult_mp" << ","				// col 20 = index_scen_mult
+	<< "index_scen_addn_mp" << ","				// col 21 = index_scen_addn
+	<< "div_yld_scen_mult_mp" << ","			// col 22 = div_yld_scen_mult
+	<< "div_yld_addn_mp" << ","					// col 23 = div_yld_addn
+	<< "lookback_defn_mp" << ","				// col 24 = get_string_of_enum_val(lookback_defn)
+	<< "lookback_sampling_interval_mp" << ","	// col 25 = get_string_of_enum_val(lookback_sampling_interval)
+	<< "lookback_yrs_mp" << ","					// col 26 = lookback_yrs
+	<< "avr_contribn_pct_mp" << ","				// col 27 = avr_contribn_pct
+	<< "avr_max_pct_mp" << ","					// col 28 = avr_max_pct
+	<< "avr_obj_pct_mp" << ","					// col 29 = avr_obj_pct
+	<< "rbc_c1_pct_mp" << ","					// col 30 = rbc_c1_pct
+	<< "unique_id_mp" << endl;					// col 31 = unique_id_mp
+	}
+
+eio_state_of_world_header_mp_output.close();
+#endif
+
+return;
+}
+
+
+
+#line 1 "write_epa_state_of_world_header_mp.INVSTRAT_ASSET.for"                                                                                   
+void INVSTRAT_ASSET::write_epa_state_of_world_header_mp(void)
+{
+#if defined(__EPA_ASSET_H_)
+static bool epa_header_first_time = true;
+
+xstring data_file_name_local = replaceWildcards(asset->sm_epa[0]->data_file_name);
+
+xstring epa_state_of_world_file
+= xstring(data_file_name_local(0 , data_file_name_local.find("_" + xstring(proj_set_loop_num) + "_" + xstring(proj_set_sub_loop_num) + ".csv")))
+  + "_" + xstring(proj_set_loop_num) + "_" + xstring(proj_set_sub_loop_num + 1) + ".csv";
+
+// Remove any old file
+if (epa_header_first_time)
+	{
+	epa_header_first_time = false;
+
+	struct stat buffer;
+	int stat_val = stat(epa_state_of_world_file.c_str(), &buffer);
+
+	// Delete existing file, so a new file can be created
+	if (stat_val == 0)
+		remove(epa_state_of_world_file);
+	}
+ 
+if (!epa_state_of_world_header_mp_output.is_open())
+	{
+   	epa_state_of_world_header_mp_output.setf(ios::fixed);
+	epa_state_of_world_header_mp_output.precision(12);
+	epa_state_of_world_header_mp_output.open(epa_state_of_world_file);
+
+	// Write header
+	epa_state_of_world_header_mp_output			// Values from inforce mp
+	<< "group" << ","				// col 0 = get_base_group_name(group)
+    << "seg_id_mp" << ","			// col 1 = seg_id
+	<< "asset_id_mp" << ","			// col 2 = asset_id
+	<< "use_mp" << ","				// col 3 = use_mp
+	<< "epa_file_defn" << ","		// col 4 = get_string_of_enum_val(epa_file_defn)
+	<< "epa_file" << ","			// col 5 = epa_file
+	<< "asset_defn" << ","			// col 6 = get_string_of_enum_val(asset_defn)
+	<< "category_id" << ","			// col 7 = category_id
+	<< "sale_class" << ","			// col 8 = get_string_of_enum_val(sale_class)
+	<< "planned_sale_date" << ","	// col 9 = planned_sale_date
+	<< "pct_to_use_mp" << ","		// col 10 = epa_pct_remaining(last_proj_period)
+	<< "avr_contribn_pct_mp" << ","	// col 11 = avr_contribn_pct
+	<< "avr_max_pct_mp" << ","		// col 12 = avr_max_pct
+	<< "avr_obj_pct_mp" << ","		// col 13 = avr_obj_pct
+	<< "rbc_c1_pct_mp" << endl;				// col 38 = rbc_c1_pct
+	}
+
+epa_state_of_world_header_mp_output.close();
+#endif
+
+return;
+}
+
+
+
+#line 1 "write_eqt_state_of_world_header_mp.INVSTRAT_ASSET.for"                                                                                   
+void INVSTRAT_ASSET::write_eqt_state_of_world_header_mp(void)
+{
+#if defined(__EQT_ASSET_H_)
+static bool eqt_header_first_time = true;
+
+xstring data_file_name = replaceWildcards(asset->sm_eqt[0]->data_location());
+
+xstring eqt_state_of_world_file
+= xstring(data_file_name(0 , data_file_name.find("_" + xstring(proj_set_loop_num) + "_" + xstring(proj_set_sub_loop_num) + ".csv")))
+  + "_" + xstring(proj_set_loop_num) + "_" + xstring(proj_set_sub_loop_num + 1) + ".csv";
+
+// Remove any old file
+if (eqt_header_first_time)
+	{
+	eqt_header_first_time = false;
+
+	struct stat buffer;
+	int stat_val = stat(eqt_state_of_world_file.c_str(), &buffer);
+
+	// Delete existing file, so a new file can be created
+	if (stat_val == 0)
+		remove(eqt_state_of_world_file);
+	}
+ 
+if (!eqt_state_of_world_header_mp_output.is_open())
+	{
+   	eqt_state_of_world_header_mp_output.setf(ios::fixed);
+	eqt_state_of_world_header_mp_output.precision(12);
+	eqt_state_of_world_header_mp_output.open(eqt_state_of_world_file);
+
+	// Write header
+	eqt_state_of_world_header_mp_output			// Values from inforce mp
+	<< "group" << ","					// col 0 = get_base_group_name(group)
+    << "seg_id_mp" << ","				// col 1 = seg_id
+	<< "asset_id_mp" << ","				// col 2 = asset_id
+	<< "use_mp" << ","					// col 3 = use_mp
+	<< "asset_index_mp" << ","			// col 4 = asset_index
+	<< "category_id_mp" << ","			// col 5 = category_id
+	<< "sale_class_mp" << ","			// col 6 = get_string_of_enum_val(sale_class)
+	<< "planned_sale_date_mp" << ","	// col 7 = planned_sale_date
+	<< "init_cost_basis_mp" << ","		// col 8 = cost_basis(last_proj_period)
+	<< "init_bk_val_mp" << ","			// col 9 = bk_val(last_proj_period)
+	<< "init_mkt_val_mp" << ","			// col 10 = mkt_val(last_proj_period)
+	<< "mkt_growth_scen_mult_mp" << ","	// col 11 = mkt_growth_scen_mult
+	<< "mkt_growth_addn_mp" << ","		// col 12 = mkt_growth_addn
+	<< "init_div_yld_mp" << ","			// col 13 = init_div_yld
+	<< "div_yld_scen_mult_mp" << ","	// col 14 = div_yld_scen_mult
+	<< "div_yld_addn_mp" << ","			// col 15 = div_yld_addn
+	<< "avr_contribn_pct_mp" << ","		// col 16 = avr_contribn_pct
+	<< "avr_max_pct_mp" << ","			// col 17 = avr_max_pct
+	<< "avr_obj_pct_mp" << ","			// col 18 = avr_obj_pct
+	<< "rbc_c1_pct_mp" << endl;			// col 19 = rbc_c1_pct
+	}
+
+eqt_state_of_world_header_mp_output.close();
+#endif
+
+return;
+}
+
+
+
+#line 1 "write_ird_state_of_world_header_mp.INVSTRAT_ASSET.for"                                                                                   
+void INVSTRAT_ASSET::write_ird_state_of_world_header_mp(void)
+{
+#if defined(__IRD_ASSET_H_)
+static bool ird_header_first_time = true;
+
+xstring data_file_name_local = replaceWildcards(asset->sm_ird[0][0]->data_file_name);
+
+xstring ird_state_of_world_file
+= xstring(data_file_name_local(0 , data_file_name_local.find("_" + xstring(proj_set_loop_num) + "_" + xstring(proj_set_sub_loop_num) + ".csv")))
+  + "_" + xstring(proj_set_loop_num) + "_" + xstring(proj_set_sub_loop_num + 1) + ".csv";
+
+// Remove any old file
+if (ird_header_first_time)
+	{
+	ird_header_first_time = false;
+
+	struct stat buffer;
+	int stat_val = stat(ird_state_of_world_file.c_str(), &buffer);
+
+	// Delete existing file, so a new file can be created
+	if (stat_val == 0)
+		remove(ird_state_of_world_file);
+	}
+ 
+if (!ird_state_of_world_header_mp_output.is_open())
+	{
+   	ird_state_of_world_header_mp_output.setf(ios::fixed);
+	ird_state_of_world_header_mp_output.precision(12);
+	ird_state_of_world_header_mp_output.open(ird_state_of_world_file);
+
+	// Write header
+	ird_state_of_world_header_mp_output		// Values from inforce mp
+	<< "group" << ","					// col 0 = get_base_group_name(group)
+    << "seg_id_mp" << ","				// col 1 = seg_id
+	<< "asset_id_mp" << ","				// col 2 = asset_id
+	<< "use_mp" << ","					// col 3 = use_mp
+	<< "hdg_grp_code_mp" << ","         // col 4 = hdg_grp_code
+	<< "category_id_mp" << ","			// col 5 = category_id
+	<< "port_defn_mp" << ","			// col 6 = get_string_of_enum_val(port_defn)
+	<< "sale_class_mp" << ","			// col 7 = get_string_of_enum_val(sale_class)
+	<< "maturity_date_mp" << ","		// col 8 = maturity_date
+	<< "planned_sale_date_mp" << ","	// col 9 = planned_sale_date
+	<< "init_notional_amt_mp" << ","	// col 10 = notional_amt(last_proj_period)
+	<< "init_cost_basis_mp" << ","		// col 11 = cost_basis(last_proj_period)
+	<< "init_bk_val_mp" << ","			// col 12 = bk_val(last_proj_period)
+	<< "init_mkt_val_mp" << ","			// col 13 = mkt_val(last_proj_period)
+	<< "rate_1_pmt_mode_mp" << ","		// col 14 = get_string_of_enum_val(rate_1_pmt_mode)
+	<< "rate_2_pmt_mode_mp" << ","		// col 15 = get_string_of_enum_val(rate_2_pmt_mode)
+	<< "pmt_defn_mp" << ","				// col 16 = get_string_of_enum_val(pmt_defn)
+	<< "pmt_first_date_mp" << ","		// col 17 = pmt_first_date
+	<< "rate_1_category_id_mp" << ","   // col 18 = rate_1_category_id
+	<< "rate_1_scen_yr_mp" << ","		// col 19 = rate_1_scen_yr
+	<< "rate_1_scen_mult_mp" << ","		// col 20 = rate_1_scen_mult
+	<< "rate_1_addn_mp" << ","			// col 21 = rate_1_addn
+	<< "rate_2_category_id_mp" << ","   // col 22 = rate_2_category_id
+	<< "rate_2_scen_yr_mp" << ","		// col 23 = rate_2_scen_yr
+	<< "rate_2_scen_mult_mp" << ","		// col 24 = rate_2_scen_mult
+	<< "rate_2_addn_mp" << ","			// col 25 = rate_2_addn
+	<< "avr_contribn_pct_mp" << ","		// col 26 = avr_contribn_pct
+	<< "avr_max_pct_mp" << ","			// col 27 = avr_max_pct
+	<< "avr_obj_pct_mp" << ","			// col 28 = avr_obj_pct
+	<< "rbc_c1_pct_mp" << endl;			// col 29 = rbc_c1_pct
+	}
+
+ird_state_of_world_header_mp_output.close();
+#endif
+
+return;
+}
+
+
+
+#line 1 "write_mtg_state_of_world_header_mp.INVSTRAT_ASSET.for"                                                                                   
+void INVSTRAT_ASSET::write_mtg_state_of_world_header_mp(void)
+{
+#if defined(__MTG_ASSET_H_)
+static bool mtg_header_first_time = true;
+
+xstring data_file_name_local = replaceWildcards(asset->sm_mtg[0][0]->data_file_name);
+
+xstring mtg_state_of_world_file
+= xstring(data_file_name_local(0 , data_file_name_local.find("_" + xstring(proj_set_loop_num) + "_" + xstring(proj_set_sub_loop_num) + ".csv")))
+  + "_" + xstring(proj_set_loop_num) + "_" + xstring(proj_set_sub_loop_num + 1) + ".csv";
+
+// Remove any old file
+if (mtg_header_first_time)
+	{
+	mtg_header_first_time = false;
+
+	struct stat buffer;
+	int stat_val = stat(mtg_state_of_world_file.c_str(), &buffer);
+
+	// Delete existing file, so a new file can be created
+	if (stat_val == 0)
+		remove(mtg_state_of_world_file);
+	}
+ 
+if (!mtg_state_of_world_header_mp_output.is_open())
+	{
+   	mtg_state_of_world_header_mp_output.setf(ios::fixed);
+	mtg_state_of_world_header_mp_output.precision(12);
+	mtg_state_of_world_header_mp_output.open(mtg_state_of_world_file);
+
+	// Write header
+	mtg_state_of_world_header_mp_output			// Values from inforce mp
+	<< "group" << ","						// col 0 = get_base_group_name(group)
+    << "seg_id_mp" << ","					// col 1 = seg_id
+	<< "asset_id_mp" << ","					// col 2 = asset_id
+	<< "use_mp" << ","						// col 3 = use_mp
+	<< "category_id_mp" << ","				// col 4 = category_id
+	<< "port_defn_mp" << ","				// col 5 = get_string_of_enum_val(port_defn)
+	<< "sale_class_mp" << ","				// col 6 = get_string_of_enum_val(sale_class)
+	<< "issue_date_mp" << ","				// col 7 = issue_date
+	<< "maturity_date_mp" << ","			// col 8 = maturity_date
+	<< "amortzn_start_cy_mp" << ","			// col 9 = amortzn_start_cy
+	<< "planned_sale_date_mp" << ","		// col 10 = planned_sale_date
+	<< "init_par_val_mp" << ","				// col 11 = notional_amt(last_proj_period)
+	<< "init_cost_basis_mp" << ","			// col 12 = cost_basis(last_proj_period)
+	<< "init_bk_val_mp" << ","				// col 13 = bk_val(last_proj_period)
+	<< "init_mkt_val_mp" << ","				// col 14 = mkt_val(last_proj_period)
+	<< "pmt_mode_mp" << ","					// col 15 = get_string_of_enum_val(pmt_mode)
+	<< "init_pmt_rate_mp" << ","			// col 16 = sm_mtg_cf->pmt_rate(last_proj_period)
+	<< "servicing_fee_mp" << ","			// col 17 = servicing_fee
+	<< "prin_val_at_issue_mp" << ","		// col 18 = prin_val_at_issue
+	<< "prepmt_opt_first_date_mp" << ","	// col 19 = prepmt_opt_first_date
+	<< "prepmt_penalty_defn_mp" << ","		// col 20 = get_string_of_enum_val(prepmt_penalty_defn)
+	<< "balloon_defn_mp" << ","				// col 21 = balloon_pmt_defn
+	<< "balloon_date_mp" << ","				// col 22 = balloon_date
+	<< "yld_maint_addn_mp" << ","			// col 23 = yld_maint_addn
+	<< "adj_reset_category_id_mp" << ","    // col 24 = adj_reset_category_id
+	<< "adj_reset_scen_yr_mp" << ","		// col 25 = adj_reset_scen_yr
+	<< "adj_reset_scen_mult_mp" << ","		// col 26 = adj_reset_scen_mult
+	<< "adj_reset_renewal_addn_mp" << ","	// col 27 = adj_reset_renewal_addn
+	<< "adj_next_reset_date_mp" << ","		// col 28 = adj_next_reset_date
+	<< "adj_reset_mths_mp" << ","			// col 29 = adj_reset_mths
+	<< "adj_max_incr_per_reset_mp" << ","	// col 30 = adj_max_incr_per_reset
+	<< "adj_max_decr_per_reset_mp" << ","	// col 31 = adj_max_decr_per_reset
+	<< "adj_min_rate_mp" << ","				// col 32 = adj_min_rate
+	<< "adj_max_rate_mp" << ","				// col 33 = adj_max_rate
+	<< "avr_contribn_pct_mp" << ","			// col 34 = avr_contribn_pct
+	<< "avr_max_pct_mp" << ","				// col 35 = avr_max_pct
+	<< "avr_obj_pct_mp" << ","				// col 36 = avr_obj_pct
+	<< "rbc_c1_pct_mp" << ","				// col 37 = rbc_c1_pct
+	<< "unique_id_mp" << endl;				// col 38 = unique_id_mp
+	}
+
+mtg_state_of_world_header_mp_output.close();
+#endif
+
+return;
+}
+
+
+
+#line 1 "write_re_state_of_world_header_mp.INVSTRAT_ASSET.for"                                                                                   
+void INVSTRAT_ASSET::write_re_state_of_world_header_mp(void)
+{
+#if defined(__RE_ASSET_H_)
+static bool re_header_first_time = true;
+
+xstring data_file_name = replaceWildcards(asset->sm_re[0]->data_location());
+
+xstring re_state_of_world_file
+= xstring(data_file_name(0 , data_file_name.find("_" + xstring(proj_set_loop_num) + "_" + xstring(proj_set_sub_loop_num) + ".csv")))
+  + "_" + xstring(proj_set_loop_num) + "_" + xstring(proj_set_sub_loop_num + 1) + ".csv";
+
+// Remove any old file
+if (re_header_first_time)
+	{
+	re_header_first_time = false;
+
+	struct stat buffer;
+	int stat_val = stat(re_state_of_world_file.c_str(), &buffer);
+
+	// Delete existing file, so a new file can be created
+	if (stat_val == 0)
+		remove(re_state_of_world_file);
+	}
+ 
+if (!re_state_of_world_header_mp_output.is_open())
+	{
+   	re_state_of_world_header_mp_output.setf(ios::fixed);
+	re_state_of_world_header_mp_output.precision(12);
+	re_state_of_world_header_mp_output.open(re_state_of_world_file);
+
+	// Write header
+	re_state_of_world_header_mp_output			// Values from inforce mp
+	<< "group" << ","					// col 0 = get_base_group_name(group)
+    << "seg_id_mp" << ","				// col 1 = seg_id
+	<< "asset_id_mp" << ","				// col 2 = asset_id
+	<< "use_mp" << ","					// col 3 = use_mp
+	<< "asset_index_mp" << ","			// col 4 = asset_index
+	<< "category_id_mp" << ","			// col 5 = category_id
+	<< "sale_class_mp" << ","			// col 6 = get_string_of_enum_val(sale_class)
+	<< "next_pmt_date_mp" << ","		// col 7 = next_pmt_date
+	<< "planned_sale_date_mp" << ","	// col 8 = planned_sale_date
+	<< "init_cost_basis_mp" << ","		// col 9 = cost_basis(last_proj_period)
+	<< "init_bk_val_mp" << ","			// col 10 = bk_val(last_proj_period)
+	<< "init_mkt_val_mp" << ","			// col 11 = mkt_val(last_proj_period)
+	<< "pmt_mode_mp" << ","				// col 12 = get_string_of_enum_val(pmt_mode)
+	<< "mkt_growth_scen_mult_mp" << ","	// col 13 = mkt_growth_scen_mult
+	<< "mkt_growth_addn_mp" << ","		// col 14 = mkt_growth_addn
+	<< "depreciation_yrs_mp" << ","		// col 15 = depreciation_yrs
+	<< "init_rent_annualzd_mp" << ","	// col 16 = rent_pmt(last_proj_period)
+	<< "rental_growth_mp" << ","		// col 17 = get_string_of_enum_val(rental_growth)
+	<< "avr_contribn_pct_mp" << ","		// col 18 = avr_contribn_pct
+	<< "avr_max_pct_mp" << ","			// col 19 = avr_max_pct
+	<< "avr_obj_pct_mp" << ","			// col 20 = avr_obj_pct
+	<< "rbc_c1_pct_mp" << endl;			// col 21 = rbc_c1_pct
+	}
+
+re_state_of_world_header_mp_output.close();
+#endif
+
+return;
+}
+
+
+
+#line 1 "write_sec_state_of_world_header_mp.INVSTRAT_ASSET.for"                                                                                   
+void INVSTRAT_ASSET::write_sec_state_of_world_header_mp(void)
+{
+#if defined(__SEC_ASSET_H_)
+static bool sec_header_first_time = true;
+
+xstring data_file_name = replaceWildcards(asset->sm_sec[0]->data_location());
+
+xstring sec_state_of_world_file
+= xstring(data_file_name(0 , data_file_name.find("_" + xstring(proj_set_loop_num) + "_" + xstring(proj_set_sub_loop_num) + ".csv")))
+  + "_" + xstring(proj_set_loop_num) + "_" + xstring(proj_set_sub_loop_num + 1) + ".csv";
+
+// Remove any old file
+if (sec_header_first_time)
+	{
+	sec_header_first_time = false;
+
+	struct stat buffer;
+	int stat_val = stat(sec_state_of_world_file.c_str(), &buffer);
+
+	// Delete existing file, so a new file can be created
+	if (stat_val == 0)
+		remove(sec_state_of_world_file);
+	}
+ 
+if (!sec_state_of_world_header_mp_output.is_open())
+	{
+   	sec_state_of_world_header_mp_output.setf(ios::fixed);
+	sec_state_of_world_header_mp_output.precision(12);
+	sec_state_of_world_header_mp_output.open(sec_state_of_world_file);
+
+	// Write header
+	sec_state_of_world_header_mp_output						// Values from inforce mp
+	<< "group" << ","									// col 0 = get_base_group_name(group)
+    << "seg_id_mp" << ","								// col 1 = seg_id
+	<< "asset_id_mp" << ","								// col 2 = asset_id
+	<< "use_mp" << ","									// col 3 = use_mp
+	<< "category_id_mp" << ","							// col 4 = category_id
+	<< "cp_asset_id_mp" << ","							// col 5 = sm_sec_cp->asset_id
+	<< "cp_category_id_mp" << ","						// col 6 = sm_sec_cp->category_id	
+	<< "sale_class_mp" << ","							// col 7 = get_string_of_enum_val(sale_class)
+	<< "planned_sale_date_mp" << ","					// col 8 = planned_sale_date
+	<< "init_tranche_par_val_mp" << ","					// col 9 = notional_amt(last_proj_period)
+	<< "init_tranche_cost_basis_mp" << ","				// col 10 = cost_basis(last_proj_period)
+	<< "init_tranche_bk_val_mp" << ","					// col 11 = bk_val(last_proj_period)
+	<< "init_tranche_mkt_val_mp" << ","					// col 12 = mkt_val(last_proj_period)
+	<< "tranche_owned_mp" << ","						// col 13 = get_string_of_enum_val(tranche_owned)
+	<< "io_po_defn_mp" << ","							// col 14 = get_string_of_enum_val(io_po_defn)
+	<< "tranche_rate_category_id_mp" << ","             // col 15 = tranche_rate_category_id
+	<< "tranche_rate_scen_yr_mp" << ","					// col 16 = tranche_rate_scen_yr
+	<< "tranche_rate_scen_mult_mp" << ","				// col 17 = tranche_rate_scen_mult
+	<< "tranche_rate_addn_mp" << ","					// col 18 = tranche_rate_addn
+	<< "tranche_min_rate_mp" << ","						// col 18 = tranche_min_rate
+	<< "tranche_max_rate_mp" << ","						// col 20 = tranche_max_rate
+	<< "init_tranche_a_bal_mp" << ","					// col 21 = sm_sec_cf->tranche_a_prin(last_proj_period)
+	<< "init_tranche_b_bal_mp" << ","					// col 22 = sm_sec_cf->tranche_b_prin(last_proj_period)
+	<< "init_tranche_c_bal_mp" << ","					// col 23 = sm_sec_cf->tranche_c_prin(last_proj_period)
+	<< "init_pac1_std_bal_mp" << ","					// col 24 = sm_sec_cf->pac1_std_bal(last_proj_period)
+	<< "init_pac1z_bal_mp" << ","						// col 25 = sm_sec_cf->pac1z_bal(last_proj_period)
+	<< "init_pac1z_z_rate_mp" << ","					// col 26 = pac1z_rate
+	<< "init_pac2a_bal_mp" << ","						// col 27 = sm_sec_cf->pac2a_bal(last_proj_period)
+	<< "init_pac2b_bal_mp" << ","						// col 28 = sm_sec_cf->pac2b_bal(last_proj_period)
+	<< "pac2_accrual_defn_mp" << ","					// col 29 = get_string_of_enum_val(pac2_accrual_defn)
+	<< "init_pac2a_z_rate_mp" << ","					// col 30 = pac2_z_rate
+	<< "init_pac3_bal_mp" << ","						// col 31 = sm_sec_cf->pac3_bal(last_proj_period)
+	<< "init_pac3_z_rate_mp" << ","						// col 32 = pac3_z_rate
+	<< "init_tranche_z_bal_mp" << ","					// col 33 = sm_sec_cf->tranche_z_prin(last_proj_period)
+	<< "tranche_z_defn_mp" << ","						// col 34 = get_string_of_enum_val(tranche_z_defn)
+	<< "tranche_z_accrual_rate_mp" << ","				// col 35 = tranche_z_accrual_rate
+	<< "tranche_z_jump_speed_mp" << ","					// col 36 = tranche_z_jump_speed
+	<< "tranche_z_prepmt_priority_bef_jump_mp" << ","	// col 37 = get_string_of_enum_val(tranche_z_prepmt_priority_bef_jump)
+	<< "avr_contribn_pct_mp" << ","						// col 38 = avr_contribn_pct
+	<< "avr_max_pct_mp" << ","							// col 39 = avr_max_pct
+	<< "avr_obj_pct_mp" << ","							// col 40 = avr_obj_pct
+	<< "rbc_c1_pct_mp" << ","							// col 41 = rbc_c1_pct
+	<< "cp_issue_date_mp" << ","						// col 42 = sm_sec_cp->issue_date
+	<< "cp_maturity_date_mp" << ","						// col 43 = sm_sec_cp->maturity_date
+	<< "cp_init_prin_val_mp" << ","						// col 44 = sm_sec_cp->prin_val(last_proj_period)
+	<< "cp_amortzn_start_cy_mp" << ","					// col 45 = sm_sec_cp->amortzn_start_cy
+	<< "cp_pmt_mode_mp" << ","							// col 46 = sm_sec_cp->pmt_mode
+	<< "cp_init_pmt_rate_mp" << ","						// col 47 = sm_sec_cp->pmt_rate(last_proj_period)
+	<< "cp_servicing_fee_mp" << ","						// col 48 = sm_sec_cp->servicing_fee
+	<< "cp_prin_val_at_issue_mp" << ","					// col 49 = sm_sec_cp->prin_val_at_issue
+	<< "cp_prepmt_opt_first_date_mp" << ","				// col 50 = sm_sec_cp->prepmt_opt_first_date
+	<< "cp_prepmt_penalty_defn_mp" << ","				// col 51 = sm_sec_cp->prepmt_penalty_defn
+	<< "cp_balloon_date_mp" << ","						// col 52 = sm_sec_cp->balloon_date
+	<< "cp_yld_maint_addn_mp" << ","					// col 53 = sm_sec_cp->yld_maint_addn
+	<< "cp_adj_reset_category_id_mp" << ","				// col 54 = sm_sec_cp->adj_reset_category_id
+	<< "cp_adj_reset_scen_yr_mp" << ","					// col 55 = sm_sec_cp->adj_reset_scen_yr
+	<< "cp_adj_reset_scen_mult_mp" << ","				// col 56 = sm_sec_cp->adj_reset_scen_mult
+	<< "cp_adj_reset_renewal_addn_mp" << ","			// col 57 = sm_sec_cp->adj_reset_renewal_addn
+	<< "cp_adj_next_reset_date_mp" << ","				// col 58 = sm_sec_cp->adj_next_reset_date
+	<< "cp_adj_reset_mths_mp" << ","					// col 59 = sm_sec_cp->adj_reset_mths
+	<< "cp_adj_max_incr_per_reset_mp" << ","			// col 60 = sm_sec_cp->adj_max_incr_per_reset
+	<< "cp_adj_max_decr_per_reset_mp" << ","			// col 61 = sm_sec_cp->adj_max_decr_per_reset
+	<< "cp_adj_min_rate_mp" << ","						// col 62 = sm_sec_cp->adj_min_rate
+	<< "cp_adj_max_rate_mp" << ","						// col 63 = sm_sec_cp->adj_max_rate
+	<< "cp_init_prepmt_cumul_mp" << endl;					// col 64 = sm_sec_cp->sec_prepmt_cumul(last_proj_period)
+	}
+
+sec_state_of_world_header_mp_output.close();
+#endif
+
+return;
+}
+
+
+
+void INVSTRAT_ASSET::Terminator()
+{
+
+bond_state_of_world_header_mp_output.close();
+mtg_state_of_world_header_mp_output.close();
+sec_state_of_world_header_mp_output.close();
+ird_state_of_world_header_mp_output.close();
+re_state_of_world_header_mp_output.close();
+eqt_state_of_world_header_mp_output.close();
+eio_state_of_world_header_mp_output.close();
+epa_state_of_world_header_mp_output.close();
+PVCFile.close();
+YMFile.close();
+
+}
+
+FunctionPtr INVSTRAT_ASSET::RegisterTerminatorOnce = []() {
+    ::PushTerminator(Terminator);
+    RegisterTerminatorOnce = NoOp;
+};
 
 	static INVSTRAT_ASSET_UDF *modelOffset		= 0;
 
@@ -15310,6 +16043,13 @@ namespace {
 	};
 	const EnumList asset_sales_selectionEnumList(9, asset_sales_selectionChoicePairs);
 
+	// EnumList for convert_type                                                                                       
+	const ChoicePair convert_typeChoicePairs[] = {
+		ChoicePair(StrEnum::UNDEFINED, StrEnum::undefinedString)
+		,ChoicePair(StrEnum::_0, "0")
+	};
+	const EnumList convert_typeEnumList(1, convert_typeChoicePairs);
+
 	// EnumList for data_validation_defn                                                                                       
 	const ChoicePair data_validation_defnChoicePairs[] = {
 		ChoicePair(StrEnum::UNDEFINED, StrEnum::undefinedString)
@@ -15318,29 +16058,12 @@ namespace {
 	};
 	const EnumList data_validation_defnEnumList(2, data_validation_defnChoicePairs);
 
-	// EnumList for fast_stat_calc_aig                                                                                       
-	const ChoicePair fast_stat_calc_aigChoicePairs[] = {
+	// EnumList for gen2_declarations                                                                                       
+	const ChoicePair gen2_declarationsChoicePairs[] = {
 		ChoicePair(StrEnum::UNDEFINED, StrEnum::undefinedString)
-		,ChoicePair(StrEnum::YES, "Yes")
-		,ChoicePair(StrEnum::NO, "No")
+		,ChoicePair(StrEnum::ASSET_DATA, "Asset Data")
 	};
-	const EnumList fast_stat_calc_aigEnumList(2, fast_stat_calc_aigChoicePairs);
-
-	// EnumList for ia_prod_v3_rsd_2_aig                                                                                       
-	const ChoicePair ia_prod_v3_rsd_2_aigChoicePairs[] = {
-		ChoicePair(StrEnum::UNDEFINED, StrEnum::undefinedString)
-		,ChoicePair(StrEnum::YES, "Yes")
-		,ChoicePair(StrEnum::NO, "No")
-	};
-	const EnumList ia_prod_v3_rsd_2_aigEnumList(2, ia_prod_v3_rsd_2_aigChoicePairs);
-
-	// EnumList for ia_prod_v3_rsd_2_defer_cf_aig                                                                                       
-	const ChoicePair ia_prod_v3_rsd_2_defer_cf_aigChoicePairs[] = {
-		ChoicePair(StrEnum::UNDEFINED, StrEnum::undefinedString)
-		,ChoicePair(StrEnum::YES, "Yes")
-		,ChoicePair(StrEnum::NO, "No")
-	};
-	const EnumList ia_prod_v3_rsd_2_defer_cf_aigEnumList(2, ia_prod_v3_rsd_2_defer_cf_aigChoicePairs);
+	const EnumList gen2_declarationsEnumList(1, gen2_declarationsChoicePairs);
 
 	// EnumList for inv_purch_timing                                                                                       
 	const ChoicePair inv_purch_timingChoicePairs[] = {
@@ -15962,665 +16685,655 @@ TableMgr<VariantTable> INVSTRAT_ASSET::mgr_;
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
 	Descriptor(3, Attribute::DOUBLE,	"asset_sub_port_inv_tgt_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->asset_sub_port_inv_tgt_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(4, Attribute::STR_ENUM,	"data_validation_defn", -1, (size_t)&modelOffset->data_validation_defn,
+	Descriptor(4, Attribute::STR_ENUM,	"convert_type", -1, (size_t)&modelOffset->convert_type,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, &convert_typeEnumList, Feature(false)),
+	Descriptor(5, Attribute::STR_ENUM,	"data_validation_defn", -1, (size_t)&modelOffset->data_validation_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &data_validation_defnEnumList, Feature(true)),
-	Descriptor(5, Attribute::DOUBLE,	"dur_match_tgt_input", Descriptor::NOT_INDEXED, (size_t)&modelOffset->dur_match_tgt_input,
+	Descriptor(6, Attribute::INT,	"date_lookup", -1, (size_t)&modelOffset->date_lookup,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(6, Attribute::DOUBLE,	"dur_match_tolerance_input", Descriptor::NOT_INDEXED, (size_t)&modelOffset->dur_match_tolerance_input,
+	Descriptor(7, Attribute::DOUBLE,	"dur_match_tgt_input", Descriptor::NOT_INDEXED, (size_t)&modelOffset->dur_match_tgt_input,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(7, Attribute::DOUBLE,	"dur_wtd_sprd_adj_aig", Descriptor::NOT_INDEXED, (size_t)&modelOffset->dur_wtd_sprd_adj_aig,
+	Descriptor(8, Attribute::DOUBLE,	"dur_match_tolerance_input", Descriptor::NOT_INDEXED, (size_t)&modelOffset->dur_match_tolerance_input,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(8, Attribute::STR_ENUM,	"fast_stat_calc_aig", -1, (size_t)&modelOffset->fast_stat_calc_aig,
-				Descriptor::NOT_SHARED, false, false, (size_t)0, &fast_stat_calc_aigEnumList, Feature(true)),
-	Descriptor(9, Attribute::DOUBLE,	"foreclosure_int_pmt_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->foreclosure_int_pmt_mult,
+	Descriptor(9, Attribute::DOUBLE,	"dur_wtd_sprd_adj_crbg", Descriptor::NOT_INDEXED, (size_t)&modelOffset->dur_wtd_sprd_adj_crbg,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(10, Attribute::STRING,	"foreclosure_inv_id", -1, (size_t)&modelOffset->foreclosure_inv_id,
+	Descriptor(10, Attribute::DOUBLE,	"foreclosure_int_pmt_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->foreclosure_int_pmt_mult,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(11, Attribute::DOUBLE,	"foreclosure_prin_pmt_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->foreclosure_prin_pmt_mult,
+	Descriptor(11, Attribute::STRING,	"foreclosure_inv_id", -1, (size_t)&modelOffset->foreclosure_inv_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(12, Attribute::INT,	"gmwb_ind", -1, (size_t)&modelOffset->gmwb_ind,
+	Descriptor(12, Attribute::DOUBLE,	"foreclosure_prin_pmt_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->foreclosure_prin_pmt_mult,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(13, Attribute::STRING,	"gmwb_type_aig", -1, (size_t)&modelOffset->gmwb_type_aig,
+	Descriptor(13, Attribute::STR_ENUM,	"gen2_declarations", -1, (size_t)&modelOffset->gen2_declarations,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, &gen2_declarationsEnumList, Feature(true)),
+	Descriptor(14, Attribute::DOUBLE,	"inv_amt_min", Descriptor::NOT_INDEXED, (size_t)&modelOffset->inv_amt_min,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(14, Attribute::STR_ENUM,	"ia_prod_v3_rsd_2_aig", -1, (size_t)&modelOffset->ia_prod_v3_rsd_2_aig,
-				Descriptor::NOT_SHARED, false, false, (size_t)0, &ia_prod_v3_rsd_2_aigEnumList, Feature(true)),
-	Descriptor(15, Attribute::STR_ENUM,	"ia_prod_v3_rsd_2_defer_cf_aig", -1, (size_t)&modelOffset->ia_prod_v3_rsd_2_defer_cf_aig,
-				Descriptor::NOT_SHARED, false, false, (size_t)0, &ia_prod_v3_rsd_2_defer_cf_aigEnumList, Feature(true)),
-	Descriptor(16, Attribute::DOUBLE,	"inv_amt_min", Descriptor::NOT_INDEXED, (size_t)&modelOffset->inv_amt_min,
-				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(17, Attribute::STR_ENUM,	"inv_purch_timing", -1, (size_t)&modelOffset->inv_purch_timing,
+	Descriptor(15, Attribute::STR_ENUM,	"inv_purch_timing", -1, (size_t)&modelOffset->inv_purch_timing,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &inv_purch_timingEnumList, Feature(true)),
-	Descriptor(18, Attribute::DOUBLE,	"inv_strat_cash_tgt_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->inv_strat_cash_tgt_pct,
+	Descriptor(16, Attribute::DOUBLE,	"inv_strat_cash_tgt_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->inv_strat_cash_tgt_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(19, Attribute::STR_ENUM,	"inv_strat_closest", -1, (size_t)&modelOffset->inv_strat_closest,
+	Descriptor(17, Attribute::STR_ENUM,	"inv_strat_closest", -1, (size_t)&modelOffset->inv_strat_closest,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &inv_strat_closestEnumList, Feature(true)),
-	Descriptor(20, Attribute::STR_ENUM,	"inv_strat_distribn_defn", -1, (size_t)&modelOffset->inv_strat_distribn_defn,
+	Descriptor(18, Attribute::STR_ENUM,	"inv_strat_distribn_defn", -1, (size_t)&modelOffset->inv_strat_distribn_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &inv_strat_distribn_defnEnumList, Feature(true)),
-	Descriptor(21, Attribute::DOUBLE,	"inv_strat_dur_wtd_sprd_adj_aig", Descriptor::NOT_INDEXED, (size_t)&modelOffset->inv_strat_dur_wtd_sprd_adj_aig,
+	Descriptor(19, Attribute::DOUBLE,	"inv_strat_dur_wtd_sprd_adj_crbg", Descriptor::NOT_INDEXED, (size_t)&modelOffset->inv_strat_dur_wtd_sprd_adj_crbg,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(22, Attribute::STR_ENUM,	"inv_strat_economic_compare_defn", -1, (size_t)&modelOffset->inv_strat_economic_compare_defn,
+	Descriptor(20, Attribute::STR_ENUM,	"inv_strat_economic_compare_defn", -1, (size_t)&modelOffset->inv_strat_economic_compare_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &inv_strat_economic_compare_defnEnumList, Feature(true)),
-	Descriptor(23, Attribute::DOUBLE,	"inv_strat_economic_dur_match_tgt_incr", Descriptor::NOT_INDEXED, (size_t)&modelOffset->inv_strat_economic_dur_match_tgt_incr,
+	Descriptor(21, Attribute::DOUBLE,	"inv_strat_economic_dur_match_tgt_incr", Descriptor::NOT_INDEXED, (size_t)&modelOffset->inv_strat_economic_dur_match_tgt_incr,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(24, Attribute::DOUBLE,	"inv_strat_economic_dur_match_tolerance_incr", Descriptor::NOT_INDEXED, (size_t)&modelOffset->inv_strat_economic_dur_match_tolerance_incr,
+	Descriptor(22, Attribute::DOUBLE,	"inv_strat_economic_dur_match_tolerance_incr", Descriptor::NOT_INDEXED, (size_t)&modelOffset->inv_strat_economic_dur_match_tolerance_incr,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(25, Attribute::DOUBLE,	"inv_strat_economic_fixed_test_val", Descriptor::NOT_INDEXED, (size_t)&modelOffset->inv_strat_economic_fixed_test_val,
+	Descriptor(23, Attribute::DOUBLE,	"inv_strat_economic_fixed_test_val", Descriptor::NOT_INDEXED, (size_t)&modelOffset->inv_strat_economic_fixed_test_val,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(26, Attribute::INT,	"inv_strat_economic_lag_mths", -1, (size_t)&modelOffset->inv_strat_economic_lag_mths,
+	Descriptor(24, Attribute::INT,	"inv_strat_economic_lag_mths", -1, (size_t)&modelOffset->inv_strat_economic_lag_mths,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(27, Attribute::STRING,	"inv_strat_economic_longer", -1, (size_t)&modelOffset->inv_strat_economic_longer,
+	Descriptor(25, Attribute::STRING,	"inv_strat_economic_longer", -1, (size_t)&modelOffset->inv_strat_economic_longer,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(28, Attribute::STRING,	"inv_strat_economic_longest", -1, (size_t)&modelOffset->inv_strat_economic_longest,
+	Descriptor(26, Attribute::STRING,	"inv_strat_economic_longest", -1, (size_t)&modelOffset->inv_strat_economic_longest,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(29, Attribute::INT,	"inv_strat_economic_mths", -1, (size_t)&modelOffset->inv_strat_economic_mths,
+	Descriptor(27, Attribute::INT,	"inv_strat_economic_mths", -1, (size_t)&modelOffset->inv_strat_economic_mths,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(30, Attribute::STRING,	"inv_strat_economic_planned", -1, (size_t)&modelOffset->inv_strat_economic_planned,
+	Descriptor(28, Attribute::STRING,	"inv_strat_economic_planned", -1, (size_t)&modelOffset->inv_strat_economic_planned,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(31, Attribute::DOUBLE,	"inv_strat_economic_rate_1_term", Descriptor::NOT_INDEXED, (size_t)&modelOffset->inv_strat_economic_rate_1_term,
+	Descriptor(29, Attribute::DOUBLE,	"inv_strat_economic_rate_1_term", Descriptor::NOT_INDEXED, (size_t)&modelOffset->inv_strat_economic_rate_1_term,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(32, Attribute::DOUBLE,	"inv_strat_economic_rate_2_term", Descriptor::NOT_INDEXED, (size_t)&modelOffset->inv_strat_economic_rate_2_term,
+	Descriptor(30, Attribute::DOUBLE,	"inv_strat_economic_rate_2_term", Descriptor::NOT_INDEXED, (size_t)&modelOffset->inv_strat_economic_rate_2_term,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(33, Attribute::STRING,	"inv_strat_economic_shorter", -1, (size_t)&modelOffset->inv_strat_economic_shorter,
+	Descriptor(31, Attribute::STRING,	"inv_strat_economic_shorter", -1, (size_t)&modelOffset->inv_strat_economic_shorter,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(34, Attribute::STRING,	"inv_strat_economic_shortest", -1, (size_t)&modelOffset->inv_strat_economic_shortest,
+	Descriptor(32, Attribute::STRING,	"inv_strat_economic_shortest", -1, (size_t)&modelOffset->inv_strat_economic_shortest,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(35, Attribute::STR_ENUM,	"inv_strat_economic_test_calc_defn", -1, (size_t)&modelOffset->inv_strat_economic_test_calc_defn,
+	Descriptor(33, Attribute::STR_ENUM,	"inv_strat_economic_test_calc_defn", -1, (size_t)&modelOffset->inv_strat_economic_test_calc_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &inv_strat_economic_test_calc_defnEnumList, Feature(true)),
-	Descriptor(36, Attribute::STR_ENUM,	"inv_strat_economic_test_defn", -1, (size_t)&modelOffset->inv_strat_economic_test_defn,
+	Descriptor(34, Attribute::STR_ENUM,	"inv_strat_economic_test_defn", -1, (size_t)&modelOffset->inv_strat_economic_test_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &inv_strat_economic_test_defnEnumList, Feature(true)),
-	Descriptor(37, Attribute::INT,	"inv_strat_economic_test_num", -1, (size_t)&modelOffset->inv_strat_economic_test_num,
+	Descriptor(35, Attribute::INT,	"inv_strat_economic_test_num", -1, (size_t)&modelOffset->inv_strat_economic_test_num,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(38, Attribute::INT,	"inv_strat_economic_tests", -1, (size_t)&modelOffset->inv_strat_economic_tests,
+	Descriptor(36, Attribute::INT,	"inv_strat_economic_tests", -1, (size_t)&modelOffset->inv_strat_economic_tests,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(39, Attribute::STRING,	"inv_strat_id", -1, (size_t)&modelOffset->inv_strat_id,
+	Descriptor(37, Attribute::STRING,	"inv_strat_id", -1, (size_t)&modelOffset->inv_strat_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(40, Attribute::STRING,	"inv_strat_planned", -1, (size_t)&modelOffset->inv_strat_planned,
+	Descriptor(38, Attribute::STRING,	"inv_strat_planned", -1, (size_t)&modelOffset->inv_strat_planned,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(41, Attribute::STRING,	"inv_strat_planned_longer", -1, (size_t)&modelOffset->inv_strat_planned_longer,
+	Descriptor(39, Attribute::STRING,	"inv_strat_planned_longer", -1, (size_t)&modelOffset->inv_strat_planned_longer,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(42, Attribute::STRING,	"inv_strat_planned_longest", -1, (size_t)&modelOffset->inv_strat_planned_longest,
+	Descriptor(40, Attribute::STRING,	"inv_strat_planned_longest", -1, (size_t)&modelOffset->inv_strat_planned_longest,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(43, Attribute::STRING,	"inv_strat_planned_shorter", -1, (size_t)&modelOffset->inv_strat_planned_shorter,
+	Descriptor(41, Attribute::STRING,	"inv_strat_planned_shorter", -1, (size_t)&modelOffset->inv_strat_planned_shorter,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(44, Attribute::STRING,	"inv_strat_planned_shortest", -1, (size_t)&modelOffset->inv_strat_planned_shortest,
+	Descriptor(42, Attribute::STRING,	"inv_strat_planned_shortest", -1, (size_t)&modelOffset->inv_strat_planned_shortest,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(45, Attribute::DOUBLE,	"inv_strat_portfolio_sprd_adj_aig", Descriptor::NOT_INDEXED, (size_t)&modelOffset->inv_strat_portfolio_sprd_adj_aig,
+	Descriptor(43, Attribute::DOUBLE,	"inv_strat_port_sprd_adj_crbg", Descriptor::NOT_INDEXED, (size_t)&modelOffset->inv_strat_port_sprd_adj_crbg,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(46, Attribute::INT,	"mths_since_issue", -1, (size_t)&modelOffset->mths_since_issue,
+	Descriptor(44, Attribute::INT,	"mths_since_issue", -1, (size_t)&modelOffset->mths_since_issue,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(47, Attribute::STR_ENUM,	"neg_cash_flow_cash_bal_defn", -1, (size_t)&modelOffset->neg_cash_flow_cash_bal_defn,
+	Descriptor(45, Attribute::STR_ENUM,	"neg_cash_flow_cash_bal_defn", -1, (size_t)&modelOffset->neg_cash_flow_cash_bal_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &neg_cash_flow_cash_bal_defnEnumList, Feature(true)),
-	Descriptor(48, Attribute::DOUBLE,	"neg_cash_flow_cash_thresh_addn", Descriptor::NOT_INDEXED, (size_t)&modelOffset->neg_cash_flow_cash_thresh_addn,
+	Descriptor(46, Attribute::DOUBLE,	"neg_cash_flow_cash_thresh_addn", Descriptor::NOT_INDEXED, (size_t)&modelOffset->neg_cash_flow_cash_thresh_addn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(49, Attribute::DOUBLE,	"neg_cash_flow_cash_thresh_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->neg_cash_flow_cash_thresh_pct,
+	Descriptor(47, Attribute::DOUBLE,	"neg_cash_flow_cash_thresh_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->neg_cash_flow_cash_thresh_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(50, Attribute::STRING,	"neg_cash_flow_neg_assets", -1, (size_t)&modelOffset->neg_cash_flow_neg_assets,
+	Descriptor(48, Attribute::STRING,	"neg_cash_flow_neg_assets", -1, (size_t)&modelOffset->neg_cash_flow_neg_assets,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(51, Attribute::INT,	"neg_cash_flow_sale_priority_avail_for_sale", -1, (size_t)&modelOffset->neg_cash_flow_sale_priority_avail_for_sale,
+	Descriptor(49, Attribute::INT,	"neg_cash_flow_sale_priority_avail_for_sale", -1, (size_t)&modelOffset->neg_cash_flow_sale_priority_avail_for_sale,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(52, Attribute::INT,	"neg_cash_flow_sale_priority_held_to_maturity", -1, (size_t)&modelOffset->neg_cash_flow_sale_priority_held_to_maturity,
+	Descriptor(50, Attribute::INT,	"neg_cash_flow_sale_priority_held_to_maturity", -1, (size_t)&modelOffset->neg_cash_flow_sale_priority_held_to_maturity,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(53, Attribute::INT,	"neg_cash_flow_sale_priority_not_assigned", -1, (size_t)&modelOffset->neg_cash_flow_sale_priority_not_assigned,
+	Descriptor(51, Attribute::INT,	"neg_cash_flow_sale_priority_not_assigned", -1, (size_t)&modelOffset->neg_cash_flow_sale_priority_not_assigned,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(54, Attribute::INT,	"neg_cash_flow_sale_priority_trading", -1, (size_t)&modelOffset->neg_cash_flow_sale_priority_trading,
+	Descriptor(52, Attribute::INT,	"neg_cash_flow_sale_priority_trading", -1, (size_t)&modelOffset->neg_cash_flow_sale_priority_trading,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(55, Attribute::STR_ENUM,	"neg_cash_flow_sale_selection_defn", -1, (size_t)&modelOffset->neg_cash_flow_sale_selection_defn,
+	Descriptor(53, Attribute::STR_ENUM,	"neg_cash_flow_sale_selection_defn", -1, (size_t)&modelOffset->neg_cash_flow_sale_selection_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &neg_cash_flow_sale_selection_defnEnumList, Feature(true)),
-	Descriptor(56, Attribute::STR_ENUM,	"neg_cash_flow_strat", -1, (size_t)&modelOffset->neg_cash_flow_strat,
+	Descriptor(54, Attribute::STR_ENUM,	"neg_cash_flow_strat", -1, (size_t)&modelOffset->neg_cash_flow_strat,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &neg_cash_flow_stratEnumList, Feature(true)),
-	Descriptor(57, Attribute::STR_ENUM,	"neg_cash_flow_strat_economic", -1, (size_t)&modelOffset->neg_cash_flow_strat_economic,
+	Descriptor(55, Attribute::STR_ENUM,	"neg_cash_flow_strat_economic", -1, (size_t)&modelOffset->neg_cash_flow_strat_economic,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &neg_cash_flow_strat_economicEnumList, Feature(true)),
-	Descriptor(58, Attribute::STR_ENUM,	"neg_cash_flow_strat_economic_cash_bal_defn", -1, (size_t)&modelOffset->neg_cash_flow_strat_economic_cash_bal_defn,
+	Descriptor(56, Attribute::STR_ENUM,	"neg_cash_flow_strat_economic_cash_bal_defn", -1, (size_t)&modelOffset->neg_cash_flow_strat_economic_cash_bal_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &neg_cash_flow_strat_economic_cash_bal_defnEnumList, Feature(true)),
-	Descriptor(59, Attribute::DOUBLE,	"neg_cash_flow_strat_economic_cash_thresh_addn", Descriptor::NOT_INDEXED, (size_t)&modelOffset->neg_cash_flow_strat_economic_cash_thresh_addn,
+	Descriptor(57, Attribute::DOUBLE,	"neg_cash_flow_strat_economic_cash_thresh_addn", Descriptor::NOT_INDEXED, (size_t)&modelOffset->neg_cash_flow_strat_economic_cash_thresh_addn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(60, Attribute::DOUBLE,	"neg_cash_flow_strat_economic_cash_thresh_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->neg_cash_flow_strat_economic_cash_thresh_pct,
+	Descriptor(58, Attribute::DOUBLE,	"neg_cash_flow_strat_economic_cash_thresh_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->neg_cash_flow_strat_economic_cash_thresh_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(61, Attribute::STR_ENUM,	"neg_cash_flow_strat_economic_compare_defn", -1, (size_t)&modelOffset->neg_cash_flow_strat_economic_compare_defn,
+	Descriptor(59, Attribute::STR_ENUM,	"neg_cash_flow_strat_economic_compare_defn", -1, (size_t)&modelOffset->neg_cash_flow_strat_economic_compare_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &neg_cash_flow_strat_economic_compare_defnEnumList, Feature(true)),
-	Descriptor(62, Attribute::DOUBLE,	"neg_cash_flow_strat_economic_fixed_test_val", Descriptor::NOT_INDEXED, (size_t)&modelOffset->neg_cash_flow_strat_economic_fixed_test_val,
+	Descriptor(60, Attribute::DOUBLE,	"neg_cash_flow_strat_economic_fixed_test_val", Descriptor::NOT_INDEXED, (size_t)&modelOffset->neg_cash_flow_strat_economic_fixed_test_val,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(63, Attribute::INT,	"neg_cash_flow_strat_economic_lag_mths", -1, (size_t)&modelOffset->neg_cash_flow_strat_economic_lag_mths,
+	Descriptor(61, Attribute::INT,	"neg_cash_flow_strat_economic_lag_mths", -1, (size_t)&modelOffset->neg_cash_flow_strat_economic_lag_mths,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(64, Attribute::INT,	"neg_cash_flow_strat_economic_mths", -1, (size_t)&modelOffset->neg_cash_flow_strat_economic_mths,
+	Descriptor(62, Attribute::INT,	"neg_cash_flow_strat_economic_mths", -1, (size_t)&modelOffset->neg_cash_flow_strat_economic_mths,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(65, Attribute::STRING,	"neg_cash_flow_strat_economic_neg_assets", -1, (size_t)&modelOffset->neg_cash_flow_strat_economic_neg_assets,
+	Descriptor(63, Attribute::STRING,	"neg_cash_flow_strat_economic_neg_assets", -1, (size_t)&modelOffset->neg_cash_flow_strat_economic_neg_assets,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(66, Attribute::DOUBLE,	"neg_cash_flow_strat_economic_rate_1_term", Descriptor::NOT_INDEXED, (size_t)&modelOffset->neg_cash_flow_strat_economic_rate_1_term,
+	Descriptor(64, Attribute::DOUBLE,	"neg_cash_flow_strat_economic_rate_1_term", Descriptor::NOT_INDEXED, (size_t)&modelOffset->neg_cash_flow_strat_economic_rate_1_term,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(67, Attribute::DOUBLE,	"neg_cash_flow_strat_economic_rate_2_term", Descriptor::NOT_INDEXED, (size_t)&modelOffset->neg_cash_flow_strat_economic_rate_2_term,
+	Descriptor(65, Attribute::DOUBLE,	"neg_cash_flow_strat_economic_rate_2_term", Descriptor::NOT_INDEXED, (size_t)&modelOffset->neg_cash_flow_strat_economic_rate_2_term,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(68, Attribute::INT,	"neg_cash_flow_strat_economic_sale_priority_avail_for_sale", -1, (size_t)&modelOffset->neg_cash_flow_strat_economic_sale_priority_avail_for_sale,
+	Descriptor(66, Attribute::INT,	"neg_cash_flow_strat_economic_sale_priority_avail_for_sale", -1, (size_t)&modelOffset->neg_cash_flow_strat_economic_sale_priority_avail_for_sale,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(69, Attribute::INT,	"neg_cash_flow_strat_economic_sale_priority_held_to_maturity", -1, (size_t)&modelOffset->neg_cash_flow_strat_economic_sale_priority_held_to_maturity,
+	Descriptor(67, Attribute::INT,	"neg_cash_flow_strat_economic_sale_priority_held_to_maturity", -1, (size_t)&modelOffset->neg_cash_flow_strat_economic_sale_priority_held_to_maturity,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(70, Attribute::INT,	"neg_cash_flow_strat_economic_sale_priority_not_assigned", -1, (size_t)&modelOffset->neg_cash_flow_strat_economic_sale_priority_not_assigned,
+	Descriptor(68, Attribute::INT,	"neg_cash_flow_strat_economic_sale_priority_not_assigned", -1, (size_t)&modelOffset->neg_cash_flow_strat_economic_sale_priority_not_assigned,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(71, Attribute::INT,	"neg_cash_flow_strat_economic_sale_priority_trading", -1, (size_t)&modelOffset->neg_cash_flow_strat_economic_sale_priority_trading,
+	Descriptor(69, Attribute::INT,	"neg_cash_flow_strat_economic_sale_priority_trading", -1, (size_t)&modelOffset->neg_cash_flow_strat_economic_sale_priority_trading,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(72, Attribute::STR_ENUM,	"neg_cash_flow_strat_economic_sale_selection_defn", -1, (size_t)&modelOffset->neg_cash_flow_strat_economic_sale_selection_defn,
+	Descriptor(70, Attribute::STR_ENUM,	"neg_cash_flow_strat_economic_sale_selection_defn", -1, (size_t)&modelOffset->neg_cash_flow_strat_economic_sale_selection_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &neg_cash_flow_strat_economic_sale_selection_defnEnumList, Feature(true)),
-	Descriptor(73, Attribute::STR_ENUM,	"neg_cash_flow_strat_economic_test_calc_defn", -1, (size_t)&modelOffset->neg_cash_flow_strat_economic_test_calc_defn,
+	Descriptor(71, Attribute::STR_ENUM,	"neg_cash_flow_strat_economic_test_calc_defn", -1, (size_t)&modelOffset->neg_cash_flow_strat_economic_test_calc_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &neg_cash_flow_strat_economic_test_calc_defnEnumList, Feature(true)),
-	Descriptor(74, Attribute::STR_ENUM,	"neg_cash_flow_strat_economic_test_defn", -1, (size_t)&modelOffset->neg_cash_flow_strat_economic_test_defn,
+	Descriptor(72, Attribute::STR_ENUM,	"neg_cash_flow_strat_economic_test_defn", -1, (size_t)&modelOffset->neg_cash_flow_strat_economic_test_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &neg_cash_flow_strat_economic_test_defnEnumList, Feature(true)),
-	Descriptor(75, Attribute::INT,	"neg_cash_flow_strat_economic_test_num", -1, (size_t)&modelOffset->neg_cash_flow_strat_economic_test_num,
+	Descriptor(73, Attribute::INT,	"neg_cash_flow_strat_economic_test_num", -1, (size_t)&modelOffset->neg_cash_flow_strat_economic_test_num,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(76, Attribute::INT,	"neg_cash_flow_strat_economic_tests", -1, (size_t)&modelOffset->neg_cash_flow_strat_economic_tests,
+	Descriptor(74, Attribute::INT,	"neg_cash_flow_strat_economic_tests", -1, (size_t)&modelOffset->neg_cash_flow_strat_economic_tests,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(77, Attribute::STR_ENUM,	"neg_cash_flow_strat_planned", -1, (size_t)&modelOffset->neg_cash_flow_strat_planned,
+	Descriptor(75, Attribute::STR_ENUM,	"neg_cash_flow_strat_planned", -1, (size_t)&modelOffset->neg_cash_flow_strat_planned,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &neg_cash_flow_strat_plannedEnumList, Feature(true)),
-	Descriptor(78, Attribute::STR_ENUM,	"neg_cash_flow_strat_planned_cash_bal_defn", -1, (size_t)&modelOffset->neg_cash_flow_strat_planned_cash_bal_defn,
+	Descriptor(76, Attribute::STR_ENUM,	"neg_cash_flow_strat_planned_cash_bal_defn", -1, (size_t)&modelOffset->neg_cash_flow_strat_planned_cash_bal_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &neg_cash_flow_strat_planned_cash_bal_defnEnumList, Feature(true)),
-	Descriptor(79, Attribute::DOUBLE,	"neg_cash_flow_strat_planned_cash_thresh_addn", Descriptor::NOT_INDEXED, (size_t)&modelOffset->neg_cash_flow_strat_planned_cash_thresh_addn,
+	Descriptor(77, Attribute::DOUBLE,	"neg_cash_flow_strat_planned_cash_thresh_addn", Descriptor::NOT_INDEXED, (size_t)&modelOffset->neg_cash_flow_strat_planned_cash_thresh_addn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(80, Attribute::DOUBLE,	"neg_cash_flow_strat_planned_cash_thresh_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->neg_cash_flow_strat_planned_cash_thresh_pct,
+	Descriptor(78, Attribute::DOUBLE,	"neg_cash_flow_strat_planned_cash_thresh_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->neg_cash_flow_strat_planned_cash_thresh_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(81, Attribute::STRING,	"neg_cash_flow_strat_planned_neg_assets", -1, (size_t)&modelOffset->neg_cash_flow_strat_planned_neg_assets,
+	Descriptor(79, Attribute::STRING,	"neg_cash_flow_strat_planned_neg_assets", -1, (size_t)&modelOffset->neg_cash_flow_strat_planned_neg_assets,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(82, Attribute::INT,	"neg_cash_flow_strat_planned_sale_priority_avail_for_sale", -1, (size_t)&modelOffset->neg_cash_flow_strat_planned_sale_priority_avail_for_sale,
+	Descriptor(80, Attribute::INT,	"neg_cash_flow_strat_planned_sale_priority_avail_for_sale", -1, (size_t)&modelOffset->neg_cash_flow_strat_planned_sale_priority_avail_for_sale,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(83, Attribute::INT,	"neg_cash_flow_strat_planned_sale_priority_held_to_maturity", -1, (size_t)&modelOffset->neg_cash_flow_strat_planned_sale_priority_held_to_maturity,
+	Descriptor(81, Attribute::INT,	"neg_cash_flow_strat_planned_sale_priority_held_to_maturity", -1, (size_t)&modelOffset->neg_cash_flow_strat_planned_sale_priority_held_to_maturity,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(84, Attribute::INT,	"neg_cash_flow_strat_planned_sale_priority_not_assigned", -1, (size_t)&modelOffset->neg_cash_flow_strat_planned_sale_priority_not_assigned,
+	Descriptor(82, Attribute::INT,	"neg_cash_flow_strat_planned_sale_priority_not_assigned", -1, (size_t)&modelOffset->neg_cash_flow_strat_planned_sale_priority_not_assigned,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(85, Attribute::INT,	"neg_cash_flow_strat_planned_sale_priority_trading", -1, (size_t)&modelOffset->neg_cash_flow_strat_planned_sale_priority_trading,
+	Descriptor(83, Attribute::INT,	"neg_cash_flow_strat_planned_sale_priority_trading", -1, (size_t)&modelOffset->neg_cash_flow_strat_planned_sale_priority_trading,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(86, Attribute::STR_ENUM,	"neg_cash_flow_strat_planned_sale_selection_defn", -1, (size_t)&modelOffset->neg_cash_flow_strat_planned_sale_selection_defn,
+	Descriptor(84, Attribute::STR_ENUM,	"neg_cash_flow_strat_planned_sale_selection_defn", -1, (size_t)&modelOffset->neg_cash_flow_strat_planned_sale_selection_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &neg_cash_flow_strat_planned_sale_selection_defnEnumList, Feature(true)),
-	Descriptor(87, Attribute::STRING,	"plan_code_aig", -1, (size_t)&modelOffset->plan_code_aig,
+	Descriptor(85, Attribute::DOUBLE,	"port_sprd_adj_crbg", Descriptor::NOT_INDEXED, (size_t)&modelOffset->port_sprd_adj_crbg,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(88, Attribute::DOUBLE,	"portfolio_sprd_adj_aig", Descriptor::NOT_INDEXED, (size_t)&modelOffset->portfolio_sprd_adj_aig,
+	Descriptor(86, Attribute::STRING,	"proj_date", -1, (size_t)&modelOffset->proj_date,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(89, Attribute::STRING,	"proj_date", -1, (size_t)&modelOffset->proj_date,
+	Descriptor(87, Attribute::STRING,	"purch_asset_id", -1, (size_t)&modelOffset->purch_asset_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(90, Attribute::STRING,	"purch_asset_id", -1, (size_t)&modelOffset->purch_asset_id,
+	Descriptor(88, Attribute::STRING,	"purch_asset_sub_port_id", -1, (size_t)&modelOffset->purch_asset_sub_port_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(91, Attribute::STRING,	"purch_asset_sub_port_id", -1, (size_t)&modelOffset->purch_asset_sub_port_id,
+	Descriptor(89, Attribute::DOUBLE,	"purch_asset_weight", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_asset_weight,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(92, Attribute::DOUBLE,	"purch_asset_weight", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_asset_weight,
+	Descriptor(90, Attribute::STRING,	"purch_bond_adj_category_id", -1, (size_t)&modelOffset->purch_bond_adj_category_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(93, Attribute::STRING,	"purch_bond_adj_category_id", -1, (size_t)&modelOffset->purch_bond_adj_category_id,
+	Descriptor(91, Attribute::DOUBLE,	"purch_bond_adj_max_above_init", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_adj_max_above_init,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(94, Attribute::DOUBLE,	"purch_bond_adj_max_above_init", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_adj_max_above_init,
+	Descriptor(92, Attribute::DOUBLE,	"purch_bond_adj_max_below_init", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_adj_max_below_init,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(95, Attribute::DOUBLE,	"purch_bond_adj_max_below_init", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_adj_max_below_init,
+	Descriptor(93, Attribute::DOUBLE,	"purch_bond_adj_max_reset_decr", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_adj_max_reset_decr,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(96, Attribute::DOUBLE,	"purch_bond_adj_max_reset_decr", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_adj_max_reset_decr,
+	Descriptor(94, Attribute::DOUBLE,	"purch_bond_adj_max_reset_incr", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_adj_max_reset_incr,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(97, Attribute::DOUBLE,	"purch_bond_adj_max_reset_incr", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_adj_max_reset_incr,
+	Descriptor(95, Attribute::INT,	"purch_bond_adj_reset_mths", -1, (size_t)&modelOffset->purch_bond_adj_reset_mths,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(98, Attribute::INT,	"purch_bond_adj_reset_mths", -1, (size_t)&modelOffset->purch_bond_adj_reset_mths,
+	Descriptor(96, Attribute::DOUBLE,	"purch_bond_adj_scen_addn_init", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_adj_scen_addn_init,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(99, Attribute::DOUBLE,	"purch_bond_adj_scen_addn_init", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_adj_scen_addn_init,
+	Descriptor(97, Attribute::DOUBLE,	"purch_bond_adj_scen_addn_renewal", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_adj_scen_addn_renewal,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(100, Attribute::DOUBLE,	"purch_bond_adj_scen_addn_renewal", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_adj_scen_addn_renewal,
+	Descriptor(98, Attribute::DOUBLE,	"purch_bond_adj_scen_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_adj_scen_mult,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(101, Attribute::DOUBLE,	"purch_bond_adj_scen_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_adj_scen_mult,
+	Descriptor(99, Attribute::DOUBLE,	"purch_bond_adj_scen_yr", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_adj_scen_yr,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(102, Attribute::DOUBLE,	"purch_bond_adj_scen_yr", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_adj_scen_yr,
+	Descriptor(100, Attribute::STRING,	"purch_bond_assets_selected", -1, (size_t)&modelOffset->purch_bond_assets_selected,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(103, Attribute::STRING,	"purch_bond_assets_selected", -1, (size_t)&modelOffset->purch_bond_assets_selected,
+	Descriptor(101, Attribute::DOUBLE,	"purch_bond_avr_contribn_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_avr_contribn_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(104, Attribute::DOUBLE,	"purch_bond_avr_contribn_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_avr_contribn_pct,
+	Descriptor(102, Attribute::DOUBLE,	"purch_bond_avr_max_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_avr_max_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(105, Attribute::DOUBLE,	"purch_bond_avr_max_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_avr_max_pct,
+	Descriptor(103, Attribute::DOUBLE,	"purch_bond_avr_obj_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_avr_obj_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(106, Attribute::DOUBLE,	"purch_bond_avr_obj_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_avr_obj_pct,
-				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(107, Attribute::STR_ENUM,	"purch_bond_call_defn", -1, (size_t)&modelOffset->purch_bond_call_defn,
+	Descriptor(104, Attribute::STR_ENUM,	"purch_bond_call_defn", -1, (size_t)&modelOffset->purch_bond_call_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &purch_bond_call_defnEnumList, Feature(true)),
-	Descriptor(108, Attribute::DOUBLE,	"purch_bond_call_prem_addn", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_call_prem_addn,
+	Descriptor(105, Attribute::DOUBLE,	"purch_bond_call_prem_addn", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_call_prem_addn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(109, Attribute::DOUBLE,	"purch_bond_call_prem_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_call_prem_mult,
+	Descriptor(106, Attribute::DOUBLE,	"purch_bond_call_prem_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_call_prem_mult,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(110, Attribute::STR_ENUM,	"purch_bond_call_price_defn", -1, (size_t)&modelOffset->purch_bond_call_price_defn,
+	Descriptor(107, Attribute::STR_ENUM,	"purch_bond_call_price_defn", -1, (size_t)&modelOffset->purch_bond_call_price_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &purch_bond_call_price_defnEnumList, Feature(true)),
-	Descriptor(111, Attribute::DOUBLE,	"purch_bond_call_price_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_call_price_pct,
+	Descriptor(108, Attribute::DOUBLE,	"purch_bond_call_price_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_call_price_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(112, Attribute::DOUBLE,	"purch_bond_call_protect_yrs", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_call_protect_yrs,
+	Descriptor(109, Attribute::DOUBLE,	"purch_bond_call_protect_yrs", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_call_protect_yrs,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(113, Attribute::STRING,	"purch_bond_category_id", -1, (size_t)&modelOffset->purch_bond_category_id,
+	Descriptor(110, Attribute::STRING,	"purch_bond_category_id", -1, (size_t)&modelOffset->purch_bond_category_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(114, Attribute::DOUBLE,	"purch_bond_first_par_call_yr", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_first_par_call_yr,
+	Descriptor(111, Attribute::DOUBLE,	"purch_bond_first_par_call_yr", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_first_par_call_yr,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(115, Attribute::DOUBLE,	"purch_bond_first_par_put_yr", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_first_par_put_yr,
+	Descriptor(112, Attribute::DOUBLE,	"purch_bond_first_par_put_yr", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_first_par_put_yr,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(116, Attribute::STRING,	"purch_bond_grp_id", -1, (size_t)&modelOffset->purch_bond_grp_id,
+	Descriptor(113, Attribute::STRING,	"purch_bond_grp_id", -1, (size_t)&modelOffset->purch_bond_grp_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(117, Attribute::STR_ENUM,	"purch_bond_pmt_mode", -1, (size_t)&modelOffset->purch_bond_pmt_mode,
+	Descriptor(114, Attribute::STR_ENUM,	"purch_bond_pmt_mode", -1, (size_t)&modelOffset->purch_bond_pmt_mode,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &purch_bond_pmt_modeEnumList, Feature(true)),
-	Descriptor(118, Attribute::STR_ENUM,	"purch_bond_port_defn", -1, (size_t)&modelOffset->purch_bond_port_defn,
+	Descriptor(115, Attribute::STR_ENUM,	"purch_bond_port_defn", -1, (size_t)&modelOffset->purch_bond_port_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &purch_bond_port_defnEnumList, Feature(true)),
-	Descriptor(119, Attribute::STR_ENUM,	"purch_bond_put_defn", -1, (size_t)&modelOffset->purch_bond_put_defn,
+	Descriptor(116, Attribute::STR_ENUM,	"purch_bond_put_defn", -1, (size_t)&modelOffset->purch_bond_put_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &purch_bond_put_defnEnumList, Feature(true)),
-	Descriptor(120, Attribute::DOUBLE,	"purch_bond_put_prem_addn", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_put_prem_addn,
+	Descriptor(117, Attribute::DOUBLE,	"purch_bond_put_prem_addn", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_put_prem_addn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(121, Attribute::DOUBLE,	"purch_bond_put_prem_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_put_prem_mult,
+	Descriptor(118, Attribute::DOUBLE,	"purch_bond_put_prem_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_put_prem_mult,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(122, Attribute::STR_ENUM,	"purch_bond_put_price_defn", -1, (size_t)&modelOffset->purch_bond_put_price_defn,
+	Descriptor(119, Attribute::STR_ENUM,	"purch_bond_put_price_defn", -1, (size_t)&modelOffset->purch_bond_put_price_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &purch_bond_put_price_defnEnumList, Feature(true)),
-	Descriptor(123, Attribute::DOUBLE,	"purch_bond_put_price_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_put_price_pct,
+	Descriptor(120, Attribute::DOUBLE,	"purch_bond_put_price_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_put_price_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(124, Attribute::DOUBLE,	"purch_bond_put_protect_yrs", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_put_protect_yrs,
+	Descriptor(121, Attribute::DOUBLE,	"purch_bond_put_protect_yrs", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_put_protect_yrs,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(125, Attribute::STR_ENUM,	"purch_bond_rate_defn", -1, (size_t)&modelOffset->purch_bond_rate_defn,
+	Descriptor(122, Attribute::STR_ENUM,	"purch_bond_rate_defn", -1, (size_t)&modelOffset->purch_bond_rate_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &purch_bond_rate_defnEnumList, Feature(true)),
-	Descriptor(126, Attribute::DOUBLE,	"purch_bond_rate_diff", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_rate_diff,
+	Descriptor(123, Attribute::DOUBLE,	"purch_bond_rate_diff", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_rate_diff,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(127, Attribute::DOUBLE,	"purch_bond_rbc_c1_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_rbc_c1_pct,
+	Descriptor(124, Attribute::DOUBLE,	"purch_bond_rbc_c1_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_rbc_c1_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(128, Attribute::STR_ENUM,	"purch_bond_sale_class", -1, (size_t)&modelOffset->purch_bond_sale_class,
+	Descriptor(125, Attribute::STR_ENUM,	"purch_bond_sale_class", -1, (size_t)&modelOffset->purch_bond_sale_class,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &purch_bond_sale_classEnumList, Feature(true)),
-	Descriptor(129, Attribute::STR_ENUM,	"purch_bond_sinking_fund_defn", -1, (size_t)&modelOffset->purch_bond_sinking_fund_defn,
+	Descriptor(126, Attribute::STR_ENUM,	"purch_bond_sinking_fund_defn", -1, (size_t)&modelOffset->purch_bond_sinking_fund_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &purch_bond_sinking_fund_defnEnumList, Feature(true)),
-	Descriptor(130, Attribute::DOUBLE,	"purch_bond_sinking_fund_prin_pmt_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_sinking_fund_prin_pmt_pct,
+	Descriptor(127, Attribute::DOUBLE,	"purch_bond_sinking_fund_prin_pmt_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_sinking_fund_prin_pmt_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(131, Attribute::DOUBLE,	"purch_bond_taxable_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_taxable_pct,
+	Descriptor(128, Attribute::DOUBLE,	"purch_bond_taxable_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_taxable_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(132, Attribute::DOUBLE,	"purch_bond_yld_maint_addn", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_yld_maint_addn,
+	Descriptor(129, Attribute::DOUBLE,	"purch_bond_yld_maint_addn", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_yld_maint_addn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(133, Attribute::DOUBLE,	"purch_bond_yrs_to_maturity", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_yrs_to_maturity,
+	Descriptor(130, Attribute::DOUBLE,	"purch_bond_yrs_to_maturity", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_bond_yrs_to_maturity,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(134, Attribute::STRING,	"purch_eio_asset_index", -1, (size_t)&modelOffset->purch_eio_asset_index,
+	Descriptor(131, Attribute::STRING,	"purch_eio_asset_index", -1, (size_t)&modelOffset->purch_eio_asset_index,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(135, Attribute::STRING,	"purch_eio_assets_selected", -1, (size_t)&modelOffset->purch_eio_assets_selected,
+	Descriptor(132, Attribute::STRING,	"purch_eio_assets_selected", -1, (size_t)&modelOffset->purch_eio_assets_selected,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(136, Attribute::DOUBLE,	"purch_eio_avr_contribn_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_eio_avr_contribn_pct,
+	Descriptor(133, Attribute::DOUBLE,	"purch_eio_avr_contribn_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_eio_avr_contribn_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(137, Attribute::DOUBLE,	"purch_eio_avr_max_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_eio_avr_max_pct,
+	Descriptor(134, Attribute::DOUBLE,	"purch_eio_avr_max_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_eio_avr_max_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(138, Attribute::DOUBLE,	"purch_eio_avr_obj_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_eio_avr_obj_pct,
+	Descriptor(135, Attribute::DOUBLE,	"purch_eio_avr_obj_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_eio_avr_obj_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(139, Attribute::STRING,	"purch_eio_category_id", -1, (size_t)&modelOffset->purch_eio_category_id,
+	Descriptor(136, Attribute::STRING,	"purch_eio_category_id", -1, (size_t)&modelOffset->purch_eio_category_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(140, Attribute::DOUBLE,	"purch_eio_div_yld_addn", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_eio_div_yld_addn,
+	Descriptor(137, Attribute::DOUBLE,	"purch_eio_div_yld_addn", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_eio_div_yld_addn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(141, Attribute::DOUBLE,	"purch_eio_div_yld_scen_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_eio_div_yld_scen_mult,
+	Descriptor(138, Attribute::DOUBLE,	"purch_eio_div_yld_scen_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_eio_div_yld_scen_mult,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(142, Attribute::STRING,	"purch_eio_grp_id", -1, (size_t)&modelOffset->purch_eio_grp_id,
+	Descriptor(139, Attribute::STRING,	"purch_eio_grp_id", -1, (size_t)&modelOffset->purch_eio_grp_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(143, Attribute::DOUBLE,	"purch_eio_index_scen_addn", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_eio_index_scen_addn,
+	Descriptor(140, Attribute::DOUBLE,	"purch_eio_index_scen_addn", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_eio_index_scen_addn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(144, Attribute::DOUBLE,	"purch_eio_index_scen_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_eio_index_scen_mult,
+	Descriptor(141, Attribute::DOUBLE,	"purch_eio_index_scen_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_eio_index_scen_mult,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(145, Attribute::STR_ENUM,	"purch_eio_lookback_defn", -1, (size_t)&modelOffset->purch_eio_lookback_defn,
+	Descriptor(142, Attribute::STR_ENUM,	"purch_eio_lookback_defn", -1, (size_t)&modelOffset->purch_eio_lookback_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &purch_eio_lookback_defnEnumList, Feature(true)),
-	Descriptor(146, Attribute::STR_ENUM,	"purch_eio_lookback_sampling_interval", -1, (size_t)&modelOffset->purch_eio_lookback_sampling_interval,
+	Descriptor(143, Attribute::STR_ENUM,	"purch_eio_lookback_sampling_interval", -1, (size_t)&modelOffset->purch_eio_lookback_sampling_interval,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &purch_eio_lookback_sampling_intervalEnumList, Feature(true)),
-	Descriptor(147, Attribute::DOUBLE,	"purch_eio_lookback_yrs", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_eio_lookback_yrs,
+	Descriptor(144, Attribute::DOUBLE,	"purch_eio_lookback_yrs", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_eio_lookback_yrs,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(148, Attribute::STR_ENUM,	"purch_eio_opt_defn", -1, (size_t)&modelOffset->purch_eio_opt_defn,
+	Descriptor(145, Attribute::STR_ENUM,	"purch_eio_opt_defn", -1, (size_t)&modelOffset->purch_eio_opt_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &purch_eio_opt_defnEnumList, Feature(true)),
-	Descriptor(149, Attribute::DOUBLE,	"purch_eio_opt_strike_price", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_eio_opt_strike_price,
+	Descriptor(146, Attribute::DOUBLE,	"purch_eio_opt_strike_price", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_eio_opt_strike_price,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(150, Attribute::DOUBLE,	"purch_eio_payout_index_max", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_eio_payout_index_max,
+	Descriptor(147, Attribute::DOUBLE,	"purch_eio_payout_index_max", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_eio_payout_index_max,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(151, Attribute::STR_ENUM,	"purch_eio_port_defn", -1, (size_t)&modelOffset->purch_eio_port_defn,
+	Descriptor(148, Attribute::STR_ENUM,	"purch_eio_port_defn", -1, (size_t)&modelOffset->purch_eio_port_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &purch_eio_port_defnEnumList, Feature(true)),
-	Descriptor(152, Attribute::DOUBLE,	"purch_eio_rbc_c1_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_eio_rbc_c1_pct,
+	Descriptor(149, Attribute::DOUBLE,	"purch_eio_rbc_c1_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_eio_rbc_c1_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(153, Attribute::STR_ENUM,	"purch_eio_sale_class", -1, (size_t)&modelOffset->purch_eio_sale_class,
+	Descriptor(150, Attribute::STR_ENUM,	"purch_eio_sale_class", -1, (size_t)&modelOffset->purch_eio_sale_class,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &purch_eio_sale_classEnumList, Feature(true)),
-	Descriptor(154, Attribute::DOUBLE,	"purch_eio_yrs_to_maturity", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_eio_yrs_to_maturity,
+	Descriptor(151, Attribute::DOUBLE,	"purch_eio_yrs_to_maturity", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_eio_yrs_to_maturity,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(155, Attribute::STRING,	"purch_eqt_asset_index", -1, (size_t)&modelOffset->purch_eqt_asset_index,
+	Descriptor(152, Attribute::STRING,	"purch_eqt_asset_index", -1, (size_t)&modelOffset->purch_eqt_asset_index,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(156, Attribute::STRING,	"purch_eqt_assets_selected", -1, (size_t)&modelOffset->purch_eqt_assets_selected,
+	Descriptor(153, Attribute::STRING,	"purch_eqt_assets_selected", -1, (size_t)&modelOffset->purch_eqt_assets_selected,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(157, Attribute::DOUBLE,	"purch_eqt_avr_contribn_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_eqt_avr_contribn_pct,
+	Descriptor(154, Attribute::DOUBLE,	"purch_eqt_avr_contribn_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_eqt_avr_contribn_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(158, Attribute::DOUBLE,	"purch_eqt_avr_max_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_eqt_avr_max_pct,
+	Descriptor(155, Attribute::DOUBLE,	"purch_eqt_avr_max_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_eqt_avr_max_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(159, Attribute::DOUBLE,	"purch_eqt_avr_obj_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_eqt_avr_obj_pct,
+	Descriptor(156, Attribute::DOUBLE,	"purch_eqt_avr_obj_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_eqt_avr_obj_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(160, Attribute::STRING,	"purch_eqt_category_id", -1, (size_t)&modelOffset->purch_eqt_category_id,
+	Descriptor(157, Attribute::STRING,	"purch_eqt_category_id", -1, (size_t)&modelOffset->purch_eqt_category_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(161, Attribute::DOUBLE,	"purch_eqt_div_yld_addn", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_eqt_div_yld_addn,
+	Descriptor(158, Attribute::DOUBLE,	"purch_eqt_div_yld_addn", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_eqt_div_yld_addn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(162, Attribute::DOUBLE,	"purch_eqt_div_yld_scen_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_eqt_div_yld_scen_mult,
+	Descriptor(159, Attribute::DOUBLE,	"purch_eqt_div_yld_scen_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_eqt_div_yld_scen_mult,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(163, Attribute::STRING,	"purch_eqt_grp_id", -1, (size_t)&modelOffset->purch_eqt_grp_id,
+	Descriptor(160, Attribute::STRING,	"purch_eqt_grp_id", -1, (size_t)&modelOffset->purch_eqt_grp_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(164, Attribute::DOUBLE,	"purch_eqt_mkt_growth_addn", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_eqt_mkt_growth_addn,
+	Descriptor(161, Attribute::DOUBLE,	"purch_eqt_mkt_growth_addn", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_eqt_mkt_growth_addn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(165, Attribute::DOUBLE,	"purch_eqt_mkt_growth_scen_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_eqt_mkt_growth_scen_mult,
+	Descriptor(162, Attribute::DOUBLE,	"purch_eqt_mkt_growth_scen_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_eqt_mkt_growth_scen_mult,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(166, Attribute::STR_ENUM,	"purch_eqt_pmt_mode", -1, (size_t)&modelOffset->purch_eqt_pmt_mode,
+	Descriptor(163, Attribute::STR_ENUM,	"purch_eqt_pmt_mode", -1, (size_t)&modelOffset->purch_eqt_pmt_mode,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &purch_eqt_pmt_modeEnumList, Feature(true)),
-	Descriptor(167, Attribute::DOUBLE,	"purch_eqt_rbc_c1_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_eqt_rbc_c1_pct,
+	Descriptor(164, Attribute::DOUBLE,	"purch_eqt_rbc_c1_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_eqt_rbc_c1_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(168, Attribute::STR_ENUM,	"purch_eqt_sale_class", -1, (size_t)&modelOffset->purch_eqt_sale_class,
+	Descriptor(165, Attribute::STR_ENUM,	"purch_eqt_sale_class", -1, (size_t)&modelOffset->purch_eqt_sale_class,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &purch_eqt_sale_classEnumList, Feature(true)),
-	Descriptor(169, Attribute::STRING,	"purch_ird_assets_selected", -1, (size_t)&modelOffset->purch_ird_assets_selected,
+	Descriptor(166, Attribute::STRING,	"purch_ird_assets_selected", -1, (size_t)&modelOffset->purch_ird_assets_selected,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(170, Attribute::DOUBLE,	"purch_ird_avr_contribn_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_ird_avr_contribn_pct,
+	Descriptor(167, Attribute::DOUBLE,	"purch_ird_avr_contribn_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_ird_avr_contribn_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(171, Attribute::DOUBLE,	"purch_ird_avr_max_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_ird_avr_max_pct,
+	Descriptor(168, Attribute::DOUBLE,	"purch_ird_avr_max_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_ird_avr_max_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(172, Attribute::DOUBLE,	"purch_ird_avr_obj_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_ird_avr_obj_pct,
+	Descriptor(169, Attribute::DOUBLE,	"purch_ird_avr_obj_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_ird_avr_obj_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(173, Attribute::STRING,	"purch_ird_category_id", -1, (size_t)&modelOffset->purch_ird_category_id,
+	Descriptor(170, Attribute::STRING,	"purch_ird_category_id", -1, (size_t)&modelOffset->purch_ird_category_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(174, Attribute::STRING,	"purch_ird_grp_id", -1, (size_t)&modelOffset->purch_ird_grp_id,
+	Descriptor(171, Attribute::STRING,	"purch_ird_grp_id", -1, (size_t)&modelOffset->purch_ird_grp_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(175, Attribute::INT,	"purch_ird_mths_to_first_reset", -1, (size_t)&modelOffset->purch_ird_mths_to_first_reset,
+	Descriptor(172, Attribute::INT,	"purch_ird_mths_to_first_reset", -1, (size_t)&modelOffset->purch_ird_mths_to_first_reset,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(176, Attribute::STR_ENUM,	"purch_ird_pmt_defn", -1, (size_t)&modelOffset->purch_ird_pmt_defn,
+	Descriptor(173, Attribute::STR_ENUM,	"purch_ird_pmt_defn", -1, (size_t)&modelOffset->purch_ird_pmt_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &purch_ird_pmt_defnEnumList, Feature(true)),
-	Descriptor(177, Attribute::STR_ENUM,	"purch_ird_port_defn", -1, (size_t)&modelOffset->purch_ird_port_defn,
+	Descriptor(174, Attribute::STR_ENUM,	"purch_ird_port_defn", -1, (size_t)&modelOffset->purch_ird_port_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &purch_ird_port_defnEnumList, Feature(true)),
-	Descriptor(178, Attribute::DOUBLE,	"purch_ird_rate_1_addn", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_ird_rate_1_addn,
+	Descriptor(175, Attribute::DOUBLE,	"purch_ird_rate_1_addn", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_ird_rate_1_addn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(179, Attribute::STRING,	"purch_ird_rate_1_category_id", -1, (size_t)&modelOffset->purch_ird_rate_1_category_id,
+	Descriptor(176, Attribute::STRING,	"purch_ird_rate_1_category_id", -1, (size_t)&modelOffset->purch_ird_rate_1_category_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(180, Attribute::STR_ENUM,	"purch_ird_rate_1_defn", -1, (size_t)&modelOffset->purch_ird_rate_1_defn,
+	Descriptor(177, Attribute::STR_ENUM,	"purch_ird_rate_1_defn", -1, (size_t)&modelOffset->purch_ird_rate_1_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &purch_ird_rate_1_defnEnumList, Feature(true)),
-	Descriptor(181, Attribute::STR_ENUM,	"purch_ird_rate_1_pmt_mode", -1, (size_t)&modelOffset->purch_ird_rate_1_pmt_mode,
+	Descriptor(178, Attribute::STR_ENUM,	"purch_ird_rate_1_pmt_mode", -1, (size_t)&modelOffset->purch_ird_rate_1_pmt_mode,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &purch_ird_rate_1_pmt_modeEnumList, Feature(true)),
-	Descriptor(182, Attribute::DOUBLE,	"purch_ird_rate_1_scen_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_ird_rate_1_scen_mult,
+	Descriptor(179, Attribute::DOUBLE,	"purch_ird_rate_1_scen_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_ird_rate_1_scen_mult,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(183, Attribute::DOUBLE,	"purch_ird_rate_1_scen_yr", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_ird_rate_1_scen_yr,
+	Descriptor(180, Attribute::DOUBLE,	"purch_ird_rate_1_scen_yr", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_ird_rate_1_scen_yr,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(184, Attribute::DOUBLE,	"purch_ird_rate_2_addn", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_ird_rate_2_addn,
+	Descriptor(181, Attribute::DOUBLE,	"purch_ird_rate_2_addn", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_ird_rate_2_addn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(185, Attribute::STRING,	"purch_ird_rate_2_category_id", -1, (size_t)&modelOffset->purch_ird_rate_2_category_id,
+	Descriptor(182, Attribute::STRING,	"purch_ird_rate_2_category_id", -1, (size_t)&modelOffset->purch_ird_rate_2_category_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(186, Attribute::STR_ENUM,	"purch_ird_rate_2_defn", -1, (size_t)&modelOffset->purch_ird_rate_2_defn,
+	Descriptor(183, Attribute::STR_ENUM,	"purch_ird_rate_2_defn", -1, (size_t)&modelOffset->purch_ird_rate_2_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &purch_ird_rate_2_defnEnumList, Feature(true)),
-	Descriptor(187, Attribute::STR_ENUM,	"purch_ird_rate_2_pmt_mode", -1, (size_t)&modelOffset->purch_ird_rate_2_pmt_mode,
+	Descriptor(184, Attribute::STR_ENUM,	"purch_ird_rate_2_pmt_mode", -1, (size_t)&modelOffset->purch_ird_rate_2_pmt_mode,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &purch_ird_rate_2_pmt_modeEnumList, Feature(true)),
-	Descriptor(188, Attribute::DOUBLE,	"purch_ird_rate_2_scen_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_ird_rate_2_scen_mult,
+	Descriptor(185, Attribute::DOUBLE,	"purch_ird_rate_2_scen_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_ird_rate_2_scen_mult,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(189, Attribute::DOUBLE,	"purch_ird_rate_2_scen_yr", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_ird_rate_2_scen_yr,
+	Descriptor(186, Attribute::DOUBLE,	"purch_ird_rate_2_scen_yr", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_ird_rate_2_scen_yr,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(190, Attribute::DOUBLE,	"purch_ird_rbc_c1_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_ird_rbc_c1_pct,
+	Descriptor(187, Attribute::DOUBLE,	"purch_ird_rbc_c1_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_ird_rbc_c1_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(191, Attribute::STR_ENUM,	"purch_ird_sale_class", -1, (size_t)&modelOffset->purch_ird_sale_class,
+	Descriptor(188, Attribute::STR_ENUM,	"purch_ird_sale_class", -1, (size_t)&modelOffset->purch_ird_sale_class,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &purch_ird_sale_classEnumList, Feature(true)),
-	Descriptor(192, Attribute::DOUBLE,	"purch_ird_yrs_to_maturity", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_ird_yrs_to_maturity,
+	Descriptor(189, Attribute::DOUBLE,	"purch_ird_yrs_to_maturity", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_ird_yrs_to_maturity,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(193, Attribute::DOUBLE,	"purch_mtg_adj_addn_init", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_mtg_adj_addn_init,
+	Descriptor(190, Attribute::DOUBLE,	"purch_mtg_adj_addn_init", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_mtg_adj_addn_init,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(194, Attribute::DOUBLE,	"purch_mtg_adj_addn_renewal", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_mtg_adj_addn_renewal,
+	Descriptor(191, Attribute::DOUBLE,	"purch_mtg_adj_addn_renewal", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_mtg_adj_addn_renewal,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(195, Attribute::STRING,	"purch_mtg_adj_category_id", -1, (size_t)&modelOffset->purch_mtg_adj_category_id,
+	Descriptor(192, Attribute::STRING,	"purch_mtg_adj_category_id", -1, (size_t)&modelOffset->purch_mtg_adj_category_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(196, Attribute::DOUBLE,	"purch_mtg_adj_max_above_init", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_mtg_adj_max_above_init,
+	Descriptor(193, Attribute::DOUBLE,	"purch_mtg_adj_max_above_init", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_mtg_adj_max_above_init,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(197, Attribute::DOUBLE,	"purch_mtg_adj_max_below_init", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_mtg_adj_max_below_init,
+	Descriptor(194, Attribute::DOUBLE,	"purch_mtg_adj_max_below_init", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_mtg_adj_max_below_init,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(198, Attribute::DOUBLE,	"purch_mtg_adj_max_reset_decr", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_mtg_adj_max_reset_decr,
+	Descriptor(195, Attribute::DOUBLE,	"purch_mtg_adj_max_reset_decr", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_mtg_adj_max_reset_decr,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(199, Attribute::DOUBLE,	"purch_mtg_adj_max_reset_incr", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_mtg_adj_max_reset_incr,
+	Descriptor(196, Attribute::DOUBLE,	"purch_mtg_adj_max_reset_incr", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_mtg_adj_max_reset_incr,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(200, Attribute::INT,	"purch_mtg_adj_reset_mths", -1, (size_t)&modelOffset->purch_mtg_adj_reset_mths,
+	Descriptor(197, Attribute::INT,	"purch_mtg_adj_reset_mths", -1, (size_t)&modelOffset->purch_mtg_adj_reset_mths,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(201, Attribute::DOUBLE,	"purch_mtg_adj_scen_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_mtg_adj_scen_mult,
+	Descriptor(198, Attribute::DOUBLE,	"purch_mtg_adj_scen_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_mtg_adj_scen_mult,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(202, Attribute::DOUBLE,	"purch_mtg_adj_scen_yr", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_mtg_adj_scen_yr,
+	Descriptor(199, Attribute::DOUBLE,	"purch_mtg_adj_scen_yr", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_mtg_adj_scen_yr,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(203, Attribute::DOUBLE,	"purch_mtg_amortzn_yrs", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_mtg_amortzn_yrs,
+	Descriptor(200, Attribute::DOUBLE,	"purch_mtg_amortzn_yrs", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_mtg_amortzn_yrs,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(204, Attribute::STRING,	"purch_mtg_assets_selected", -1, (size_t)&modelOffset->purch_mtg_assets_selected,
+	Descriptor(201, Attribute::STRING,	"purch_mtg_assets_selected", -1, (size_t)&modelOffset->purch_mtg_assets_selected,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(205, Attribute::DOUBLE,	"purch_mtg_avr_contribn_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_mtg_avr_contribn_pct,
+	Descriptor(202, Attribute::DOUBLE,	"purch_mtg_avr_contribn_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_mtg_avr_contribn_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(206, Attribute::DOUBLE,	"purch_mtg_avr_max_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_mtg_avr_max_pct,
+	Descriptor(203, Attribute::DOUBLE,	"purch_mtg_avr_max_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_mtg_avr_max_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(207, Attribute::DOUBLE,	"purch_mtg_avr_obj_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_mtg_avr_obj_pct,
+	Descriptor(204, Attribute::DOUBLE,	"purch_mtg_avr_obj_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_mtg_avr_obj_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(208, Attribute::STR_ENUM,	"purch_mtg_balloon_defn", -1, (size_t)&modelOffset->purch_mtg_balloon_defn,
+	Descriptor(205, Attribute::STR_ENUM,	"purch_mtg_balloon_defn", -1, (size_t)&modelOffset->purch_mtg_balloon_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &purch_mtg_balloon_defnEnumList, Feature(true)),
-	Descriptor(209, Attribute::DOUBLE,	"purch_mtg_balloon_prin_pmt_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_mtg_balloon_prin_pmt_pct,
+	Descriptor(206, Attribute::DOUBLE,	"purch_mtg_balloon_prin_pmt_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_mtg_balloon_prin_pmt_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(210, Attribute::STRING,	"purch_mtg_category_id", -1, (size_t)&modelOffset->purch_mtg_category_id,
+	Descriptor(207, Attribute::STRING,	"purch_mtg_category_id", -1, (size_t)&modelOffset->purch_mtg_category_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(211, Attribute::DOUBLE,	"purch_mtg_first_par_prepmt_yr", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_mtg_first_par_prepmt_yr,
+	Descriptor(208, Attribute::DOUBLE,	"purch_mtg_first_par_prepmt_yr", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_mtg_first_par_prepmt_yr,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(212, Attribute::STRING,	"purch_mtg_grp_id", -1, (size_t)&modelOffset->purch_mtg_grp_id,
+	Descriptor(209, Attribute::STRING,	"purch_mtg_grp_id", -1, (size_t)&modelOffset->purch_mtg_grp_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(213, Attribute::STR_ENUM,	"purch_mtg_pmt_mode", -1, (size_t)&modelOffset->purch_mtg_pmt_mode,
+	Descriptor(210, Attribute::STR_ENUM,	"purch_mtg_pmt_mode", -1, (size_t)&modelOffset->purch_mtg_pmt_mode,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &purch_mtg_pmt_modeEnumList, Feature(true)),
-	Descriptor(214, Attribute::STR_ENUM,	"purch_mtg_port_defn", -1, (size_t)&modelOffset->purch_mtg_port_defn,
+	Descriptor(211, Attribute::STR_ENUM,	"purch_mtg_port_defn", -1, (size_t)&modelOffset->purch_mtg_port_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &purch_mtg_port_defnEnumList, Feature(true)),
-	Descriptor(215, Attribute::DOUBLE,	"purch_mtg_prepmt_penalty_addn", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_mtg_prepmt_penalty_addn,
+	Descriptor(212, Attribute::DOUBLE,	"purch_mtg_prepmt_penalty_addn", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_mtg_prepmt_penalty_addn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(216, Attribute::STR_ENUM,	"purch_mtg_prepmt_penalty_defn", -1, (size_t)&modelOffset->purch_mtg_prepmt_penalty_defn,
+	Descriptor(213, Attribute::STR_ENUM,	"purch_mtg_prepmt_penalty_defn", -1, (size_t)&modelOffset->purch_mtg_prepmt_penalty_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &purch_mtg_prepmt_penalty_defnEnumList, Feature(true)),
-	Descriptor(217, Attribute::DOUBLE,	"purch_mtg_prepmt_penalty_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_mtg_prepmt_penalty_mult,
+	Descriptor(214, Attribute::DOUBLE,	"purch_mtg_prepmt_penalty_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_mtg_prepmt_penalty_mult,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(218, Attribute::DOUBLE,	"purch_mtg_prepmt_penalty_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_mtg_prepmt_penalty_pct,
+	Descriptor(215, Attribute::DOUBLE,	"purch_mtg_prepmt_penalty_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_mtg_prepmt_penalty_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(219, Attribute::DOUBLE,	"purch_mtg_prepmt_protect_yrs", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_mtg_prepmt_protect_yrs,
+	Descriptor(216, Attribute::DOUBLE,	"purch_mtg_prepmt_protect_yrs", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_mtg_prepmt_protect_yrs,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(220, Attribute::STR_ENUM,	"purch_mtg_rate_defn", -1, (size_t)&modelOffset->purch_mtg_rate_defn,
+	Descriptor(217, Attribute::STR_ENUM,	"purch_mtg_rate_defn", -1, (size_t)&modelOffset->purch_mtg_rate_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &purch_mtg_rate_defnEnumList, Feature(true)),
-	Descriptor(221, Attribute::DOUBLE,	"purch_mtg_rate_diff", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_mtg_rate_diff,
+	Descriptor(218, Attribute::DOUBLE,	"purch_mtg_rate_diff", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_mtg_rate_diff,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(222, Attribute::DOUBLE,	"purch_mtg_rbc_c1_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_mtg_rbc_c1_pct,
+	Descriptor(219, Attribute::DOUBLE,	"purch_mtg_rbc_c1_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_mtg_rbc_c1_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(223, Attribute::STR_ENUM,	"purch_mtg_sale_class", -1, (size_t)&modelOffset->purch_mtg_sale_class,
+	Descriptor(220, Attribute::STR_ENUM,	"purch_mtg_sale_class", -1, (size_t)&modelOffset->purch_mtg_sale_class,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &purch_mtg_sale_classEnumList, Feature(true)),
-	Descriptor(224, Attribute::DOUBLE,	"purch_mtg_servicing_fee", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_mtg_servicing_fee,
+	Descriptor(221, Attribute::DOUBLE,	"purch_mtg_servicing_fee", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_mtg_servicing_fee,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(225, Attribute::DOUBLE,	"purch_mtg_yld_maint_addn", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_mtg_yld_maint_addn,
+	Descriptor(222, Attribute::DOUBLE,	"purch_mtg_yld_maint_addn", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_mtg_yld_maint_addn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(226, Attribute::DOUBLE,	"purch_mtg_yrs_to_balloon", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_mtg_yrs_to_balloon,
+	Descriptor(223, Attribute::DOUBLE,	"purch_mtg_yrs_to_balloon", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_mtg_yrs_to_balloon,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(227, Attribute::DOUBLE,	"purch_mtg_yrs_to_maturity", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_mtg_yrs_to_maturity,
+	Descriptor(224, Attribute::DOUBLE,	"purch_mtg_yrs_to_maturity", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_mtg_yrs_to_maturity,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(228, Attribute::STRING,	"purch_re_asset_index", -1, (size_t)&modelOffset->purch_re_asset_index,
+	Descriptor(225, Attribute::STRING,	"purch_re_asset_index", -1, (size_t)&modelOffset->purch_re_asset_index,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(229, Attribute::STRING,	"purch_re_assets_selected", -1, (size_t)&modelOffset->purch_re_assets_selected,
+	Descriptor(226, Attribute::STRING,	"purch_re_assets_selected", -1, (size_t)&modelOffset->purch_re_assets_selected,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(230, Attribute::DOUBLE,	"purch_re_avr_contribn_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_re_avr_contribn_pct,
+	Descriptor(227, Attribute::DOUBLE,	"purch_re_avr_contribn_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_re_avr_contribn_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(231, Attribute::DOUBLE,	"purch_re_avr_max_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_re_avr_max_pct,
+	Descriptor(228, Attribute::DOUBLE,	"purch_re_avr_max_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_re_avr_max_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(232, Attribute::DOUBLE,	"purch_re_avr_obj_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_re_avr_obj_pct,
+	Descriptor(229, Attribute::DOUBLE,	"purch_re_avr_obj_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_re_avr_obj_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(233, Attribute::STRING,	"purch_re_category_id", -1, (size_t)&modelOffset->purch_re_category_id,
+	Descriptor(230, Attribute::STRING,	"purch_re_category_id", -1, (size_t)&modelOffset->purch_re_category_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(234, Attribute::DOUBLE,	"purch_re_depreciation_yrs", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_re_depreciation_yrs,
+	Descriptor(231, Attribute::DOUBLE,	"purch_re_depreciation_yrs", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_re_depreciation_yrs,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(235, Attribute::STRING,	"purch_re_grp_id", -1, (size_t)&modelOffset->purch_re_grp_id,
+	Descriptor(232, Attribute::STRING,	"purch_re_grp_id", -1, (size_t)&modelOffset->purch_re_grp_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(236, Attribute::DOUBLE,	"purch_re_mkt_growth_addn", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_re_mkt_growth_addn,
+	Descriptor(233, Attribute::DOUBLE,	"purch_re_mkt_growth_addn", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_re_mkt_growth_addn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(237, Attribute::DOUBLE,	"purch_re_mkt_growth_scen_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_re_mkt_growth_scen_mult,
+	Descriptor(234, Attribute::DOUBLE,	"purch_re_mkt_growth_scen_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_re_mkt_growth_scen_mult,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(238, Attribute::STR_ENUM,	"purch_re_pmt_mode", -1, (size_t)&modelOffset->purch_re_pmt_mode,
+	Descriptor(235, Attribute::STR_ENUM,	"purch_re_pmt_mode", -1, (size_t)&modelOffset->purch_re_pmt_mode,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &purch_re_pmt_modeEnumList, Feature(true)),
-	Descriptor(239, Attribute::DOUBLE,	"purch_re_rbc_c1_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_re_rbc_c1_pct,
+	Descriptor(236, Attribute::DOUBLE,	"purch_re_rbc_c1_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_re_rbc_c1_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(240, Attribute::DOUBLE,	"purch_re_rent_rate_scen_addn", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_re_rent_rate_scen_addn,
+	Descriptor(237, Attribute::DOUBLE,	"purch_re_rent_rate_scen_addn", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_re_rent_rate_scen_addn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(241, Attribute::DOUBLE,	"purch_re_rent_rate_scen_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_re_rent_rate_scen_mult,
+	Descriptor(238, Attribute::DOUBLE,	"purch_re_rent_rate_scen_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_re_rent_rate_scen_mult,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(242, Attribute::STR_ENUM,	"purch_re_rental_growth", -1, (size_t)&modelOffset->purch_re_rental_growth,
+	Descriptor(239, Attribute::STR_ENUM,	"purch_re_rental_growth", -1, (size_t)&modelOffset->purch_re_rental_growth,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &purch_re_rental_growthEnumList, Feature(true)),
-	Descriptor(243, Attribute::STR_ENUM,	"purch_re_sale_class", -1, (size_t)&modelOffset->purch_re_sale_class,
+	Descriptor(240, Attribute::STR_ENUM,	"purch_re_sale_class", -1, (size_t)&modelOffset->purch_re_sale_class,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &purch_re_sale_classEnumList, Feature(true)),
-	Descriptor(244, Attribute::STRING,	"purch_sec_assets_selected", -1, (size_t)&modelOffset->purch_sec_assets_selected,
+	Descriptor(241, Attribute::STRING,	"purch_sec_assets_selected", -1, (size_t)&modelOffset->purch_sec_assets_selected,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(245, Attribute::DOUBLE,	"purch_sec_avr_contribn_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_avr_contribn_pct,
+	Descriptor(242, Attribute::DOUBLE,	"purch_sec_avr_contribn_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_avr_contribn_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(246, Attribute::DOUBLE,	"purch_sec_avr_max_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_avr_max_pct,
+	Descriptor(243, Attribute::DOUBLE,	"purch_sec_avr_max_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_avr_max_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(247, Attribute::DOUBLE,	"purch_sec_avr_obj_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_avr_obj_pct,
+	Descriptor(244, Attribute::DOUBLE,	"purch_sec_avr_obj_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_avr_obj_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(248, Attribute::STRING,	"purch_sec_category_id", -1, (size_t)&modelOffset->purch_sec_category_id,
+	Descriptor(245, Attribute::STRING,	"purch_sec_category_id", -1, (size_t)&modelOffset->purch_sec_category_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(249, Attribute::DOUBLE,	"purch_sec_cp_adj_addn_init", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_cp_adj_addn_init,
+	Descriptor(246, Attribute::DOUBLE,	"purch_sec_cp_adj_addn_init", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_cp_adj_addn_init,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(250, Attribute::DOUBLE,	"purch_sec_cp_adj_addn_renewal", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_cp_adj_addn_renewal,
+	Descriptor(247, Attribute::DOUBLE,	"purch_sec_cp_adj_addn_renewal", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_cp_adj_addn_renewal,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(251, Attribute::STRING,	"purch_sec_cp_adj_category_id", -1, (size_t)&modelOffset->purch_sec_cp_adj_category_id,
+	Descriptor(248, Attribute::STRING,	"purch_sec_cp_adj_category_id", -1, (size_t)&modelOffset->purch_sec_cp_adj_category_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(252, Attribute::DOUBLE,	"purch_sec_cp_adj_max_above_init", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_cp_adj_max_above_init,
+	Descriptor(249, Attribute::DOUBLE,	"purch_sec_cp_adj_max_above_init", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_cp_adj_max_above_init,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(253, Attribute::DOUBLE,	"purch_sec_cp_adj_max_below_init", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_cp_adj_max_below_init,
+	Descriptor(250, Attribute::DOUBLE,	"purch_sec_cp_adj_max_below_init", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_cp_adj_max_below_init,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(254, Attribute::DOUBLE,	"purch_sec_cp_adj_max_reset_decr", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_cp_adj_max_reset_decr,
+	Descriptor(251, Attribute::DOUBLE,	"purch_sec_cp_adj_max_reset_decr", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_cp_adj_max_reset_decr,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(255, Attribute::DOUBLE,	"purch_sec_cp_adj_max_reset_incr", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_cp_adj_max_reset_incr,
+	Descriptor(252, Attribute::DOUBLE,	"purch_sec_cp_adj_max_reset_incr", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_cp_adj_max_reset_incr,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
+	Descriptor(253, Attribute::INT,	"purch_sec_cp_adj_reset_mths", -1, (size_t)&modelOffset->purch_sec_cp_adj_reset_mths,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
+	Descriptor(254, Attribute::DOUBLE,	"purch_sec_cp_adj_scen_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_cp_adj_scen_mult,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
+	Descriptor(255, Attribute::DOUBLE,	"purch_sec_cp_adj_scen_yr", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_cp_adj_scen_yr,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
 	};
 	Attribute::Descriptor INVSTRAT_ASSET::descriptor_256[] = {
-	Descriptor(256, Attribute::INT,	"purch_sec_cp_adj_reset_mths", -1, (size_t)&modelOffset->purch_sec_cp_adj_reset_mths,
+	Descriptor(256, Attribute::DOUBLE,	"purch_sec_cp_amortzn_yrs", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_cp_amortzn_yrs,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(257, Attribute::DOUBLE,	"purch_sec_cp_adj_scen_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_cp_adj_scen_mult,
+	Descriptor(257, Attribute::STRING,	"purch_sec_cp_asset_id", -1, (size_t)&modelOffset->purch_sec_cp_asset_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(258, Attribute::DOUBLE,	"purch_sec_cp_adj_scen_yr", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_cp_adj_scen_yr,
+	Descriptor(258, Attribute::STRING,	"purch_sec_cp_category_id", -1, (size_t)&modelOffset->purch_sec_cp_category_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(259, Attribute::DOUBLE,	"purch_sec_cp_amortzn_yrs", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_cp_amortzn_yrs,
+	Descriptor(259, Attribute::DOUBLE,	"purch_sec_cp_first_par_prepmt_yr", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_cp_first_par_prepmt_yr,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(260, Attribute::STRING,	"purch_sec_cp_asset_id", -1, (size_t)&modelOffset->purch_sec_cp_asset_id,
-				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(261, Attribute::STRING,	"purch_sec_cp_category_id", -1, (size_t)&modelOffset->purch_sec_cp_category_id,
-				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(262, Attribute::DOUBLE,	"purch_sec_cp_first_par_prepmt_yr", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_cp_first_par_prepmt_yr,
-				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(263, Attribute::STR_ENUM,	"purch_sec_cp_pmt_mode", -1, (size_t)&modelOffset->purch_sec_cp_pmt_mode,
+	Descriptor(260, Attribute::STR_ENUM,	"purch_sec_cp_pmt_mode", -1, (size_t)&modelOffset->purch_sec_cp_pmt_mode,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &purch_sec_cp_pmt_modeEnumList, Feature(true)),
-	Descriptor(264, Attribute::DOUBLE,	"purch_sec_cp_prepmt_penalty_addn", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_cp_prepmt_penalty_addn,
+	Descriptor(261, Attribute::DOUBLE,	"purch_sec_cp_prepmt_penalty_addn", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_cp_prepmt_penalty_addn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(265, Attribute::STR_ENUM,	"purch_sec_cp_prepmt_penalty_defn", -1, (size_t)&modelOffset->purch_sec_cp_prepmt_penalty_defn,
+	Descriptor(262, Attribute::STR_ENUM,	"purch_sec_cp_prepmt_penalty_defn", -1, (size_t)&modelOffset->purch_sec_cp_prepmt_penalty_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &purch_sec_cp_prepmt_penalty_defnEnumList, Feature(true)),
-	Descriptor(266, Attribute::DOUBLE,	"purch_sec_cp_prepmt_penalty_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_cp_prepmt_penalty_mult,
+	Descriptor(263, Attribute::DOUBLE,	"purch_sec_cp_prepmt_penalty_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_cp_prepmt_penalty_mult,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(267, Attribute::DOUBLE,	"purch_sec_cp_prepmt_penalty_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_cp_prepmt_penalty_pct,
+	Descriptor(264, Attribute::DOUBLE,	"purch_sec_cp_prepmt_penalty_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_cp_prepmt_penalty_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(268, Attribute::DOUBLE,	"purch_sec_cp_prepmt_protect_yrs", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_cp_prepmt_protect_yrs,
+	Descriptor(265, Attribute::DOUBLE,	"purch_sec_cp_prepmt_protect_yrs", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_cp_prepmt_protect_yrs,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(269, Attribute::STR_ENUM,	"purch_sec_cp_rate_defn", -1, (size_t)&modelOffset->purch_sec_cp_rate_defn,
+	Descriptor(266, Attribute::STR_ENUM,	"purch_sec_cp_rate_defn", -1, (size_t)&modelOffset->purch_sec_cp_rate_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &purch_sec_cp_rate_defnEnumList, Feature(true)),
-	Descriptor(270, Attribute::DOUBLE,	"purch_sec_cp_rate_diff", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_cp_rate_diff,
+	Descriptor(267, Attribute::DOUBLE,	"purch_sec_cp_rate_diff", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_cp_rate_diff,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(271, Attribute::DOUBLE,	"purch_sec_cp_servicing_fee", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_cp_servicing_fee,
+	Descriptor(268, Attribute::DOUBLE,	"purch_sec_cp_servicing_fee", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_cp_servicing_fee,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(272, Attribute::DOUBLE,	"purch_sec_cp_yld_maint_addn", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_cp_yld_maint_addn,
+	Descriptor(269, Attribute::DOUBLE,	"purch_sec_cp_yld_maint_addn", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_cp_yld_maint_addn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(273, Attribute::DOUBLE,	"purch_sec_cp_yrs_to_balloon", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_cp_yrs_to_balloon,
+	Descriptor(270, Attribute::DOUBLE,	"purch_sec_cp_yrs_to_balloon", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_cp_yrs_to_balloon,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(274, Attribute::DOUBLE,	"purch_sec_cp_yrs_to_maturity", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_cp_yrs_to_maturity,
+	Descriptor(271, Attribute::DOUBLE,	"purch_sec_cp_yrs_to_maturity", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_cp_yrs_to_maturity,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(275, Attribute::STRING,	"purch_sec_grp_id", -1, (size_t)&modelOffset->purch_sec_grp_id,
+	Descriptor(272, Attribute::STRING,	"purch_sec_grp_id", -1, (size_t)&modelOffset->purch_sec_grp_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(276, Attribute::STR_ENUM,	"purch_sec_io_po_defn", -1, (size_t)&modelOffset->purch_sec_io_po_defn,
+	Descriptor(273, Attribute::STR_ENUM,	"purch_sec_io_po_defn", -1, (size_t)&modelOffset->purch_sec_io_po_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &purch_sec_io_po_defnEnumList, Feature(true)),
-	Descriptor(277, Attribute::DOUBLE,	"purch_sec_pac1_std_sch", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_pac1_std_sch,
+	Descriptor(274, Attribute::DOUBLE,	"purch_sec_pac1_std_sch", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_pac1_std_sch,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(278, Attribute::DOUBLE,	"purch_sec_pac1z_accrual_addn", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_pac1z_accrual_addn,
+	Descriptor(275, Attribute::DOUBLE,	"purch_sec_pac1z_accrual_addn", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_pac1z_accrual_addn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(279, Attribute::DOUBLE,	"purch_sec_pac1z_sch", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_pac1z_sch,
+	Descriptor(276, Attribute::DOUBLE,	"purch_sec_pac1z_sch", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_pac1z_sch,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(280, Attribute::STR_ENUM,	"purch_sec_pac2_accrual_defn", -1, (size_t)&modelOffset->purch_sec_pac2_accrual_defn,
+	Descriptor(277, Attribute::STR_ENUM,	"purch_sec_pac2_accrual_defn", -1, (size_t)&modelOffset->purch_sec_pac2_accrual_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &purch_sec_pac2_accrual_defnEnumList, Feature(true)),
-	Descriptor(281, Attribute::DOUBLE,	"purch_sec_pac2_z_accrual_addn", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_pac2_z_accrual_addn,
+	Descriptor(278, Attribute::DOUBLE,	"purch_sec_pac2_z_accrual_addn", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_pac2_z_accrual_addn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(282, Attribute::DOUBLE,	"purch_sec_pac2a_sch", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_pac2a_sch,
+	Descriptor(279, Attribute::DOUBLE,	"purch_sec_pac2a_sch", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_pac2a_sch,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(283, Attribute::DOUBLE,	"purch_sec_pac2b_sch", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_pac2b_sch,
+	Descriptor(280, Attribute::DOUBLE,	"purch_sec_pac2b_sch", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_pac2b_sch,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(284, Attribute::DOUBLE,	"purch_sec_pac3_sch", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_pac3_sch,
+	Descriptor(281, Attribute::DOUBLE,	"purch_sec_pac3_sch", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_pac3_sch,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(285, Attribute::DOUBLE,	"purch_sec_pac3_z_accrual_addn", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_pac3_z_accrual_addn,
+	Descriptor(282, Attribute::DOUBLE,	"purch_sec_pac3_z_accrual_addn", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_pac3_z_accrual_addn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(286, Attribute::DOUBLE,	"purch_sec_rbc_c1_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_rbc_c1_pct,
+	Descriptor(283, Attribute::DOUBLE,	"purch_sec_rbc_c1_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_rbc_c1_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(287, Attribute::STR_ENUM,	"purch_sec_sale_class", -1, (size_t)&modelOffset->purch_sec_sale_class,
+	Descriptor(284, Attribute::STR_ENUM,	"purch_sec_sale_class", -1, (size_t)&modelOffset->purch_sec_sale_class,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &purch_sec_sale_classEnumList, Feature(true)),
-	Descriptor(288, Attribute::DOUBLE,	"purch_sec_tranche_a_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_tranche_a_pct,
+	Descriptor(285, Attribute::DOUBLE,	"purch_sec_tranche_a_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_tranche_a_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(289, Attribute::DOUBLE,	"purch_sec_tranche_b_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_tranche_b_pct,
+	Descriptor(286, Attribute::DOUBLE,	"purch_sec_tranche_b_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_tranche_b_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(290, Attribute::DOUBLE,	"purch_sec_tranche_c_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_tranche_c_pct,
+	Descriptor(287, Attribute::DOUBLE,	"purch_sec_tranche_c_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_tranche_c_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(291, Attribute::STR_ENUM,	"purch_sec_tranche_owned", -1, (size_t)&modelOffset->purch_sec_tranche_owned,
+	Descriptor(288, Attribute::STR_ENUM,	"purch_sec_tranche_owned", -1, (size_t)&modelOffset->purch_sec_tranche_owned,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &purch_sec_tranche_ownedEnumList, Feature(true)),
-	Descriptor(292, Attribute::DOUBLE,	"purch_sec_tranche_rate_addn", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_tranche_rate_addn,
+	Descriptor(289, Attribute::DOUBLE,	"purch_sec_tranche_rate_addn", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_tranche_rate_addn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(293, Attribute::STRING,	"purch_sec_tranche_rate_category_id", -1, (size_t)&modelOffset->purch_sec_tranche_rate_category_id,
+	Descriptor(290, Attribute::STRING,	"purch_sec_tranche_rate_category_id", -1, (size_t)&modelOffset->purch_sec_tranche_rate_category_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(294, Attribute::STR_ENUM,	"purch_sec_tranche_rate_defn", -1, (size_t)&modelOffset->purch_sec_tranche_rate_defn,
+	Descriptor(291, Attribute::STR_ENUM,	"purch_sec_tranche_rate_defn", -1, (size_t)&modelOffset->purch_sec_tranche_rate_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &purch_sec_tranche_rate_defnEnumList, Feature(true)),
-	Descriptor(295, Attribute::DOUBLE,	"purch_sec_tranche_rate_max_decr_from_init", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_tranche_rate_max_decr_from_init,
+	Descriptor(292, Attribute::DOUBLE,	"purch_sec_tranche_rate_max_decr_from_init", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_tranche_rate_max_decr_from_init,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(296, Attribute::DOUBLE,	"purch_sec_tranche_rate_max_incr_from_init", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_tranche_rate_max_incr_from_init,
+	Descriptor(293, Attribute::DOUBLE,	"purch_sec_tranche_rate_max_incr_from_init", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_tranche_rate_max_incr_from_init,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(297, Attribute::DOUBLE,	"purch_sec_tranche_rate_scen_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_tranche_rate_scen_mult,
+	Descriptor(294, Attribute::DOUBLE,	"purch_sec_tranche_rate_scen_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_tranche_rate_scen_mult,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(298, Attribute::DOUBLE,	"purch_sec_tranche_rate_scen_yr", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_tranche_rate_scen_yr,
+	Descriptor(295, Attribute::DOUBLE,	"purch_sec_tranche_rate_scen_yr", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_tranche_rate_scen_yr,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(299, Attribute::DOUBLE,	"purch_sec_tranche_z_addn", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_tranche_z_addn,
+	Descriptor(296, Attribute::DOUBLE,	"purch_sec_tranche_z_addn", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_tranche_z_addn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(300, Attribute::STR_ENUM,	"purch_sec_tranche_z_defn", -1, (size_t)&modelOffset->purch_sec_tranche_z_defn,
+	Descriptor(297, Attribute::STR_ENUM,	"purch_sec_tranche_z_defn", -1, (size_t)&modelOffset->purch_sec_tranche_z_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &purch_sec_tranche_z_defnEnumList, Feature(true)),
-	Descriptor(301, Attribute::DOUBLE,	"purch_sec_tranche_z_jump_speed", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_tranche_z_jump_speed,
+	Descriptor(298, Attribute::DOUBLE,	"purch_sec_tranche_z_jump_speed", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_tranche_z_jump_speed,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(302, Attribute::DOUBLE,	"purch_sec_tranche_z_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_tranche_z_pct,
+	Descriptor(299, Attribute::DOUBLE,	"purch_sec_tranche_z_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_sec_tranche_z_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(303, Attribute::STR_ENUM,	"purch_sec_tranche_z_prepmt_priority_bef_jump", -1, (size_t)&modelOffset->purch_sec_tranche_z_prepmt_priority_bef_jump,
+	Descriptor(300, Attribute::STR_ENUM,	"purch_sec_tranche_z_prepmt_priority_bef_jump", -1, (size_t)&modelOffset->purch_sec_tranche_z_prepmt_priority_bef_jump,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &purch_sec_tranche_z_prepmt_priority_bef_jumpEnumList, Feature(true)),
-	Descriptor(304, Attribute::STRING,	"rbc_c4_method", -1, (size_t)&modelOffset->rbc_c4_method,
-				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(305, Attribute::STR_ENUM,	"rebal_dur_match_defn", -1, (size_t)&modelOffset->rebal_dur_match_defn,
+	Descriptor(301, Attribute::STR_ENUM,	"rebal_dur_match_defn", -1, (size_t)&modelOffset->rebal_dur_match_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &rebal_dur_match_defnEnumList, Feature(true)),
-	Descriptor(306, Attribute::STR_ENUM,	"rebal_freq", -1, (size_t)&modelOffset->rebal_freq,
+	Descriptor(302, Attribute::STR_ENUM,	"rebal_freq", -1, (size_t)&modelOffset->rebal_freq,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &rebal_freqEnumList, Feature(true)),
-	Descriptor(307, Attribute::INT,	"rebal_sale_priority_avail_for_sale", -1, (size_t)&modelOffset->rebal_sale_priority_avail_for_sale,
+	Descriptor(303, Attribute::INT,	"rebal_sale_priority_avail_for_sale", -1, (size_t)&modelOffset->rebal_sale_priority_avail_for_sale,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(308, Attribute::INT,	"rebal_sale_priority_held_to_maturity", -1, (size_t)&modelOffset->rebal_sale_priority_held_to_maturity,
+	Descriptor(304, Attribute::INT,	"rebal_sale_priority_held_to_maturity", -1, (size_t)&modelOffset->rebal_sale_priority_held_to_maturity,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(309, Attribute::INT,	"rebal_sale_priority_not_assigned", -1, (size_t)&modelOffset->rebal_sale_priority_not_assigned,
+	Descriptor(305, Attribute::INT,	"rebal_sale_priority_not_assigned", -1, (size_t)&modelOffset->rebal_sale_priority_not_assigned,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(310, Attribute::INT,	"rebal_sale_priority_trading", -1, (size_t)&modelOffset->rebal_sale_priority_trading,
+	Descriptor(306, Attribute::INT,	"rebal_sale_priority_trading", -1, (size_t)&modelOffset->rebal_sale_priority_trading,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(311, Attribute::STR_ENUM,	"rebal_sale_selection_defn", -1, (size_t)&modelOffset->rebal_sale_selection_defn,
+	Descriptor(307, Attribute::STR_ENUM,	"rebal_sale_selection_defn", -1, (size_t)&modelOffset->rebal_sale_selection_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &rebal_sale_selection_defnEnumList, Feature(true)),
-	Descriptor(312, Attribute::STRING,	"refinance_inv_id", -1, (size_t)&modelOffset->refinance_inv_id,
+	Descriptor(308, Attribute::STRING,	"refinance_inv_id", -1, (size_t)&modelOffset->refinance_inv_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(313, Attribute::DOUBLE,	"restructure_int_pmt_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->restructure_int_pmt_mult,
+	Descriptor(309, Attribute::DOUBLE,	"restructure_int_pmt_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->restructure_int_pmt_mult,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(314, Attribute::STRING,	"restructure_inv_id", -1, (size_t)&modelOffset->restructure_inv_id,
+	Descriptor(310, Attribute::STRING,	"restructure_inv_id", -1, (size_t)&modelOffset->restructure_inv_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(315, Attribute::DOUBLE,	"restructure_prin_pmt_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->restructure_prin_pmt_mult,
+	Descriptor(311, Attribute::DOUBLE,	"restructure_prin_pmt_mult", Descriptor::NOT_INDEXED, (size_t)&modelOffset->restructure_prin_pmt_mult,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(316, Attribute::STRING,	"seg_id", -1, (size_t)&modelOffset->seg_id,
+	Descriptor(312, Attribute::STRING,	"seg_id", -1, (size_t)&modelOffset->seg_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(317, Attribute::INT,	"surr_chg_period_aig", -1, (size_t)&modelOffset->surr_chg_period_aig,
+	Descriptor(313, Attribute::INT,	"yrs_to_inv_mthly", -1, (size_t)&modelOffset->yrs_to_inv_mthly,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(318, Attribute::INT,	"yrs_to_inv_mthly", -1, (size_t)&modelOffset->yrs_to_inv_mthly,
+	Descriptor(314, Attribute::INT,	"yrs_to_inv_qtrly", -1, (size_t)&modelOffset->yrs_to_inv_qtrly,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(319, Attribute::INT,	"yrs_to_inv_qtrly", -1, (size_t)&modelOffset->yrs_to_inv_qtrly,
+	Descriptor(315, Attribute::INT,	"msnumelement", -1, (size_t)&modelOffset->msnumelement,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(320, Attribute::INT,	"msnumelement", -1, (size_t)&modelOffset->msnumelement,
-				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(321, Attribute::SCALAR_INT,	"final_period", -1, (size_t)&modelOffset->final_period,
+	Descriptor(316, Attribute::SCALAR_INT,	"final_period", -1, (size_t)&modelOffset->final_period,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&INVSTRAT_ASSET_UDF::invstrat_asset_final_period)),
-	Descriptor(322, Attribute::SCALAR_INT,	"foreclosure_asset_id", -1, (size_t)&modelOffset->foreclosure_asset_id,
+	Descriptor(317, Attribute::SCALAR_INT,	"foreclosure_asset_id", -1, (size_t)&modelOffset->foreclosure_asset_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&INVSTRAT_ASSET_UDF::invstrat_asset_foreclosure_asset_id)),
-	Descriptor(323, Attribute::SCALAR_STRING,	"proj_date_adj", -1, (size_t)&modelOffset->proj_date_adj,
+	Descriptor(318, Attribute::SCALAR_STRING,	"proj_date_adj", -1, (size_t)&modelOffset->proj_date_adj,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((sF)&INVSTRAT_ASSET_UDF::invstrat_asset_proj_date_adj)),
-	Descriptor(324, Attribute::SCALAR_INT,	"proj_start_date", -1, (size_t)&modelOffset->proj_start_date,
+	Descriptor(319, Attribute::SCALAR_INT,	"proj_start_date", -1, (size_t)&modelOffset->proj_start_date,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&INVSTRAT_ASSET_UDF::invstrat_asset_proj_start_date)),
-	Descriptor(325, Attribute::SCALAR_INT,	"proj_start_mth", -1, (size_t)&modelOffset->proj_start_mth,
+	Descriptor(320, Attribute::SCALAR_INT,	"proj_start_mth", -1, (size_t)&modelOffset->proj_start_mth,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&INVSTRAT_ASSET_UDF::invstrat_asset_proj_start_mth)),
-	Descriptor(326, Attribute::SCALAR_INT,	"proj_start_yr", -1, (size_t)&modelOffset->proj_start_yr,
+	Descriptor(321, Attribute::SCALAR_INT,	"proj_start_yr", -1, (size_t)&modelOffset->proj_start_yr,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&INVSTRAT_ASSET_UDF::invstrat_asset_proj_start_yr)),
-	Descriptor(327, Attribute::SCALAR_INT,	"rebal_sales_priority_class_max", -1, (size_t)&modelOffset->rebal_sales_priority_class_max,
+	Descriptor(322, Attribute::SCALAR_INT,	"rebal_sales_priority_class_max", -1, (size_t)&modelOffset->rebal_sales_priority_class_max,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&INVSTRAT_ASSET_UDF::invstrat_asset_rebal_sales_priority_class_max)),
-	Descriptor(328, Attribute::SCALAR_INT,	"refinance_asset_id", -1, (size_t)&modelOffset->refinance_asset_id,
+	Descriptor(323, Attribute::SCALAR_INT,	"refinance_asset_id", -1, (size_t)&modelOffset->refinance_asset_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&INVSTRAT_ASSET_UDF::invstrat_asset_refinance_asset_id)),
-	Descriptor(329, Attribute::SCALAR_INT,	"restructure_asset_id", -1, (size_t)&modelOffset->restructure_asset_id,
+	Descriptor(324, Attribute::SCALAR_INT,	"restructure_asset_id", -1, (size_t)&modelOffset->restructure_asset_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&INVSTRAT_ASSET_UDF::invstrat_asset_restructure_asset_id)),
-	Descriptor(330, Attribute::SCALAR_INT,	"sales_priority_sub_port_max", -1, (size_t)&modelOffset->sales_priority_sub_port_max,
+	Descriptor(325, Attribute::SCALAR_INT,	"sales_priority_sub_port_max", -1, (size_t)&modelOffset->sales_priority_sub_port_max,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&INVSTRAT_ASSET_UDF::invstrat_asset_sales_priority_sub_port_max)),
-	Descriptor(331, Attribute::SCALAR_INT,	"seg_num", -1, (size_t)&modelOffset->seg_num,
+	Descriptor(326, Attribute::SCALAR_INT,	"seg_num", -1, (size_t)&modelOffset->seg_num,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&INVSTRAT_ASSET_UDF::invstrat_asset_seg_num)),
-	Descriptor(332, Attribute::SCALAR_INT,	"start_period", -1, (size_t)&modelOffset->start_period,
+	Descriptor(327, Attribute::SCALAR_INT,	"start_period", -1, (size_t)&modelOffset->start_period,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&INVSTRAT_ASSET_UDF::invstrat_asset_start_period)),
 	};
 
@@ -16953,13 +17666,8 @@ TableMgr<VariantTable> INVSTRAT_ASSET::mgr_;
 	&INVSTRAT_ASSET::descriptor_256[69],
 	&INVSTRAT_ASSET::descriptor_256[70],
 	&INVSTRAT_ASSET::descriptor_256[71],
-	&INVSTRAT_ASSET::descriptor_256[72],
-	&INVSTRAT_ASSET::descriptor_256[73],
-	&INVSTRAT_ASSET::descriptor_256[74],
-	&INVSTRAT_ASSET::descriptor_256[75],
-	&INVSTRAT_ASSET::descriptor_256[76],
 	nullptr};
-	const size_t INVSTRAT_ASSET::sDescriptorCount = 333;
+	const size_t INVSTRAT_ASSET::sDescriptorCount = 328;
 
 //factory
 INVSTRAT_ASSET* INVSTRAT_ASSET::makeThis(int isSubmodel, ModelClass* owner, INVSTRAT_ASSET* peer, 
@@ -17070,12 +17778,6 @@ typedef xstring (INVSTRAT_ASSET_UDF::*sPFs) (xstring);
 
 // constructor if this model class is the base class of another model class
 INVSTRAT_ASSET::INVSTRAT_ASSET(int columnCount, Descriptor* mocd[], Product* persObj) : ModelClass(columnCount, mocd, persObj), Variable(*this)
-  , sm_bond_is(0)
-  , sm_bond_pv(0)
-  , sm_bond_ym(0)
-  , sm_mtg_is(0)
-  , sm_mtg_pv(0)
-  , sm_mtg_ym(0)
 
 	, adco(company_asset_adco)
 	, ann_pba(company_seg_ann_pba)
@@ -17083,30 +17785,24 @@ INVSTRAT_ASSET::INVSTRAT_ASSET(int columnCount, Descriptor* mocd[], Product* per
 	, asset_sub_port(company_asset_asset_sub_port)
 	, bond(company_asset_bond)
 	, bond_cf(company_asset_bond_bond_cf)
-	, bond_is(company_asset_bond_bond_cf_bond_is)
-	, bond_pv(company_asset_bond_bond_cf_bond_pv)
-	, bond_ym(company_asset_bond_bond_cf_bond_ym)
+	, bond_cf_var(company_asset_bond_bond_cf_var)
 	, eio(company_asset_eio)
 	, epa(company_asset_epa)
 	, epl(company_liab_epl)
 	, fia(company_liab_fia)
 	, fia_account(company_liab_fia_fia_account)
 	, fia_ann_pba(company_liab_fia_fia_ann_pba)
-	, fia_automation(company_liab_fia_fia_automation)
 	, fia_carvm_stat(company_liab_fia_carvm_stat)
 	, fia_carvm_tax(company_liab_fia_carvm_tax)
+	, fia_mrb(company_liab_fia_fia_mrb)
 	, fia_rates(company_liab_fia_fia_rates)
-	, fia_sfas133(company_liab_fia_fia_sfas133)
 	, fia_sfas97rd(company_liab_fia_fia_sfas97rd)
 	, hedge_grp(company_seg_hedge_grp)
-	, intex(company_asset_intex)
 	, inv_strategy(company_inv_strategy)
 	, liab(company_liab)
 	, mtg(company_asset_mtg)
 	, mtg_cf(company_asset_mtg_mtg_cf)
-	, mtg_is(company_asset_mtg_mtg_cf_mtg_is)
-	, mtg_pv(company_asset_mtg_mtg_cf_mtg_pv)
-	, mtg_ym(company_asset_mtg_mtg_cf_mtg_ym)
+	, mtg_cf_var(company_asset_mtg_mtg_cf_var)
 	, rates(company_rates)
 	, seg(company_seg)
 	, sfas97rd(company_seg_sfas97rd)
@@ -17114,6 +17810,7 @@ INVSTRAT_ASSET::INVSTRAT_ASSET(int columnCount, Descriptor* mocd[], Product* per
 	gProxyInitialiser = 0;
 	gColumnInitialiser = 0;
 
+	RegisterTerminatorOnce();
 	typedef double (ModelClass::*dPFi2) (int, int);
 	typedef double (INVSTRAT_ASSET_UDF::*dPXi2) (int, int);
 	dPXi2 temp2;
@@ -17124,12 +17821,6 @@ INVSTRAT_ASSET::INVSTRAT_ASSET(int columnCount, Descriptor* mocd[], Product* per
 INVSTRAT_ASSET::INVSTRAT_ASSET(const xstring &modelClassName,
 		int isSm, ModelClass *owner, ModelClass *peer, int mainRebase,
 		const char *name, ModelClass* arrayPersistentObj) : ModelClass(55, INVSTRAT_ASSET::descriptorTable, arrayPersistentObj), Variable(*this)
-  , sm_bond_is(0)
-  , sm_bond_pv(0)
-  , sm_bond_ym(0)
-  , sm_mtg_is(0)
-  , sm_mtg_pv(0)
-  , sm_mtg_ym(0)
 
 	, adco(company_asset_adco)
 	, ann_pba(company_seg_ann_pba)
@@ -17137,36 +17828,31 @@ INVSTRAT_ASSET::INVSTRAT_ASSET(const xstring &modelClassName,
 	, asset_sub_port(company_asset_asset_sub_port)
 	, bond(company_asset_bond)
 	, bond_cf(company_asset_bond_bond_cf)
-	, bond_is(company_asset_bond_bond_cf_bond_is)
-	, bond_pv(company_asset_bond_bond_cf_bond_pv)
-	, bond_ym(company_asset_bond_bond_cf_bond_ym)
+	, bond_cf_var(company_asset_bond_bond_cf_var)
 	, eio(company_asset_eio)
 	, epa(company_asset_epa)
 	, epl(company_liab_epl)
 	, fia(company_liab_fia)
 	, fia_account(company_liab_fia_fia_account)
 	, fia_ann_pba(company_liab_fia_fia_ann_pba)
-	, fia_automation(company_liab_fia_fia_automation)
 	, fia_carvm_stat(company_liab_fia_carvm_stat)
 	, fia_carvm_tax(company_liab_fia_carvm_tax)
+	, fia_mrb(company_liab_fia_fia_mrb)
 	, fia_rates(company_liab_fia_fia_rates)
-	, fia_sfas133(company_liab_fia_fia_sfas133)
 	, fia_sfas97rd(company_liab_fia_fia_sfas97rd)
 	, hedge_grp(company_seg_hedge_grp)
-	, intex(company_asset_intex)
 	, inv_strategy(company_inv_strategy)
 	, liab(company_liab)
 	, mtg(company_asset_mtg)
 	, mtg_cf(company_asset_mtg_mtg_cf)
-	, mtg_is(company_asset_mtg_mtg_cf_mtg_is)
-	, mtg_pv(company_asset_mtg_mtg_cf_mtg_pv)
-	, mtg_ym(company_asset_mtg_mtg_cf_mtg_ym)
+	, mtg_cf_var(company_asset_mtg_mtg_cf_var)
 	, rates(company_rates)
 	, seg(company_seg)
 	, sfas97rd(company_seg_sfas97rd)
  // Tables...
  // Generic Tables ...
 {
+	RegisterTerminatorOnce();
 
 #ifdef MICROSOFT
 #pragma warning(pop)
@@ -17188,7 +17874,7 @@ INVSTRAT_ASSET::INVSTRAT_ASSET(const xstring &modelClassName,
        isMainModel = !isSm;
 		modelName = name;
 
-#ifdef __CREATE_COMP_COMP_CLASS_
+#ifdef __CREATE_AA_COMP_COMP_CLASS_
        company = 0;
 #endif
 #ifdef __CREATE_ASSET_ASSET_CLASS_
@@ -17207,22 +17893,13 @@ INVSTRAT_ASSET::INVSTRAT_ASSET(const xstring &modelClassName,
        company_asset_bond_bond_cf = 0;
 #endif
 #ifdef __CREATE_BOND_CF_ASSET_CLASS_
-       company_asset_bond_bond_cf_bond_is = 0;
-#endif
-#ifdef __CREATE_BOND_CF_ASSET_CLASS_
-       company_asset_bond_bond_cf_bond_pv = 0;
-#endif
-#ifdef __CREATE_BOND_CF_ASSET_CLASS_
-       company_asset_bond_bond_cf_bond_ym = 0;
+       company_asset_bond_bond_cf_var = 0;
 #endif
 #ifdef __CREATE_EIO_ASSET_CLASS_
        company_asset_eio = 0;
 #endif
 #ifdef __CREATE_EPA_ASSET_CLASS_
        company_asset_epa = 0;
-#endif
-#ifdef __CREATE_INTEX_ASSET_CLASS_
-       company_asset_intex = 0;
 #endif
 #ifdef __CREATE_MTG_ASSET_CLASS_
        company_asset_mtg = 0;
@@ -17231,13 +17908,7 @@ INVSTRAT_ASSET::INVSTRAT_ASSET(const xstring &modelClassName,
        company_asset_mtg_mtg_cf = 0;
 #endif
 #ifdef __CREATE_MTG_CF_ASSET_CLASS_
-       company_asset_mtg_mtg_cf_mtg_is = 0;
-#endif
-#ifdef __CREATE_MTG_CF_ASSET_CLASS_
-       company_asset_mtg_mtg_cf_mtg_pv = 0;
-#endif
-#ifdef __CREATE_MTG_CF_ASSET_CLASS_
-       company_asset_mtg_mtg_cf_mtg_ym = 0;
+       company_asset_mtg_mtg_cf_var = 0;
 #endif
 #ifdef __CREATE_INVSTRAT_ASSET_CLASS_
        company_inv_strategy = 0;
@@ -17263,14 +17934,11 @@ INVSTRAT_ASSET::INVSTRAT_ASSET(const xstring &modelClassName,
 #ifdef __CREATE_ANN_PBA_PBA_CLASS_
        company_liab_fia_fia_ann_pba = 0;
 #endif
-#ifdef __CREATE_AUTOMATION_CLASS_
-       company_liab_fia_fia_automation = 0;
+#ifdef __CREATE_MRB_GAAP_CLASS_
+       company_liab_fia_fia_mrb = 0;
 #endif
 #ifdef __CREATE_RATES_ECONOMY_CLASS_
        company_liab_fia_fia_rates = 0;
-#endif
-#ifdef __CREATE_SFAS133_GAAP_CLASS_
-       company_liab_fia_fia_sfas133 = 0;
 #endif
 #ifdef __CREATE_SFAS97RD_GAAP_CLASS_
        company_liab_fia_fia_sfas97rd = 0;
@@ -17289,9 +17957,6 @@ INVSTRAT_ASSET::INVSTRAT_ASSET(const xstring &modelClassName,
 #endif
 #ifdef __CREATE_SFAS97RD_GAAP_CLASS_
        company_seg_sfas97rd = 0;
-#endif
-#ifdef __CREATE_UTIL_RAFM_CLASS_
-       util = 0;
 #endif
 
 #ifdef VOCAL1
@@ -17350,8 +18015,8 @@ INVSTRAT_ASSET::INVSTRAT_ASSET(const xstring &modelClassName,
 
  void INVSTRAT_ASSET::copy_names() {
 
-#ifdef __CREATE_COMP_COMP_CLASS_
-		company = (COMP_COMP*)(findUnique("company"));
+#ifdef __CREATE_AA_COMP_COMP_CLASS_
+		company = (AA_COMP_COMP*)(findUnique("company"));
 #endif
 #ifdef __CREATE_ASSET_ASSET_CLASS_
 		company_asset = (ASSET_ASSET*)(findUnique("company|asset"));
@@ -17369,22 +18034,13 @@ INVSTRAT_ASSET::INVSTRAT_ASSET(const xstring &modelClassName,
 		company_asset_bond_bond_cf = (BOND_CF_ASSET*)(findUnique("company|asset|bond|bond_cf"));
 #endif
 #ifdef __CREATE_BOND_CF_ASSET_CLASS_
-		company_asset_bond_bond_cf_bond_is = (BOND_CF_ASSET*)(findUnique("company|asset|bond|bond_cf|bond_is"));
-#endif
-#ifdef __CREATE_BOND_CF_ASSET_CLASS_
-		company_asset_bond_bond_cf_bond_pv = (BOND_CF_ASSET*)(findUnique("company|asset|bond|bond_cf|bond_pv"));
-#endif
-#ifdef __CREATE_BOND_CF_ASSET_CLASS_
-		company_asset_bond_bond_cf_bond_ym = (BOND_CF_ASSET*)(findUnique("company|asset|bond|bond_cf|bond_ym"));
+		company_asset_bond_bond_cf_var = (BOND_CF_ASSET*)(findUnique("company|asset|bond|bond_cf_var"));
 #endif
 #ifdef __CREATE_EIO_ASSET_CLASS_
 		company_asset_eio = (EIO_ASSET*)(findUnique("company|asset|eio"));
 #endif
 #ifdef __CREATE_EPA_ASSET_CLASS_
 		company_asset_epa = (EPA_ASSET*)(findUnique("company|asset|epa"));
-#endif
-#ifdef __CREATE_INTEX_ASSET_CLASS_
-		company_asset_intex = (INTEX_ASSET*)(findUnique("company|asset|intex"));
 #endif
 #ifdef __CREATE_MTG_ASSET_CLASS_
 		company_asset_mtg = (MTG_ASSET*)(findUnique("company|asset|mtg"));
@@ -17393,13 +18049,7 @@ INVSTRAT_ASSET::INVSTRAT_ASSET(const xstring &modelClassName,
 		company_asset_mtg_mtg_cf = (MTG_CF_ASSET*)(findUnique("company|asset|mtg|mtg_cf"));
 #endif
 #ifdef __CREATE_MTG_CF_ASSET_CLASS_
-		company_asset_mtg_mtg_cf_mtg_is = (MTG_CF_ASSET*)(findUnique("company|asset|mtg|mtg_cf|mtg_is"));
-#endif
-#ifdef __CREATE_MTG_CF_ASSET_CLASS_
-		company_asset_mtg_mtg_cf_mtg_pv = (MTG_CF_ASSET*)(findUnique("company|asset|mtg|mtg_cf|mtg_pv"));
-#endif
-#ifdef __CREATE_MTG_CF_ASSET_CLASS_
-		company_asset_mtg_mtg_cf_mtg_ym = (MTG_CF_ASSET*)(findUnique("company|asset|mtg|mtg_cf|mtg_ym"));
+		company_asset_mtg_mtg_cf_var = (MTG_CF_ASSET*)(findUnique("company|asset|mtg|mtg_cf_var"));
 #endif
 #ifdef __CREATE_INVSTRAT_ASSET_CLASS_
 		company_inv_strategy = (INVSTRAT_ASSET*)(findUnique("company|inv_strategy"));
@@ -17425,14 +18075,11 @@ INVSTRAT_ASSET::INVSTRAT_ASSET(const xstring &modelClassName,
 #ifdef __CREATE_ANN_PBA_PBA_CLASS_
 		company_liab_fia_fia_ann_pba = (ANN_PBA_PBA*)(findUnique("company|liab|fia|fia_ann_pba"));
 #endif
-#ifdef __CREATE_AUTOMATION_CLASS_
-		company_liab_fia_fia_automation = (AUTOMATION*)(findUnique("company|liab|fia|fia_automation"));
+#ifdef __CREATE_MRB_GAAP_CLASS_
+		company_liab_fia_fia_mrb = (MRB_GAAP*)(findUnique("company|liab|fia|fia_mrb"));
 #endif
 #ifdef __CREATE_RATES_ECONOMY_CLASS_
 		company_liab_fia_fia_rates = (RATES_ECONOMY*)(findUnique("company|liab|fia|fia_rates"));
-#endif
-#ifdef __CREATE_SFAS133_GAAP_CLASS_
-		company_liab_fia_fia_sfas133 = (SFAS133_GAAP*)(findUnique("company|liab|fia|fia_sfas133"));
 #endif
 #ifdef __CREATE_SFAS97RD_GAAP_CLASS_
 		company_liab_fia_fia_sfas97rd = (SFAS97RD_GAAP*)(findUnique("company|liab|fia|fia_sfas97rd"));
@@ -17451,9 +18098,6 @@ INVSTRAT_ASSET::INVSTRAT_ASSET(const xstring &modelClassName,
 #endif
 #ifdef __CREATE_SFAS97RD_GAAP_CLASS_
 		company_seg_sfas97rd = (SFAS97RD_GAAP*)(findUnique("company|seg|sfas97rd"));
-#endif
-#ifdef __CREATE_UTIL_RAFM_CLASS_
-		util = (UTIL_RAFM*)(findUnique("util"));
 #endif
  }
 //copy_names END@2
@@ -17665,12 +18309,6 @@ INVSTRAT_ASSET_persistent_object::INVSTRAT_ASSET_persistent_object(const xstring
 			INVSTRAT_ASSET(modelClassName, isSm, owner, peer, mainRebase, name, arrayPersistentObj), 
 			mReadArray(true),
 			pfl(0)
-	, sm_bond_is(INVSTRAT_ASSET::sm_bond_is)
-	, sm_bond_pv(INVSTRAT_ASSET::sm_bond_pv)
-	, sm_bond_ym(INVSTRAT_ASSET::sm_bond_ym)
-	, sm_mtg_is(INVSTRAT_ASSET::sm_mtg_is)
-	, sm_mtg_pv(INVSTRAT_ASSET::sm_mtg_pv)
-	, sm_mtg_ym(INVSTRAT_ASSET::sm_mtg_ym)
 
 	{
 
@@ -17750,7 +18388,7 @@ void INVSTRAT_ASSET::after_startup(int decrement) {
 //ms_BeforeStartup END@2
 
 HVector<ModelClass::ddfStruct> INVSTRAT_ASSET::ddfVector;
-BitArray INVSTRAT_ASSET::dataVariables(333);
+BitArray INVSTRAT_ASSET::dataVariables(328);
 bool INVSTRAT_ASSET::hasBeenWritten = false;
 
 

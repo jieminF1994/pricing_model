@@ -1,13 +1,12 @@
 ﻿
 //MODELCLASS BEGIN
+//MODELCLASS aa_comp_comp
 //MODELCLASS adco_asset
 //MODELCLASS ann_pba_pba
 //MODELCLASS asset_asset
-//MODELCLASS automation
 //MODELCLASS a_subport_asset
 //MODELCLASS bond_asset
 //MODELCLASS bond_cf_asset
-//MODELCLASS comp_comp
 //MODELCLASS eio_asset
 //MODELCLASS epa_asset
 //MODELCLASS epl_liab
@@ -15,16 +14,14 @@
 //MODELCLASS fiacarvm_liab
 //MODELCLASS fia_liab
 //MODELCLASS hdg_grp_comp
-//MODELCLASS intex_asset
 //MODELCLASS invstrat_asset
 //MODELCLASS liab_liab
+//MODELCLASS mrb_gaap
 //MODELCLASS mtg_asset
 //MODELCLASS mtg_cf_asset
 //MODELCLASS rates_economy
 //MODELCLASS seg_comp
-//MODELCLASS sfas133_gaap
 //MODELCLASS sfas97rd_gaap
-//MODELCLASS util_rafm
 //MODELCLASS END
 
 #if defined(MICROSOFT)
@@ -75,14 +72,13 @@ extern MemCount gMem;
 extern MY_DLL Parmfile *p;
 #include "column2.h"
 #include "ModelClass\mtg_cf_asset_udf.h"
+#include "ModelClass\aa_comp_comp.h"
 #include "ModelClass\adco_asset.h"
 #include "ModelClass\ann_pba_pba.h"
 #include "ModelClass\asset_asset.h"
-#include "ModelClass\automation.h"
 #include "ModelClass\a_subport_asset.h"
 #include "ModelClass\bond_asset.h"
 #include "ModelClass\bond_cf_asset.h"
-#include "ModelClass\comp_comp.h"
 #include "ModelClass\eio_asset.h"
 #include "ModelClass\epa_asset.h"
 #include "ModelClass\epl_liab.h"
@@ -90,15 +86,13 @@ extern MY_DLL Parmfile *p;
 #include "ModelClass\fiacarvm_liab.h"
 #include "ModelClass\fia_liab.h"
 #include "ModelClass\hdg_grp_comp.h"
-#include "ModelClass\intex_asset.h"
 #include "ModelClass\invstrat_asset.h"
 #include "ModelClass\liab_liab.h"
+#include "ModelClass\mrb_gaap.h"
 #include "ModelClass\mtg_asset.h"
 #include "ModelClass\rates_economy.h"
 #include "ModelClass\seg_comp.h"
-#include "ModelClass\sfas133_gaap.h"
 #include "ModelClass\sfas97rd_gaap.h"
-#include "ModelClass\util_rafm.h"
 #pragma optimize( "gs", on )
 
 #include "generatedCppHeader.h"
@@ -109,7 +103,7 @@ extern MY_DLL Parmfile *p;
 //Redundant includes only for snip test:
 //iomanip included for "setprecision()"
 #include <iomanip>
-#include <strstream> //WTW - Gen2
+#include <strstream>
 typedef vector<vector<string>> sowfinput;
 typedef vector<string> sowfcols;
 typedef map <xstring, long, less <xstring> > sowfmap;
@@ -120,7 +114,9 @@ typedef vector<vector<string>> deptaskinput;
 typedef vector<string> deptaskcols;
 typedef map <xstring, long, less <xstring> > deptaskmap;
 typedef deptaskmap::iterator deptaskmapiter;
-//extern MY_DLL strstream log_screen; //WTW - Gen2 - MY_DLL is not supported
+const int pv = 0;
+const int is = 1;
+const int ym = 2;
 const int EFFECTIVE_RATE = 0;
 const int EFFECTIVE_ANNUAL = 1;
 const int NOMINAL_SEMIANNUAL = 2;
@@ -138,9 +134,8 @@ const double LEAST_ANNUAL_GROWTH_RATE = -0.9999;
 const double LEAST_BOND_EQUIVALENT_RATE = 0.0001;
 const double SPOT_SHIFT_FOR_EFFECTIVE_DURATION_CALCULATION = 0.0001;
 const double ONE_MILLION = 1000000.0;
-//WTW - Gen2 - Move Extern definitions to rates header
-//const double MINIMUM_MONTHLY_YIELD_RATIO = -0.9; // annual yield = (1.0-0.9)^12 = 1.0e-12
-//const double MAXIMUM_MONTHLY_YIELD_RATIO	 = 999999999.0; // annual yield = (1.0+999999999.0)^12 = 1.0e+120
+const double MINIMUM_MONTHLY_YIELD_RATIO = -0.9; // annual yield = (1.0-0.9)^12 = 1.0e-12
+const double MAXIMUM_MONTHLY_YIELD_RATIO	 = 999999999.0; // annual yield = (1.0+999999999.0)^12 = 1.0e+120
 const int DECIMALS_TO_ROUND = 6;
 const int ROUND_NEGATIVE_TOZERO = 0;
 const int ROUND_NEAR = 1;
@@ -154,11 +149,10 @@ const int SUM_OVER_NEGATIVE = -101;
 const int TIER = -98;
 const int ANY_GROUP = -99;
 const bool DO_NOT_ISSUE_WARNINGS = false;
-//WTW - Gen2 - Move Extern definitions to rates header
-//const int CALL_CODE = 1; 
-//const int PUT_CODE = 2; 
-//const int CONTINUOUS_PAYOUT_CODE = 3;
-//const int FUTURES_CODE = 4;
+const int CALL_CODE = 1;
+const int PUT_CODE = 2;
+const int CONTINUOUS_PAYOUT_CODE = 3;
+const int FUTURES_CODE = 4;
 // Model point type
 const int NEW_PURCH = 0;
 const int INIT_MP = 1;
@@ -208,11 +202,13 @@ const int HEDGE_CASH_FLOW = 0;
 const int HEDGE_MKT_VAL = 1;
 const int HEDGE_ARRAY_SIZE = 2;
 // global calculation flags
-//extern bool pricing_flag;//WTW - Gen2 - Move Extern definitions to rates header
+extern bool pricing_flag;
 extern bool factors_flag;
 extern bool nb_flag;
 extern bool alm_flag;
 extern bool tcm_flag;
+extern bool pba_disc_rate_flag;
+extern int pba_segment_size;
 extern bool avr_flag;
 extern bool imr_flag;
 extern bool gaap_flag;
@@ -220,17 +216,12 @@ extern bool tgt_cap_flag;
 extern bool stoch_flag;
 extern bool valn_flag;
 extern bool time_step_flag;
-extern bool sfas133_valn_flag;
+extern bool mrb_valn_flag;
 extern bool sop031_valn_flag;
 extern bool sfas97rd_valn_flag;
-extern bool sfas97lp_valn_flag;
-extern bool sfas97lp_gpr_valn_flag;
 extern bool sfas91_valn_flag;
-extern bool sfas60_valn_flag;
-extern bool sfas60_gpr_valn_flag;
+extern bool gaap_ldti_valn_flag;
 extern bool sfas120_nlp_valn_flag;
-extern bool sfas120_valn_flag;
-extern bool sfas120_gpr_valn_flag;
 extern bool loc_gpr_valn_flag;
 extern bool pba_valn_flag;
 extern bool pba_scen_amt_valn_flag;
@@ -239,6 +230,7 @@ extern bool res_scen_amt_valn_flag;
 extern bool res_det_res_valn_flag;
 extern bool res_ag38_8d_valn_flag;
 extern bool std_scen_valn_flag;
+extern bool std_scen_prescribed_assump_flag;
 extern bool rbc_std_scen_valn_flag;
 extern bool rbc_std_scen_step2_valn_flag;
 extern bool res_std_scen_valn_flag;
@@ -261,33 +253,32 @@ extern double aggregate_amount_threshold;
 extern double model_point_amount_threshold;
 extern double rate_ratio_threshold;
 extern vector<string> valn_periods;
+
 // utility functions - elaborated in rates/economy externs
-//WTW - Gen2 - Move Extern definitions to rates header
-/*extern double round_result(int rounding, int negative, double x, int n);
+extern double round_result(int rounding, int negative, double x, int n);
 extern double factorial(int n);
 extern int n_choose_k(int n, int k);
 extern xstring check_date_format(const xstring &date);
+extern int month_from_day_number(int nSerialDate);
+extern int year_from_day_number(int nSerialDate);
+extern int day_from_day_number(int nSerialDate);
+extern int month_number_from_date(int year, int month); 
+extern int day_number_from_date(int nYear, int nMonth, int nDay);
 extern int get_mth_from_date(const xstring &date);
 extern int get_yr_from_date(const xstring &date);
 extern int get_day_from_date(const xstring &date);
-extern int month_from_day_number(int nSerialDate);//WTW - Gen2 - add new formula to replace unsupported MonthFromDayNumber() function
-extern int year_from_day_number(int nSerialDate);//WTW - Gen2 - add new formula to replace unsupported YearFromDayNumber() function
-extern int day_from_day_number(int nSerialDate);//WTW - Gen2 - add new formula to replace unsupported DayFromDayNumber() function
-extern int month_number_from_date(int year, int month); //WTW - Gen2 - add new formula to replace unsupported MonthNumberFromDate() function
-extern int day_number_from_date(int nYear, int nMonth, int nDay); //WTW - Gen2 - add new formula to replace unsupported DayNumberFromDate() function
 extern int get_end_of_mth_day(int yr, int mth);
 extern xstring add_mths_to_date(const xstring &date, int mths);
 extern int get_mth_from_adj_date(const xstring &date, int mths);
 extern double convert_rate_basis(double orig_rate, double orig_rate_basis, double new_rate_basis);
 extern double convert_decrem_rate_basis(double orig_rate, double orig_rate_basis, double new_rate_basis);
-extern long int determine_tbl_size(int sNumberOfDims, ...);
 extern xstring get_file_name(const xstring &source_file);
 extern xstring get_file_path(const xstring &source_file);
-extern xstring get_base_group_name(const xstring &tag, bool seriatim_flag = false);
+extern xstring get_base_group_name(const xstring &tag, bool split_flag = false);
 extern xstring get_string_of_date(double date);
 extern xstring get_string_of_enum_val(StrEnum::EnumValue type);
 extern int date_diff(xstring first_date, xstring second_date);
-extern int number_of_decimals(double xxx, int digits);//WTW - Gen2 - replace preprocessor #define with formula
+extern int number_of_decimals(double xxx,int digits);
 extern xstring write_string(double value, int string_length, int significant_digits);
 extern xstring write_array_to_string(SmartArray <double> value_array, int low, int high);
 extern void read_from_string(xstring temp_string, SmartArray <double> &temp_array);
@@ -308,25 +299,8 @@ extern double bs_opt_val_continuous_highest_gain(int call_or_put, double current
 extern double bs_opt_val_highest_gain(int call_or_put, double current_price, double observed_max, double observed_min, double strike_price, double length_of_sampling_period, int sampling_freq, double yrs_to_expiry, double risk_free_rate, double init_div_yld, double index_vol, int scen_int_freq, int scen_index_freq);
 extern double bs_opt_val_mthly_sum_cap(int crediting_mths, int known_index_vals, double sum_capped_amts,  double mthly_cap_rate, double yrs_to_expiry, double risk_free_rate, double init_div_yld, double index_vol, int scen_int_freq, int scen_index_freq);
 extern double cumul_bivariate_normal_distribn(double x, double y, double rho);
-extern double cumul_normal_distribn(double x);*/
+extern double cumul_normal_distribn(double x);
 
-// RAFM SQLite
-#ifndef _RAFMSQLITE_H_
-#define _RAFMSQLITE_H_
-
-#include <string>
-#include <vector>
-
-using namespace std;
-
-// 20210614 STW: upgrade to RAFM 2.9
-/*
-extern void openDatabase(string dbPath);
-extern void closeDatabase();
-extern string readCsvFile(string csvPath);
-extern void executeQuery(string sql, vector<string>& columns, vector<vector<string>>& results);
-*/
-#endif
 #endif
 extern int trace_wanted;
 
@@ -377,8 +351,8 @@ extern bool intex_detail_wanted;
 // This macro evaluates the number of decimals in the 'xxx' value that corresponds
 // to 'sig_digits' significant digits. This macro is used to set solving_flag tolerance
 // factors. For example, NUMBER_OF_DECIMALS(50000,11) evaluates to 6.
-#define NUMBER_OF_DECIMALS(xxx,sig_digits) (fabs(xxx) < 0.000000001 ? (sig_digits-1) : (min((sig_digits-1), (int)((sig_digits) - log10(fabs(xxx))))))
-#define SIGNIFICANT_DIGITS 11
+//#define NUMBER_OF_DECIMALS(xxx,sig_digits) (fabs(xxx) < 0.000000001 ? (sig_digits-1) : (min((sig_digits-1), (int)((sig_digits) - log10(fabs(xxx))))))
+static constexpr int SIGNIFICANT_DIGITS = 11;
 
 extern int maximum_t_high_value;
 extern int minimum_t_low_value;
@@ -394,7 +368,6 @@ extern const int& last_proj_task_loop;
 extern const int& proj_task_loop_num;
 extern const int& num_of_proj_task_loops;
 
-extern MY_DLL2 int use_overlay_code;
 extern MY_DLL int trace_level_wanted;
 extern MY_DLL int trace_level;
 extern MY_DLL bool bEmitTurboDebugger;
@@ -408,15 +381,6 @@ extern MY_DLL Parmfile *  p;
 
 	TempTableHolderCollection MTG_CF_ASSET::TTHC;
 void MTG_CF_ASSET::removeSMPointers(ModelClass* modelToRemove){
-
-	if(modelToRemove == sm_mtg_is)
-		sm_mtg_is = 0;
-
-	if(modelToRemove == sm_mtg_pv)
-		sm_mtg_pv = 0;
-
-	if(modelToRemove == sm_mtg_ym)
-		sm_mtg_ym = 0;
 
 }		
 
@@ -446,7 +410,6 @@ return accr_int_bef_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - accr_int_aft_dflt
@@ -472,11 +435,11 @@ if (intex_proj_flag)
 			+ mtg->intex_accr_int_adj(t - 1))
 		   * remaining_pct_aft_dflt(t);
 
-if (this == mtg_cf)
+if (model_name == MTG_CF)
 	return accr_int(t - 1)
 		   * remaining_pct_aft_dflt(t);
 
-if (t == rebase_period + 1)
+if (t == rebase_time + 1)
 	{
 	if (pv_timing == END_OF_MONTH)
 		return accr_int_bef_sale(t - 1);
@@ -505,7 +468,6 @@ if (t == rebase_period + 1)
 return accr_int(t - 1);
 
 }
-
 
 //@@ END
 
@@ -547,7 +509,6 @@ return accr_int_bef_prepmt(t)
 	   * (1.0 - prepmt_pct_mthly(t));
 
 }
-
 
 //@@ END
 
@@ -607,7 +568,6 @@ return accr_int_direct(t, par_val_aft_sched_pmt,
 
 }
 
-
 //@@ END
 
 //@@ START - accr_int_bef_sale
@@ -659,8 +619,8 @@ double accr_int_aft_prepmt = 0;
 
 if (dflt_appl == NO)
 	{
-	if (this != mtg_cf
-		&& t > rebase_period + 1)
+	if (model_name != MTG_CF
+		&& t > rebase_time + 1)
 		accr_int_aft_prepmt = this->accr_int_aft_prepmt(t);
 	else
 		accr_int_aft_prepmt = this->accr_int_aft_prepmt(t);
@@ -671,7 +631,6 @@ else
 return accr_int_aft_prepmt;
 
 }
-
 
 //@@ END
 
@@ -696,6 +655,7 @@ if (intex_proj_flag)
 if (prepmt_appl == NO)
 	return NO_AVG;
 
+mtg->category_id = mtg->category_id;
 if (mtg->prepmt_model_defn == SPLINE)
 	return NO_AVG;
 
@@ -704,7 +664,7 @@ if (t < mtg->commencement_period || t > mtg->maturity_period)
 
 if ((t == 0 && mtg->existing_asset_indicator)
 	|| (t == mtg->commencement_period && !mtg->existing_asset_indicator)
-	|| (pv_defn != CASH_FLOWS && t == rebase_period))
+	|| (pv_defn != CASH_FLOWS && t == rebase_time))
 	{
 	setup_adco_submodel_parameters(t);
 
@@ -714,7 +674,6 @@ if ((t == 0 && mtg->existing_asset_indicator)
 return adco_prepmt_forecast(t - 1);
 
 }
-
 
 //@@ END
 
@@ -756,7 +715,7 @@ double local_par_val_for_balloon_pmt_aft_dflt_bom
 
 double local_par_val_aft_dflt_bom = 0;
 
-if (this == mtg_cf || t <= rebase_period + 1)
+if (model_name == MTG_CF || t <= rebase_time + 1)
 	{
 	local_par_val_aft_dflt_bom = par_val_aft_dflt(t);
 
@@ -845,7 +804,6 @@ return min(local_par_val_for_balloon_pmt_aft_dflt_bom,
 
 }
 
-
 //@@ END
 
 //@@ START - balloon_pmt_inc
@@ -894,7 +852,6 @@ return accr_int_direct(t, local_balloon_pmt, pmt_rate(t - 1));
 
 }
 
-
 //@@ END
 
 //@@ START - int_pmt
@@ -935,13 +892,13 @@ if (mtg->pmt_mode != MONTHLY
 double local_par_val_aft_dflt_bom = 0;
 double base_interest_payment = 0;
 
-if (this == mtg_cf
-	|| t <= rebase_period + 1)
+if (model_name == MTG_CF
+	|| t <= rebase_time + 1)
 	local_par_val_aft_dflt_bom = par_val_aft_dflt(t);
 else
 	local_par_val_aft_dflt_bom = par_val_aft_prepmt(t - 1);
 
-if (this == mtg_is)
+if (getElementNumber() == is)
 	base_interest_payment
 	= local_par_val_aft_dflt_bom
 	  * (pmt_rate(t - 1) + mtg->servicing_fee)
@@ -964,7 +921,6 @@ return base_interest_payment;
 
 }
 
-
 //@@ END
 
 //@@ START - int_savings_pv_aft_prepmt
@@ -979,7 +935,7 @@ double MTG_CF_ASSET_UDF::mtg_cf_asset_int_savings_pv_aft_prepmt(int t) {
 //^^^
 
 #line 1 "int_savings_pv_aft_prepmt.MTG_CF_ASSET.for"
-if (this == mtg_cf)
+if (model_name == MTG_CF)
 	return NO_AVG;
 
 if (mtg->prepmt_first_period >= mtg->maturity_period - 1)
@@ -988,7 +944,7 @@ if (mtg->prepmt_first_period >= mtg->maturity_period - 1)
 if (intex_proj_flag)
 	return mtg_cf->int_savings_pv_bef_prepmt(t);
 
-int valuation_period = max(rebase_period, mtg->commencement_period);
+int valuation_period = max(rebase_time, mtg->commencement_period);
 
 if (pv_defn == MARKET_VALUE
 	|| pv_defn == MARKET_VALUE_SHIFTED)
@@ -1001,14 +957,14 @@ if (pv_defn == MARKET_VALUE
 		if (pv_tbl_defn == USE_TABLES)
 			return pv_interest_savings_after_prepayments[t - valuation_period];
 
-		return mtg_pv->int_savings_pv_bef_prepmt(t)
+		return mtg->sm_mtg_cf_var[0][pv]->int_savings_pv_bef_prepmt(t)
 			   * (1.0 - prepmt_pct_mthly(t));
 		}
 
 	if (t == valuation_period)
 		{
 		if (pv_defn == MARKET_VALUE_SHIFTED)
-			return pv_int_savings_pv_for_mkt_val_calc;
+			return pv_interest_savings_after_prepayments[0];
 
 		if (mtg->use_eom_scen_rates == YES
 			&& t > mtg->commencement_period)
@@ -1031,7 +987,7 @@ else if (pv_defn == NET_YIELD
 	if (pv_tbl_defn == USE_TABLES)
 		return pv_interest_savings_after_prepayments[t - valuation_period];
 
-	return mtg_pv->int_savings_pv_bef_prepmt(t)
+	return mtg->sm_mtg_cf_var[0][pv]->int_savings_pv_bef_prepmt(t)
 		   * (1.0 - prepmt_pct_mthly(t));
 	}
 
@@ -1056,10 +1012,11 @@ if (t == valuation_period)
 		mtg->asset_detail_pv_output();
 		}
 
-	mtg->rebase_cash_flow(t,
-				INTEREST_SAVINGS,
-				"mtg_cf->int_savings_pv_aft_prepmt",
-				modelName);
+	if (mtg->sm_mtg_cf_var[0][is]->rebase_time < t)
+		mtg->rebase_cash_flow(t,
+					INTEREST_SAVINGS,
+					"mtg_cf->int_savings_pv_aft_prepmt",
+					modelName);
 
 	if (pv_timing == END_OF_MONTH
 		|| mtg->use_eom_scen_rates == YES)
@@ -1079,19 +1036,19 @@ if (t == valuation_period)
 	// save current pv parameters
 	pv_calc_parameters(t, SAVE);
 
-	if ((mtg_pv->pv_defn == MARKET_VALUE
-		 || mtg_pv->pv_defn == MARKET_VALUE_SHIFTED)
+	if ((mtg->sm_mtg_cf_var[0][pv]->pv_defn == MARKET_VALUE
+		 || mtg->sm_mtg_cf_var[0][pv]->pv_defn == MARKET_VALUE_SHIFTED)
 		&& mtg->mkt_val_defn == TO_NEXT_RATE_RESET)
-		mtg_is->pv_calc_parameters(t,
+		mtg->sm_mtg_cf_var[0][is]->pv_calc_parameters(t,
 					INTEREST_SAVINGS_AFTER_PREPAYMENTS,
 					mtg->mths_to_next_reset(t));
 	else // TO_MATURITY
-		mtg_is->pv_calc_parameters(t,
+		mtg->sm_mtg_cf_var[0][is]->pv_calc_parameters(t,
 					INTEREST_SAVINGS_AFTER_PREPAYMENTS,
 					xint(mtg->maturity_period - t));
 
 	ispv
-	= mtg_is->pv_calc(t,
+	= mtg->sm_mtg_cf_var[0][is]->pv_calc(t,
 				discount_rate,
 				temp1, // calculated_derivative
 				temp2  // calculated_modified_duration
@@ -1121,7 +1078,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - int_savings_pv_bef_prepmt
@@ -1146,7 +1102,7 @@ double ispv = 0;
 
 if (pv_defn != CASH_FLOWS)
 	{
-	int valuation_period = max(rebase_period, mtg->commencement_period);
+	int valuation_period = max(rebase_time, mtg->commencement_period);
 
 	if (t > valuation_period)
 		{
@@ -1196,10 +1152,11 @@ if (mtg->asset_detail_pv_flag(t))
 	mtg->asset_detail_pv_output();
 	}
 
-mtg->rebase_cash_flow(t,
-		INTEREST_SAVINGS,
-		"mtg_cf->int_savings_pv_bef_prepmt",
-		modelName);
+if (mtg->sm_mtg_cf_var[0][is]->rebase_time < t)
+	mtg->rebase_cash_flow(t,
+			INTEREST_SAVINGS,
+			"mtg_cf->int_savings_pv_bef_prepmt",
+			modelName);
 
 if (pv_timing == END_OF_MONTH
 	|| mtg->use_eom_scen_rates == YES)
@@ -1218,11 +1175,11 @@ discount_rate
 
 // set global values for temporary tables
 pv_calc_parameters(t, SAVE);
-mtg_is->pv_calc_parameters(t,
+mtg->sm_mtg_cf_var[0][is]->pv_calc_parameters(t,
 			INTEREST_SAVINGS_BEFORE_PREPAYMENTS,
 			xint(mtg->maturity_period - t));
 
-ispv = mtg_is->pv_calc(t,
+ispv = mtg->sm_mtg_cf_var[0][is]->pv_calc(t,
 			discount_rate,
 			temp1, // calculated_derivative
 			temp2  // calculated_modified_duration
@@ -1248,7 +1205,6 @@ if (mtg->asset_detail_pv_flag(t))
 return ispv;
 
 }
-
 
 //@@ END
 
@@ -1319,7 +1275,7 @@ if (pv_defn == CASH_FLOWS)
 	if (t > 0)
 		{
 		// Reset and parameterize the intex submodel
-		intex->resetValues();
+		intex->rebaseModel(0);
 		intex->shift_defn = shift_defn;
 
 		intex->proj_defn = EXPERIENCE;
@@ -1331,13 +1287,13 @@ if (pv_defn == CASH_FLOWS)
 	}	
 
 if (pv_defn == NET_YIELD
-	&& t == rebase_period)
+	&& t == rebase_time)
 	{
 	// ensure mtg_cf intex cash flows have been run
 	mtg_cf->intex_pmt_processed(t);
 	
 	// Reset and parameterize the intex submodel
-	intex->resetValues();
+	intex->rebaseModel(0);
 	intex->shift_defn = shift_defn;
 
 	intex->proj_defn = NET_YIELD;
@@ -1364,13 +1320,13 @@ if (pv_defn == MARKET_VALUE_SHIFTED)
 	return 1;
 
 if (pv_defn == MARKET_VALUE
-	&& t == rebase_period)
+	&& t == rebase_time)
 	{
 	// ensure mtg_cf intex cash flows have been run
 	mtg_cf->intex_pmt_processed(t);
 
 	// Reset and parameterize the intex submodel
-	intex->resetValues();
+	intex->rebaseModel(0);
 	intex->shift_defn = shift_defn;
 
 	intex->proj_defn = MARKET_VALUE;
@@ -1406,7 +1362,6 @@ return 0;
 
 }
 
-
 //@@ END
 
 //@@ START - mths_since_issue
@@ -1424,7 +1379,6 @@ double MTG_CF_ASSET_UDF::mtg_cf_asset_mths_since_issue(int t) {
 return mtg->mths_since_issue(t);
 
 }
-
 
 //@@ END
 
@@ -1446,14 +1400,13 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 if (t < mtg->commencement_period || t >= mtg->maturity_period)
   return NO_AVG;
 
-if (this == mtg_cf)
+if (model_name == MTG_CF)
 	return par_val_bef_sale(t)
 		   * (1.0 - mtg->sold_pct(t));
 
 return par_val_bef_sale(t);
 
 }
-
 
 //@@ END
 
@@ -1475,24 +1428,24 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 if (t <= mtg->commencement_period || t > mtg->maturity_period)
 	return NO_AVG;
 
-if (this == mtg_cf)
+if (model_name == MTG_CF)
 	return par_val_bef_sale(t - 1)
 		   * (1.0 - mtg->sold_pct(t - 1))
 		   * remaining_pct_aft_dflt(t);
 
-if (t == rebase_period + 1)
+if (t == rebase_time + 1)
 	{
 	if (pv_timing == END_OF_MONTH)
 		return pv_initial_par_value;
 
 	if (pv_timing == BEFORE_PREPAYMENTS)
 		{
-		if (rebase_period == mtg->commencement_period)
+		if (rebase_time == mtg->commencement_period)
 			{
-			if (this == mtg_is && !mtg->existing_asset_indicator)
+			if (getElementNumber() == is && !mtg->existing_asset_indicator)
 				// for interest savings present value calculation
 				// within the market value per unit of par calculation
-				return mtg_pv->par_val_bef_sale(t - 1);
+				return mtg->sm_mtg_cf_var[0][pv]->par_val_bef_sale(t - 1);
 
 			return pv_initial_par_value;
 			}
@@ -1504,10 +1457,10 @@ if (t == rebase_period + 1)
 		{
 		return pv_initial_par_value;
 		
-		if (this == mtg_is && !mtg->existing_asset_indicator)
+		if (getElementNumber() == is && !mtg->existing_asset_indicator)
 			// for interest savings present value calculation
 			// within the market value per unit of par calculation
-			return mtg_pv->par_val_bef_sale(t - 1);
+			return mtg->sm_mtg_cf_var[0][pv]->par_val_bef_sale(t - 1);
 
 		return par_val_bef_sale(t - 1);
 		}
@@ -1516,7 +1469,6 @@ if (t == rebase_period + 1)
 return par_val_aft_prepmt(t - 1);
 
 }
-
 
 //@@ END
 
@@ -1563,7 +1515,6 @@ return par_val_aft_sched_pmt
 
 }
 
-
 //@@ END
 
 //@@ START - par_val_aft_sched_pmt
@@ -1591,7 +1542,7 @@ if (intex_proj_flag)
 if (t == mtg->maturity_period)
 	return NO_AVG;
 
-if (this == mtg_cf)
+if (model_name == MTG_CF)
 	{
 	double par_val_aft_dflt
 	= par_val_bef_sale(t - 1)
@@ -1632,7 +1583,7 @@ if (this == mtg_cf)
 	return par_val_aft_pmt;
 	}
 
-if (t <= rebase_period + 1)
+if (t <= rebase_time + 1)
 	{
 	double par_val_aft_dflt = 0;
 
@@ -1641,12 +1592,12 @@ if (t <= rebase_period + 1)
 
 	else if (pv_timing == BEFORE_PREPAYMENTS)
 		{
-		if (rebase_period == mtg->commencement_period)
+		if (rebase_time == mtg->commencement_period)
 			{
-			if (this == mtg_is && !mtg->existing_asset_indicator)
+			if (getElementNumber() == is && !mtg->existing_asset_indicator)
 				// for interest savings present value calculation
 				// within the market value per unit of par calculation
-				par_val_aft_dflt = mtg_pv->par_val_bef_sale(t - 1);
+				par_val_aft_dflt = mtg->sm_mtg_cf_var[0][pv]->par_val_bef_sale(t - 1);
 			else
 				par_val_aft_dflt = pv_initial_par_value;
 			}
@@ -1742,7 +1693,6 @@ return par_val_aft_pmt;
 
 }
 
-
 //@@ END
 
 //@@ START - par_val_bef_sale
@@ -1783,16 +1733,15 @@ if(t == mtg->commencement_period && !mtg->existing_asset_indicator)
 			   * mtg->neg_asset_flag;
 	}
 
-if (this == mtg_cf)
+if (model_name == MTG_CF)
 	return par_val_aft_prepmt(t);
 
-if (rebase_period == t)
+if (rebase_time == t)
 	return mtg_cf->par_val_bef_sale(t);
 
 return par_val_aft_prepmt(t);
 
 }
-
 
 //@@ END
 
@@ -1814,12 +1763,12 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 if (t <= mtg->commencement_period || t > mtg->maturity_period)
 	return NO_AVG;
 
-if (this == mtg_cf)
+if (model_name == MTG_CF)
 	return par_val_for_balloon_pmt_bef_sale(t - 1)
 		   * (1.0 - mtg->sold_pct(t - 1))
 		   * remaining_pct_aft_dflt(t);
 
-if (t == rebase_period + 1)
+if (t <= rebase_time + 1) //20250625 MQ fix
 	{
 	if (pv_timing == END_OF_MONTH)
 		return par_val_for_balloon_pmt_bef_sale(t - 1);
@@ -1846,7 +1795,6 @@ return par_val_for_balloon_pmt_aft_dflt(t - 1);
 
 }
 
-
 //@@ END
 
 //@@ START - par_val_for_balloon_pmt_bef_sale
@@ -1869,7 +1817,7 @@ if (t == 0 && mtg->existing_asset_indicator)
 
 if (t == mtg->commencement_period && !mtg->existing_asset_indicator)
 	{
-	if (this == mtg_cf)
+	if (model_name == MTG_CF)
 		return mtg->par_val_at_issue;
 
 	if (pv_par_val_per_unit_of_par_calculation)
@@ -1887,7 +1835,6 @@ return par_val_for_balloon_pmt_aft_dflt(t)
 	   * (1.0 - prepmt_pct);
 
 }
-
 
 //@@ END
 
@@ -1909,21 +1856,21 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 if (t <= mtg->commencement_period || t > mtg->maturity_period)
 	return NO_AVG;
 
-if (this == mtg_cf)
+if (model_name == MTG_CF)
 	return pmt_amt_bef_sale(t - 1)
 		   * (1.0 - mtg->sold_pct(t - 1))
 		   * remaining_pct_aft_dflt(t);
 
-if (t == rebase_period + 1)
+if (t == rebase_time + 1)
 	{
 	if (pv_timing == END_OF_MONTH)
 		return pmt_amt_bef_sale(t - 1);
 
 	if (pv_timing == BEFORE_PREPAYMENTS)
 		{
-		if (rebase_period == mtg->commencement_period)
+		if (rebase_time == mtg->commencement_period)
 			{
-			if (this == mtg_is && !mtg->existing_asset_indicator)
+			if (getElementNumber() == is && !mtg->existing_asset_indicator)
 				// for interest savings present value calculation
 				// within the market value per unit of par calculation
 				return mtg->pmt_amt(t - 1,
@@ -1949,7 +1896,7 @@ if (t == rebase_period + 1)
 						pmt_rate(t - 1) + mtg->servicing_fee,
 						mtg->amortzn_period);
 
-		if (this == mtg_is
+		if (getElementNumber() == is
 				|| t == max(0, mtg->commencement_period))
 			return pmt_amt_bef_sale(t - 1);
 
@@ -1961,7 +1908,6 @@ if (t == rebase_period + 1)
 return pmt_amt_bef_sale(t - 1);
 
 }
-
 
 //@@ END
 
@@ -2009,8 +1955,8 @@ if (intex_proj_flag)
 
 double par_val_aft_pmt = 0;
 
-if (this == mtg_cf
-	|| t == rebase_period + 1)
+if (model_name == MTG_CF
+	|| t == rebase_time + 1)
 	{
 	if (mtg->mths_to_next_pmt(t - 1) != 1)
 		par_val_aft_pmt = par_val_aft_dflt(t);
@@ -2083,7 +2029,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - pmt_amt_bef_sale
@@ -2111,7 +2056,7 @@ if (t == 0 && mtg->existing_asset_indicator)
 
 if (t == mtg->commencement_period && !mtg->existing_asset_indicator)
 	{
-	if (this == mtg_cf)
+	if (model_name == MTG_CF)
 		return mtg->pmt_amt(t, 
 						max(ONE_MILLION, fabs(mtg->purch_amt)),
 						mtg->maturity_period - t,
@@ -2129,8 +2074,8 @@ if (t == mtg->commencement_period && !mtg->existing_asset_indicator)
 				mtg->amortzn_period);
 	}
 
-if (this != mtg_cf
-		&& rebase_period == t)
+if (model_name != MTG_CF
+		&& rebase_time == t)
 	return mtg_cf->pmt_amt_bef_sale(t);
 
 double monthly_prepayment_factor_local = 0;
@@ -2144,7 +2089,6 @@ return pmt_amt_aft_sched_payment(t)
 	   * (1.0 - monthly_prepayment_factor_local);
 
 }
-
 
 //@@ END
 
@@ -2220,7 +2164,6 @@ return pmt_rate(t - 1);
 
 }
 
-
 //@@ END
 
 //@@ START - prepmt_amt
@@ -2257,7 +2200,7 @@ if (prepmt_appl == NO
 	|| t < mtg->prepmt_first_period)
 	return NO_AVG;
 
-if (this == mtg_cf)
+if (model_name == MTG_CF)
 	{
 	if (par_val_aft_sched_pmt(t) < rate_ratio_threshold)
 		return NO_AVG;
@@ -2281,7 +2224,6 @@ if (mtg->prepmt_first_period < mtg->maturity_period)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -2317,7 +2259,6 @@ return accr_int_bef_prepmt(t)
 
 }
 
-
 //@@ END
 
 //@@ START - prepmt_pct
@@ -2343,20 +2284,24 @@ if (local_par_val_aft_sched_pmt == 0.0)
 	return NO_AVG;
 
 double psa_factor = 0.0;
+mtg->category_id = mtg->category_id;
 if (mtg->prepmt_defn == PERCENT_OF_PSA)
 	psa_factor = mtg->psa_base_rate[min(30, mtg->mths_since_issue(t))];
 else
 	psa_factor = 1.0;
 
+mtg->category_id = mtg->category_id;
 double nonfinancial_factor = mtg->prepmt_nonfinancial_pct * psa_factor;
 
 double int_rate_diff = 0.0;
 double local_pmt_rate = 0.0;
+mtg->category_id = mtg->category_id;
 if (mtg->prepmt_int_diff_defn == NET_YIELD)
 	local_pmt_rate = mtg->net_yld(t - 1);
 else
 	local_pmt_rate = pmt_rate(t);
 
+mtg->category_id = mtg->category_id;
 if (mtg->prepmt_int_diff_defn == GROSS_INTEREST_RATE)
 	int_rate_diff
 	= convert_rate_basis(local_pmt_rate + mtg->servicing_fee,
@@ -2374,7 +2319,7 @@ else if (mtg->prepmt_int_diff_defn == NET_YIELD)
 
 // Set lookup key for prepmt_exercise_pct variable
 mtg->int_rate_diff = int_rate_diff - refinancing_rate(t);
-
+mtg->category_id = mtg->category_id;
 double diff_factor = mtg->prepmt_exercise_pct_input * psa_factor;
 
 double financial_prepayment_factor = 0.0;
@@ -2384,22 +2329,33 @@ if (diff_factor > rate_ratio_threshold)
 	double prepayment_cost = 0;
 	
 	if (mtg->prepmt_first_period < mtg->maturity_period)
+		{		
+		mtg->category_id = mtg->category_id;
+		double refinancing_cost_pct_local = mtg->refinancing_cost_pct;
+		
 		prepayment_cost
 		= local_par_val_aft_sched_pmt
-		  * (prepmt_penalty(t) + mtg->refinancing_cost_pct);
+		  * (prepmt_penalty(t) + refinancing_cost_pct_local);
+		}
+
 	else
+		{
+		mtg->category_id = mtg->category_id;
 		prepayment_cost	= local_par_val_aft_sched_pmt * mtg->refinancing_cost_pct;
-	
+		}
+
 	double interest_savings	= int_savings_pv_bef_prepmt(t) - local_par_val_aft_sched_pmt;
 
 	if (interest_savings > prepayment_cost)
 		financial_prepayment_factor	= diff_factor;
 	}
 
+mtg->category_id = mtg->category_id;
 double mortgage_seasonality_adjustment_factor = mtg->prepmt_nonfinancial_seasonality_addn;
 
 double nonfinancial_interest_diff = 0.0;
 
+mtg->category_id = mtg->category_id;
 if (mtg->prepmt_int_diff_defn == GROSS_INTEREST_RATE)
 	nonfinancial_interest_diff
 	= refinancing_rate(t)
@@ -2423,8 +2379,10 @@ else if (mtg->prepmt_int_diff_defn == NET_YIELD)
 // Set lookup key for prepmt_nonfinancial_adj variable
 mtg->nonfinancial_int_rate_diff = nonfinancial_interest_diff;
 
+mtg->category_id = mtg->category_id;
 double mortgage_nonfinancial_adjustment_factor = mtg->prepmt_nonfinancial_adj * psa_factor;
 
+mtg->category_id = mtg->category_id;
 double mortgage_seasoning_adjustment_factor = mtg->prepmt_seasoning_since_issue_mult;
 
 return max(0.0,
@@ -2435,7 +2393,6 @@ return max(0.0,
 			   * mortgage_seasoning_adjustment_factor, 1.0));
 
 }
-
 
 //@@ END
 
@@ -2470,10 +2427,13 @@ if (prepmt_appl == NO
 	|| par_val_aft_sched_pmt(t) <= 0)
 	return NO_AVG;
 
-if (mtg->prepmt_model_defn == SPLINE)
+mtg->category_id = mtg->category_id;
+StrEnum::EnumValue prepmt_model_defn_local = mtg->prepmt_model_defn;
+
+if (prepmt_model_defn_local == SPLINE)
 	return 1.0 - pow(1.0 - prepmt_pct(t), 1.0 / 12.0);
 
-if (mtg->prepmt_model_defn == ANDREW_DAVIDSON
+if (prepmt_model_defn_local == ANDREW_DAVIDSON
 	&& adco_prepmt_forecast(t))
 	{
 	int schedule_index;
@@ -2489,7 +2449,6 @@ if (mtg->prepmt_model_defn == ANDREW_DAVIDSON
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -2536,7 +2495,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - refinancing_rate
@@ -2557,9 +2515,9 @@ if (t < mtg->commencement_period || t > mtg->maturity_period)
 int scenario_month;
 int valuation_period;
 
-if (pv_defn != CASH_FLOWS && t > rebase_period)
+if (pv_defn != CASH_FLOWS && t > rebase_time)
 	{
-	valuation_period = max(rebase_period, mtg->commencement_period);
+	valuation_period = max(rebase_time, mtg->commencement_period);
 
 	if (pv_timing == END_OF_MONTH
 		|| mtg->use_eom_scen_rates == YES)
@@ -2592,7 +2550,6 @@ return mtg->category_refinancing_rate(t,
 
 }
 
-
 //@@ END
 
 //@@ START - remaining_pct_aft_dflt
@@ -2619,7 +2576,6 @@ if (dflt_appl == NO)
 return (1.0 - mtg->decr_pct(t));
 
 }
-
 
 //@@ END
 
@@ -2651,7 +2607,7 @@ if (local_par_val_aft_pmt <= 0.0)
 
 double remaining_pct_aft_dflt = 1.0;
 
-if (this == mtg_cf)
+if (model_name == MTG_CF)
 	remaining_pct_aft_dflt = this->remaining_pct_aft_dflt(t);
 
 if (t < mtg->maturity_period)
@@ -2670,7 +2626,6 @@ if (intex_proj_flag)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -2700,7 +2655,7 @@ double base_index_rate;
 
 // Set the initial renewal rate for adjustable rate mortgages
 // Used to set initial payment rate.
-if (this == mtg_cf)
+if (model_name == MTG_CF)
 	{
 	if (mtg->use_eom_scen_rates == YES)
 		scenario_month = 0;
@@ -2709,7 +2664,7 @@ if (this == mtg_cf)
 
 	if (t == 0 && mtg->existing_asset_indicator)
 		base_index_rate 
-		= rates->get_int_rate(t + scenario_month
+		= rates_ptr->get_int_rate(t + scenario_month
 						      + (mtg->mths_to_next_reset(t)
 						      - mtg->adj_reset_mths),
 						mtg->adj_reset_category_id,
@@ -2717,16 +2672,16 @@ if (this == mtg_cf)
 						mtg->adj_reset_scen_yr,
 						0.0, 
 						mtg->pmt_freq,
-						shift_defn,mtg->portfolio_sprd_adj_aig);//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+						shift_defn, mtg->port_sprd_adj_crbg);//CRBG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
 	else
 		base_index_rate
-		= rates->get_int_rate(t + scenario_month,
+		= rates_ptr->get_int_rate(t + scenario_month,
 		                mtg->adj_reset_category_id,
 						GET_YIELD_RATE,
 						mtg->adj_reset_scen_yr,
 						0.0,
 						mtg->pmt_freq, 
-						shift_defn,mtg->portfolio_sprd_adj_aig);//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+						shift_defn, mtg->port_sprd_adj_crbg);//CRBG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
 
 	return base_index_rate
 		   * mtg->adj_reset_scen_mult
@@ -2734,7 +2689,7 @@ if (this == mtg_cf)
 	}
 
 int valuation_period
-= max(rebase_period, mtg->commencement_period);
+= max(rebase_time, mtg->commencement_period);
 
 // For net yield calculations for mortgages, hold coupon rate constant.
 // This method is described on pages 1154-1157 of Fabozzi's "Handbook of
@@ -2747,8 +2702,8 @@ if (pv_defn == NET_YIELD)
 // on the forward rates curve as of the rebase period.
 if (pv_defn == MARKET_VALUE
 	|| pv_defn == MARKET_VALUE_SHIFTED
-	|| this == mtg_is
-	|| this == mtg_ym)
+	|| getElementNumber() == is
+	|| getElementNumber() == ym)
 	{
 	if (pv_timing == END_OF_MONTH
 		|| mtg->use_eom_scen_rates == YES)
@@ -2757,13 +2712,13 @@ if (pv_defn == MARKET_VALUE
 		scenario_month = - 1;
 
 	base_index_rate
-	= convert_rate_basis(rates->get_int_rate(valuation_period + scenario_month,
+	= convert_rate_basis(rates_ptr->get_int_rate(valuation_period + scenario_month,
 							mtg->adj_reset_category_id,
 							GET_FORWARD_RATE,
 							(t - valuation_period) / 12.0,
 							mtg->adj_reset_scen_yr,
 							NOMINAL_SEMIANNUAL,
-							shift_defn,mtg->portfolio_sprd_adj_aig),//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+							shift_defn, mtg->port_sprd_adj_crbg),//CRBG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
 			   NOMINAL_SEMIANNUAL,
 			   mtg->pmt_freq);
 
@@ -2775,7 +2730,6 @@ if (pv_defn == MARKET_VALUE
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -2826,8 +2780,8 @@ if (mtg->mths_to_next_pmt(t - 1) != 1
 	if (t < mtg->maturity_period)
 		return balloon_pmt(t);
 
-	if (this == mtg_cf
-		|| t <= rebase_period + 1)
+	if (model_name == MTG_CF
+		|| t <= rebase_time + 1)
 		return par_val_aft_dflt(t);
 
 	return par_val_aft_prepmt(t - 1);
@@ -2836,8 +2790,8 @@ if (mtg->mths_to_next_pmt(t - 1) != 1
 double base_principal_payment = 0;
 double local_par_val_aft_dflt_bom = 0;
 
-if (this == mtg_cf
-	|| t <= rebase_period + 1)
+if (model_name == MTG_CF
+	|| t <= rebase_time + 1)
 	{
 	local_par_val_aft_dflt_bom = par_val_aft_dflt(t);
 
@@ -2895,7 +2849,6 @@ return local_prin_pmt;
 
 }
 
-
 //@@ END
 
 //@@ START - since_foreclosure_int_mult
@@ -2931,20 +2884,24 @@ if (pv_defn == CASH_FLOWS)
 		return company->sm_inv_strategy[mtg->seg_num]->foreclosure_int_pmt_mult;
 
 	// mths_since_issue(t) < 1
-	return company->sm_inv_strategy[mtg->seg_num]->foreclosure_int_pmt_mult.AtTime(period);
+	company->sm_inv_strategy[mtg->seg_num]->date_lookup = company->sm_inv_strategy[mtg->seg_num]->date(period);
+	return company->sm_inv_strategy[mtg->seg_num]->foreclosure_int_pmt_mult;
 	}
 
 // pv_defn != CASH_FLOWS
-int valuation_period = max(rebase_period, mtg->commencement_period);
+int valuation_period = max(rebase_time, mtg->commencement_period);
 
 if (mths_since_issue(valuation_period + 1) >= 1)
-	return company->sm_inv_strategy[mtg->seg_num]->foreclosure_int_pmt_mult.AtTime(valuation_period + 1);
-
+	{
+	company->sm_inv_strategy[mtg->seg_num]->date_lookup = company->sm_inv_strategy[mtg->seg_num]->date(valuation_period + 1);
+	return company->sm_inv_strategy[mtg->seg_num]->foreclosure_int_pmt_mult;
+	}
 // mths_since_issue(valuation_period + 1) < 1
-return company->sm_inv_strategy[mtg->seg_num]->foreclosure_int_pmt_mult.AtTime(period);
+company->sm_inv_strategy[mtg->seg_num]->date_lookup = company->sm_inv_strategy[mtg->seg_num]->date(period);
+
+return company->sm_inv_strategy[mtg->seg_num]->foreclosure_int_pmt_mult;
 
 }
-
 
 //@@ END
 
@@ -2981,20 +2938,24 @@ if (pv_defn == CASH_FLOWS)
 		return company->sm_inv_strategy[mtg->seg_num]->foreclosure_prin_pmt_mult;
 
 	// mths_since_issue(t) < 1
-	return company->sm_inv_strategy[mtg->seg_num]->foreclosure_prin_pmt_mult.AtTime(period);
+	company->sm_inv_strategy[mtg->seg_num]->date_lookup = company->sm_inv_strategy[mtg->seg_num]->date(period);
+	return company->sm_inv_strategy[mtg->seg_num]->foreclosure_prin_pmt_mult;
 	}
 
 // pv_defn != CASH_FLOWS
-int valuation_period = max(rebase_period, mtg->commencement_period);
+int valuation_period = max(rebase_time, mtg->commencement_period);
 
 if (mths_since_issue(valuation_period + 1) >= 1)
-	return company->sm_inv_strategy[mtg->seg_num]->foreclosure_prin_pmt_mult.AtTime(valuation_period + 1);
+	{
+	company->sm_inv_strategy[mtg->seg_num]->date_lookup = company->sm_inv_strategy[mtg->seg_num]->date(valuation_period + 1);
+	return company->sm_inv_strategy[mtg->seg_num]->foreclosure_prin_pmt_mult;
+	}
 
 // mths_since_issue(valuation_period + 1) < 1
-return company->sm_inv_strategy[mtg->seg_num]->foreclosure_prin_pmt_mult.AtTime(period);
+company->sm_inv_strategy[mtg->seg_num]->date_lookup = company->sm_inv_strategy[mtg->seg_num]->date(period);
+return company->sm_inv_strategy[mtg->seg_num]->foreclosure_prin_pmt_mult;
 
 }
-
 
 //@@ END
 
@@ -3031,20 +2992,24 @@ if (pv_defn == CASH_FLOWS)
 		return company->sm_inv_strategy[mtg->seg_num]->restructure_int_pmt_mult;
 
 	// mths_since_issue(t) < 1
-	return company->sm_inv_strategy[mtg->seg_num]->restructure_int_pmt_mult.AtTime(period);
+	company->sm_inv_strategy[mtg->seg_num]->date_lookup = company->sm_inv_strategy[mtg->seg_num]->date(period);
+	return company->sm_inv_strategy[mtg->seg_num]->restructure_int_pmt_mult;
 	}
 
 // pv_defn != CASH_FLOWS
-int valuation_period = max(rebase_period, mtg->commencement_period);
+int valuation_period = max(rebase_time, mtg->commencement_period);
 
 if (mths_since_issue(valuation_period + 1) >= 1)
-	return company->sm_inv_strategy[mtg->seg_num]->restructure_int_pmt_mult.AtTime(valuation_period + 1);
+	{
+	company->sm_inv_strategy[mtg->seg_num]->date_lookup = company->sm_inv_strategy[mtg->seg_num]->date(valuation_period + 1);
+	return company->sm_inv_strategy[mtg->seg_num]->restructure_int_pmt_mult;
+	}
 
 // mths_since_issue(valuation_period + 1) < 1
-return company->sm_inv_strategy[mtg->seg_num]->restructure_int_pmt_mult.AtTime(period);
+company->sm_inv_strategy[mtg->seg_num]->date_lookup = company->sm_inv_strategy[mtg->seg_num]->date(period);
+return company->sm_inv_strategy[mtg->seg_num]->restructure_int_pmt_mult;
 
 }
-
 
 //@@ END
 
@@ -3081,20 +3046,24 @@ if (pv_defn == CASH_FLOWS)
 		return company->sm_inv_strategy[mtg->seg_num]->restructure_prin_pmt_mult;
 
 	// mths_since_issue(t) < 1
-	return company->sm_inv_strategy[mtg->seg_num]->restructure_prin_pmt_mult.AtTime(period);
+	company->sm_inv_strategy[mtg->seg_num]->date_lookup = company->sm_inv_strategy[mtg->seg_num]->date(period);
+	return company->sm_inv_strategy[mtg->seg_num]->restructure_prin_pmt_mult;
 	}
 
 // pv_defn != CASH_FLOWS
-int valuation_period = max(rebase_period, mtg->commencement_period);
+int valuation_period = max(rebase_time, mtg->commencement_period);
 
 if (mths_since_issue(valuation_period + 1) >= 1)
-	return company->sm_inv_strategy[mtg->seg_num]->restructure_prin_pmt_mult.AtTime(valuation_period + 1);
+	{
+	company->sm_inv_strategy[mtg->seg_num]->date_lookup = company->sm_inv_strategy[mtg->seg_num]->date(valuation_period + 1);
+	return company->sm_inv_strategy[mtg->seg_num]->restructure_prin_pmt_mult;
+	}
 
 // mths_since_issue(valuation_period + 1) < 1
-return company->sm_inv_strategy[mtg->seg_num]->restructure_prin_pmt_mult.AtTime(period);
+company->sm_inv_strategy[mtg->seg_num]->date_lookup = company->sm_inv_strategy[mtg->seg_num]->date(period);
+return company->sm_inv_strategy[mtg->seg_num]->restructure_prin_pmt_mult;
 
 }
-
 
 //@@ END
 
@@ -3153,8 +3122,8 @@ extern bool intex_detail_wanted;
 // This macro evaluates the number of decimals in the 'xxx' value that corresponds
 // to 'sig_digits' significant digits. This macro is used to set solving_flag tolerance
 // factors. For example, NUMBER_OF_DECIMALS(50000,11) evaluates to 6.
-#define NUMBER_OF_DECIMALS(xxx,sig_digits) (fabs(xxx) < 0.000000001 ? (sig_digits-1) : (min((sig_digits-1), (int)((sig_digits) - log10(fabs(xxx))))))
-#define SIGNIFICANT_DIGITS 11
+//#define NUMBER_OF_DECIMALS(xxx,sig_digits) (fabs(xxx) < 0.000000001 ? (sig_digits-1) : (min((sig_digits-1), (int)((sig_digits) - log10(fabs(xxx))))))
+static constexpr int SIGNIFICANT_DIGITS = 11;
 
 extern int maximum_t_high_value;
 extern int minimum_t_low_value;
@@ -3163,6 +3132,13 @@ extern int minimum_t_low_value;
 #if 0 // START_CLASS
 int adco_arm_mths_to_reset;
 double adco_arm_pay_rate;
+
+#if defined(ASSET_ONLY_MODEL)
+RATES_ECONOMY /*modelobject_name: MTG_RATES*/ *rates_ptr;
+#else
+RATES_ECONOMY /*modelobject_name: RATES*/ *rates_ptr;
+#endif
+
 #endif // END_CLASS
 
 #if 0 // START_CONSTRUCTOR
@@ -3170,13 +3146,11 @@ adco_arm_mths_to_reset = 0;
 adco_arm_pay_rate = 0;
 #endif // END_CONSTRUCTOR
 
-rebase_period = minimum_t_low_value - 1;
-
 t_low = mtg->calculated_t_low;
 t_high = mtg->calculated_t_high;
 
 //parameterize the cash flow models.
-if (this == mtg_cf)
+if (model_name == MTG_CF)
 	{
 	dflt_appl = "Yes";
 	prepmt_appl = "Yes";
@@ -3187,7 +3161,7 @@ if (this == mtg_cf)
 	use_spot_rates = "No";
 	}
 
-else if (this == mtg_pv)
+else if (getElementNumber() == pv)
 	{
 	dflt_appl = "No";
 	prepmt_appl = "Yes";
@@ -3198,7 +3172,7 @@ else if (this == mtg_pv)
 	use_spot_rates = "Yes";
 	}
 
-else if (this == mtg_ym)
+else if (getElementNumber() == ym)
 	{
 	dflt_appl = "No";
 	prepmt_appl = "No";
@@ -3209,36 +3183,9 @@ else if (this == mtg_ym)
 	use_spot_rates = "No";
 	}
 
-// Setup experience rates pointer
-if (!isRebaseClone)
-	{
-	mtg_pv->rates = rates;
-	mtg_is->rates = rates;
-	mtg_ym->rates = rates;
-
-	#if defined(__INTEX_ASSET_H_)
-	if (mtg->intex)
-		{
-		mtg_pv->intex = intex;
-		mtg_is->intex = intex;
-		mtg_ym->intex = intex;
-		}
-	#endif
-	
-	#if defined(__ADCO_ASSET_H_)
-	if (mtg->adco)
-		{
-		mtg_pv->adco = adco;
-		mtg_is->adco = adco;
-		mtg_ym->adco = adco;
-		}
-	#endif
-	}
-
 return 1.0;
 
 }
-
 
 //@@ END
 
@@ -3265,7 +3212,6 @@ return tranche_portion_bef_sale(t)
 
 }
 
-
 //@@ END
 
 //@@ START - tranche_portion_aft_dflt
@@ -3290,7 +3236,6 @@ return tranche_portion(t - 1)
 	   * remaining_pct_aft_dflt(t);
 
 }
-
 
 //@@ END
 
@@ -3329,7 +3274,6 @@ return tranche_portion_aft_dflt(t);
 
 }
 
-
 //@@ END
 
 //@@ START - yld_maint_cash_flow_pct_bef_prepmt
@@ -3348,14 +3292,14 @@ if (t < mtg->commencement_period || t > mtg->maturity_period)
 	return NO_AVG;
 
 if (mtg->prepmt_penalty_defn != CASH_FLOW_MAINTENANCE
-	|| this == mtg_cf
+	|| model_name == MTG_CF
 	|| pv_defn == NET_YIELD
-	|| this == mtg_ym)
+	|| getElementNumber() == ym)
 	return 1.0;
 
 double yield_maintenance_cash_flow_factor = 0;
 
-if (t == rebase_period + 1)
+if (t == rebase_time + 1)
 	yield_maintenance_cash_flow_factor = 1.0;
 else
 	{
@@ -3372,7 +3316,6 @@ return yield_maintenance_cash_flow_factor
 	   * remaining_pct_aft_sched_pmt(t);
 
 }
-
 
 //@@ END
 
@@ -3409,6 +3352,7 @@ else
 	{
 	double int_rate_diff = 0;
 
+	mtg->category_id = mtg->category_id;
 	if (mtg->prepmt_int_diff_defn == GROSS_INTEREST_RATE)
 		int_rate_diff
 		= convert_rate_basis(pmt_rate(t) + mtg->servicing_fee, 
@@ -3492,7 +3436,7 @@ else
 		double par_val = 0;
 		double temp = 0;
 		int pv_detail_period
-		= (this == mtg_cf ? t : max((int)mtg->commencement_period,(int)rebase_period));
+		= (model_name == MTG_CF ? t : max((int)mtg->commencement_period,(int)rebase_time));
 
 #define YM_UPDATE 0 // 1 for output, 0 for none
 
@@ -3516,39 +3460,28 @@ if (output_wanted)
 	}
 #endif
 
-		if (this == mtg_cf)
+		if (model_name == MTG_CF)
 			adjusted_rebase_period = t;
-		else if (this == mtg_pv)
-			adjusted_rebase_period = mtg_pv->rebase_period;
+		else if (getElementNumber() == pv)
+			adjusted_rebase_period = mtg->sm_mtg_cf_var[0][pv]->rebase_time;
 		else
 			{
-			if (this == mtg_is)
+			if (getElementNumber() == is)
 				throw FatalError("this is mtg_is in mtg_cf->yld_maint_cost_pct");
-			else if (this == mtg_ym)
+			else if (getElementNumber() == ym)
 				throw FatalError("this is mtg_ym in mtg_cf->yld_maint_cost_pct");
 			else
 				throw FatalError("this is unknown in mtg_cf->yld_maint_cost_pct");
 			}
 
 		bool has_been_rebased = false;
-
-		if (mtg_ym->isShrunk)
+		if (mtg->sm_mtg_cf_var[0][ym]->rebase_time < adjusted_rebase_period)
 			{
 			mtg->rebase_cash_flow(adjusted_rebase_period,
 						YIELD_MAINTENANCE,
 						"mtg_cf->yld_maint_cost_pct", modelName);
 
-			mtg_ym->pv_calc_parameters(t, YIELD_MAINTENANCE);
-
-			has_been_rebased = true;
-			}
-		else if (mtg_ym->rebase_period < adjusted_rebase_period)
-			{
-			mtg->rebase_cash_flow(adjusted_rebase_period,
-						YIELD_MAINTENANCE,
-						"mtg_cf->yld_maint_cost_pct", modelName);
-
-			mtg_ym->pv_calc_parameters(t, YIELD_MAINTENANCE);
+			mtg->sm_mtg_cf_var[0][ym]->pv_calc_parameters(t, YIELD_MAINTENANCE);
 			
 			has_been_rebased = true;
 			}
@@ -3560,12 +3493,12 @@ if (output_wanted)
 		//          |-----------------------|----------------------|
 		// adjusted_rebase_period			t				maturity_period (or reset period)
 		adjusted_rebase_period
-		= max(this->rebase_period, max((int)t_low, mtg->commencement_period));
+		= max(this->rebase_time, max((int)t_low, mtg->commencement_period));
 
 		if (pv_defn == MARKET_VALUE_SHIFTED)
-			mtg_ym->shift_defn = "Spot Shift";
+			mtg->sm_mtg_cf_var[0][ym]->shift_defn = "Spot Shift";
 		else
-			mtg_ym->shift_defn = "No Shift";
+			mtg->sm_mtg_cf_var[0][ym]->shift_defn = "No Shift";
 
 		if (mtg->mths_to_next_reset(t) < mtg->maturity_period - t
 			|| mtg->maturity_period > mtg->balloon_pmt_period
@@ -3588,7 +3521,7 @@ if (output_wanted)
 				maturity_amount = par_val;
 
 			yield_maintenance_present_value
-			= mtg_ym->pv_calc_simple(t,
+			= mtg->sm_mtg_cf_var[0][ym]->pv_calc_simple(t,
 					convert_rate_basis(yield_plus_addn,
 							NOMINAL_SEMIANNUAL,
 							mtg->pmt_freq),
@@ -3651,9 +3584,9 @@ if (output_wanted)
 				if (dont_use_yield_maintenance_pv_tables)
 					{
 					cost_factor_denominator
-					= (mtg_ym->par_val_aft_sched_pmt(t)
-					   + accr_int_direct(t, mtg_ym->par_val_aft_sched_pmt(t),
-					   				mtg_ym->pmt_rate(t) + mtg->servicing_fee))
+					= (mtg->sm_mtg_cf_var[0][ym]->par_val_aft_sched_pmt(t)
+					   + accr_int_direct(t, mtg->sm_mtg_cf_var[0][ym]->par_val_aft_sched_pmt(t),
+					   				mtg->sm_mtg_cf_var[0][ym]->pmt_rate(t) + mtg->servicing_fee))
 					  * yld_maint_cash_flow_pct_bef_prepmt(t);
 					}
 				else
@@ -3703,9 +3636,9 @@ if (output_wanted)
 					if (initialize_yield_maintenance_pv_tables)
 						{
 						pv_yield_maintenance_par_plus_accrued[0]
-						= mtg_ym->par_val_aft_sched_pmt(t)
-						  + accr_int_direct(t, mtg_ym->par_val_aft_sched_pmt(t),
-										mtg_ym->pmt_rate(t) + mtg->servicing_fee);
+						= mtg->sm_mtg_cf_var[0][ym]->par_val_aft_sched_pmt(t)
+						  + accr_int_direct(t, mtg->sm_mtg_cf_var[0][ym]->par_val_aft_sched_pmt(t),
+										mtg->sm_mtg_cf_var[0][ym]->pmt_rate(t) + mtg->servicing_fee);
 						}
 
 					for (month = 1; month <= months_remaining; month++)
@@ -3714,14 +3647,14 @@ if (output_wanted)
 
 						if (mtg->mths_to_next_pmt(t + month - 1) == 1)
 							servicing_amount
-							= mtg_ym->par_val_aft_dflt(t + month) 
+							= mtg->sm_mtg_cf_var[0][ym]->par_val_aft_dflt(t + month) 
 							   * mtg->servicing_fee 
 							   / mtg->pmt_freq;
 						else
 							servicing_amount = 0.0;
 
 						discounted_cash_flow
-						= (mtg_ym->cash_flow(t + month) + servicing_amount)
+						= (mtg->sm_mtg_cf_var[0][ym]->cash_flow(t + month) + servicing_amount)
 						  * yld_maint_cash_flow_pct_bef_prepmt(t)
 						  * discount_factor;
 
@@ -3731,12 +3664,12 @@ if (output_wanted)
 						if (initialize_yield_maintenance_pv_tables)
 							{
 							pv_yield_maintenance_cash_flows[month-1]
-							= mtg_ym->cash_flow(t + month) + servicing_amount;
+							= mtg->sm_mtg_cf_var[0][ym]->cash_flow(t + month) + servicing_amount;
 
 							pv_yield_maintenance_par_plus_accrued[month]
-							= mtg_ym->par_val_aft_sched_pmt(t + month)
-							  + accr_int_direct(t + month, mtg_ym->par_val_aft_sched_pmt(t + month),
-					   						mtg_ym->pmt_rate(t + month) + mtg->servicing_fee);
+							= mtg->sm_mtg_cf_var[0][ym]->par_val_aft_sched_pmt(t + month)
+							  + accr_int_direct(t + month, mtg->sm_mtg_cf_var[0][ym]->par_val_aft_sched_pmt(t + month),
+					   						mtg->sm_mtg_cf_var[0][ym]->pmt_rate(t + month) + mtg->servicing_fee);
 
 #if YM_UPDATE
 if (output_wanted)
@@ -3754,7 +3687,7 @@ if (output_wanted)
 
 							}
 
-						if (mtg_ym->par_val_aft_sched_pmt(t + month) == 0)
+						if (mtg->sm_mtg_cf_var[0][ym]->par_val_aft_sched_pmt(t + month) == 0)
 							break;
 						}
 
@@ -3829,7 +3762,6 @@ return cost_factor;
 
 }
 
-
 //@@ END
 
 //@@ START - yld_maint_rate
@@ -3850,10 +3782,10 @@ if (t < mtg->commencement_period || t > mtg->maturity_period)
 int scenario_month;
 int valuation_period;
 
-if (this == mtg_cf)
+if (model_name == MTG_CF)
 	valuation_period = t;
 else
-	valuation_period = max(rebase_period, mtg->commencement_period);
+	valuation_period = max(rebase_time, mtg->commencement_period);
 
 if (mtg->use_eom_scen_rates == YES
 	|| (pv_defn != CASH_FLOWS
@@ -3862,34 +3794,33 @@ if (mtg->use_eom_scen_rates == YES
 else
 	scenario_month = - 1;
 
-if (this == mtg_cf)
-	return rates->get_int_rate(t + scenario_month,
+if (model_name == MTG_CF)
+	return rates_ptr->get_int_rate(t + scenario_month,
 	                "Govt",
 					GET_YIELD_RATE,
 					(mtg->maturity_period - t) / 12.0,
 					0.0,
 					NOMINAL_SEMIANNUAL,
-					NO_SHIFT,0);//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+					NO_SHIFT);
 
 if (pv_defn == MARKET_VALUE_SHIFTED)
-	return rates->get_int_rate(valuation_period + scenario_month,
+	return rates_ptr->get_int_rate(valuation_period + scenario_month,
 	                "Govt",
 	                GET_FORWARD_RATE,
 					(t - valuation_period) / 12.0,
 					(mtg->maturity_period - t) / 12.0,
 					NOMINAL_SEMIANNUAL,
-					SPOT_SHIFT,0);//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+					SPOT_SHIFT);
 
-return rates->get_int_rate(valuation_period + scenario_month,
+return rates_ptr->get_int_rate(valuation_period + scenario_month,
                 "Govt",
                 GET_FORWARD_RATE,
 				(t - valuation_period) / 12.0,
 				(mtg->maturity_period - t) / 12.0,
 				NOMINAL_SEMIANNUAL,
-				NO_SHIFT,0);//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+				NO_SHIFT);
 
 }
-
 
 //@@ END
 
@@ -3944,7 +3875,7 @@ return sched_prin_pmt(t)
 
 #line 1 "forecast_adco_adj_wac_rate.MTG_CF_ASSET.for"                                                                                   
 void MTG_CF_ASSET::forecast_adco_adj_wac_rate(int t)
-{
+{/*
 #if defined(__ADCO_ASSET_H_)
 if (!adco)
 	return;
@@ -4022,24 +3953,24 @@ for (int month = 1; month <= 600; month++)
 			{
 			if (month <= offset) // use past actual renewal rates
 				renrate
-				= rates->get_int_rate(t + scn_mth - offset + month,
+				= rates_ptr->get_int_rate(t + scn_mth - offset + month,
 				            mtg->adj_reset_category_id,
 							GET_YIELD_RATE,
 							mtg->adj_reset_scen_yr,
 							0.0,
 							mtg->pmt_freq,
-							shift_defn,mtg->portfolio_sprd_adj_aig)//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+							shift_defn, mtg->port_sprd_adj_crbg);//CRBG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
 				  * mtg->adj_reset_scen_mult
 				  + mtg->adj_reset_renewal_addn;
             else // use current renewal rate
 				renrate
-				= rates->get_int_rate(t + scn_mth,
+				= rates_ptr->get_int_rate(t + scn_mth,
 				            mtg->adj_reset_category_id,
 							GET_YIELD_RATE,
 							mtg->adj_reset_scen_yr,
 							0.0,
 							mtg->pmt_freq,
-							shift_defn,mtg->portfolio_sprd_adj_aig)//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+							shift_defn, mtg->port_sprd_adj_crbg);//CRBG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
 				  * mtg->adj_reset_scen_mult
 				  + mtg->adj_reset_renewal_addn;
 			}
@@ -4047,25 +3978,25 @@ for (int month = 1; month <= 600; month++)
 			{
 			if (month <= offset) // use past actual renewal rates
 				renrate
-				= rates->get_int_rate(t + scn_mth - offset + month,
+				= rates_ptr->get_int_rate(t + scn_mth - offset + month,
 				            mtg->adj_reset_category_id,
 							GET_YIELD_RATE,
 							mtg->adj_reset_scen_yr,
 							0.0,
 							mtg->pmt_freq,
-							NO_SHIFT,mtg->portfolio_sprd_adj_aig)//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+							NO_SHIFT, mtg->port_sprd_adj_crbg);//CRBG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
 				* mtg->adj_reset_scen_mult
 				+ mtg->adj_reset_renewal_addn;
 			else // use forward renewal rates
 				{
 				renrate
-				= convert_rate_basis(rates->get_int_rate(t + scn_mth,
+				= convert_rate_basis(rates_ptr->get_int_rate(t + scn_mth,
 				                            mtg->adj_reset_category_id,
 				                            GET_FORWARD_RATE,
 											(month-offset) * (1.0 / 12.0),
 											mtg->adj_reset_scen_yr,
 											NOMINAL_SEMIANNUAL,
-											shift_defn,mtg->portfolio_sprd_adj_aig),//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+											shift_defn, mtg->port_sprd_adj_crbg),//CRBG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
 						NOMINAL_SEMIANNUAL,
 						mtg->pmt_freq)
 				  * mtg->adj_reset_scen_mult
@@ -4075,13 +4006,13 @@ for (int month = 1; month <= 600; month++)
 		}
 	else // Initial setup - use actual renewal rates
 		renrate
-		= rates->get_int_rate(t + scn_mth - offset + month,
+		= rates_ptr->get_int_rate(t + scn_mth - offset + month,
 		            mtg->adj_reset_category_id,
 					GET_YIELD_RATE,
 					mtg->adj_reset_scen_yr,
 					0.0,
 					mtg->pmt_freq,
-					shift_defn,mtg->portfolio_sprd_adj_aig)//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+					shift_defn, mtg->port_sprd_adj_crbg)//CRBG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
 		  * mtg->adj_reset_scen_mult
 		  + mtg->adj_reset_renewal_addn;
 
@@ -4098,7 +4029,7 @@ for (int month = 1; month <= 600; month++)
 
 	priorrate = renrate;
 	}
-#endif
+#endif*/
 }
 
 
@@ -4218,18 +4149,6 @@ else
 		      - years_to_payment * scen_frequency);
 		}
 
-	if (this->isShrunk)
-		{
-		log_screen << "Error. t=" << t
-				<< " " << (this==mtg_cf ? "mtg_cf"
-							: (this==mtg_pv ? "mtg_pv"
-							: (this==mtg_is ? "mtg_is"
-							: (this==mtg_ym ? "mtg_ym" : "???"))))
-				<< " is shrunk in pv_calc |" << modelName
-				<< MSG_ERROR;
-		throw FatalError("");
-		}
-
 	// discount cash flows
 	if (!use_pv_tables)
 		{
@@ -4244,13 +4163,13 @@ else
 			else
 				{
 				spot_rate
-				= rates->get_int_rate(t, 
+				= rates_ptr->get_int_rate(t, 
 				              mtg->category_id, 
 				              GET_SPOT_RATE,
 				              (month - t) / 12.0,
 				              0.0,
 				              NOMINAL_SEMIANNUAL,
-				              shift_defn,mtg->portfolio_sprd_adj_aig);//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+				              shift_defn, mtg->port_sprd_adj_crbg);//CRBG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
 
 				local_discount_rate
 				= spot_rate + spread_to_spot;
@@ -4348,13 +4267,13 @@ else
 			else
 				{
 				spot_rate
-				= rates->get_int_rate(t, 
+				= rates_ptr->get_int_rate(t, 
 				              mtg->category_id, 
 				              GET_SPOT_RATE,
 				              (month - t) / 12.0,
 				              0.0,
 				              NOMINAL_SEMIANNUAL,
-				              shift_defn,mtg->portfolio_sprd_adj_aig);//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+				              shift_defn, mtg->port_sprd_adj_crbg);//CRBG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
 				
 				local_discount_rate
 				= spot_rate + spread_to_spot;
@@ -4470,7 +4389,7 @@ else if (pv_timing == AFTER_PREPAYMENTS)
 		|| (!mtg->existing_asset_indicator && t > mtg->commencement_period))
 		pv_initial_par_value = mtg_cf->par_val_bef_sale(t);
 	else
-		pv_initial_par_value = mtg_pv->par_val_bef_sale(t);
+		pv_initial_par_value = mtg->sm_mtg_cf_var[0][pv]->par_val_bef_sale(t);
 	}
 
 else
@@ -4708,10 +4627,10 @@ if (command == RESTORE)
 	return;
 	}
 
-throw FatalError("Unrecognized command code '" + (xstring)command
-				+ "' in mtg_cf->pv_calc_parameters");
+convert_type = command;
 
-return;
+throw FatalError("Unrecognized command code '" + convert_type
+				+ "' in mtg_cf->pv_calc_parameters");
 }
 
 
@@ -4796,7 +4715,7 @@ calculated_modified_duration
    * pow(periodic_discount, pmt_freq - 1);
 
 // use rebase_period to reduce sliding windows size
-if (mtg->asset_detail_pv_flag(rebase_period))
+if (mtg->asset_detail_pv_flag(rebase_time))
    	{
 	PVCounter++;
 	PVCText << PVCounter
@@ -4882,7 +4801,7 @@ for(int i = 0; i <= 600; i++)
 
 StrEnum::EnumValue forecast_type = UNDEFINED;
 
-if (this == mtg_cf)
+if (model_name == MTG_CF)
 	forecast_type = EXPERIENCE;
 else if (pv_defn == NET_YIELD)
 	forecast_type = NET_YIELD;
@@ -4897,9 +4816,9 @@ if (mtg->asset_id != adco->asset_id
 	|| shift_defn != adco->shift_defn
 	|| pv_timing != adco->pv_timing
 	|| t != adco->valuation_period
-    || (t == 0 && this == mtg_cf)) // force recaculation after anticipated yield calculation
+    || (t == 0 && model_name == MTG_CF)) // force recaculation after anticipated yield calculation
 	{
-	adco->resetValues();
+	adco->rebaseModel(0);
   
 	// Projection parameters
 	adco->prepmt_model_defn = "MBS";
@@ -4920,7 +4839,6 @@ if (mtg->asset_id != adco->asset_id
 	adco->existing_asset_indicator = mtg->existing_asset_indicator;
 	adco->commencement_period = mtg->commencement_period;
     adco->coupon = (pmt_rate(t) + mtg->servicing_fee) * 100.0;
-	adco->ms_rereadGrid();
 	
 	adco->interest_only_mths = max(0, (mtg->amortzn_start_cy 
 	                                   - get_yr_from_date(mtg->issue_date)) * 12);
@@ -4942,8 +4860,8 @@ if (mtg->asset_id != adco->asset_id
 			adco->prepmt_penalty_mths = 0;
 		else if (mtg->prepmt_penalty_defn == PENALTY_PERCENT)
 			{
-			// 20191021 STW: fix compiler error while converting from RAFM 2.6 to RAFM 2.8
-			int month;
+			int month = 1;
+
 			for (month = 1; month <= mtg->maturity_period; month++)
 	   			{
 		   		if (fabs(mtg->prepmt_penalty_sch[month]) < model_point_amount_threshold)
@@ -5065,7 +4983,7 @@ int cal_mth = xint(mtg->cal_mth(t));
 
 maximum_iterations = SOLVE_FOR_SPREAD_MAXIMUM_ITERATIONS;
 
-tolerance = 0.5 / pow(10, NUMBER_OF_DECIMALS(target_value,SIGNIFICANT_DIGITS));
+tolerance = 0.5 / pow(10, number_of_decimals(target_value,SIGNIFICANT_DIGITS));
 
 if (guess_spread_low == SOLVE_FOR_SPREAD_HIGHEST_SPREAD)
 	{	
@@ -5352,7 +5270,7 @@ if (pv_defn == NET_YIELD
         || (t == mtg->commencement_period && !mtg->existing_asset_indicator)))
 	pv_timing = "End of Month";
 
-tolerance = 0.5 / pow(10, NUMBER_OF_DECIMALS(target_value,SIGNIFICANT_DIGITS));
+tolerance = 0.5 / pow(10, number_of_decimals(target_value,SIGNIFICANT_DIGITS));
 
 if (mtg->asset_detail_pv_flag(t))
 	{
@@ -5605,23 +5523,7 @@ else
 		if (initialize_pv_tables
 			&& pv_defn != MARKET_VALUE_SHIFTED)
 			pv_initialize_yield_maintenance_table = true;
-
-		if (this->isShrunk)
-			{
-			log_screen << "Error. t=" << t
-					<< " " << (this==mtg_cf ? "mtg_cf"
-								: (this==mtg_pv ? "mtg_pv"
-								: (this==mtg_is ? "mtg_is"
-								: (this==mtg_ym ? "mtg_ym" : "???"))))
-					<< " rebase_period=" << rebase_period
-					<< " pv_defn=" << pv_defn
-					<< " pv_tbl_defn=" << pv_tbl_defn
-					<< " pv_timing=" << pv_timing
-					<< " is shrunk in weighted_avg_life_calc |" << modelName
-					<< MSG_ERROR;
-			throw FatalError("");
-			}
-
+		
 		while (month < t + pv_months && !done) 
 			{
 			month++;
@@ -5718,11 +5620,14 @@ else
 						<< prepmt_amt(month) << ","
 						<< pmt_rate(month) << ",";
 
+				mtg->category_id = mtg->category_id;
+				double refinancing_cost_pct_local = mtg->refinancing_cost_pct;
+
 				if (present_value_includes_prepayments)
 					PVCFile << refinancing_rate(month) << ","
 							<< int_savings_pv_bef_prepmt(month) << ","
 							<< int_savings_pv_bef_prepmt(month) - par_val_aft_sched_pmt(month) << ","
-							<< par_val_aft_sched_pmt(month)	* (prepmt_penalty(month) + mtg->refinancing_cost_pct) << ",";
+							<< par_val_aft_sched_pmt(month)	* (prepmt_penalty(month) + refinancing_cost_pct_local) << ",";
 				
 				if (month == t + 1)
 					PVCFile << pv_interest_savings_monthly_refinancing_rate;
@@ -6064,6 +5969,13 @@ const CashFlowCommonData* MTG_CF_ASSET::mCFStaticData[] = {
 namespace {
 	typedef EnumList::ChoicePair ChoicePair;
 
+	// EnumList for convert_type                                                                                       
+	const ChoicePair convert_typeChoicePairs[] = {
+		ChoicePair(StrEnum::UNDEFINED, StrEnum::undefinedString)
+		,ChoicePair(StrEnum::_0, "0")
+	};
+	const EnumList convert_typeEnumList(1, convert_typeChoicePairs);
+
 	// EnumList for dflt_appl                                                                                       
 	const ChoicePair dflt_applChoicePairs[] = {
 		ChoicePair(StrEnum::UNDEFINED, StrEnum::undefinedString)
@@ -6071,6 +5983,14 @@ namespace {
 		,ChoicePair(StrEnum::NO, "No")
 	};
 	const EnumList dflt_applEnumList(2, dflt_applChoicePairs);
+
+	// EnumList for model_name                                                                                       
+	const ChoicePair model_nameChoicePairs[] = {
+		ChoicePair(StrEnum::UNDEFINED, StrEnum::undefinedString)
+		,ChoicePair(StrEnum::MTG_CF, "mtg_cf")
+		,ChoicePair(StrEnum::MTG_CF_VAR, "mtg_cf_var")
+	};
+	const EnumList model_nameEnumList(2, model_nameChoicePairs);
 
 	// EnumList for prepmt_appl                                                                                       
 	const ChoicePair prepmt_applChoicePairs[] = {
@@ -6164,25 +6084,31 @@ void MTG_CF_ASSET::createAllShare() {
 TableMgr<VariantTable> MTG_CF_ASSET::mgr_;
 
 	Attribute::Descriptor MTG_CF_ASSET::descriptor_0[] = {
-	Descriptor(0, Attribute::STR_ENUM,	"dflt_appl", -1, (size_t)&modelOffset->dflt_appl,
+	Descriptor(0, Attribute::STR_ENUM,	"convert_type", -1, (size_t)&modelOffset->convert_type,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, &convert_typeEnumList, Feature(false)),
+	Descriptor(1, Attribute::STR_ENUM,	"dflt_appl", -1, (size_t)&modelOffset->dflt_appl,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &dflt_applEnumList, Feature(true)),
-	Descriptor(1, Attribute::STR_ENUM,	"prepmt_appl", -1, (size_t)&modelOffset->prepmt_appl,
+	Descriptor(2, Attribute::STR_ENUM,	"model_name", -1, (size_t)&modelOffset->model_name,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, &model_nameEnumList, Feature(true)),
+	Descriptor(3, Attribute::STR_ENUM,	"prepmt_appl", -1, (size_t)&modelOffset->prepmt_appl,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &prepmt_applEnumList, Feature(true)),
-	Descriptor(2, Attribute::ARRAY_DOUBLE,	"prepmt_rate", -1, (size_t)&modelOffset->prepmt_rate,
+	Descriptor(4, Attribute::ARRAY_DOUBLE,	"prepmt_rate", -1, (size_t)&modelOffset->prepmt_rate,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature(1)),
-	Descriptor(3, Attribute::STR_ENUM,	"pv_defn", -1, (size_t)&modelOffset->pv_defn,
+	Descriptor(5, Attribute::STR_ENUM,	"pv_defn", -1, (size_t)&modelOffset->pv_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &pv_defnEnumList, Feature(true)),
-	Descriptor(4, Attribute::DOUBLE,	"pv_int_savings_pv_for_mkt_val_calc", Descriptor::NOT_INDEXED, (size_t)&modelOffset->pv_int_savings_pv_for_mkt_val_calc,
+	Descriptor(6, Attribute::DOUBLE,	"pv_int_savings_pv_for_mkt_val_calc", Descriptor::NOT_INDEXED, (size_t)&modelOffset->pv_int_savings_pv_for_mkt_val_calc,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(5, Attribute::STR_ENUM,	"pv_tbl_defn", -1, (size_t)&modelOffset->pv_tbl_defn,
+	Descriptor(7, Attribute::STR_ENUM,	"pv_tbl_defn", -1, (size_t)&modelOffset->pv_tbl_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &pv_tbl_defnEnumList, Feature(true)),
-	Descriptor(6, Attribute::STR_ENUM,	"pv_timing", -1, (size_t)&modelOffset->pv_timing,
+	Descriptor(8, Attribute::STR_ENUM,	"pv_timing", -1, (size_t)&modelOffset->pv_timing,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &pv_timingEnumList, Feature(true)),
-	Descriptor(7, Attribute::STR_ENUM,	"shift_defn", -1, (size_t)&modelOffset->shift_defn,
+	Descriptor(9, Attribute::INT,	"rebase_time", -1, (size_t)&modelOffset->rebase_time,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
+	Descriptor(10, Attribute::STR_ENUM,	"shift_defn", -1, (size_t)&modelOffset->shift_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &shift_defnEnumList, Feature(true)),
-	Descriptor(8, Attribute::STR_ENUM,	"use_spot_rates", -1, (size_t)&modelOffset->use_spot_rates,
+	Descriptor(11, Attribute::STR_ENUM,	"use_spot_rates", -1, (size_t)&modelOffset->use_spot_rates,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &use_spot_ratesEnumList, Feature(true)),
-	Descriptor(9, Attribute::INT,	"msnumelement", -1, (size_t)&modelOffset->msnumelement,
+	Descriptor(12, Attribute::INT,	"msnumelement", -1, (size_t)&modelOffset->msnumelement,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
 	};
 
@@ -6197,8 +6123,11 @@ TableMgr<VariantTable> MTG_CF_ASSET::mgr_;
 	&MTG_CF_ASSET::descriptor_0[7],
 	&MTG_CF_ASSET::descriptor_0[8],
 	&MTG_CF_ASSET::descriptor_0[9],
+	&MTG_CF_ASSET::descriptor_0[10],
+	&MTG_CF_ASSET::descriptor_0[11],
+	&MTG_CF_ASSET::descriptor_0[12],
 	nullptr};
-	const size_t MTG_CF_ASSET::sDescriptorCount = 10;
+	const size_t MTG_CF_ASSET::sDescriptorCount = 13;
 
 //factory
 MTG_CF_ASSET* MTG_CF_ASSET::makeThis(int isSubmodel, ModelClass* owner, MTG_CF_ASSET* peer, 
@@ -6232,27 +6161,6 @@ MTG_CF_ASSET* MTG_CF_ASSET::makeThis(int isSubmodel, ModelClass* owner, MTG_CF_A
 		setVisitorPointersAndMap(name, newP, 'N');
 
 	// create submodels of this model here
-	if (rebasing_wanted && (!peer || peer != newP->sm_calling_model)) {
-	if (find(unusedModels.begin(), unusedModels.end(), name + "|mtg_pv") == unusedModels.end()) {
-	newP->sm_mtg_pv = MTG_CF_ASSET::makeThis(1, newP, newP, 0, name + "|mtg_pv", (MTG_CF_ASSET_persistent_object*)(arrayTemplate?arrayTemplate->sm_mtg_pv:0));
-	newP->adopt(newP->sm_mtg_pv);
-	}
-	}
-
-	if (rebasing_wanted && (!peer || peer != newP->sm_calling_model)) {
-	if (find(unusedModels.begin(), unusedModels.end(), name + "|mtg_is") == unusedModels.end()) {
-	newP->sm_mtg_is = MTG_CF_ASSET::makeThis(1, newP, newP, 0, name + "|mtg_is", (MTG_CF_ASSET_persistent_object*)(arrayTemplate?arrayTemplate->sm_mtg_is:0));
-	newP->adopt(newP->sm_mtg_is);
-	}
-	}
-
-	if (rebasing_wanted && (!peer || peer != newP->sm_calling_model)) {
-	if (find(unusedModels.begin(), unusedModels.end(), name + "|mtg_ym") == unusedModels.end()) {
-	newP->sm_mtg_ym = MTG_CF_ASSET::makeThis(1, newP, newP, 0, name + "|mtg_ym", (MTG_CF_ASSET_persistent_object*)(arrayTemplate?arrayTemplate->sm_mtg_ym:0));
-	newP->adopt(newP->sm_mtg_ym);
-	}
-	}
-
 
 	// only do this for topmodel created
    if (!arrayTemplate && newP == CP) {
@@ -6306,27 +6214,6 @@ MTG_CF_ASSET_persistent_object* MTG_CF_ASSET_persistent_object::makeThis(int isS
 		setVisitorPointersAndMap(name, newP, 'N');
 
 	// create submodels of this model here
-	if (rebasing_wanted && (!peer || peer != newP->sm_calling_model)) {
-	if (find(unusedModels.begin(), unusedModels.end(), name + "|mtg_pv") == unusedModels.end()) {
-	newP->sm_mtg_pv = (MTG_CF_ASSET*)MTG_CF_ASSET_persistent_object::makeThis(1, newP, newP, 0, name + "|mtg_pv", (MTG_CF_ASSET_persistent_object*)(arrayTemplate?arrayTemplate->sm_mtg_pv:0), fixedArray);
-	newP->adopt(newP->sm_mtg_pv);
-	}
-	}
-
-	if (rebasing_wanted && (!peer || peer != newP->sm_calling_model)) {
-	if (find(unusedModels.begin(), unusedModels.end(), name + "|mtg_is") == unusedModels.end()) {
-	newP->sm_mtg_is = (MTG_CF_ASSET*)MTG_CF_ASSET_persistent_object::makeThis(1, newP, newP, 0, name + "|mtg_is", (MTG_CF_ASSET_persistent_object*)(arrayTemplate?arrayTemplate->sm_mtg_is:0), fixedArray);
-	newP->adopt(newP->sm_mtg_is);
-	}
-	}
-
-	if (rebasing_wanted && (!peer || peer != newP->sm_calling_model)) {
-	if (find(unusedModels.begin(), unusedModels.end(), name + "|mtg_ym") == unusedModels.end()) {
-	newP->sm_mtg_ym = (MTG_CF_ASSET*)MTG_CF_ASSET_persistent_object::makeThis(1, newP, newP, 0, name + "|mtg_ym", (MTG_CF_ASSET_persistent_object*)(arrayTemplate?arrayTemplate->sm_mtg_ym:0), fixedArray);
-	newP->adopt(newP->sm_mtg_ym);
-	}
-	}
-
 	// only do this for topmodel created
    if (!arrayTemplate && newP == CP) {
 		IsMainRebaseForClonesVisitor().visitAll(CP);
@@ -6351,25 +6238,14 @@ typedef xstring (MTG_CF_ASSET_UDF::*sPFs) (xstring);
 
 // constructor if this model class is the base class of another model class
 MTG_CF_ASSET::MTG_CF_ASSET(int columnCount, Descriptor* mocd[], Product* persObj) : ModelClass(columnCount, mocd, persObj), Variable(*this)
-  , sm_bond_is(0)
-  , sm_bond_pv(0)
-  , sm_bond_ym(0)
 
-  , sm_mtg_is(0)
-  , sm_mtg_pv(0)
-  , sm_mtg_ym(0)
 	, adco(company_asset_adco)
 	, asset(company_asset)
-	, bond_pv(company_asset_bond_bond_cf_bond_pv)
-	, bond_ym(company_asset_bond_bond_cf_bond_ym)
 	, epl(company_liab_epl)
 	, fia(company_liab_fia)
-	, intex(company_asset_intex)
+	, liab(company_liab)
 	, mtg(company_asset_mtg)
 	, mtg_cf(company_asset_mtg_mtg_cf)
-	, mtg_is(company_asset_mtg_mtg_cf_mtg_is)
-	, mtg_pv(company_asset_mtg_mtg_cf_mtg_pv)
-	, mtg_ym(company_asset_mtg_mtg_cf_mtg_ym)
 	, rates(company_rates)
 	, seg(company_seg)
 {
@@ -6386,25 +6262,14 @@ MTG_CF_ASSET::MTG_CF_ASSET(int columnCount, Descriptor* mocd[], Product* persObj
 MTG_CF_ASSET::MTG_CF_ASSET(const xstring &modelClassName,
 		int isSm, ModelClass *owner, ModelClass *peer, int mainRebase,
 		const char *name, ModelClass* arrayPersistentObj) : ModelClass(45, MTG_CF_ASSET::descriptorTable, arrayPersistentObj), Variable(*this)
-  , sm_bond_is(0)
-  , sm_bond_pv(0)
-  , sm_bond_ym(0)
 
-  , sm_mtg_is(0)
-  , sm_mtg_pv(0)
-  , sm_mtg_ym(0)
 	, adco(company_asset_adco)
 	, asset(company_asset)
-	, bond_pv(company_asset_bond_bond_cf_bond_pv)
-	, bond_ym(company_asset_bond_bond_cf_bond_ym)
 	, epl(company_liab_epl)
 	, fia(company_liab_fia)
-	, intex(company_asset_intex)
+	, liab(company_liab)
 	, mtg(company_asset_mtg)
 	, mtg_cf(company_asset_mtg_mtg_cf)
-	, mtg_is(company_asset_mtg_mtg_cf_mtg_is)
-	, mtg_pv(company_asset_mtg_mtg_cf_mtg_pv)
-	, mtg_ym(company_asset_mtg_mtg_cf_mtg_ym)
 	, rates(company_rates)
 	, seg(company_seg)
  // Tables...
@@ -6431,7 +6296,7 @@ MTG_CF_ASSET::MTG_CF_ASSET(const xstring &modelClassName,
        isMainModel = !isSm;
 		modelName = name;
 
-#ifdef __CREATE_COMP_COMP_CLASS_
+#ifdef __CREATE_AA_COMP_COMP_CLASS_
        company = 0;
 #endif
 #ifdef __CREATE_ASSET_ASSET_CLASS_
@@ -6440,29 +6305,14 @@ MTG_CF_ASSET::MTG_CF_ASSET(const xstring &modelClassName,
 #ifdef __CREATE_ADCO_ASSET_CLASS_
        company_asset_adco = 0;
 #endif
-#ifdef __CREATE_BOND_CF_ASSET_CLASS_
-       company_asset_bond_bond_cf_bond_pv = 0;
-#endif
-#ifdef __CREATE_BOND_CF_ASSET_CLASS_
-       company_asset_bond_bond_cf_bond_ym = 0;
-#endif
-#ifdef __CREATE_INTEX_ASSET_CLASS_
-       company_asset_intex = 0;
-#endif
 #ifdef __CREATE_MTG_ASSET_CLASS_
        company_asset_mtg = 0;
 #endif
 #ifdef __CREATE_MTG_CF_ASSET_CLASS_
        company_asset_mtg_mtg_cf = 0;
 #endif
-#ifdef __CREATE_MTG_CF_ASSET_CLASS_
-       company_asset_mtg_mtg_cf_mtg_is = 0;
-#endif
-#ifdef __CREATE_MTG_CF_ASSET_CLASS_
-       company_asset_mtg_mtg_cf_mtg_pv = 0;
-#endif
-#ifdef __CREATE_MTG_CF_ASSET_CLASS_
-       company_asset_mtg_mtg_cf_mtg_ym = 0;
+#ifdef __CREATE_LIAB_LIAB_CLASS_
+       company_liab = 0;
 #endif
 #ifdef __CREATE_EPL_LIAB_CLASS_
        company_liab_epl = 0;
@@ -6534,8 +6384,8 @@ MTG_CF_ASSET::MTG_CF_ASSET(const xstring &modelClassName,
 
  void MTG_CF_ASSET::copy_names() {
 
-#ifdef __CREATE_COMP_COMP_CLASS_
-		company = (COMP_COMP*)(findUnique("company"));
+#ifdef __CREATE_AA_COMP_COMP_CLASS_
+		company = (AA_COMP_COMP*)(findUnique("company"));
 #endif
 #ifdef __CREATE_ASSET_ASSET_CLASS_
 		company_asset = (ASSET_ASSET*)(findUnique("company|asset"));
@@ -6543,29 +6393,14 @@ MTG_CF_ASSET::MTG_CF_ASSET(const xstring &modelClassName,
 #ifdef __CREATE_ADCO_ASSET_CLASS_
 		company_asset_adco = (ADCO_ASSET*)(findUnique("company|asset|adco"));
 #endif
-#ifdef __CREATE_BOND_CF_ASSET_CLASS_
-		company_asset_bond_bond_cf_bond_pv = (BOND_CF_ASSET*)(findUnique("company|asset|bond|bond_cf|bond_pv"));
-#endif
-#ifdef __CREATE_BOND_CF_ASSET_CLASS_
-		company_asset_bond_bond_cf_bond_ym = (BOND_CF_ASSET*)(findUnique("company|asset|bond|bond_cf|bond_ym"));
-#endif
-#ifdef __CREATE_INTEX_ASSET_CLASS_
-		company_asset_intex = (INTEX_ASSET*)(findUnique("company|asset|intex"));
-#endif
 #ifdef __CREATE_MTG_ASSET_CLASS_
 		company_asset_mtg = (MTG_ASSET*)(findUnique("company|asset|mtg"));
 #endif
 #ifdef __CREATE_MTG_CF_ASSET_CLASS_
 		company_asset_mtg_mtg_cf = (MTG_CF_ASSET*)(findUnique("company|asset|mtg|mtg_cf"));
 #endif
-#ifdef __CREATE_MTG_CF_ASSET_CLASS_
-		company_asset_mtg_mtg_cf_mtg_is = (MTG_CF_ASSET*)(findUnique("company|asset|mtg|mtg_cf|mtg_is"));
-#endif
-#ifdef __CREATE_MTG_CF_ASSET_CLASS_
-		company_asset_mtg_mtg_cf_mtg_pv = (MTG_CF_ASSET*)(findUnique("company|asset|mtg|mtg_cf|mtg_pv"));
-#endif
-#ifdef __CREATE_MTG_CF_ASSET_CLASS_
-		company_asset_mtg_mtg_cf_mtg_ym = (MTG_CF_ASSET*)(findUnique("company|asset|mtg|mtg_cf|mtg_ym"));
+#ifdef __CREATE_LIAB_LIAB_CLASS_
+		company_liab = (LIAB_LIAB*)(findUnique("company|liab"));
 #endif
 #ifdef __CREATE_EPL_LIAB_CLASS_
 		company_liab_epl = (EPL_LIAB*)(findUnique("company|liab|epl"));
@@ -6789,13 +6624,7 @@ MTG_CF_ASSET_persistent_object::MTG_CF_ASSET_persistent_object(const xstring &mo
 			MTG_CF_ASSET(modelClassName, isSm, owner, peer, mainRebase, name, arrayPersistentObj), 
 			mReadArray(true),
 			pfl(0)
-	, sm_bond_is(MTG_CF_ASSET::sm_bond_is)
-	, sm_bond_pv(MTG_CF_ASSET::sm_bond_pv)
-	, sm_bond_ym(MTG_CF_ASSET::sm_bond_ym)
 
-	, sm_mtg_is(MTG_CF_ASSET::sm_mtg_is)
-	, sm_mtg_pv(MTG_CF_ASSET::sm_mtg_pv)
-	, sm_mtg_ym(MTG_CF_ASSET::sm_mtg_ym)
 	{
 
 
@@ -6865,21 +6694,6 @@ void MTG_CF_ASSET::resetValues(int decrement) {
 
 void MTG_CF_ASSET::after_startup(int decrement) {
 // Call startup for submodels
-  if (indexOfChild(sm_mtg_pv) >= 0 && ! sm_mtg_pv->isShrunk) { // generated for clones only
-  if(sm_mtg_pv)
-   sm_mtg_pv->doBeforeStartupProcessing(decrement);
-  }
-
-  if (indexOfChild(sm_mtg_is) >= 0 && ! sm_mtg_is->isShrunk) { // generated for clones only
-  if(sm_mtg_is)
-   sm_mtg_is->doBeforeStartupProcessing(decrement);
-  }
-
-  if (indexOfChild(sm_mtg_ym) >= 0 && ! sm_mtg_ym->isShrunk) { // generated for clones only
-  if(sm_mtg_ym)
-   sm_mtg_ym->doBeforeStartupProcessing(decrement);
-  }
-
 }
 //after_startup END@2
 
@@ -6889,7 +6703,7 @@ void MTG_CF_ASSET::after_startup(int decrement) {
 //ms_BeforeStartup END@2
 
 HVector<ModelClass::ddfStruct> MTG_CF_ASSET::ddfVector;
-BitArray MTG_CF_ASSET::dataVariables(10);
+BitArray MTG_CF_ASSET::dataVariables(13);
 bool MTG_CF_ASSET::hasBeenWritten = false;
 
 

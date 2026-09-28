@@ -1,13 +1,12 @@
 ﻿
 //MODELCLASS BEGIN
+//MODELCLASS aa_comp_comp
 //MODELCLASS adco_asset
 //MODELCLASS ann_pba_pba
 //MODELCLASS asset_asset
-//MODELCLASS automation
 //MODELCLASS a_subport_asset
 //MODELCLASS bond_asset
 //MODELCLASS bond_cf_asset
-//MODELCLASS comp_comp
 //MODELCLASS eio_asset
 //MODELCLASS epa_asset
 //MODELCLASS epl_liab
@@ -15,16 +14,14 @@
 //MODELCLASS fiacarvm_liab
 //MODELCLASS fia_liab
 //MODELCLASS hdg_grp_comp
-//MODELCLASS intex_asset
 //MODELCLASS invstrat_asset
 //MODELCLASS liab_liab
+//MODELCLASS mrb_gaap
 //MODELCLASS mtg_asset
 //MODELCLASS mtg_cf_asset
 //MODELCLASS rates_economy
 //MODELCLASS seg_comp
-//MODELCLASS sfas133_gaap
 //MODELCLASS sfas97rd_gaap
-//MODELCLASS util_rafm
 //MODELCLASS END
 
 #if defined(MICROSOFT)
@@ -75,30 +72,27 @@ extern MemCount gMem;
 extern MY_DLL Parmfile *p;
 #include "column2.h"
 #include "ModelClass\hdg_grp_comp_udf.h"
+#include "ModelClass\aa_comp_comp.h"
 #include "ModelClass\adco_asset.h"
 #include "ModelClass\ann_pba_pba.h"
 #include "ModelClass\asset_asset.h"
-#include "ModelClass\automation.h"
 #include "ModelClass\a_subport_asset.h"
 #include "ModelClass\bond_asset.h"
 #include "ModelClass\bond_cf_asset.h"
-#include "ModelClass\comp_comp.h"
 #include "ModelClass\eio_asset.h"
 #include "ModelClass\epa_asset.h"
 #include "ModelClass\epl_liab.h"
 #include "ModelClass\fiaafund_liab.h"
 #include "ModelClass\fiacarvm_liab.h"
 #include "ModelClass\fia_liab.h"
-#include "ModelClass\intex_asset.h"
 #include "ModelClass\invstrat_asset.h"
 #include "ModelClass\liab_liab.h"
+#include "ModelClass\mrb_gaap.h"
 #include "ModelClass\mtg_asset.h"
 #include "ModelClass\mtg_cf_asset.h"
 #include "ModelClass\rates_economy.h"
 #include "ModelClass\seg_comp.h"
-#include "ModelClass\sfas133_gaap.h"
 #include "ModelClass\sfas97rd_gaap.h"
-#include "ModelClass\util_rafm.h"
 #pragma optimize( "gs", on )
 
 #include "generatedCppHeader.h"
@@ -109,7 +103,7 @@ extern MY_DLL Parmfile *p;
 //Redundant includes only for snip test:
 //iomanip included for "setprecision()"
 #include <iomanip>
-#include <strstream> //WTW - Gen2
+#include <strstream>
 typedef vector<vector<string>> sowfinput;
 typedef vector<string> sowfcols;
 typedef map <xstring, long, less <xstring> > sowfmap;
@@ -120,7 +114,9 @@ typedef vector<vector<string>> deptaskinput;
 typedef vector<string> deptaskcols;
 typedef map <xstring, long, less <xstring> > deptaskmap;
 typedef deptaskmap::iterator deptaskmapiter;
-//extern MY_DLL strstream log_screen; //WTW - Gen2 - MY_DLL is not supported
+const int pv = 0;
+const int is = 1;
+const int ym = 2;
 const int EFFECTIVE_RATE = 0;
 const int EFFECTIVE_ANNUAL = 1;
 const int NOMINAL_SEMIANNUAL = 2;
@@ -138,9 +134,8 @@ const double LEAST_ANNUAL_GROWTH_RATE = -0.9999;
 const double LEAST_BOND_EQUIVALENT_RATE = 0.0001;
 const double SPOT_SHIFT_FOR_EFFECTIVE_DURATION_CALCULATION = 0.0001;
 const double ONE_MILLION = 1000000.0;
-//WTW - Gen2 - Move Extern definitions to rates header
-//const double MINIMUM_MONTHLY_YIELD_RATIO = -0.9; // annual yield = (1.0-0.9)^12 = 1.0e-12
-//const double MAXIMUM_MONTHLY_YIELD_RATIO	 = 999999999.0; // annual yield = (1.0+999999999.0)^12 = 1.0e+120
+const double MINIMUM_MONTHLY_YIELD_RATIO = -0.9; // annual yield = (1.0-0.9)^12 = 1.0e-12
+const double MAXIMUM_MONTHLY_YIELD_RATIO	 = 999999999.0; // annual yield = (1.0+999999999.0)^12 = 1.0e+120
 const int DECIMALS_TO_ROUND = 6;
 const int ROUND_NEGATIVE_TOZERO = 0;
 const int ROUND_NEAR = 1;
@@ -154,11 +149,10 @@ const int SUM_OVER_NEGATIVE = -101;
 const int TIER = -98;
 const int ANY_GROUP = -99;
 const bool DO_NOT_ISSUE_WARNINGS = false;
-//WTW - Gen2 - Move Extern definitions to rates header
-//const int CALL_CODE = 1; 
-//const int PUT_CODE = 2; 
-//const int CONTINUOUS_PAYOUT_CODE = 3;
-//const int FUTURES_CODE = 4;
+const int CALL_CODE = 1;
+const int PUT_CODE = 2;
+const int CONTINUOUS_PAYOUT_CODE = 3;
+const int FUTURES_CODE = 4;
 // Model point type
 const int NEW_PURCH = 0;
 const int INIT_MP = 1;
@@ -208,11 +202,13 @@ const int HEDGE_CASH_FLOW = 0;
 const int HEDGE_MKT_VAL = 1;
 const int HEDGE_ARRAY_SIZE = 2;
 // global calculation flags
-//extern bool pricing_flag;//WTW - Gen2 - Move Extern definitions to rates header
+extern bool pricing_flag;
 extern bool factors_flag;
 extern bool nb_flag;
 extern bool alm_flag;
 extern bool tcm_flag;
+extern bool pba_disc_rate_flag;
+extern int pba_segment_size;
 extern bool avr_flag;
 extern bool imr_flag;
 extern bool gaap_flag;
@@ -220,17 +216,12 @@ extern bool tgt_cap_flag;
 extern bool stoch_flag;
 extern bool valn_flag;
 extern bool time_step_flag;
-extern bool sfas133_valn_flag;
+extern bool mrb_valn_flag;
 extern bool sop031_valn_flag;
 extern bool sfas97rd_valn_flag;
-extern bool sfas97lp_valn_flag;
-extern bool sfas97lp_gpr_valn_flag;
 extern bool sfas91_valn_flag;
-extern bool sfas60_valn_flag;
-extern bool sfas60_gpr_valn_flag;
+extern bool gaap_ldti_valn_flag;
 extern bool sfas120_nlp_valn_flag;
-extern bool sfas120_valn_flag;
-extern bool sfas120_gpr_valn_flag;
 extern bool loc_gpr_valn_flag;
 extern bool pba_valn_flag;
 extern bool pba_scen_amt_valn_flag;
@@ -239,6 +230,7 @@ extern bool res_scen_amt_valn_flag;
 extern bool res_det_res_valn_flag;
 extern bool res_ag38_8d_valn_flag;
 extern bool std_scen_valn_flag;
+extern bool std_scen_prescribed_assump_flag;
 extern bool rbc_std_scen_valn_flag;
 extern bool rbc_std_scen_step2_valn_flag;
 extern bool res_std_scen_valn_flag;
@@ -261,33 +253,32 @@ extern double aggregate_amount_threshold;
 extern double model_point_amount_threshold;
 extern double rate_ratio_threshold;
 extern vector<string> valn_periods;
+
 // utility functions - elaborated in rates/economy externs
-//WTW - Gen2 - Move Extern definitions to rates header
-/*extern double round_result(int rounding, int negative, double x, int n);
+extern double round_result(int rounding, int negative, double x, int n);
 extern double factorial(int n);
 extern int n_choose_k(int n, int k);
 extern xstring check_date_format(const xstring &date);
+extern int month_from_day_number(int nSerialDate);
+extern int year_from_day_number(int nSerialDate);
+extern int day_from_day_number(int nSerialDate);
+extern int month_number_from_date(int year, int month); 
+extern int day_number_from_date(int nYear, int nMonth, int nDay);
 extern int get_mth_from_date(const xstring &date);
 extern int get_yr_from_date(const xstring &date);
 extern int get_day_from_date(const xstring &date);
-extern int month_from_day_number(int nSerialDate);//WTW - Gen2 - add new formula to replace unsupported MonthFromDayNumber() function
-extern int year_from_day_number(int nSerialDate);//WTW - Gen2 - add new formula to replace unsupported YearFromDayNumber() function
-extern int day_from_day_number(int nSerialDate);//WTW - Gen2 - add new formula to replace unsupported DayFromDayNumber() function
-extern int month_number_from_date(int year, int month); //WTW - Gen2 - add new formula to replace unsupported MonthNumberFromDate() function
-extern int day_number_from_date(int nYear, int nMonth, int nDay); //WTW - Gen2 - add new formula to replace unsupported DayNumberFromDate() function
 extern int get_end_of_mth_day(int yr, int mth);
 extern xstring add_mths_to_date(const xstring &date, int mths);
 extern int get_mth_from_adj_date(const xstring &date, int mths);
 extern double convert_rate_basis(double orig_rate, double orig_rate_basis, double new_rate_basis);
 extern double convert_decrem_rate_basis(double orig_rate, double orig_rate_basis, double new_rate_basis);
-extern long int determine_tbl_size(int sNumberOfDims, ...);
 extern xstring get_file_name(const xstring &source_file);
 extern xstring get_file_path(const xstring &source_file);
-extern xstring get_base_group_name(const xstring &tag, bool seriatim_flag = false);
+extern xstring get_base_group_name(const xstring &tag, bool split_flag = false);
 extern xstring get_string_of_date(double date);
 extern xstring get_string_of_enum_val(StrEnum::EnumValue type);
 extern int date_diff(xstring first_date, xstring second_date);
-extern int number_of_decimals(double xxx, int digits);//WTW - Gen2 - replace preprocessor #define with formula
+extern int number_of_decimals(double xxx,int digits);
 extern xstring write_string(double value, int string_length, int significant_digits);
 extern xstring write_array_to_string(SmartArray <double> value_array, int low, int high);
 extern void read_from_string(xstring temp_string, SmartArray <double> &temp_array);
@@ -308,25 +299,8 @@ extern double bs_opt_val_continuous_highest_gain(int call_or_put, double current
 extern double bs_opt_val_highest_gain(int call_or_put, double current_price, double observed_max, double observed_min, double strike_price, double length_of_sampling_period, int sampling_freq, double yrs_to_expiry, double risk_free_rate, double init_div_yld, double index_vol, int scen_int_freq, int scen_index_freq);
 extern double bs_opt_val_mthly_sum_cap(int crediting_mths, int known_index_vals, double sum_capped_amts,  double mthly_cap_rate, double yrs_to_expiry, double risk_free_rate, double init_div_yld, double index_vol, int scen_int_freq, int scen_index_freq);
 extern double cumul_bivariate_normal_distribn(double x, double y, double rho);
-extern double cumul_normal_distribn(double x);*/
+extern double cumul_normal_distribn(double x);
 
-// RAFM SQLite
-#ifndef _RAFMSQLITE_H_
-#define _RAFMSQLITE_H_
-
-#include <string>
-#include <vector>
-
-using namespace std;
-
-// 20210614 STW: upgrade to RAFM 2.9
-/*
-extern void openDatabase(string dbPath);
-extern void closeDatabase();
-extern string readCsvFile(string csvPath);
-extern void executeQuery(string sql, vector<string>& columns, vector<vector<string>>& results);
-*/
-#endif
 #endif
 extern int trace_wanted;
 
@@ -336,14 +310,7 @@ extern MY_DLL int last_model_period;
 extern MY_DLL Message_handler *eh;
 
 deptaskinput valn_hedge_input;
-deptaskcols valn_hedge_input_cols;
-deptaskmap valn_hedge_input_pos;
-deptaskmapiter valn_hedge_input_pos_iter;
-
 deptaskinput valn_hedge_final_input;
-deptaskcols valn_hedge_final_input_cols;
-deptaskmap valn_hedge_final_input_pos;
-deptaskmapiter valn_hedge_final_input_pos_iter;
 
 // define sum over command, END_OF_PERIOD is defined globally
 const int BEG_OF_PERIOD = 0;
@@ -362,7 +329,6 @@ extern const int& last_proj_task_loop;
 extern const int& proj_task_loop_num;
 extern const int& num_of_proj_task_loops;
 
-extern MY_DLL2 int use_overlay_code;
 extern MY_DLL int trace_level_wanted;
 extern MY_DLL int trace_level;
 extern MY_DLL bool bEmitTurboDebugger;
@@ -402,7 +368,6 @@ return proj_start_mth + t - 1
 
 }
 
-
 //@@ END
 
 //@@ START - cal_yr
@@ -427,7 +392,6 @@ return proj_start_yr + cal_yr_relative(t) - 1;
 
 }
 
-
 //@@ END
 
 //@@ START - cal_yr_relative
@@ -448,7 +412,6 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 return 1 + floor((proj_start_mth + t - 2) / 12.0);
 
 }
-
 
 //@@ END
 
@@ -476,11 +439,10 @@ opt_payoff(t);
 
 if (fabs(notional_to_hedge(t)) < rate_ratio_threshold)
 	return NO_AVG;
-
+	
 return (notional_amt_to_hedge_cap(t) / notional_to_hedge(t) - 1.0);
 
 }
-
 
 //@@ END
 
@@ -496,10 +458,19 @@ double HDG_GRP_COMP_UDF::hdg_grp_comp_delta_hedge_flag(int t) {
 //^^^
 
 #line 1 "delta_hedge_flag.HDG_GRP_COMP.for"
-if (!hedge_proj_stmt_flag || hedge_grp_delta_hedge_defn == NO)
-	return 0;
+if (t > 0)
+	{
+	hedge_grp_id = hedge_grp_id;
+	int hedge_grp_delta_hedge_rebal_freq_local = hedge_grp_delta_hedge_rebal_freq;
 
-if (t > 0 && (t % hedge_grp_delta_hedge_rebal_freq) != 0)
+	if ((t % hedge_grp_delta_hedge_rebal_freq_local) != 0)
+		return 0;
+	}
+
+hedge_grp_id = hedge_grp_id;
+StrEnum::EnumValue hedge_grp_delta_hedge_defn_local = hedge_grp_delta_hedge_defn;
+
+if (!hedge_proj_stmt_flag || hedge_grp_delta_hedge_defn_local == NO)
 	return 0;
 
 // Check for existing delta hedge assets. If they exist, delta hedge strategy is not executed at t == 0
@@ -507,8 +478,7 @@ if (t == 0)
 	{
 	#if defined(__EIO_ASSET_H_)
 	int mp = 0;
-	mpmap::iterator mp_map_iter;
-	EIO_ASSET *eio_element = NULL;
+	map <int, long, less <int> >::iterator mp_map_iter;
 
 	if (eio_mp_map_active.size() > 0)
 		{
@@ -517,9 +487,8 @@ if (t == 0)
 			 mp_map_iter++)
 			{
 			mp = mp_map_iter->first;
-			eio_element = company->sm_asset->sm_eio[mp];
 
-			if (eio_element->hdg_grp_code.find("Delta") < string::npos)
+			if (company->sm_asset->sm_eio[mp][0]->hdg_grp_code.find("Delta") < string::npos)
 				return 0;
 			}			         
 		}
@@ -529,7 +498,6 @@ if (t == 0)
 return 1.0;
 
 }
-
 
 //@@ END
 
@@ -554,8 +522,8 @@ delta_hedge_sale_amt(t);
 bool hedge_strat_detail_flag = asset->asset_detail_rpt_inv_strat_flag(t);
 if (hedge_strat_detail_flag)
 	{
-	seg->SALFile << endl;
-	seg->SALFile << "Start Delta Hedge Investments for "
+	seg_element->SALFile << endl;
+	seg_element->SALFile << "Start Delta Hedge Investments for "
 				 << "Hedge Group=" << hedge_grp_id << " " 
 	             << "Period=" << t << " "
 				 << "Year=" << xint(cal_yr(t)) << " "
@@ -570,15 +538,19 @@ map <xstring, double> delta_hedge_coeff;
 map <xstring, double> index_val;
 map <xstring, double> notional_to_purch;
 int new_mp_num = -1;
-int seg_num = seg->getElementNumber();
+int seg_num = seg_element->getElementNumber();
 int index_loops = 1;
-if (hedge_grp_delta_hedge_liab_shock_defn == INDEX_SPECIFIC)
+
+hedge_grp_id = hedge_grp_id;
+StrEnum::EnumValue hedge_grp_delta_hedge_liab_shock_defn_local = hedge_grp_delta_hedge_liab_shock_defn;
+
+if (hedge_grp_delta_hedge_liab_shock_defn_local == INDEX_SPECIFIC)
 	index_loops = company->delta_gamma_hedge_index_list.size();
 
 for (int index = 0; index < index_loops; index++)
 	{
 	// set lookup key
-	if (hedge_grp_delta_hedge_liab_shock_defn == PARALLEL)
+	if (hedge_grp_delta_hedge_liab_shock_defn_local == PARALLEL)
 		hedge_grp_index_name = "Parallel";
 	else
 		hedge_grp_index_name = company->delta_gamma_hedge_index_list[index];
@@ -596,7 +568,12 @@ for (int index = 0; index < index_loops; index++)
 	xstring hedge_grp_code = hedge_grp_id + "|Delta|" + hedge_grp_index_name;
 
 	xstring map_index = hedge_grp_index_name + "_" + xstring(t);
-	xstring index_name = get_purch_asset_index_name(seg_num, hedge_grp_index_name, hedge_grp_delta_hedge_asset_id);
+
+	hedge_grp_id = hedge_grp_id;
+	hedge_grp_index_name = hedge_grp_index_name;
+	xstring hedge_grp_delta_hedge_asset_id_local = hedge_grp_delta_hedge_asset_id;
+
+	xstring index_name = get_purch_asset_index_name(seg_num, hedge_grp_index_name, hedge_grp_delta_hedge_asset_id_local);
 
 	index_val[greek_needed_map_index] = rates->get_index_val(t, index_name);
 	notional_to_purch[greek_needed_map_index] = index_val[greek_needed_map_index] * delta_hedge_coeff[greek_needed_map_index];
@@ -609,7 +586,7 @@ for (int index = 0; index < index_loops; index++)
 																		HEDGING,
 																		new_mp_num,
 																		hedge_grp_code,
-																		hedge_grp_delta_hedge_asset_id,
+																		hedge_grp_delta_hedge_asset_id_local,
 																		notional_inv,
 																		1.0,
 																		1.0);
@@ -625,13 +602,13 @@ for (int index = 0; index < index_loops; index++)
 
 if (hedge_strat_detail_flag)
 	{
-	seg->SALFile << endl;
-	seg->SALFile << "Delta Hedge Investments Summary" << endl;
-	seg->SALFile << "IndexName,IndexVal,DeltaNeeded,AssetDelta,HedgeCoeff,NotionalPurch" << endl;
+	seg_element->SALFile << endl;
+	seg_element->SALFile << "Delta Hedge Investments Summary" << endl;
+	seg_element->SALFile << "IndexName,IndexVal,DeltaNeeded,AssetDelta,HedgeCoeff,NotionalPurch" << endl;
 
 	for (int index = 0; index < index_loops; index++)
 		{
-		if (hedge_grp_delta_hedge_liab_shock_defn == PARALLEL)
+		if (hedge_grp_delta_hedge_liab_shock_defn_local == PARALLEL)
 			hedge_grp_index_name = "Parallel";
 		else
 			hedge_grp_index_name = company->delta_gamma_hedge_index_list[index];
@@ -639,7 +616,7 @@ if (hedge_strat_detail_flag)
 		// Asset greek needed has been updates for sales
 		xstring greek_needed_map_index = "Delta_" + hedge_grp_index_name + "_" + xstring(t);
 		xstring greek_map_index = "Delta_Purchase_" + hedge_grp_index_name + "_" + xstring(t);
-		seg->SALFile << hedge_grp_index_name << ","
+		seg_element->SALFile << hedge_grp_index_name << ","
 		             << index_val[greek_needed_map_index] << ","
 		             << asset_greeks_needed[greek_needed_map_index] << ","
 					 << asset_greeks[greek_map_index] << ","	
@@ -654,8 +631,8 @@ notional_to_purch.clear();
 
 if (hedge_strat_detail_flag)
 	{
-	seg->SALFile << endl;
-	seg->SALFile << "End Delta Hedge Investments for "
+	seg_element->SALFile << endl;
+	seg_element->SALFile << "End Delta Hedge Investments for "
 				 << "Hedge Group=" << hedge_grp_id << " " 
 	             << "Period=" << t << " "
 				 << "Year=" << xint(cal_yr(t)) << " "
@@ -665,7 +642,6 @@ if (hedge_strat_detail_flag)
 return inv_amt;
 
 }
-
 
 //@@ END
 
@@ -691,7 +667,6 @@ return sum_over_assets("mkt_val", t, DELTA, END_OF_PERIOD);
 
 }
 
-
 //@@ END
 
 //@@ START - delta_hedge_mkt_val_incr
@@ -712,7 +687,6 @@ if (t <= start_period || t > final_period)
 return delta_hedge_mkt_val(t) - delta_hedge_mkt_val(t - 1);
 
 }
-
 
 //@@ END
 
@@ -735,7 +709,6 @@ return sum_over_assets("opt_pmt", t, DELTA, BEFORE_SALE);
 
 }
 
-
 //@@ END
 
 //@@ START - delta_hedge_prof
@@ -750,10 +723,13 @@ double HDG_GRP_COMP_UDF::hdg_grp_comp_delta_hedge_prof(int t) {
 //^^^
 
 #line 1 "delta_hedge_prof.HDG_GRP_COMP.for"
-if (!hedge_proj_stmt_flag || hedge_grp_delta_hedge_defn == NO)
+if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (t <= start_period || t > final_period)
+hedge_grp_id = hedge_grp_id;
+StrEnum::EnumValue hedge_grp_delta_hedge_defn_local = hedge_grp_delta_hedge_defn;
+
+if (!hedge_proj_stmt_flag || hedge_grp_delta_hedge_defn_local == NO)
 	return NO_AVG;
 
 return delta_hedge_pmt(t)
@@ -763,7 +739,6 @@ return delta_hedge_pmt(t)
 	   + delta_hedge_mkt_val_incr(t);
 
 }
-
 
 //@@ END
 
@@ -793,16 +768,14 @@ if (!eio_mp_map_active.size())
 // Do not process sales if there are no Delta assets in the active map
 int mp = 0;
 bool delta_hedges = false;
-mpmap::iterator mp_map_iter;
-EIO_ASSET *eio_element = NULL;
+map <int, long, less <int> >::iterator mp_map_iter;
 for (mp_map_iter = eio_mp_map_active.begin();
 	mp_map_iter != eio_mp_map_active.end();
 	mp_map_iter++)
 	{
 	mp = mp_map_iter->first;
-	eio_element = company->sm_asset->sm_eio[mp];
 
-	if (eio_element->hdg_grp_code.find("Delta") < string::npos)
+	if (company->sm_asset->sm_eio[mp][0]->hdg_grp_code.find("Delta") < string::npos)
 		{
 		delta_hedges = true;
 		break;
@@ -816,8 +789,8 @@ if (!delta_hedges)
 bool hedge_strat_detail_flag = asset->asset_detail_rpt_inv_strat_flag(t);
 if (hedge_strat_detail_flag)
 	{
-	seg->SALFile << endl;
-	seg->SALFile << "Start Delta Hedge Sales for "
+	seg_element->SALFile << endl;
+	seg_element->SALFile << "Start Delta Hedge Sales for "
 				 << "Hedge Group=" << hedge_grp_id << " " 
 	             << "Period=" << t << " "
 				 << "Year=" << xint(cal_yr(t)) << " "
@@ -826,17 +799,21 @@ if (hedge_strat_detail_flag)
 
 double sales_amt = 0.0;
 int new_mp_num = -1;
-int seg_num = seg->getElementNumber();
+int seg_num = seg_element->getElementNumber();
 int index_loops = 1;
-if (hedge_grp_delta_hedge_liab_shock_defn == INDEX_SPECIFIC) // Just one loop for parallel hedging
+
+hedge_grp_id = hedge_grp_id;
+StrEnum::EnumValue hedge_grp_delta_hedge_liab_shock_defn_local = hedge_grp_delta_hedge_liab_shock_defn;
+
+if (hedge_grp_delta_hedge_liab_shock_defn_local == INDEX_SPECIFIC) // Just one loop for parallel hedging
 	index_loops = company->delta_gamma_hedge_index_list.size();
 
 for (int index = 0; index < index_loops; index++)
 	{
 	int mp = 0;
-	mpmap::iterator mp_map_iter;
+	map <int, long, less <int> >::iterator mp_map_iter;
 	xstring index_name;
-	if (hedge_grp_delta_hedge_liab_shock_defn == PARALLEL)
+	if (hedge_grp_delta_hedge_liab_shock_defn_local == PARALLEL)
 		index_name = "Parallel";
 	else
 		index_name = company->delta_gamma_hedge_index_list[index];
@@ -855,18 +832,17 @@ for (int index = 0; index < index_loops; index++)
 
 	if (hedge_strat_detail_flag)
 		{
-		seg->SALFile << endl;
-		seg->SALFile << "Processing Hedge Sales for Index " << index_name << endl;
-		seg->SALFile << "DeltaNeeded," << greek_needed << endl
+		seg_element->SALFile << endl;
+		seg_element->SALFile << "Processing Hedge Sales for Index " << index_name << endl;
+		seg_element->SALFile << "DeltaNeeded," << greek_needed << endl
 					 << "DeltaAsset," << delta_asset << endl
 					 << "DeltaDiff," << delta_diff << endl;
 
-		seg->SALFile << endl;
-		seg->SALFile << "AssetID,HedgeGrpCode,DeltaAsset,SoldPct,NotionalSold,MktValSold,DeltaSold" << endl;
+		seg_element->SALFile << endl;
+		seg_element->SALFile << "AssetID,HedgeGrpCode,DeltaAsset,SoldPct,NotionalSold,MktValSold,DeltaSold" << endl;
 		}
 
 	#if defined(__EIO_ASSET_H_)
-	EIO_ASSET *eio_element = NULL;
 
 	if (eio_mp_map_active.size() > 0)
 		{
@@ -878,26 +854,24 @@ for (int index = 0; index < index_loops; index++)
 				mp_map_iter++)
 			{
 			mp = mp_map_iter->first;
-			eio_element = company->sm_asset->sm_eio[mp];
 
-			if (eio_element->hdg_grp_code.find("Delta") == string::npos)
+			if (company->sm_asset->sm_eio[mp][0]->hdg_grp_code.find("Delta") == string::npos)
 				continue;
 
-			if (hedge_grp_delta_hedge_liab_shock_defn == INDEX_SPECIFIC
-				&& eio_element->hdg_grp_code.find(index_name) == string::npos)
+			if (hedge_grp_delta_hedge_liab_shock_defn_local == INDEX_SPECIFIC
+				&& company->sm_asset->sm_eio[mp][0]->hdg_grp_code.find(index_name) == string::npos)
 				continue;
 
-			if (t < eio_element->commencement_period
-				|| (t == eio_element->commencement_period
-					&& eio_element->purchased_bom_flag)
-				|| (t > max(0, eio_element->commencement_period)
-					&& (fabs(eio_element->notional_amt_bef_sale(t)) < ASSET_ACTIVE_THRESHOLD)
-						|| eio_element->Column(col_num_sold_pct_fund_match).Exists(t)))
+			if (t < company->sm_asset->sm_eio[mp][0]->commencement_period
+				|| (t == company->sm_asset->sm_eio[mp][0]->commencement_period
+					&& company->sm_asset->sm_eio[mp][0]->purchased_bom_flag)
+				|| (t > max(0, company->sm_asset->sm_eio[mp][0]->commencement_period)
+					&& (fabs(company->sm_asset->sm_eio[mp][0]->notional_amt_bef_sale(t)) < ASSET_ACTIVE_THRESHOLD)))
 				continue;
 
 			// calculate delta for asset. Option values have already been determined in the strategy setup
-			delta_indv_asset = (eio_element->opt_val_asset_up_1_bef_sale(t) - eio_element->opt_val_asset_down_1_bef_sale(t))
-								* asset->sm_eio[mp]->pct_to_use;	
+			delta_indv_asset = (company->sm_asset->sm_eio[mp][0]->opt_val_asset_up_1_bef_sale(t) - company->sm_asset->sm_eio[mp][0]->opt_val_asset_down_1_bef_sale(t))
+								* asset->sm_eio[mp][0]->pct_to_use;	
 
 			double sold_pct = 0.0;
 
@@ -935,22 +909,24 @@ for (int index = 0; index < index_loops; index++)
 				}
 
 			delta_sold = delta_indv_asset * sold_pct;
-			eio_element->Column(col_num_sold_pct_fund_match).SetValue(t, sold_pct); 
+			company->sm_asset->sm_eio[mp][0]->sold_pct_fund_match_value = sold_pct;
+			company->sm_asset->sm_eio[mp][0]->Column(col_num_sold_pct_fund_match).Value(t);
+			company->sm_asset->sm_eio[mp][0]->sold_pct_fund_match_value = 0.0;
 
 			delta_sold_total += delta_sold;
 			delta_asset_remaining -= delta_sold;
 
-			sales_amt += eio_element->mkt_val_sold(t)
-			             * eio_element->pct_to_use;
+			sales_amt += company->sm_asset->sm_eio[mp][0]->mkt_val_sold(t)
+			             * company->sm_asset->sm_eio[mp][0]->pct_to_use;
 
 			if (hedge_strat_detail_flag)
 				{
-				seg->SALFile << eio_element->asset_id << ","
-				             << eio_element->hdg_grp_code << ","
+				seg_element->SALFile << company->sm_asset->sm_eio[mp][0]->asset_id << ","
+				             << company->sm_asset->sm_eio[mp][0]->hdg_grp_code << ","
 							 << delta_indv_asset << ","
 							 << sold_pct << ","
-							 << eio_element->notional_amt_sold(t) * eio_element->pct_to_use << ","
-							 << eio_element->mkt_val_sold(t) * eio_element->pct_to_use << ","
+							 << company->sm_asset->sm_eio[mp][0]->notional_amt_sold(t) * company->sm_asset->sm_eio[mp][0]->pct_to_use << ","
+							 << company->sm_asset->sm_eio[mp][0]->mkt_val_sold(t) * company->sm_asset->sm_eio[mp][0]->pct_to_use << ","
 							 << delta_sold << endl;
 				}
 			}			         
@@ -964,8 +940,8 @@ for (int index = 0; index < index_loops; index++)
 
 	if (hedge_strat_detail_flag)
 		{
-		seg->SALFile << "Sales Summary" << endl;
-		seg->SALFile << "DeltaNeeded," << greek_needed << endl
+		seg_element->SALFile << "Sales Summary" << endl;
+		seg_element->SALFile << "DeltaNeeded," << greek_needed << endl
 					 << "DeltaAsset," << delta_asset << endl
 		             << "DeltaSold," << delta_sold_total << endl
 					 << "DeltaRemaining," << delta_diff << endl;
@@ -974,8 +950,8 @@ for (int index = 0; index < index_loops; index++)
 
 if (hedge_strat_detail_flag)
 	{
-	seg->SALFile << endl;
-	seg->SALFile << "End Delta Hedge Sales for "
+	seg_element->SALFile << endl;
+	seg_element->SALFile << "End Delta Hedge Sales for "
 				 << "Hedge Group=" << hedge_grp_id << " " 
 	             << "Period=" << t << " "
 				 << "Year=" << xint(cal_yr(t)) << " "
@@ -986,7 +962,6 @@ return sales_amt;
 
 
 }
-
 
 //@@ END
 
@@ -1012,10 +987,9 @@ double transaction_cost = 0.0;
 double notional_amt_purch = 0.0;
 double notional_amt_sold = 0.0;
 int mp = 0;
-mpmap::iterator mp_map_iter;
+map <int, long, less <int> >::iterator mp_map_iter;
 
 #if defined(__EIO_ASSET_H_)
-EIO_ASSET *eio_element = NULL;
 
 if (eio_mp_map_active.size() > 0)
 	{
@@ -1024,21 +998,23 @@ if (eio_mp_map_active.size() > 0)
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		eio_element = company->sm_asset->sm_eio[mp];
 
-		if (t < eio_element->commencement_period
-			|| (t == eio_element->commencement_period
-				&& eio_element->purchased_bom_flag)
-			|| (t > max(0, eio_element->commencement_period)
-				&& fabs(eio_element->notional_amt(t - 1)) < ASSET_ACTIVE_THRESHOLD)
-			|| eio_element->hdg_grp_code.find("Delta") == string::npos)
+		if (t < company->sm_asset->sm_eio[mp][0]->commencement_period
+			|| (t == company->sm_asset->sm_eio[mp][0]->commencement_period
+				&& company->sm_asset->sm_eio[mp][0]->purchased_bom_flag)
+			|| (t > max(0, company->sm_asset->sm_eio[mp][0]->commencement_period)
+				&& fabs(company->sm_asset->sm_eio[mp][0]->notional_amt(t - 1)) < ASSET_ACTIVE_THRESHOLD)
+			|| company->sm_asset->sm_eio[mp][0]->hdg_grp_code.find("Delta") == string::npos)
 			continue;
 
-		notional_amt_sold = eio_element->notional_amt_sold(t) * eio_element->pct_to_use;
-		notional_amt_purch = eio_element->notional_amt_purch(t) * eio_element->pct_to_use;		
+		notional_amt_sold = company->sm_asset->sm_eio[mp][0]->notional_amt_sold(t) * company->sm_asset->sm_eio[mp][0]->pct_to_use;
+		notional_amt_purch = company->sm_asset->sm_eio[mp][0]->notional_amt_purch(t) * company->sm_asset->sm_eio[mp][0]->pct_to_use;		
+		
+		hedge_grp_id = hedge_grp_id;
+		double hedge_grp_delta_hedge_transaction_costs_bps_local = hedge_grp_delta_hedge_transaction_costs_bps;
 
 		transaction_cost += (fabs(notional_amt_sold) + fabs(notional_amt_purch)) 
-		                   * hedge_grp_delta_hedge_transaction_costs_bps / 10000.0;
+		                   * hedge_grp_delta_hedge_transaction_costs_bps_local / 10000.0;
 		}			         
 	}
 #endif
@@ -1046,7 +1022,6 @@ if (eio_mp_map_active.size() > 0)
 return transaction_cost;
 
 }
-
 
 //@@ END
 
@@ -1077,7 +1052,6 @@ return liab_greeks[greek_index];
 
 }
 
-
 //@@ END
 
 //@@ START - delta_index_2
@@ -1106,7 +1080,6 @@ return liab_greeks[greek_index];
 
 
 }
-
 
 //@@ END
 
@@ -1137,7 +1110,6 @@ return liab_greeks[greek_index];
 
 }
 
-
 //@@ END
 
 //@@ START - delta_index_4
@@ -1166,7 +1138,6 @@ return liab_greeks[greek_index];
 
 
 }
-
 
 //@@ END
 
@@ -1197,7 +1168,6 @@ return liab_greeks[greek_index];
 
 }
 
-
 //@@ END
 
 //@@ START - delta_index_6
@@ -1227,7 +1197,6 @@ return liab_greeks[greek_index];
 
 }
 
-
 //@@ END
 
 //@@ START - delta_parallel
@@ -1254,7 +1223,6 @@ return liab_greeks[greek_index];
 
 }
 
-
 //@@ END
 
 //@@ START - econ_cash
@@ -1275,7 +1243,6 @@ if (t < start_period || t > final_period)
 return econ_res(t) - hedge_mkt_val(t);
 
 }
-
 
 //@@ END
 
@@ -1298,7 +1265,6 @@ return econ_cash(t - 1)
 	* (pow(1.0 + econ_cash_int_rate(t), 1.0 / 12.0) - 1.0);
 
 }
-
 
 //@@ END
 
@@ -1323,10 +1289,9 @@ return rates->get_int_rate(((t == 0 && valn_period == 0)? t : t - 1),
                            SHORT_TERM_RATE_TERM,
                            0.0,
                            EFFECTIVE_ANNUAL,
-                           NO_SHIFT,0);//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+                           NO_SHIFT);
 
 }
-
 
 //@@ END
 
@@ -1357,7 +1322,6 @@ return delta_hedge_prof(t)
 
 }
 
-
 //@@ END
 
 //@@ START - econ_prof_unhedged
@@ -1381,7 +1345,6 @@ return econ_res_int(t)
 	   - econ_res_incr(t);
 
 }
-
 
 //@@ END
 
@@ -1408,7 +1371,6 @@ return liab_greeks[greek_index];
 
 }
 
-
 //@@ END
 
 //@@ START - econ_res_incr
@@ -1429,7 +1391,6 @@ if (t <= start_period || t > final_period)
 return econ_res(t) - econ_res(t - 1);
 
 }
-
 
 //@@ END
 
@@ -1453,7 +1414,6 @@ return econ_res(t - 1)
 
 }
 
-
 //@@ END
 
 //@@ START - finalize
@@ -1471,7 +1431,6 @@ double HDG_GRP_COMP_UDF::hdg_grp_comp_finalize(int t) {
 return 1.0;
 
 }
-
 
 //@@ END
 
@@ -1494,7 +1453,6 @@ return sum_over_liabilities("fund_val_decrem", t, BEG_OF_PERIOD);
 
 }
 
-
 //@@ END
 
 //@@ START - fund_val_decrem_cumul
@@ -1512,15 +1470,17 @@ double HDG_GRP_COMP_UDF::hdg_grp_comp_fund_val_decrem_cumul(int t) {
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 	
-if ((t + valn_period) % hedge_grp_rebal_freq == 1 
-	|| hedge_grp_rebal_freq == 1)	
+hedge_grp_id = hedge_grp_id;
+int hedge_grp_rebal_freq_local = hedge_grp_rebal_freq;
+
+if ((t + valn_period) % hedge_grp_rebal_freq_local == 1 
+	|| hedge_grp_rebal_freq_local == 1)	
 	return fund_val_decrem(t);
 
 return fund_val_decrem_cumul(t - 1)
        + fund_val_decrem(t);
 
 }
-
 
 //@@ END
 
@@ -1544,7 +1504,6 @@ return sum_over_liabilities("fund_val_e", t, END_OF_PERIOD)
 
 }
 
-
 //@@ END
 
 //@@ START - gamma_hedge_flag
@@ -1562,10 +1521,16 @@ double HDG_GRP_COMP_UDF::hdg_grp_comp_gamma_hedge_flag(int t) {
 if (!hedge_proj_stmt_flag || !gamma_vega_hedge_flag(t))
 	return 0;
 
-if (hedge_grp_gamma_vega_hedge_type_defn == VEGA)
+hedge_grp_id = hedge_grp_id;
+StrEnum::EnumValue hedge_grp_gamma_vega_hedge_type_defn_local = hedge_grp_gamma_vega_hedge_type_defn;
+
+if (hedge_grp_gamma_vega_hedge_type_defn_local == VEGA)
 	return 0;
 
-if (hedge_grp_gamma_vega_hedge_liab_shock_defn == INDEX_TERM_SPECIFIC)
+hedge_grp_id = hedge_grp_id;
+StrEnum::EnumValue hedge_grp_gamma_vega_hedge_liab_shock_defn_local = hedge_grp_gamma_vega_hedge_liab_shock_defn;
+
+if (hedge_grp_gamma_vega_hedge_liab_shock_defn_local == INDEX_TERM_SPECIFIC)
 	throw FatalError("Invalid GAMMA liab shock definition 'Index Term Specific'. Please correct your data.");
 
 // Check for existing gamma hedge assets. If they exist, gamma hedge strategy is not executed at t == 0
@@ -1573,8 +1538,7 @@ if (t == 0)
 	{
 	#if defined(__EIO_ASSET_H_)
 	int mp = 0;
-	mpmap::iterator mp_map_iter;
-	EIO_ASSET *eio_element = NULL;
+	map <int, long, less <int> >::iterator mp_map_iter;
 
 	if (eio_mp_map_active.size() > 0)
 		{
@@ -1583,9 +1547,8 @@ if (t == 0)
 			 mp_map_iter++)
 			{
 			mp = mp_map_iter->first;
-			eio_element = company->sm_asset->sm_eio[mp];
 
-			if (eio_element->hdg_grp_code.find("Gamma") < string::npos)
+			if (company->sm_asset->sm_eio[mp][0]->hdg_grp_code.find("Gamma") < string::npos)
 				return 0;
 			}			         
 		}
@@ -1595,7 +1558,6 @@ if (t == 0)
 return 1.0;
 
 }
-
 
 //@@ END
 
@@ -1620,8 +1582,8 @@ gamma_hedge_sale_amt(t);
 bool hedge_strat_detail_flag = asset->asset_detail_rpt_inv_strat_flag(t);
 if (hedge_strat_detail_flag)
 	{
-	seg->SALFile << endl;
-	seg->SALFile << "Start Gamma Hedge Investments for "
+	seg_element->SALFile << endl;
+	seg_element->SALFile << "Start Gamma Hedge Investments for "
 				 << "Hedge Group=" << hedge_grp_id << " " 
 	             << "Period=" << t << " "
 				 << "Year=" << xint(cal_yr(t)) << " "
@@ -1635,9 +1597,13 @@ double inv_amt = 0.0;
 map <xstring, double> gamma_hedge_coeff;
 map <xstring, double> notional_to_purch;
 int new_mp_num = -1;
-int seg_num = seg->getElementNumber();
+int seg_num = seg_element->getElementNumber();
 int index_loops = 1;
-if (hedge_grp_gamma_vega_hedge_liab_shock_defn == INDEX_SPECIFIC) // Just one loop for parallel hedging
+
+hedge_grp_id = hedge_grp_id;
+StrEnum::EnumValue hedge_grp_gamma_vega_hedge_liab_shock_defn_local = hedge_grp_gamma_vega_hedge_liab_shock_defn;
+
+if (hedge_grp_gamma_vega_hedge_liab_shock_defn_local == INDEX_SPECIFIC) // Just one loop for parallel hedging
 	index_loops = company->delta_gamma_hedge_index_list.size();
 
 for (int index = 0; index < index_loops; index++)
@@ -1645,7 +1611,7 @@ for (int index = 0; index < index_loops; index++)
 	xstring index_name;
 
 	// set lookup key
-	if (hedge_grp_gamma_vega_hedge_liab_shock_defn == PARALLEL)
+	if (hedge_grp_gamma_vega_hedge_liab_shock_defn_local == PARALLEL)
 		hedge_grp_index_name = "Parallel";
 	else
 		hedge_grp_index_name = company->delta_gamma_hedge_index_list[index];
@@ -1665,7 +1631,13 @@ for (int index = 0; index < index_loops; index++)
 	xstring hedge_grp_code = hedge_grp_id + "|Gamma|" + hedge_grp_index_name;
 
 	xstring map_index = hedge_grp_index_name + "_" + xstring(t);
-	xstring purch_hedge_index_name = get_purch_asset_index_name(seg_num, hedge_grp_index_name, hedge_grp_gamma_vega_hedge_asset_id);
+
+	hedge_grp_id = hedge_grp_id;
+	hedge_grp_index_name = hedge_grp_index_name;
+	hedge_grp_index_term = hedge_grp_index_term;
+	xstring hedge_grp_gamma_vega_hedge_asset_id_local = hedge_grp_gamma_vega_hedge_asset_id;
+
+	xstring purch_hedge_index_name = get_purch_asset_index_name(seg_num, hedge_grp_index_name, hedge_grp_gamma_vega_hedge_asset_id_local);
 
 	notional_to_purch[greek_needed_map_index] = ONE_MILLION * gamma_hedge_coeff[greek_needed_map_index];
 	double notional_inv = notional_to_purch[greek_needed_map_index];
@@ -1677,7 +1649,7 @@ for (int index = 0; index < index_loops; index++)
 																		HEDGING,
 																		new_mp_num,
 																		hedge_grp_code,
-																		hedge_grp_gamma_vega_hedge_asset_id,
+																		hedge_grp_gamma_vega_hedge_asset_id_local,
 																		notional_inv,
 																		-1.0,
 																		-1.0);
@@ -1693,13 +1665,13 @@ for (int index = 0; index < index_loops; index++)
 
 if (hedge_strat_detail_flag)
 	{
-	seg->SALFile << endl;
-	seg->SALFile << "Gamma Hedge Investments Summary" << endl;
-	seg->SALFile << "IndexName,GammaNeeded,AssetGamma,HedgeCoeff,NotionalPurch" << endl;
+	seg_element->SALFile << endl;
+	seg_element->SALFile << "Gamma Hedge Investments Summary" << endl;
+	seg_element->SALFile << "IndexName,GammaNeeded,AssetGamma,HedgeCoeff,NotionalPurch" << endl;
 
 	for (int index = 0; index < index_loops; index++)
 		{
-		if (hedge_grp_gamma_vega_hedge_liab_shock_defn == PARALLEL)
+		if (hedge_grp_gamma_vega_hedge_liab_shock_defn_local == PARALLEL)
 			hedge_grp_index_name = "Parallel";
 		else
 			hedge_grp_index_name = company->delta_gamma_hedge_index_list[index];
@@ -1707,7 +1679,7 @@ if (hedge_strat_detail_flag)
 		// Asset greek needed has been updates for sales
 		xstring greek_needed_map_index = "Gamma_" + hedge_grp_index_name + "_" + xstring(t);
 		xstring greek_map_index = "Gamma_Purchase_" + hedge_grp_index_name + "_" + xstring(t);
-		seg->SALFile << hedge_grp_index_name << ","
+		seg_element->SALFile << hedge_grp_index_name << ","
 		             << asset_greeks_needed[greek_needed_map_index] << ","
 					 << asset_greeks[greek_map_index] << ","
 		             << gamma_hedge_coeff[greek_needed_map_index] << ","
@@ -1720,8 +1692,8 @@ notional_to_purch.clear();
 
 if (hedge_strat_detail_flag)
 	{
-	seg->SALFile << endl;
-	seg->SALFile << "End Gamma Hedge Investments for "
+	seg_element->SALFile << endl;
+	seg_element->SALFile << "End Gamma Hedge Investments for "
 				 << "Hedge Group=" << hedge_grp_id << " " 
 	             << "Period=" << t << " "
 				 << "Year=" << xint(cal_yr(t)) << " "
@@ -1731,7 +1703,6 @@ if (hedge_strat_detail_flag)
 return inv_amt;
 
 }
-
 
 //@@ END
 
@@ -1757,7 +1728,6 @@ return sum_over_assets("mkt_val", t, GAMMA, END_OF_PERIOD);
 
 }
 
-
 //@@ END
 
 //@@ START - gamma_hedge_mkt_val_incr
@@ -1778,7 +1748,6 @@ if (t <= start_period || t > final_period)
 return gamma_hedge_mkt_val(t) - gamma_hedge_mkt_val(t - 1);
 
 }
-
 
 //@@ END
 
@@ -1801,7 +1770,6 @@ return sum_over_assets("opt_pmt", t, GAMMA, BEFORE_SALE);
 
 }
 
-
 //@@ END
 
 //@@ START - gamma_hedge_prof
@@ -1816,10 +1784,15 @@ double HDG_GRP_COMP_UDF::hdg_grp_comp_gamma_hedge_prof(int t) {
 //^^^
 
 #line 1 "gamma_hedge_prof.HDG_GRP_COMP.for"
-if (!hedge_proj_stmt_flag || hedge_grp_gamma_vega_hedge_defn == NO || hedge_grp_gamma_vega_hedge_type_defn == VEGA)
+if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (t <= start_period || t > final_period)
+hedge_grp_id = hedge_grp_id;
+StrEnum::EnumValue hedge_grp_gamma_vega_hedge_defn_local = hedge_grp_gamma_vega_hedge_defn;
+hedge_grp_id = hedge_grp_id;
+StrEnum::EnumValue hedge_grp_gamma_vega_hedge_type_defn_local = hedge_grp_gamma_vega_hedge_type_defn;
+
+if (!hedge_proj_stmt_flag || hedge_grp_gamma_vega_hedge_defn_local == NO || hedge_grp_gamma_vega_hedge_type_defn_local == VEGA)
 	return NO_AVG;
 
 return gamma_hedge_pmt(t)
@@ -1829,7 +1802,6 @@ return gamma_hedge_pmt(t)
 	   + gamma_hedge_mkt_val_incr(t);
 
 }
-
 
 //@@ END
 
@@ -1859,16 +1831,14 @@ if (!eio_mp_map_active.size())
 // Do not process sales if there are no Gamma assets in the active map
 int mp = 0;
 bool gamma_hedges = false;
-mpmap::iterator mp_map_iter;
-EIO_ASSET *eio_element = NULL;
+map <int, long, less <int> >::iterator mp_map_iter;
 for (mp_map_iter = eio_mp_map_active.begin();
 	mp_map_iter != eio_mp_map_active.end();
 	mp_map_iter++)
 	{
 	mp = mp_map_iter->first;
-	eio_element = company->sm_asset->sm_eio[mp];
 
-	if (eio_element->hdg_grp_code.find("Gamma") < string::npos)
+	if (company->sm_asset->sm_eio[mp][0]->hdg_grp_code.find("Gamma") < string::npos)
 		{
 		gamma_hedges = true;
 		break;
@@ -1882,8 +1852,8 @@ if (!gamma_hedges)
 bool hedge_strat_detail_flag = asset->asset_detail_rpt_inv_strat_flag(t);
 if (hedge_strat_detail_flag)
 	{
-	seg->SALFile << endl;
-	seg->SALFile << "Start Gamma Hedge Sales for "
+	seg_element->SALFile << endl;
+	seg_element->SALFile << "Start Gamma Hedge Sales for "
 				 << "Hedge Group=" << hedge_grp_id << " " 
 	             << "Period=" << t << " "
 				 << "Year=" << xint(cal_yr(t)) << " "
@@ -1892,17 +1862,21 @@ if (hedge_strat_detail_flag)
 
 double sales_amt = 0.0;
 int new_mp_num = -1;
-int seg_num = seg->getElementNumber();
+int seg_num = seg_element->getElementNumber();
 int index_loops = 1;
-if (hedge_grp_gamma_vega_hedge_liab_shock_defn == INDEX_SPECIFIC) // Just one loop for parallel hedging
+
+hedge_grp_id = hedge_grp_id;
+StrEnum::EnumValue hedge_grp_gamma_vega_hedge_liab_shock_defn_local = hedge_grp_gamma_vega_hedge_liab_shock_defn;
+
+if (hedge_grp_gamma_vega_hedge_liab_shock_defn_local == INDEX_SPECIFIC) // Just one loop for parallel hedging
 	index_loops = company->delta_gamma_hedge_index_list.size();
 
 for (int index = 0; index < index_loops; index++)
 	{
 	int mp = 0;
-	mpmap::iterator mp_map_iter;
+	map <int, long, less <int> >::iterator mp_map_iter;
 	xstring index_name;
-	if (hedge_grp_gamma_vega_hedge_liab_shock_defn == PARALLEL)
+	if (hedge_grp_gamma_vega_hedge_liab_shock_defn_local == PARALLEL)
 		index_name = "Parallel";
 	else
 		index_name = company->delta_gamma_hedge_index_list[index];
@@ -1921,19 +1895,18 @@ for (int index = 0; index < index_loops; index++)
 
 	if (hedge_strat_detail_flag)
 		{
-		seg->SALFile << endl;
-		seg->SALFile << "Processing Hedge Sales for Index " << index_name << endl;
-		seg->SALFile << "GammaNeeded," << greek_needed << endl
+		seg_element->SALFile << endl;
+		seg_element->SALFile << "Processing Hedge Sales for Index " << index_name << endl;
+		seg_element->SALFile << "GammaNeeded," << greek_needed << endl
 					 << "GammaAsset," << gamma_asset << endl
 					 << "GammaDiff," << gamma_diff << endl;
 
-		seg->SALFile << endl;
-		seg->SALFile << "AssetID,HedgeGrpCode,GammaAsset,SoldPct,NotionalSold,MktValSold,GammaSold" << endl;
+		seg_element->SALFile << endl;
+		seg_element->SALFile << "AssetID,HedgeGrpCode,GammaAsset,SoldPct,NotionalSold,MktValSold,GammaSold" << endl;
 
 		}
 
 	#if defined(__EIO_ASSET_H_)
-	EIO_ASSET *eio_element = NULL;
 
 	if (eio_mp_map_active.size() > 0)
 		{
@@ -1945,27 +1918,25 @@ for (int index = 0; index < index_loops; index++)
 				mp_map_iter++)
 			{
 			mp = mp_map_iter->first;
-			eio_element = company->sm_asset->sm_eio[mp];
 
-			if (eio_element->hdg_grp_code.find("Gamma") == string::npos)
+			if (company->sm_asset->sm_eio[mp][0]->hdg_grp_code.find("Gamma") == string::npos)
 				continue;
 
-			if (hedge_grp_gamma_vega_hedge_liab_shock_defn == INDEX_SPECIFIC
-				&& eio_element->hdg_grp_code.find(index_name) == string::npos)
+			if (hedge_grp_gamma_vega_hedge_liab_shock_defn_local == INDEX_SPECIFIC
+				&& company->sm_asset->sm_eio[mp][0]->hdg_grp_code.find(index_name) == string::npos)
 				continue;
 
-			if (t < eio_element->commencement_period
-				|| (t == eio_element->commencement_period
-					&& eio_element->purchased_bom_flag)
-				|| (t > max(0, eio_element->commencement_period)
-					&& (fabs(eio_element->notional_amt_bef_sale(t)) < ASSET_ACTIVE_THRESHOLD)
-						|| eio_element->Column(col_num_sold_pct_fund_match).Exists(t)))
+			if (t < company->sm_asset->sm_eio[mp][0]->commencement_period
+				|| (t == company->sm_asset->sm_eio[mp][0]->commencement_period
+					&& company->sm_asset->sm_eio[mp][0]->purchased_bom_flag)
+				|| (t > max(0, company->sm_asset->sm_eio[mp][0]->commencement_period)
+					&& (fabs(company->sm_asset->sm_eio[mp][0]->notional_amt_bef_sale(t)) < ASSET_ACTIVE_THRESHOLD)))
 				continue;
 
 			// calculate gamma for asset. Option values have already been determined in the strategy setup
-			gamma_indv_asset = (eio_element->opt_val_asset_up_1_bef_sale(t) + eio_element->opt_val_asset_down_1_bef_sale(t)
-			                    - eio_element->opt_val_baseline_bef_sale(t) * 2.0)
-								* asset->sm_eio[mp]->pct_to_use;	
+			gamma_indv_asset = (company->sm_asset->sm_eio[mp][0]->opt_val_asset_up_1_bef_sale(t) + company->sm_asset->sm_eio[mp][0]->opt_val_asset_down_1_bef_sale(t)
+			                    - company->sm_asset->sm_eio[mp][0]->opt_val_baseline_bef_sale(t) * 2.0)
+								* asset->sm_eio[mp][0]->pct_to_use;	
 
 			double sold_pct = 0.0;
 
@@ -2003,22 +1974,25 @@ for (int index = 0; index < index_loops; index++)
 				}
 
 			gamma_sold = gamma_indv_asset * sold_pct;
-			eio_element->Column(col_num_sold_pct_fund_match).SetValue(t, sold_pct); 
+
+			company->sm_asset->sm_eio[mp][0]->sold_pct_fund_match_value = sold_pct;
+			company->sm_asset->sm_eio[mp][0]->Column(col_num_sold_pct_fund_match).Value(t);
+			company->sm_asset->sm_eio[mp][0]->sold_pct_fund_match_value = 0.0;
 
 			gamma_sold_total += gamma_sold;
 			gamma_asset_remaining -= gamma_sold;
 
-			sales_amt += eio_element->mkt_val_sold(t)
-			             * eio_element->pct_to_use;
+			sales_amt += company->sm_asset->sm_eio[mp][0]->mkt_val_sold(t)
+			             * company->sm_asset->sm_eio[mp][0]->pct_to_use;
 
 			if (hedge_strat_detail_flag)
 				{
-				seg->SALFile << eio_element->asset_id << ","
-				             << eio_element->hdg_grp_code << ","
+				seg_element->SALFile << company->sm_asset->sm_eio[mp][0]->asset_id << ","
+				             << company->sm_asset->sm_eio[mp][0]->hdg_grp_code << ","
 							 << gamma_indv_asset << ","
 							 << sold_pct << ","
-							 << eio_element->notional_amt_sold(t) * eio_element->pct_to_use << ","
-							 << eio_element->mkt_val_sold(t) * eio_element->pct_to_use << ","
+							 << company->sm_asset->sm_eio[mp][0]->notional_amt_sold(t) * company->sm_asset->sm_eio[mp][0]->pct_to_use << ","
+							 << company->sm_asset->sm_eio[mp][0]->mkt_val_sold(t) * company->sm_asset->sm_eio[mp][0]->pct_to_use << ","
 							 << gamma_sold << endl;
 				}
 			}			         
@@ -2032,8 +2006,8 @@ for (int index = 0; index < index_loops; index++)
 
 	if (hedge_strat_detail_flag)
 		{
-		seg->SALFile << "Sales Summary" << endl;
-		seg->SALFile << "GammaNeeded," << greek_needed << endl
+		seg_element->SALFile << "Sales Summary" << endl;
+		seg_element->SALFile << "GammaNeeded," << greek_needed << endl
 					 << "GammaAsset," << gamma_asset << endl
 		             << "GammaSold," << gamma_sold_total << endl
 					 << "GammaRemaining," << gamma_diff << endl;
@@ -2042,8 +2016,8 @@ for (int index = 0; index < index_loops; index++)
 
 if (hedge_strat_detail_flag)
 	{
-	seg->SALFile << endl;
-	seg->SALFile << "End Gamma Hedge Sales for "
+	seg_element->SALFile << endl;
+	seg_element->SALFile << "End Gamma Hedge Sales for "
 				 << "Hedge Group=" << hedge_grp_id << " " 
 	             << "Period=" << t << " "
 				 << "Year=" << xint(cal_yr(t)) << " "
@@ -2054,7 +2028,6 @@ return sales_amt;
 
 
 }
-
 
 //@@ END
 
@@ -2080,10 +2053,9 @@ double transaction_cost = 0.0;
 double notional_amt_purch = 0.0;
 double notional_amt_sold = 0.0;
 int mp = 0;
-mpmap::iterator mp_map_iter;
+map <int, long, less <int> >::iterator mp_map_iter;
 
 #if defined(__EIO_ASSET_H_)
-EIO_ASSET *eio_element = NULL;
 
 if (eio_mp_map_active.size() > 0)
 	{
@@ -2092,21 +2064,23 @@ if (eio_mp_map_active.size() > 0)
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		eio_element = company->sm_asset->sm_eio[mp];
 
-		if (t < eio_element->commencement_period
-			|| (t == eio_element->commencement_period
-				&& eio_element->purchased_bom_flag)
-			|| (t > max(0, eio_element->commencement_period)
-				&& fabs(eio_element->notional_amt(t - 1)) < ASSET_ACTIVE_THRESHOLD)
-			|| eio_element->hdg_grp_code.find("Gamma") < string:: npos)
+		if (t < company->sm_asset->sm_eio[mp][0]->commencement_period
+			|| (t == company->sm_asset->sm_eio[mp][0]->commencement_period
+				&& company->sm_asset->sm_eio[mp][0]->purchased_bom_flag)
+			|| (t > max(0, company->sm_asset->sm_eio[mp][0]->commencement_period)
+				&& fabs(company->sm_asset->sm_eio[mp][0]->notional_amt(t - 1)) < ASSET_ACTIVE_THRESHOLD)
+			|| company->sm_asset->sm_eio[mp][0]->hdg_grp_code.find("Gamma") < string:: npos)
 			continue;
 
-		notional_amt_sold = eio_element->notional_amt_sold(t) * eio_element->pct_to_use;
-		notional_amt_purch = eio_element->notional_amt_purch(t) * eio_element->pct_to_use;		
+		notional_amt_sold = company->sm_asset->sm_eio[mp][0]->notional_amt_sold(t) * company->sm_asset->sm_eio[mp][0]->pct_to_use;
+		notional_amt_purch = company->sm_asset->sm_eio[mp][0]->notional_amt_purch(t) * company->sm_asset->sm_eio[mp][0]->pct_to_use;		
+		
+		hedge_grp_id = hedge_grp_id;
+		double hedge_grp_gamma_vega_hedge_transaction_costs_bps_local = hedge_grp_gamma_vega_hedge_transaction_costs_bps;
 
 		transaction_cost += (fabs(notional_amt_sold) + fabs(notional_amt_purch)) 
-		                   * hedge_grp_gamma_vega_hedge_transaction_costs_bps / 10000.0;
+		                   * hedge_grp_gamma_vega_hedge_transaction_costs_bps_local / 10000.0;
 		}			         
 	}
 #endif
@@ -2114,7 +2088,6 @@ if (eio_mp_map_active.size() > 0)
 return transaction_cost;
 
 }
-
 
 //@@ END
 
@@ -2145,7 +2118,6 @@ return liab_greeks[greek_index];
 
 }
 
-
 //@@ END
 
 //@@ START - gamma_index_2
@@ -2174,7 +2146,6 @@ return liab_greeks[greek_index];
 
 
 }
-
 
 //@@ END
 
@@ -2205,7 +2176,6 @@ return liab_greeks[greek_index];
 
 }
 
-
 //@@ END
 
 //@@ START - gamma_index_4
@@ -2234,7 +2204,6 @@ return liab_greeks[greek_index];
 
 
 }
-
 
 //@@ END
 
@@ -2265,7 +2234,6 @@ return liab_greeks[greek_index];
 
 }
 
-
 //@@ END
 
 //@@ START - gamma_index_6
@@ -2295,7 +2263,6 @@ return liab_greeks[greek_index];
 
 }
 
-
 //@@ END
 
 //@@ START - gamma_parallel
@@ -2322,7 +2289,6 @@ return liab_greeks[greek_index];
 
 }
 
-
 //@@ END
 
 //@@ START - gamma_vega_hedge_flag
@@ -2337,16 +2303,24 @@ double HDG_GRP_COMP_UDF::hdg_grp_comp_gamma_vega_hedge_flag(int t) {
 //^^^
 
 #line 1 "gamma_vega_hedge_flag.HDG_GRP_COMP.for"
-if (!hedge_proj_stmt_flag || hedge_grp_gamma_vega_hedge_defn == NO)
-	return 0;
+if (t > 0)
+	{
+	hedge_grp_id = hedge_grp_id;
+	int hedge_grp_gamma_vega_hedge_rebal_freq_local = hedge_grp_gamma_vega_hedge_rebal_freq;
 
-if (t > 0 && (t % hedge_grp_gamma_vega_hedge_rebal_freq) != 0)
+	if ((t % hedge_grp_gamma_vega_hedge_rebal_freq_local) != 0)
+		return 0;
+	}
+
+hedge_grp_id = hedge_grp_id;
+StrEnum::EnumValue hedge_grp_gamma_vega_hedge_defn_local = hedge_grp_gamma_vega_hedge_defn;
+
+if (!hedge_proj_stmt_flag || hedge_grp_gamma_vega_hedge_defn_local == NO)
 	return 0;
 
 return 1.0;
 
 }
-
 
 //@@ END
 
@@ -2401,7 +2375,6 @@ return - inv_amt_bom
 
 }
 
-
 //@@ END
 
 //@@ START - hedge_cost_charge
@@ -2426,7 +2399,6 @@ return sum_over_liabilities("gmab_chg", t, BEG_OF_PERIOD)
 
 
 }
-
 
 //@@ END
 
@@ -2453,7 +2425,6 @@ return hedge_exp;
 
 }
 
-
 //@@ END
 
 //@@ START - hedge_int_pmt
@@ -2475,7 +2446,6 @@ return sum_over_assets("int_pmt", t, SUM_OVER_ALL, BEFORE_SALE);
 
 }
 
-
 //@@ END
 
 //@@ START - hedge_inv_amt_bom
@@ -2496,9 +2466,9 @@ if (t <= start_period || t > final_period)
 if (fabs(notional_amt_to_hedge(t)) < aggregate_amount_threshold)
 	return NO_AVG;
 
-int bucket_size = seg->sm_hedge_grp[getElementNumber(0)].size();
+int bucket_size = seg_element->sm_hedge_grp[getElementNumber(0)].size();
 int new_mp_num = -1;
-int seg_num = seg->getElementNumber();
+int seg_num = seg_element->getElementNumber();
 xstring hedge_grp_code = hedge_grp_id;
 investing_bom_flag = true;
 
@@ -2508,23 +2478,19 @@ if (bucket_size > 1)
 	hedge_grp_code += "|Bucket_" + bucket_str;
 	}
 
+hedge_grp_id = hedge_grp_id;
+xstring hedge_grp_asset_id_local = hedge_grp_asset_id;
+
 double inv_amt = company->sm_inv_strategy[seg_num]->buy_assets_hedging(t, 
 														YES, //save_assets
 														HEDGING,
 														new_mp_num,
 														hedge_grp_code,
-														hedge_grp_asset_id,
+														hedge_grp_asset_id_local,
 														notional_amt_to_hedge(t),
 														long_strike(t),
 														short_strike(t));
 
-/*log_screen<<"t= "<<t
-<<" hedge_grp_code= "<<hedge_grp_code
-<<" notional_amt_to_hedge(t)= "<<notional_amt_to_hedge(t)
-<<" long_strike(t)= "<<long_strike(t)
-<<" short_strike(t)= "<<short_strike(t)
-<<" inv_amt= "<<inv_amt
-<<MSG_USER;*/
 investing_bom_flag = false;
 
 // Add new element to the hedge group eio map
@@ -2538,7 +2504,6 @@ return inv_amt;
 
 
 }
-
 
 //@@ END
 
@@ -2568,7 +2533,6 @@ return hedge_inv_amt;
 
 }
 
-
 //@@ END
 
 //@@ START - hedge_liab_claims
@@ -2592,7 +2556,6 @@ return sum_over_liabilities("maturity_claims_gmab", t, END_OF_PERIOD)
 	   + sum_over_liabilities("ann_claims_gmwb", t, END_OF_PERIOD);
 
 }
-
 
 //@@ END
 
@@ -2618,7 +2581,6 @@ return sum_over_assets("mkt_val", t, SUM_OVER_ALL, END_OF_PERIOD);
 
 }
 
-
 //@@ END
 
 //@@ START - hedge_notional_amt
@@ -2639,7 +2601,6 @@ if (t < start_period || t > final_period)
 return sum_over_assets("notional_amt", t, SUM_OVER_ALL, END_OF_PERIOD);
 
 }
-
 
 //@@ END
 
@@ -2662,7 +2623,6 @@ return sum_over_assets("notional_amt_bef_fund_match_sale", t, SUM_OVER_ALL, BEFO
 
 }
 
-
 //@@ END
 
 //@@ START - hedge_opt_pmt
@@ -2683,7 +2643,6 @@ if (t <= start_period || t > final_period)
 return sum_over_assets("opt_pmt", t, SUM_OVER_ALL, BEFORE_SALE);
 
 }
-
 
 //@@ END
 
@@ -2714,7 +2673,10 @@ if (hedge_proj_stmt_flag) // Hedging is for VA greeks
 	return hedge_sale_amt;
 	}
 // else hedging is for FIA/IUL option budget notional amounts
-if (t == start_period || (t + valn_period) % hedge_grp_rebal_freq != 0)
+hedge_grp_id = hedge_grp_id;
+int hedge_grp_rebal_freq_local = hedge_grp_rebal_freq;
+
+if (t == start_period || (t + valn_period) % hedge_grp_rebal_freq_local != 0)
 	return NO_AVG;
 
 if (hedge_notional_amt_available(t) < notional_amt_required(t))
@@ -2726,7 +2688,7 @@ if (fabs(hedge_notional_amt_available(t) - notional_amt_required(t)) < aggregate
 if (fabs(hedge_notional_amt_available(t)) < aggregate_amount_threshold)
 	return NO_AVG;
 
-int seg_num = seg->getElementNumber();
+int seg_num = seg_element->getElementNumber();
 
 return company->sm_inv_strategy[seg_num]->sell_assets_hedges(t, eio_mp_map_active, 
 											    hedge_notional_amt_available(t), 
@@ -2734,7 +2696,6 @@ return company->sm_inv_strategy[seg_num]->sell_assets_hedges(t, eio_mp_map_activ
 												hedge_grp_id);
 
 }
-
 
 //@@ END
 
@@ -2760,7 +2721,6 @@ return notional_amt_to_hedge_index (t) / notional_to_hedge(t);
 
 }
 
-
 //@@ END
 
 //@@ START - initialize
@@ -2782,26 +2742,29 @@ ird_mp_map_active.clear();
 int hedge_grp_liab_counter = 0;
 int hedge_grp_asset_counter = 0;
 int bucket_size = 1;
-
+{
 #if defined(__FIA_LIAB_H_) || defined(__IUL_LIAB_H_)
 if (!hedge_valn_flag)
 	{
-	if (hedge_grp_crediting_defn != POINT_TO_POINT
-		&& hedge_grp_crediting_defn != MOVING_AVERAGE)
+	hedge_grp_id = hedge_grp_id;
+	StrEnum::EnumValue hedge_grp_crediting_defn_local = hedge_grp_crediting_defn;
+
+	if (hedge_grp_crediting_defn_local != POINT_TO_POINT
+		&& hedge_grp_crediting_defn_local != MOVING_AVERAGE)
 		throw FatalError("Only hedging for crediting method of point to point and moving average is supported.");
 	}
 #endif
-
+}
 vector <string> plan_codes;
 plan_codes.clear();
 
 // parse and stores plan codes into vector
-split_string_usl(hedge_grp_plan_codes.c_str(), plan_codes, ",");//WTW - Gen2 - split_tring internal RAFM function
+hedge_grp_id = hedge_grp_id;
+split_string_usl(hedge_grp_plan_codes.c_str(), plan_codes, ",");
 
 //liability mapping (begin)
+{
 #if defined(__VA_LIAB_H_)
-if (independent_mp_defn == YES)
-	hedge_grp_liab_counter = hedge_grp_liab_counter + 1;
 for (int mp = 0; mp < liab->sm_va.size(); mp++) 
 	{
 	// mapping process starts		
@@ -2821,31 +2784,42 @@ for (int mp = 0; mp < liab->sm_va.size(); mp++)
 	liab->sm_va[mp]->hedge_grp_code[hedge_grp_count_id] = in_hedge_group;
 	}
 #endif	
-
+}
+{
 #if defined(__FIA_LIAB_H_)
 for (int mp = 0; mp < liab->sm_fia.size(); mp++) 
 	{
-	liab->sm_fia[mp]->pol_yr_lookup_gen2 = liab->sm_fia[mp]->pol_yr(0); //WTW - Gen2 - add working variable for lookups that vary by time for character input
-
 	int sub_fv_size = liab->sm_fia[mp]->sm_fia_account.size();
 	for (int sub_fv = 0; sub_fv < sub_fv_size; sub_fv++)
 		{
 		xstring mp_plan_code = xstring(liab->sm_fia[mp]->plan_code);
-		int mp_fia_cred_defn = liab->sm_fia[mp]->sm_fia_account[sub_fv]->crediting_rate_defn;
+		StrEnum::EnumValue mp_fia_cred_defn = liab->sm_fia[mp]->sm_fia_account[sub_fv]->crediting_rate_defn;
 		int mp_fia_cred_mths = liab->sm_fia[mp]->sm_fia_account[sub_fv]->crediting_mths;
-		int mp_fia_dyn_lever = liab->sm_fia[mp]->sm_fia_account[sub_fv]->crediting_dyn_lever;//WTW - Gen2 - character input that varies by time
+		StrEnum::EnumValue mp_fia_dyn_lever = liab->sm_fia[mp]->sm_fia_account[sub_fv]->crediting_dyn_lever;
 		xstring mp_fia_index = liab->sm_fia[mp]->sm_fia_account[sub_fv]->crediting_eqt_index;
 		xstring mp_hedge_grp = liab->sm_fia[mp]->sm_fia_account[sub_fv]->hedge_grp_code;
 		
+		hedge_grp_id = hedge_grp_id;
+		StrEnum::EnumValue hedge_grp_crediting_defn_local = hedge_grp_crediting_defn;
+
+		hedge_grp_id = hedge_grp_id;
+		int hedge_grp_crediting_mths_local = hedge_grp_crediting_mths;
+		
+		hedge_grp_id = hedge_grp_id;
+		StrEnum::EnumValue hedge_grp_dyn_lever_local = hedge_grp_dyn_lever;
+
+		hedge_grp_id = hedge_grp_id;
+		xstring hedge_grp_index_local = hedge_grp_index;
+
 		// mapping process starts		
 		for (int plan_count = 0; plan_count < plan_codes.size(); plan_count++)
 			{
 			if ((xstring(plan_codes[plan_count]) == "ALL" 
 				|| eq(mp_plan_code, xstring(plan_codes[plan_count]))) // case insensitive 
-				&& mp_fia_cred_defn == hedge_grp_crediting_defn
-				&& mp_fia_cred_mths == hedge_grp_crediting_mths
-				&& mp_fia_dyn_lever == hedge_grp_dyn_lever 
-				&& mp_fia_index == hedge_grp_index)
+				&& mp_fia_cred_defn == hedge_grp_crediting_defn_local
+				&& mp_fia_cred_mths == hedge_grp_crediting_mths_local
+				&& mp_fia_dyn_lever == hedge_grp_dyn_lever_local
+				&& mp_fia_index == hedge_grp_index_local)
 				{
 				liab->sm_fia[mp]->sm_fia_account[sub_fv]->hedge_grp_code = hedge_grp_id;
 				hedge_grp_liab_counter = hedge_grp_liab_counter + 1;
@@ -2854,7 +2828,8 @@ for (int mp = 0; mp < liab->sm_fia.size(); mp++)
 		}				
 	}
 #endif	
-
+}
+{
 #if defined(__IUL_LIAB_H_)
 // For IUL hedging, bucket_size for hedge_grp must always be the hedge crediting months
 bucket_size = hedge_grp_crediting_mths;
@@ -2898,26 +2873,29 @@ for (int mp = 0; mp < liab->sm_iul.size(); mp++)
 		}				
 	}
 #endif
+}
 //liability mapping (end)
 
 //asset - eio mapping (begin)
+{
 #if defined(__EIO_ASSET_H_)
 vector <string> eio_hedge_grp;
 for (int mp = 0; mp < asset->sm_eio.size(); mp++) 
 	{
 	eio_hedge_grp.clear();
 
-	if (asset->sm_eio[mp]->port_defn != HEDGING)
+	if (asset->sm_eio[mp][0]->port_defn != HEDGING)
 		continue;
 
 	// parse and stores separate hedge group and bucket number into string vector
-	split_string_usl(asset->sm_eio[mp]->hdg_grp_code.c_str(), eio_hedge_grp, "|");//WTW - Gen2 - split_tring internal RAFM function
+	split_string_usl(asset->sm_eio[mp][0]->hdg_grp_code.c_str(), eio_hedge_grp, "|");
 	if (eio_hedge_grp.size() <= 1) // No buckets or greek information, simple mapping of assets to hedge groups
 		{
-		xstring mp_hedge_grp = asset->sm_eio[mp]->hdg_grp_code;
+		xstring mp_hedge_grp = asset->sm_eio[mp][0]->hdg_grp_code;
 
 		// mapping process starts		
-		if (mp_hedge_grp == hedge_grp_id)
+		if (mp_hedge_grp == hedge_grp_id
+			&& eq(asset->sm_eio[mp][0]->seg_id, seg_id))
 			{
 			hedge_grp_asset_counter += 1;
 			eio_mp_map_active[mp] = mp;
@@ -2928,7 +2906,8 @@ for (int mp = 0; mp < asset->sm_eio.size(); mp++)
 		xstring mp_hedge_grp = eio_hedge_grp[0];
 
 		// mapping process starts		
-		if (mp_hedge_grp == hedge_grp_id)
+		if (mp_hedge_grp == hedge_grp_id
+			&& eq(asset->sm_eio[mp][0]->seg_id, seg_id))
 			{
 			hedge_grp_asset_counter += 1;
 			eio_mp_map_active[mp] = mp;
@@ -2940,7 +2919,9 @@ for (int mp = 0; mp < asset->sm_eio.size(); mp++)
 		int hedge_bucket = atoi(eio_hedge_grp[1].substr(eio_hedge_grp[1].find_last_of("_") + 1).c_str());
 
 		// mapping process starts		
-		if (mp_hedge_grp == hedge_grp_id && getElementNumber(1) == hedge_bucket)
+		if (mp_hedge_grp == hedge_grp_id 
+			&& getElementNumber(1) == hedge_bucket
+			&& eq(asset->sm_eio[mp][0]->seg_id, seg_id))
 			{
 			hedge_grp_asset_counter += 1;
 			eio_mp_map_active[mp] = mp;
@@ -2948,26 +2929,29 @@ for (int mp = 0; mp < asset->sm_eio.size(); mp++)
 		}
 	}
 #endif
+}
 //asset - eio mapping (end)
 
 //asset - ird mapping (begin)
+{
 #if defined(__IRD_ASSET_H_)
 vector <string> ird_hedge_grp;
 for (int mp = 0; mp < asset->sm_ird.size(); mp++) 
 	{
 	ird_hedge_grp.clear();
 
-	if (asset->sm_ird[mp]->port_defn != HEDGING)
+	if (asset->sm_ird[mp][0]->port_defn != HEDGING)
 		continue;
 
 	// parse and stores separate hedge group and bucket number into string vector
-	split_string_usl(asset->sm_ird[mp]->hdg_grp_code.c_str(), ird_hedge_grp, "|");//WTW - Gen2 - split_tring internal RAFM function
+	split_string_usl(asset->sm_ird[mp][0]->hdg_grp_code.c_str(), ird_hedge_grp, "|");
 	if (ird_hedge_grp.size() <= 1) // No buckets or greek information, simple mapping of assets to hedge groups
 		{
-		xstring mp_hedge_grp = asset->sm_ird[mp]->hdg_grp_code;
+		xstring mp_hedge_grp = asset->sm_ird[mp][0]->hdg_grp_code;
 
 		// mapping process starts		
-		if (mp_hedge_grp == hedge_grp_id)
+		if (mp_hedge_grp == hedge_grp_id
+			&& eq(asset->sm_ird[mp][0]->seg_id, seg_id))
 			{
 			hedge_grp_asset_counter += 1;
 			ird_mp_map_active[mp] = mp;
@@ -2978,7 +2962,8 @@ for (int mp = 0; mp < asset->sm_ird.size(); mp++)
 		xstring mp_hedge_grp = ird_hedge_grp[0];
 
 		// mapping process starts		
-		if (mp_hedge_grp == hedge_grp_id)
+		if (mp_hedge_grp == hedge_grp_id
+			&& eq(asset->sm_ird[mp][0]->seg_id, seg_id))
 			{
 			hedge_grp_asset_counter += 1;
 			ird_mp_map_active[mp] = mp;
@@ -2986,6 +2971,7 @@ for (int mp = 0; mp < asset->sm_ird.size(); mp++)
 		}
 	}
 #endif
+}
 //asset - ird mapping (end)
 
 // set hedge_grp id as group name, crucial as this will be used as the key id to retrieve values from the output files
@@ -3018,8 +3004,8 @@ if (hedge_grp_liab_counter + hedge_grp_asset_counter > 0)
 	}	
 	
 // Update counters in segment
-seg->hedge_grp_asset_counter = hedge_grp_asset_counter;
-seg->hedge_grp_liab_counter = hedge_grp_liab_counter;
+seg_element->hedge_grp_asset_counter = hedge_grp_asset_counter;
+seg_element->hedge_grp_liab_counter = hedge_grp_liab_counter;
 
 if (hedge_valn_final_flag)
 	get_hedge_valn_results();
@@ -3030,7 +3016,6 @@ if (hedge_proj_stmt_flag)
 return 1.0;
 
 }
-
 
 //@@ END
 
@@ -3054,7 +3039,6 @@ return sum_over_liabilities("direct_cash_flow_bom", t, BEG_OF_PERIOD)
 
 }
 
-
 //@@ END
 
 //@@ START - liab_cash_flow_eom
@@ -3076,7 +3060,6 @@ return sum_over_liabilities("direct_cash_flow_eom", t, END_OF_PERIOD)
        - sum_over_liabilities("reins_cash_flow_eom", t, END_OF_PERIOD);
 
 }
-
 
 //@@ END
 
@@ -3102,7 +3085,6 @@ return notional_amt_to_hedge_long_strike(t) / notional_to_hedge(t);
 
 }
 
-
 //@@ END
 
 //@@ START - notional_amt_required
@@ -3120,10 +3102,9 @@ double HDG_GRP_COMP_UDF::hdg_grp_comp_notional_amt_required(int t) {
 if (t < start_period || t > final_period)
 	return NO_AVG;
 
-return hedge_notional_amt_available(t) - fund_val_decrem_cumul(t);
+return max(hedge_notional_amt_available(t) - fund_val_decrem_cumul(t), 0.0);//prevent hedge from decrementing to negative value
 
 }
-
 
 //@@ END
 
@@ -3146,7 +3127,6 @@ return sum_over_liabilities("notional_to_hedge_net", t, BEG_OF_PERIOD);
 
 }
 
-
 //@@ END
 
 //@@ START - notional_amt_to_hedge_cap
@@ -3168,7 +3148,6 @@ return sum_over_liabilities("notional_to_hedge_cap", t, BEG_OF_PERIOD);
 
 }
 
-
 //@@ END
 
 //@@ START - notional_amt_to_hedge_index
@@ -3189,7 +3168,6 @@ if (t <= start_period)
 return sum_over_liabilities("notional_to_hedge_index", t, BEG_OF_PERIOD);
 
 }
-
 
 //@@ END
 
@@ -3215,7 +3193,6 @@ return sum_over_liabilities("notional_to_hedge_long_strike", t, BEG_OF_PERIOD);
 
 }
 
-
 //@@ END
 
 //@@ START - notional_to_hedge
@@ -3236,7 +3213,6 @@ if (t <= start_period)
 return sum_over_liabilities("notional_to_hedge", t, BEG_OF_PERIOD);
 
 }
-
 
 //@@ END
 
@@ -3262,7 +3238,6 @@ return opt_budget_amt(t) / notional_to_hedge(t);
 
 }
 
-
 //@@ END
 
 //@@ START - opt_budget_amt
@@ -3284,7 +3259,6 @@ return sum_over_liabilities("opt_budget_amt", t, BEG_OF_PERIOD);
 
 }
 
-
 //@@ END
 
 //@@ START - opt_payoff
@@ -3305,7 +3279,6 @@ if (t <= start_period)
 return sum_over_liabilities("opt_payoff", t, BEG_OF_PERIOD);
 
 }
-
 
 //@@ END
 
@@ -3330,7 +3303,6 @@ if (fabs( notional_to_hedge(t)) < rate_ratio_threshold)
 return  notional_amt_to_hedge(t) / notional_to_hedge(t);
 
 }
-
 
 //@@ END
 
@@ -3436,7 +3408,6 @@ return 1.0;
 
 }
 
-
 //@@ END
 
 //@@ START - pv_charges
@@ -3461,41 +3432,50 @@ vector <string> plan_codes;
 plan_codes.clear();
 
 // parse and stores plan codes into vector
-split_string_usl(hedge_grp_plan_codes.c_str(), plan_codes, ",");//WTW - Gen2 - split_tring internal RAFM function
+hedge_grp_id = hedge_grp_id;
+split_string_usl(hedge_grp_plan_codes.c_str(), plan_codes, ",");
 
 double hedge_group_pv_charges = 0.0;
 xstring index;
 
+hedge_grp_id = hedge_grp_id;
+StrEnum::EnumValue hedge_grp_gmab_defn_local = hedge_grp_gmab_defn;
+hedge_grp_id = hedge_grp_id;
+StrEnum::EnumValue hedge_grp_gmdb_defn_local = hedge_grp_gmdb_defn;
+hedge_grp_id = hedge_grp_id;
+StrEnum::EnumValue hedge_grp_gmib_defn_local = hedge_grp_gmib_defn;
+hedge_grp_id = hedge_grp_id;
+StrEnum::EnumValue hedge_grp_gmwb_defn_local = hedge_grp_gmwb_defn;
+
 for (int plan_count = 0; plan_count < plan_codes.size(); plan_count++)
 	{	
-	if (hedge_grp_gmab_defn == YES)
+	if (hedge_grp_gmab_defn_local == YES)
 		{
 		index = xstring(plan_codes[plan_count]) + "_GMAB_Fees";
-		hedge_group_pv_charges += seg->va_hedge_vals[index];		
+		hedge_group_pv_charges += seg_element->va_hedge_vals[index];		
 		}
 
-	if (hedge_grp_gmdb_defn == YES)
+	if (hedge_grp_gmdb_defn_local == YES)
 		{
 		index = xstring(plan_codes[plan_count]) + "_GMDB_Fees";
-		hedge_group_pv_charges += seg->va_hedge_vals[index];		
+		hedge_group_pv_charges += seg_element->va_hedge_vals[index];		
 		}
 							
-	if (hedge_grp_gmib_defn == YES)
+	if (hedge_grp_gmib_defn_local == YES)
 		{
 		index = xstring(plan_codes[plan_count]) + "_GMIB_Fees";
-		hedge_group_pv_charges += seg->va_hedge_vals[index];		
+		hedge_group_pv_charges += seg_element->va_hedge_vals[index];		
 		}
 
-	if (hedge_grp_gmwb_defn == YES)
+	if (hedge_grp_gmwb_defn_local == YES)
 		{
 		index = xstring(plan_codes[plan_count]) + "_GMWB_Fees";
-		hedge_group_pv_charges += seg->va_hedge_vals[index];		
+		hedge_group_pv_charges += seg_element->va_hedge_vals[index];		
 		}
 	}
 return hedge_group_pv_charges;
 
 }
-
 
 //@@ END
 
@@ -3521,43 +3501,52 @@ vector <string> plan_codes;
 plan_codes.clear();
 
 // parse and stores plan codes into vector
-split_string_usl(hedge_grp_plan_codes.c_str(), plan_codes, ",");//WTW - Gen2 - split_tring internal RAFM function
+hedge_grp_id = hedge_grp_id;
+split_string_usl(hedge_grp_plan_codes.c_str(), plan_codes, ",");
 
 double hedge_group_pv_claims = 0.0;
 xstring index;
 
+hedge_grp_id = hedge_grp_id;
+StrEnum::EnumValue hedge_grp_gmab_defn_local = hedge_grp_gmab_defn;
+hedge_grp_id = hedge_grp_id;
+StrEnum::EnumValue hedge_grp_gmdb_defn_local = hedge_grp_gmdb_defn;
+hedge_grp_id = hedge_grp_id;
+StrEnum::EnumValue hedge_grp_gmib_defn_local = hedge_grp_gmib_defn;
+hedge_grp_id = hedge_grp_id;
+StrEnum::EnumValue hedge_grp_gmwb_defn_local = hedge_grp_gmwb_defn;
+
 for (int plan_count = 0; plan_count < plan_codes.size(); plan_count++)
 	{
 
-	if (hedge_grp_gmab_defn == YES)
+	if (hedge_grp_gmab_defn_local == YES)
 		{
 		index = xstring(plan_codes[plan_count]) + "_GMAB_Claims";
-		hedge_group_pv_claims += seg->va_hedge_vals[index];		
+		hedge_group_pv_claims += seg_element->va_hedge_vals[index];		
 		}
 
-	if (hedge_grp_gmdb_defn == YES)
+	if (hedge_grp_gmdb_defn_local == YES)
 		{
 		index = xstring(plan_codes[plan_count]) + "_GMDB_Claims";
-		hedge_group_pv_claims += seg->va_hedge_vals[index];		
+		hedge_group_pv_claims += seg_element->va_hedge_vals[index];		
 		}
 							
-	if (hedge_grp_gmib_defn == YES)
+	if (hedge_grp_gmib_defn_local == YES)
 		{
 		index = xstring(plan_codes[plan_count]) + "_GMIB_Claims";
-		hedge_group_pv_claims += seg->va_hedge_vals[index];		
+		hedge_group_pv_claims += seg_element->va_hedge_vals[index];		
 		}
 
-	if (hedge_grp_gmwb_defn == YES)
+	if (hedge_grp_gmwb_defn_local == YES)
 		{
 		index = xstring(plan_codes[plan_count]) + "_GMWB_Claims";
-		hedge_group_pv_claims += seg->va_hedge_vals[index];		
+		hedge_group_pv_claims += seg_element->va_hedge_vals[index];		
 		}
 	}
 
 return hedge_group_pv_claims;
 
 }
-
 
 //@@ END
 
@@ -3573,10 +3562,19 @@ double HDG_GRP_COMP_UDF::hdg_grp_comp_rho_convex_hedge_flag(int t) {
 //^^^
 
 #line 1 "rho_convex_hedge_flag.HDG_GRP_COMP.for"
-if (!hedge_proj_stmt_flag || hedge_grp_rho_convex_hedge_defn == NO)
-	return 0;
+if (t > 0)
+	{
+	hedge_grp_id = hedge_grp_id;
+	int hedge_grp_rho_convex_hedge_rebal_freq_local = hedge_grp_rho_convex_hedge_rebal_freq;
+	
+	if ((t % hedge_grp_rho_convex_hedge_rebal_freq_local) != 0)
+		return 0;
+	}
 
-if (t > 0 && (t % hedge_grp_rho_convex_hedge_rebal_freq) != 0)
+hedge_grp_id = hedge_grp_id;
+StrEnum::EnumValue hedge_grp_rho_convex_hedge_defn_local = hedge_grp_rho_convex_hedge_defn;
+
+if (!hedge_proj_stmt_flag || hedge_grp_rho_convex_hedge_defn_local == NO)
 	return 0;
 
 // Check for existing rho convex hedge assets. If they exist, rho convex hedge strategy is not executed at t == 0
@@ -3584,8 +3582,7 @@ if (t == 0)
 	{
 	#if defined(__IRD_ASSET_H_)
 	int mp = 0;
-	mpmap::iterator mp_map_iter;
-	IRD_ASSET *ird_element = NULL;
+	map <int, long, less <int> >::iterator mp_map_iter;
 
 	if (ird_mp_map_active.size() > 0)
 		{
@@ -3594,9 +3591,8 @@ if (t == 0)
 			 mp_map_iter++)
 			{
 			mp = mp_map_iter->first;
-			ird_element = company->sm_asset->sm_ird[mp];
 
-			if (ird_element->hdg_grp_code.find("RhoConvexity") < string::npos)
+			if (company->sm_asset->sm_ird[mp][0]->hdg_grp_code.find("RhoConvexity") < string::npos)
 				return 0;
 			}			         
 		}
@@ -3606,7 +3602,6 @@ if (t == 0)
 return 1;
 
 }
-
 
 //@@ END
 
@@ -3631,8 +3626,8 @@ rho_convex_hedge_sale_amt(t);
 bool hedge_strat_detail_flag = asset->asset_detail_rpt_inv_strat_flag(t);
 if (hedge_strat_detail_flag)
 	{
-	seg->SALFile << endl;
-	seg->SALFile << "Start Rho Convexity Hedge Investments for "
+	seg_element->SALFile << endl;
+	seg_element->SALFile << "Start Rho Convexity Hedge Investments for "
 				 << "Hedge Group=" << hedge_grp_id << " " 
 	             << "Period=" << t << " "
 				 << "Year=" << xint(cal_yr(t)) << " "
@@ -3646,16 +3641,19 @@ double inv_amt = 0.0;
 map <xstring, double> rho_convex_hedge_coeff;
 map <xstring, double> notional_to_purch;
 int new_mp_num = -1;
-int seg_num = seg->getElementNumber();
+int seg_num = seg_element->getElementNumber();
 int key_rate_loops = 1;
 
-if (hedge_grp_rho_convex_hedge_liab_shock_defn == KEY_RATE_SPECIFIC)
+hedge_grp_id = hedge_grp_id;
+StrEnum::EnumValue hedge_grp_rho_convex_hedge_liab_shock_defn_local = hedge_grp_rho_convex_hedge_liab_shock_defn;
+
+if (hedge_grp_rho_convex_hedge_liab_shock_defn_local == KEY_RATE_SPECIFIC)
 	key_rate_loops = company->rho_hedge_key_rate_list.size();
 
 for (int key_rate = 0; key_rate < key_rate_loops; key_rate++)
 	{
 	// set lookup key
-	if (hedge_grp_rho_convex_hedge_liab_shock_defn == PARALLEL)
+	if (hedge_grp_rho_convex_hedge_liab_shock_defn_local == PARALLEL)
 		hedge_grp_key_rate = "Parallel";
 	else
 		hedge_grp_key_rate = company->rho_hedge_key_rate_list[key_rate];
@@ -3675,6 +3673,10 @@ for (int key_rate = 0; key_rate < key_rate_loops; key_rate++)
 	notional_to_purch[greek_needed_map_index] = ONE_MILLION * rho_convex_hedge_coeff[greek_needed_map_index];
 	double notional_inv = notional_to_purch[greek_needed_map_index];
 
+	hedge_grp_id = hedge_grp_id;
+	hedge_grp_key_rate = hedge_grp_key_rate;
+	xstring hedge_grp_rho_convex_hedge_asset_id_local = hedge_grp_rho_convex_hedge_asset_id;
+
 	if (fabs(notional_inv) > model_point_amount_threshold)
 		{
 		inv_amt += company->sm_inv_strategy[seg_num]->buy_assets_hedging(t, 
@@ -3682,7 +3684,7 @@ for (int key_rate = 0; key_rate < key_rate_loops; key_rate++)
 																		HEDGING,
 																		new_mp_num,
 																		hedge_grp_code,
-																		hedge_grp_rho_convex_hedge_asset_id,
+																		hedge_grp_rho_convex_hedge_asset_id_local,
 																		notional_inv,
 																		-1.0,
 																		-1.0);
@@ -3698,14 +3700,14 @@ for (int key_rate = 0; key_rate < key_rate_loops; key_rate++)
 
 if (hedge_strat_detail_flag)
 	{
-	seg->SALFile << endl;
-	seg->SALFile << "Rho Convexity Hedge Investments Summary" << endl;
-	seg->SALFile << "KeyRateTermName,RhoConvexNeeded,AssetRhoConvex,HedgeCoeff,NotionalPurch" << endl;
+	seg_element->SALFile << endl;
+	seg_element->SALFile << "Rho Convexity Hedge Investments Summary" << endl;
+	seg_element->SALFile << "KeyRateTermName,RhoConvexNeeded,AssetRhoConvex,HedgeCoeff,NotionalPurch" << endl;
 
 	for (int key_rate = 0; key_rate < key_rate_loops; key_rate++)
 		{
 		// set lookup key
-		if (hedge_grp_rho_convex_hedge_liab_shock_defn == PARALLEL)
+		if (hedge_grp_rho_convex_hedge_liab_shock_defn_local == PARALLEL)
 			hedge_grp_key_rate = "Parallel";
 		else
 			hedge_grp_key_rate = company->rho_hedge_key_rate_list[key_rate];
@@ -3713,7 +3715,7 @@ if (hedge_strat_detail_flag)
 		// Asset greek needed has been updates for sales
 		xstring greek_needed_map_index = "RhoConvexity_" + hedge_grp_key_rate + "_" + xstring(t);
 		xstring greek_map_index = "RhoConvexity_Purchase_" + hedge_grp_key_rate + "_" + xstring(t);
-		seg->SALFile << hedge_grp_key_rate << ","
+		seg_element->SALFile << hedge_grp_key_rate << ","
 		             << asset_greeks_needed[greek_needed_map_index] << ","
 					 << asset_greeks[greek_map_index] << ","
 		             << rho_convex_hedge_coeff[greek_needed_map_index] << ","
@@ -3726,8 +3728,8 @@ notional_to_purch.clear();
 
 if (hedge_strat_detail_flag)
 	{
-	seg->SALFile << endl;
-	seg->SALFile << "End Rho Convexity Hedge Investments for "
+	seg_element->SALFile << endl;
+	seg_element->SALFile << "End Rho Convexity Hedge Investments for "
 				 << "Hedge Group=" << hedge_grp_id << " " 
 	             << "Period=" << t << " "
 				 << "Year=" << xint(cal_yr(t)) << " "
@@ -3737,7 +3739,6 @@ if (hedge_strat_detail_flag)
 return inv_amt;
 
 }
-
 
 //@@ END
 
@@ -3763,7 +3764,6 @@ return sum_over_assets("mkt_val", t, RHO_CONVEXITY, END_OF_PERIOD);
 
 }
 
-
 //@@ END
 
 //@@ START - rho_convex_hedge_mkt_val_incr
@@ -3784,7 +3784,6 @@ if (t <= start_period || t > final_period)
 return rho_convex_hedge_mkt_val(t) - rho_convex_hedge_mkt_val(t - 1);
 
 }
-
 
 //@@ END
 
@@ -3807,7 +3806,6 @@ return sum_over_assets("int_pmt", t, RHO_CONVEXITY, BEFORE_SALE);
 
 }
 
-
 //@@ END
 
 //@@ START - rho_convex_hedge_prof
@@ -3822,10 +3820,13 @@ double HDG_GRP_COMP_UDF::hdg_grp_comp_rho_convex_hedge_prof(int t) {
 //^^^
 
 #line 1 "rho_convex_hedge_prof.HDG_GRP_COMP.for"
-if (!hedge_proj_stmt_flag || hedge_grp_rho_convex_hedge_defn == NO)
+if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (t <= start_period || t > final_period)
+hedge_grp_id = hedge_grp_id;
+StrEnum::EnumValue hedge_grp_rho_convex_hedge_defn_local = hedge_grp_rho_convex_hedge_defn;
+
+if (!hedge_proj_stmt_flag || hedge_grp_rho_convex_hedge_defn_local == NO)
 	return NO_AVG;
 
 return rho_convex_hedge_pmt(t)
@@ -3835,7 +3836,6 @@ return rho_convex_hedge_pmt(t)
 	   + rho_convex_hedge_mkt_val_incr(t); 
 
 }
-
 
 //@@ END
 
@@ -3865,16 +3865,14 @@ if (!ird_mp_map_active.size())
 // Do not process sales if there are no Rho convexity assets in the active map
 int mp = 0;
 bool rho_convex_hedges = false;
-mpmap::iterator mp_map_iter;
-IRD_ASSET *ird_element = NULL;
+map <int, long, less <int> >::iterator mp_map_iter;
 for (mp_map_iter = ird_mp_map_active.begin();
 	mp_map_iter != ird_mp_map_active.end();
 	mp_map_iter++)
 	{
 	mp = mp_map_iter->first;
-	ird_element = company->sm_asset->sm_ird[mp];
 
-	if (ird_element->hdg_grp_code.find("RhoConvexity") < string::npos)
+	if (company->sm_asset->sm_ird[mp][0]->hdg_grp_code.find("RhoConvexity") < string::npos)
 		{
 		rho_convex_hedges = true;
 		break;
@@ -3888,8 +3886,8 @@ if (!rho_convex_hedges)
 bool hedge_strat_detail_flag = asset->asset_detail_rpt_inv_strat_flag(t);
 if (hedge_strat_detail_flag)
 	{
-	seg->SALFile << endl;
-	seg->SALFile << "Start Rho Convexity Hedge Sales for "
+	seg_element->SALFile << endl;
+	seg_element->SALFile << "Start Rho Convexity Hedge Sales for "
 				 << "Hedge Group=" << hedge_grp_id << " " 
 	             << "Period=" << t << " "
 				 << "Year=" << xint(cal_yr(t)) << " "
@@ -3898,17 +3896,21 @@ if (hedge_strat_detail_flag)
 
 double sales_amt = 0.0;
 int new_mp_num = -1;
-int seg_num = seg->getElementNumber();
+int seg_num = seg_element->getElementNumber();
 int key_rate_loops = 1;
-if (hedge_grp_rho_convex_hedge_liab_shock_defn == KEY_RATE_SPECIFIC) // Just one loop for parallel hedging
+
+hedge_grp_id = hedge_grp_id;
+StrEnum::EnumValue hedge_grp_rho_convex_hedge_liab_shock_defn_local = hedge_grp_rho_convex_hedge_liab_shock_defn;
+
+if (hedge_grp_rho_convex_hedge_liab_shock_defn_local == KEY_RATE_SPECIFIC) // Just one loop for parallel hedging
 	key_rate_loops = company->rho_hedge_key_rate_list.size();
 
 for (int key_rate = 0; key_rate < key_rate_loops; key_rate++)
 	{
 	int mp = 0;
-	mpmap::iterator mp_map_iter;
+	map <int, long, less <int> >::iterator mp_map_iter;
 	xstring key_rate_name;
-	if (hedge_grp_rho_convex_hedge_liab_shock_defn == PARALLEL)
+	if (hedge_grp_rho_convex_hedge_liab_shock_defn_local == PARALLEL)
 		key_rate_name = "Parallel";
 	else
 		key_rate_name = company->rho_hedge_key_rate_list[key_rate];
@@ -3927,88 +3929,84 @@ for (int key_rate = 0; key_rate < key_rate_loops; key_rate++)
 
 	if (hedge_strat_detail_flag)
 		{
-		seg->SALFile << endl;
-		seg->SALFile << "Processing Hedge Sales for Key Rate Term " << key_rate_name << endl;
-		seg->SALFile << "RhoConvexNeeded," << greek_needed << endl
+		seg_element->SALFile << endl;
+		seg_element->SALFile << "Processing Hedge Sales for Key Rate Term " << key_rate_name << endl;
+		seg_element->SALFile << "RhoConvexNeeded," << greek_needed << endl
 					 << "RhoConvexAsset," << rho_convex_asset << endl
 					 << "RhoConvexDiff," << rho_convex_diff << endl;
 
-		seg->SALFile << endl;
-		seg->SALFile << "AssetID,HedgeGrpCode,RhoConvexAsset,SoldPct,NotionalSold,MktValSold,RhoConvexSold" << endl;
+		seg_element->SALFile << endl;
+		seg_element->SALFile << "AssetID,HedgeGrpCode,RhoConvexAsset,SoldPct,NotionalSold,MktValSold,RhoConvexSold" << endl;
 		}
 
 	#if defined(__IRD_ASSET_H_)
-	IRD_ASSET *ird_element = NULL;
-
 	if (ird_mp_map_active.size() > 0)
 		{
 		int col_num_sold_pct_fund_match
-		= asset->sm_ird[0]->Column("sold_pct_fund_match").Number();
+		= asset->sm_ird[0][0]->Column("sold_pct_fund_match").Number();
 
 		for (mp_map_iter = ird_mp_map_active.begin();
 			 mp_map_iter != ird_mp_map_active.end();
 			 mp_map_iter++)
 			{
 			mp = mp_map_iter->first;
-			ird_element = company->sm_asset->sm_ird[mp];
 
-			if (ird_element->hdg_grp_code.find("RhoConvexity|") == string::npos)
+			if (company->sm_asset->sm_ird[mp][0]->hdg_grp_code.find("RhoConvexity|") == string::npos)
 				continue;
 
-			if (ird_element->hdg_grp_code.find(key_rate_name) == string::npos)
+			if (company->sm_asset->sm_ird[mp][0]->hdg_grp_code.find(key_rate_name) == string::npos)
 				continue;
 
-			if (t < ird_element->commencement_period
-				|| (t > max(0, ird_element->commencement_period)
-					&& (fabs(ird_element->notional_amt_bef_sale(t)) < ASSET_ACTIVE_THRESHOLD)
-						|| ird_element->Column(col_num_sold_pct_fund_match).Exists(t)))
+			if (t < company->sm_asset->sm_ird[mp][0]->commencement_period
+				|| (t > max(0, company->sm_asset->sm_ird[mp][0]->commencement_period)
+					&& (fabs(company->sm_asset->sm_ird[mp][0]->notional_amt_bef_sale(t)) < ASSET_ACTIVE_THRESHOLD)))
 				continue;
 
 			// calculate Rho for asset. Option values have already been determined in the strategy setup
 			if (key_rate_name == "Parallel")
-				rho_convex_indv_asset = (ird_element->opt_val_int_up_1_bef_sale(t) + ird_element->opt_val_int_down_1_bef_sale(t)
-										  - 2.0 * ird_element->opt_val_baseline_bef_sale(t))
-										 * asset->sm_eio[mp]->pct_to_use;	
+				rho_convex_indv_asset = (company->sm_asset->sm_ird[mp][0]->opt_val_int_up_1_bef_sale(t) + company->sm_asset->sm_ird[mp][0]->opt_val_int_down_1_bef_sale(t)
+										  - 2.0 * company->sm_asset->sm_ird[mp][0]->opt_val_baseline_bef_sale(t))
+										 * asset->sm_eio[mp][0]->pct_to_use;	
 			else if (key_rate == 0)
-				rho_convex_indv_asset = (ird_element->opt_val_int_key_rate_1_up_1_bef_sale(t) + ird_element->opt_val_int_key_rate_1_down_1_bef_sale(t)
-										  - 2.0 * ird_element->opt_val_baseline_bef_sale(t))
-										 * asset->sm_ird[mp]->pct_to_use;	
+				rho_convex_indv_asset = (company->sm_asset->sm_ird[mp][0]->opt_val_int_key_rate_1_up_1_bef_sale(t) + company->sm_asset->sm_ird[mp][0]->opt_val_int_key_rate_1_down_1_bef_sale(t)
+										  - 2.0 * company->sm_asset->sm_ird[mp][0]->opt_val_baseline_bef_sale(t))
+										 * asset->sm_ird[mp][0]->pct_to_use;	
 			else if (key_rate == 1)
-				rho_convex_indv_asset = (ird_element->opt_val_int_key_rate_2_up_1_bef_sale(t) + ird_element->opt_val_int_key_rate_2_down_1_bef_sale(t)
-										  - 2.0 * ird_element->opt_val_baseline_bef_sale(t))
-										 * asset->sm_ird[mp]->pct_to_use;	
+				rho_convex_indv_asset = (company->sm_asset->sm_ird[mp][0]->opt_val_int_key_rate_2_up_1_bef_sale(t) + company->sm_asset->sm_ird[mp][0]->opt_val_int_key_rate_2_down_1_bef_sale(t)
+										  - 2.0 * company->sm_asset->sm_ird[mp][0]->opt_val_baseline_bef_sale(t))
+										 * asset->sm_ird[mp][0]->pct_to_use;	
 			else if (key_rate == 2)
-				rho_convex_indv_asset = (ird_element->opt_val_int_key_rate_3_up_1_bef_sale(t) + ird_element->opt_val_int_key_rate_3_down_1_bef_sale(t)
-										  - 2.0 * ird_element->opt_val_baseline_bef_sale(t))
-										 * asset->sm_ird[mp]->pct_to_use;	
+				rho_convex_indv_asset = (company->sm_asset->sm_ird[mp][0]->opt_val_int_key_rate_3_up_1_bef_sale(t) + company->sm_asset->sm_ird[mp][0]->opt_val_int_key_rate_3_down_1_bef_sale(t)
+										  - 2.0 * company->sm_asset->sm_ird[mp][0]->opt_val_baseline_bef_sale(t))
+										 * asset->sm_ird[mp][0]->pct_to_use;	
 			else if (key_rate == 3)
-				rho_convex_indv_asset = (ird_element->opt_val_int_key_rate_4_up_1_bef_sale(t) + ird_element->opt_val_int_key_rate_4_down_1_bef_sale(t)
-										  - 2.0 * ird_element->opt_val_baseline_bef_sale(t))
-										 * asset->sm_ird[mp]->pct_to_use;	
+				rho_convex_indv_asset = (company->sm_asset->sm_ird[mp][0]->opt_val_int_key_rate_4_up_1_bef_sale(t) + company->sm_asset->sm_ird[mp][0]->opt_val_int_key_rate_4_down_1_bef_sale(t)
+										  - 2.0 * company->sm_asset->sm_ird[mp][0]->opt_val_baseline_bef_sale(t))
+										 * asset->sm_ird[mp][0]->pct_to_use;	
 			else if (key_rate == 4)
-				rho_convex_indv_asset = (ird_element->opt_val_int_key_rate_5_up_1_bef_sale(t) + ird_element->opt_val_int_key_rate_5_down_1_bef_sale(t)
-										  - 2.0 * ird_element->opt_val_baseline_bef_sale(t))
-										 * asset->sm_ird[mp]->pct_to_use;	
+				rho_convex_indv_asset = (company->sm_asset->sm_ird[mp][0]->opt_val_int_key_rate_5_up_1_bef_sale(t) + company->sm_asset->sm_ird[mp][0]->opt_val_int_key_rate_5_down_1_bef_sale(t)
+										  - 2.0 * company->sm_asset->sm_ird[mp][0]->opt_val_baseline_bef_sale(t))
+										 * asset->sm_ird[mp][0]->pct_to_use;	
 			else if (key_rate == 5)
-				rho_convex_indv_asset = (ird_element->opt_val_int_key_rate_6_up_1_bef_sale(t) + ird_element->opt_val_int_key_rate_6_down_1_bef_sale(t)
-										  - 2.0 * ird_element->opt_val_baseline_bef_sale(t))
-										 * asset->sm_ird[mp]->pct_to_use;	
+				rho_convex_indv_asset = (company->sm_asset->sm_ird[mp][0]->opt_val_int_key_rate_6_up_1_bef_sale(t) + company->sm_asset->sm_ird[mp][0]->opt_val_int_key_rate_6_down_1_bef_sale(t)
+										  - 2.0 * company->sm_asset->sm_ird[mp][0]->opt_val_baseline_bef_sale(t))
+										 * asset->sm_ird[mp][0]->pct_to_use;	
 			else if (key_rate == 6)
-				rho_convex_indv_asset = (ird_element->opt_val_int_key_rate_7_up_1_bef_sale(t) + ird_element->opt_val_int_key_rate_7_down_1_bef_sale(t)
-										  - 2.0 * ird_element->opt_val_baseline_bef_sale(t))
-										 * asset->sm_ird[mp]->pct_to_use;	
+				rho_convex_indv_asset = (company->sm_asset->sm_ird[mp][0]->opt_val_int_key_rate_7_up_1_bef_sale(t) + company->sm_asset->sm_ird[mp][0]->opt_val_int_key_rate_7_down_1_bef_sale(t)
+										  - 2.0 * company->sm_asset->sm_ird[mp][0]->opt_val_baseline_bef_sale(t))
+										 * asset->sm_ird[mp][0]->pct_to_use;	
 			else if (key_rate == 7)
-				rho_convex_indv_asset = (ird_element->opt_val_int_key_rate_8_up_1_bef_sale(t) + ird_element->opt_val_int_key_rate_8_down_1_bef_sale(t)
-										  - 2.0 * ird_element->opt_val_baseline_bef_sale(t))
-										 * asset->sm_ird[mp]->pct_to_use;	
+				rho_convex_indv_asset = (company->sm_asset->sm_ird[mp][0]->opt_val_int_key_rate_8_up_1_bef_sale(t) + company->sm_asset->sm_ird[mp][0]->opt_val_int_key_rate_8_down_1_bef_sale(t)
+										  - 2.0 * company->sm_asset->sm_ird[mp][0]->opt_val_baseline_bef_sale(t))
+										 * asset->sm_ird[mp][0]->pct_to_use;	
 			else if (key_rate == 8)
-				rho_convex_indv_asset = (ird_element->opt_val_int_key_rate_9_up_1_bef_sale(t) + ird_element->opt_val_int_key_rate_9_down_1_bef_sale(t)
-										  - 2.0 * ird_element->opt_val_baseline_bef_sale(t))
-										 * asset->sm_ird[mp]->pct_to_use;	
+				rho_convex_indv_asset = (company->sm_asset->sm_ird[mp][0]->opt_val_int_key_rate_9_up_1_bef_sale(t) + company->sm_asset->sm_ird[mp][0]->opt_val_int_key_rate_9_down_1_bef_sale(t)
+										  - 2.0 * company->sm_asset->sm_ird[mp][0]->opt_val_baseline_bef_sale(t))
+										 * asset->sm_ird[mp][0]->pct_to_use;	
 			else if (key_rate == 9)
-				rho_convex_indv_asset = (ird_element->opt_val_int_key_rate_10_up_1_bef_sale(t) + ird_element->opt_val_int_key_rate_10_down_1_bef_sale(t)
-									  - 2.0 * ird_element->opt_val_baseline_bef_sale(t))
-									 * asset->sm_ird[mp]->pct_to_use;	
+				rho_convex_indv_asset = (company->sm_asset->sm_ird[mp][0]->opt_val_int_key_rate_10_up_1_bef_sale(t) + company->sm_asset->sm_ird[mp][0]->opt_val_int_key_rate_10_down_1_bef_sale(t)
+									  - 2.0 * company->sm_asset->sm_ird[mp][0]->opt_val_baseline_bef_sale(t))
+									 * asset->sm_ird[mp][0]->pct_to_use;	
 
 			double sold_pct = 0.0;
 
@@ -4046,22 +4044,25 @@ for (int key_rate = 0; key_rate < key_rate_loops; key_rate++)
 				}
 
 			rho_convex_sold = rho_convex_indv_asset * sold_pct;
-			ird_element->Column(col_num_sold_pct_fund_match).SetValue(t, sold_pct); 
+
+			company->sm_asset->sm_ird[mp][0]->sold_pct_fund_match_value = sold_pct;
+			company->sm_asset->sm_ird[mp][0]->Column(col_num_sold_pct_fund_match).Value(t);
+			company->sm_asset->sm_ird[mp][0]->sold_pct_fund_match_value = 0.0;
 
 			rho_convex_sold_total += rho_convex_sold;
 			rho_convex_asset_remaining -= rho_convex_sold;
 
-			sales_amt += ird_element->mkt_val_sold(t)
-						 * ird_element->pct_to_use;
+			sales_amt += company->sm_asset->sm_ird[mp][0]->mkt_val_sold(t)
+						 * company->sm_asset->sm_ird[mp][0]->pct_to_use;
 
 			if (hedge_strat_detail_flag)
 				{
-				seg->SALFile << ird_element->asset_id << ","
-				             << ird_element->hdg_grp_code << ","
+				seg_element->SALFile << company->sm_asset->sm_ird[mp][0]->asset_id << ","
+				             << company->sm_asset->sm_ird[mp][0]->hdg_grp_code << ","
 							 << rho_convex_indv_asset << ","
 							 << sold_pct << ","
-							 << ird_element->notional_amt_sold(t) * ird_element->pct_to_use << ","
-							 << ird_element->mkt_val_sold(t) * ird_element->pct_to_use << ","
+							 << company->sm_asset->sm_ird[mp][0]->notional_amt_sold(t) * company->sm_asset->sm_ird[mp][0]->pct_to_use << ","
+							 << company->sm_asset->sm_ird[mp][0]->mkt_val_sold(t) * company->sm_asset->sm_ird[mp][0]->pct_to_use << ","
 							 << rho_convex_sold << endl;
 				}
 			}			         
@@ -4075,8 +4076,8 @@ for (int key_rate = 0; key_rate < key_rate_loops; key_rate++)
 
 	if (hedge_strat_detail_flag)
 		{
-		seg->SALFile << "Sales Summary" << endl;
-		seg->SALFile << "RhoConvexNeeded," << greek_needed << endl
+		seg_element->SALFile << "Sales Summary" << endl;
+		seg_element->SALFile << "RhoConvexNeeded," << greek_needed << endl
 					 << "RhoConvexAsset," << rho_convex_asset << endl
 		             << "RhoConvexSold," << rho_convex_sold_total << endl
 					 << "RhoConvexRemaining," << rho_convex_diff << endl;
@@ -4085,8 +4086,8 @@ for (int key_rate = 0; key_rate < key_rate_loops; key_rate++)
 
 if (hedge_strat_detail_flag)
 	{
-	seg->SALFile << endl;
-	seg->SALFile << "End Rho Convexity Hedge Sales for "
+	seg_element->SALFile << endl;
+	seg_element->SALFile << "End Rho Convexity Hedge Sales for "
 				 << "Hedge Group=" << hedge_grp_id << " " 
 	             << "Period=" << t << " "
 				 << "Year=" << xint(cal_yr(t)) << " "
@@ -4097,7 +4098,6 @@ return sales_amt;
 
 
 }
-
 
 //@@ END
 
@@ -4123,10 +4123,9 @@ double transaction_cost = 0.0;
 double notional_amt_purch = 0.0;
 double notional_amt_sold = 0.0;
 int mp = 0;
-mpmap::iterator mp_map_iter;
+map <int, long, less <int> >::iterator mp_map_iter;
 
 #if defined(__IRD_ASSET_H_)
-IRD_ASSET *ird_element = NULL;
 
 if (ird_mp_map_active.size() > 0)
 	{
@@ -4135,19 +4134,21 @@ if (ird_mp_map_active.size() > 0)
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		ird_element = company->sm_asset->sm_ird[mp];
 
-		if (t < ird_element->commencement_period
-			|| (t > max(0, ird_element->commencement_period)
-				&& fabs(ird_element->notional_amt(t - 1)) < ASSET_ACTIVE_THRESHOLD)
-			|| ird_element->hdg_grp_code.find("RhoConvexity|") == string::npos)
+		if (t < company->sm_asset->sm_ird[mp][0]->commencement_period
+			|| (t > max(0, company->sm_asset->sm_ird[mp][0]->commencement_period)
+				&& fabs(company->sm_asset->sm_ird[mp][0]->notional_amt(t - 1)) < ASSET_ACTIVE_THRESHOLD)
+			|| company->sm_asset->sm_ird[mp][0]->hdg_grp_code.find("RhoConvexity|") == string::npos)
 			continue;
 
-		notional_amt_sold = ird_element->notional_amt_sold(t) * ird_element->pct_to_use;
-		notional_amt_purch = ird_element->notional_amt_purch(t) * ird_element->pct_to_use;		
+		notional_amt_sold = company->sm_asset->sm_ird[mp][0]->notional_amt_sold(t) * company->sm_asset->sm_ird[mp][0]->pct_to_use;
+		notional_amt_purch = company->sm_asset->sm_ird[mp][0]->notional_amt_purch(t) * company->sm_asset->sm_ird[mp][0]->pct_to_use;		
+
+		hedge_grp_id = hedge_grp_id;
+		double hedge_grp_rho_hedge_transaction_costs_bps_local = hedge_grp_rho_hedge_transaction_costs_bps;
 
 		transaction_cost += (fabs(notional_amt_sold) + fabs(notional_amt_purch)) 
-		                   * hedge_grp_rho_hedge_transaction_costs_bps / 10000.0;
+		                   * hedge_grp_rho_hedge_transaction_costs_bps_local / 10000.0;
 		}			         
 	}
 #endif
@@ -4155,7 +4156,6 @@ if (ird_mp_map_active.size() > 0)
 return transaction_cost;
 
 }
-
 
 //@@ END
 
@@ -4186,7 +4186,6 @@ return liab_greeks[greek_index];
 
 }
 
-
 //@@ END
 
 //@@ START - rho_convex_key_rate_10
@@ -4215,7 +4214,6 @@ return liab_greeks[greek_index];
 
 
 }
-
 
 //@@ END
 
@@ -4246,7 +4244,6 @@ return liab_greeks[greek_index];
 
 }
 
-
 //@@ END
 
 //@@ START - rho_convex_key_rate_3
@@ -4275,7 +4272,6 @@ return liab_greeks[greek_index];
 
 
 }
-
 
 //@@ END
 
@@ -4306,7 +4302,6 @@ return liab_greeks[greek_index];
 
 }
 
-
 //@@ END
 
 //@@ START - rho_convex_key_rate_5
@@ -4335,7 +4330,6 @@ return liab_greeks[greek_index];
 
 
 }
-
 
 //@@ END
 
@@ -4366,7 +4360,6 @@ return liab_greeks[greek_index];
 
 }
 
-
 //@@ END
 
 //@@ START - rho_convex_key_rate_7
@@ -4395,7 +4388,6 @@ return liab_greeks[greek_index];
 
 
 }
-
 
 //@@ END
 
@@ -4426,7 +4418,6 @@ return liab_greeks[greek_index];
 
 }
 
-
 //@@ END
 
 //@@ START - rho_convex_key_rate_9
@@ -4456,7 +4447,6 @@ return liab_greeks[greek_index];
 
 }
 
-
 //@@ END
 
 //@@ START - rho_convex_parallel
@@ -4483,7 +4473,6 @@ return liab_greeks[greek_index];
 
 }
 
-
 //@@ END
 
 //@@ START - rho_hedge_flag
@@ -4498,10 +4487,19 @@ double HDG_GRP_COMP_UDF::hdg_grp_comp_rho_hedge_flag(int t) {
 //^^^
 
 #line 1 "rho_hedge_flag.HDG_GRP_COMP.for"
-if (!hedge_proj_stmt_flag || hedge_grp_rho_hedge_defn == NO)
-	return 0;
+if (t > 0)
+	{
+	hedge_grp_id = hedge_grp_id;
+	int hedge_grp_rho_hedge_rebal_freq_local = hedge_grp_rho_hedge_rebal_freq;
 
-if (t > 0 && (t % hedge_grp_rho_hedge_rebal_freq) != 0)
+	if ((t % hedge_grp_rho_hedge_rebal_freq_local) != 0)
+		return 0;
+	}
+
+hedge_grp_id = hedge_grp_id;
+StrEnum::EnumValue hedge_grp_rho_hedge_defn_local = hedge_grp_rho_hedge_defn;
+
+if (!hedge_proj_stmt_flag || hedge_grp_rho_hedge_defn_local == NO)
 	return 0;
 
 // Check for existing rho hedge assets. If they exist, rho hedge strategy is not executed at t == 0
@@ -4509,8 +4507,7 @@ if (t == 0)
 	{
 	#if defined(__IRD_ASSET_H_)
 	int mp = 0;
-	mpmap::iterator mp_map_iter;
-	IRD_ASSET *ird_element = NULL;
+	map <int, long, less <int> >::iterator mp_map_iter;
 
 	if (ird_mp_map_active.size() > 0)
 		{
@@ -4519,9 +4516,8 @@ if (t == 0)
 			 mp_map_iter++)
 			{
 			mp = mp_map_iter->first;
-			ird_element = company->sm_asset->sm_ird[mp];
 
-			if (ird_element->hdg_grp_code.find("Rho|") < string::npos)
+			if (company->sm_asset->sm_ird[mp][0]->hdg_grp_code.find("Rho|") < string::npos)
 				return 0;
 			}			         
 		}
@@ -4531,7 +4527,6 @@ if (t == 0)
 return 1;
 
 }
-
 
 //@@ END
 
@@ -4556,8 +4551,8 @@ rho_hedge_sale_amt(t);
 bool hedge_strat_detail_flag = asset->asset_detail_rpt_inv_strat_flag(t);
 if (hedge_strat_detail_flag)
 	{
-	seg->SALFile << endl;
-	seg->SALFile << "Start Rho Hedge Investments for "
+	seg_element->SALFile << endl;
+	seg_element->SALFile << "Start Rho Hedge Investments for "
 				 << "Hedge Group=" << hedge_grp_id << " " 
 	             << "Period=" << t << " "
 				 << "Year=" << xint(cal_yr(t)) << " "
@@ -4571,16 +4566,19 @@ double inv_amt = 0.0;
 map <xstring, double> rho_hedge_coeff;
 map <xstring, double> notional_to_purch;
 int new_mp_num = -1;
-int seg_num = seg->getElementNumber();
+int seg_num = seg_element->getElementNumber();
 int key_rate_loops = 1;
 
-if (hedge_grp_rho_hedge_liab_shock_defn == KEY_RATE_SPECIFIC)
+hedge_grp_id = hedge_grp_id;
+StrEnum::EnumValue hedge_grp_rho_hedge_liab_shock_defn_local = hedge_grp_rho_hedge_liab_shock_defn;
+
+if (hedge_grp_rho_hedge_liab_shock_defn_local == KEY_RATE_SPECIFIC)
 	key_rate_loops = company->rho_hedge_key_rate_list.size();
 
 for (int key_rate = 0; key_rate < key_rate_loops; key_rate++)
 	{
 	// set lookup key
-	if (hedge_grp_rho_hedge_liab_shock_defn == PARALLEL)
+	if (hedge_grp_rho_hedge_liab_shock_defn_local == PARALLEL)
 		hedge_grp_key_rate = "Parallel";
 	else
 		hedge_grp_key_rate = company->rho_hedge_key_rate_list[key_rate];
@@ -4599,6 +4597,10 @@ for (int key_rate = 0; key_rate < key_rate_loops; key_rate++)
 
 	notional_to_purch[greek_needed_map_index] = ONE_MILLION * rho_hedge_coeff[greek_needed_map_index];
 	double notional_inv = notional_to_purch[greek_needed_map_index];
+	
+	hedge_grp_id = hedge_grp_id;
+	hedge_grp_key_rate = hedge_grp_key_rate;
+	xstring hedge_grp_rho_hedge_asset_id_local = hedge_grp_rho_hedge_asset_id;
 
 	if (fabs(notional_inv) > model_point_amount_threshold)
 		{
@@ -4607,7 +4609,7 @@ for (int key_rate = 0; key_rate < key_rate_loops; key_rate++)
 																		HEDGING,
 																		new_mp_num,
 																		hedge_grp_code,
-																		hedge_grp_rho_hedge_asset_id,
+																		hedge_grp_rho_hedge_asset_id_local,
 																		notional_inv,
 																		-1.0,
 																		-1.0);
@@ -4623,14 +4625,14 @@ for (int key_rate = 0; key_rate < key_rate_loops; key_rate++)
 
 if (hedge_strat_detail_flag)
 	{
-	seg->SALFile << endl;
-	seg->SALFile << "Rho Hedge Investments Summary" << endl;
-	seg->SALFile << "KeyRateTermName,RhoNeeded,AssetRho,HedgeCoeff,NotionalPurch" << endl;
+	seg_element->SALFile << endl;
+	seg_element->SALFile << "Rho Hedge Investments Summary" << endl;
+	seg_element->SALFile << "KeyRateTermName,RhoNeeded,AssetRho,HedgeCoeff,NotionalPurch" << endl;
 
 	for (int key_rate = 0; key_rate < key_rate_loops; key_rate++)
 		{
 		// set lookup key
-		if (hedge_grp_rho_hedge_liab_shock_defn == PARALLEL)
+		if (hedge_grp_rho_hedge_liab_shock_defn_local == PARALLEL)
 			hedge_grp_key_rate = "Parallel";
 		else
 			hedge_grp_key_rate = company->rho_hedge_key_rate_list[key_rate];
@@ -4638,7 +4640,7 @@ if (hedge_strat_detail_flag)
 		// Asset greek needed has been updates for sales
 		xstring greek_needed_map_index = "Rho_" + hedge_grp_key_rate + "_" + xstring(t);
 		xstring greek_map_index = "Rho_Purchase_" + hedge_grp_key_rate + "_" + xstring(t);
-		seg->SALFile << hedge_grp_key_rate << ","
+		seg_element->SALFile << hedge_grp_key_rate << ","
 		             << asset_greeks_needed[greek_needed_map_index] << ","
 					 << asset_greeks[greek_map_index] << ","
 		             << rho_hedge_coeff[greek_needed_map_index] << ","
@@ -4651,8 +4653,8 @@ notional_to_purch.clear();
 
 if (hedge_strat_detail_flag)
 	{
-	seg->SALFile << endl;
-	seg->SALFile << "End Rho Hedge Investments for "
+	seg_element->SALFile << endl;
+	seg_element->SALFile << "End Rho Hedge Investments for "
 				 << "Hedge Group=" << hedge_grp_id << " " 
 	             << "Period=" << t << " "
 				 << "Year=" << xint(cal_yr(t)) << " "
@@ -4662,7 +4664,6 @@ if (hedge_strat_detail_flag)
 return inv_amt;
 
 }
-
 
 //@@ END
 
@@ -4688,7 +4689,6 @@ return sum_over_assets("mkt_val", t, RHO, END_OF_PERIOD);
 
 }
 
-
 //@@ END
 
 //@@ START - rho_hedge_mkt_val_incr
@@ -4709,7 +4709,6 @@ if (t <= start_period || t > final_period)
 return rho_hedge_mkt_val(t) - rho_hedge_mkt_val(t - 1);
 
 }
-
 
 //@@ END
 
@@ -4732,7 +4731,6 @@ return sum_over_assets("int_pmt", t, RHO, BEFORE_SALE);
 
 }
 
-
 //@@ END
 
 //@@ START - rho_hedge_prof
@@ -4747,10 +4745,13 @@ double HDG_GRP_COMP_UDF::hdg_grp_comp_rho_hedge_prof(int t) {
 //^^^
 
 #line 1 "rho_hedge_prof.HDG_GRP_COMP.for"
-if (!hedge_proj_stmt_flag || hedge_grp_rho_hedge_defn == NO)
+if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (t <= start_period || t > final_period)
+hedge_grp_id = hedge_grp_id;
+StrEnum::EnumValue hedge_grp_rho_hedge_defn_local = hedge_grp_rho_hedge_defn;
+
+if (!hedge_proj_stmt_flag || hedge_grp_rho_hedge_defn_local == NO)
 	return NO_AVG;
 
 return rho_hedge_pmt(t)
@@ -4760,7 +4761,6 @@ return rho_hedge_pmt(t)
 	   + rho_hedge_mkt_val_incr(t);
 
 }
-
 
 //@@ END
 
@@ -4790,16 +4790,14 @@ if (!ird_mp_map_active.size())
 // Do not process sales if there are no Rho assets in the active map
 int mp = 0;
 bool rho_hedges = false;
-mpmap::iterator mp_map_iter;
-IRD_ASSET *ird_element = NULL;
+map <int, long, less <int> >::iterator mp_map_iter;
 for (mp_map_iter = ird_mp_map_active.begin();
 	mp_map_iter != ird_mp_map_active.end();
 	mp_map_iter++)
 	{
 	mp = mp_map_iter->first;
-	ird_element = company->sm_asset->sm_ird[mp];
 
-	if (ird_element->hdg_grp_code.find("Rho|") < string::npos)
+	if (company->sm_asset->sm_ird[mp][0]->hdg_grp_code.find("Rho|") < string::npos)
 		{
 		rho_hedges = true;
 		break;
@@ -4813,8 +4811,8 @@ if (!rho_hedges)
 bool hedge_strat_detail_flag = asset->asset_detail_rpt_inv_strat_flag(t);
 if (hedge_strat_detail_flag)
 	{
-	seg->SALFile << endl;
-	seg->SALFile << "Start Rho Hedge Sales for "
+	seg_element->SALFile << endl;
+	seg_element->SALFile << "Start Rho Hedge Sales for "
 				 << "Hedge Group=" << hedge_grp_id << " " 
 	             << "Period=" << t << " "
 				 << "Year=" << xint(cal_yr(t)) << " "
@@ -4823,17 +4821,21 @@ if (hedge_strat_detail_flag)
 
 double sales_amt = 0.0;
 int new_mp_num = -1;
-int seg_num = seg->getElementNumber();
+int seg_num = seg_element->getElementNumber();
 int key_rate_loops = 1;
-if (hedge_grp_rho_hedge_liab_shock_defn == KEY_RATE_SPECIFIC) // Just one loop for parallel hedging
+
+hedge_grp_id = hedge_grp_id;
+StrEnum::EnumValue hedge_grp_rho_hedge_liab_shock_defn_local = hedge_grp_rho_hedge_liab_shock_defn;
+
+if (hedge_grp_rho_hedge_liab_shock_defn_local == KEY_RATE_SPECIFIC) // Just one loop for parallel hedging
 	key_rate_loops = company->rho_hedge_key_rate_list.size();
 
 for (int key_rate = 0; key_rate < key_rate_loops; key_rate++)
 	{
 	int mp = 0;
-	mpmap::iterator mp_map_iter;
+	map <int, long, less <int> >::iterator mp_map_iter;
 	xstring key_rate_name;
-	if (hedge_grp_rho_hedge_liab_shock_defn == PARALLEL)
+	if (hedge_grp_rho_hedge_liab_shock_defn_local == PARALLEL)
 		key_rate_name = "Parallel";
 	else
 		key_rate_name = company->rho_hedge_key_rate_list[key_rate];
@@ -4852,77 +4854,74 @@ for (int key_rate = 0; key_rate < key_rate_loops; key_rate++)
 
 	if (hedge_strat_detail_flag)
 		{
-		seg->SALFile << endl;
-		seg->SALFile << "Processing Hedge Sales for Key Rate Term " << key_rate_name << endl;
-		seg->SALFile << "RhoNeeded," << greek_needed << endl
+		seg_element->SALFile << endl;
+		seg_element->SALFile << "Processing Hedge Sales for Key Rate Term " << key_rate_name << endl;
+		seg_element->SALFile << "RhoNeeded," << greek_needed << endl
 					 << "RhoAsset," << rho_asset << endl
 					 << "RhoDiff," << rho_diff << endl;
 
-		seg->SALFile << endl;
-		seg->SALFile << "AssetID,HedgeGrpCode,RhoAsset,SoldPct,NotionalSold,MktValSold,RhoSold" << endl;
+		seg_element->SALFile << endl;
+		seg_element->SALFile << "AssetID,HedgeGrpCode,RhoAsset,SoldPct,NotionalSold,MktValSold,RhoSold" << endl;
 		}
 
 	#if defined(__IRD_ASSET_H_)
-	IRD_ASSET *ird_element = NULL;
 
 	if (ird_mp_map_active.size() > 0)
 		{
 		int col_num_sold_pct_fund_match
-		= asset->sm_ird[0]->Column("sold_pct_fund_match").Number();
+		= asset->sm_ird[0][0]->Column("sold_pct_fund_match").Number();
 
 		for (mp_map_iter = ird_mp_map_active.begin();
 			 mp_map_iter != ird_mp_map_active.end();
 			 mp_map_iter++)
 			{
 			mp = mp_map_iter->first;
-			ird_element = company->sm_asset->sm_ird[mp];
 
-			if (ird_element->hdg_grp_code.find("Rho|") == string::npos)
+			if (company->sm_asset->sm_ird[mp][0]->hdg_grp_code.find("Rho|") == string::npos)
 				continue;
 
-			if (ird_element->hdg_grp_code.find(key_rate_name) == string::npos)
+			if (company->sm_asset->sm_ird[mp][0]->hdg_grp_code.find(key_rate_name) == string::npos)
 				continue;
 
-			if (t < ird_element->commencement_period
-				|| (t > max(0, ird_element->commencement_period)
-					&& (fabs(ird_element->notional_amt_bef_sale(t)) < ASSET_ACTIVE_THRESHOLD)
-						|| ird_element->Column(col_num_sold_pct_fund_match).Exists(t)))
+			if (t < company->sm_asset->sm_ird[mp][0]->commencement_period
+				|| (t > max(0, company->sm_asset->sm_ird[mp][0]->commencement_period)
+					&& (fabs(company->sm_asset->sm_ird[mp][0]->notional_amt_bef_sale(t)) < ASSET_ACTIVE_THRESHOLD)))
 				continue;
 
 			// calculate Rho for asset. Option values have already been determined in the strategy setup
 			if (key_rate_name == "Parallel")
-				rho_indv_asset = (ird_element->opt_val_int_up_1_bef_sale(t) - ird_element->opt_val_int_down_1_bef_sale(t))
-								 * asset->sm_eio[mp]->pct_to_use;	
+				rho_indv_asset = (company->sm_asset->sm_ird[mp][0]->opt_val_int_up_1_bef_sale(t) - company->sm_asset->sm_ird[mp][0]->opt_val_int_down_1_bef_sale(t))
+								 * asset->sm_eio[mp][0]->pct_to_use;	
 			else if (key_rate == 0)
-				rho_indv_asset = (ird_element->opt_val_int_key_rate_1_up_1_bef_sale(t) - ird_element->opt_val_int_key_rate_1_down_1_bef_sale(t))
-								 * asset->sm_ird[mp]->pct_to_use;	
+				rho_indv_asset = (company->sm_asset->sm_ird[mp][0]->opt_val_int_key_rate_1_up_1_bef_sale(t) - company->sm_asset->sm_ird[mp][0]->opt_val_int_key_rate_1_down_1_bef_sale(t))
+								 * asset->sm_ird[mp][0]->pct_to_use;	
 			else if (key_rate == 1)
-				rho_indv_asset = (ird_element->opt_val_int_key_rate_2_up_1_bef_sale(t) - ird_element->opt_val_int_key_rate_2_down_1_bef_sale(t))
-								 * asset->sm_ird[mp]->pct_to_use;	
+				rho_indv_asset = (company->sm_asset->sm_ird[mp][0]->opt_val_int_key_rate_2_up_1_bef_sale(t) - company->sm_asset->sm_ird[mp][0]->opt_val_int_key_rate_2_down_1_bef_sale(t))
+								 * asset->sm_ird[mp][0]->pct_to_use;	
 			else if (key_rate == 2)
-				rho_indv_asset = (ird_element->opt_val_int_key_rate_3_up_1_bef_sale(t) - ird_element->opt_val_int_key_rate_3_down_1_bef_sale(t))
-								 * asset->sm_ird[mp]->pct_to_use;	
+				rho_indv_asset = (company->sm_asset->sm_ird[mp][0]->opt_val_int_key_rate_3_up_1_bef_sale(t) - company->sm_asset->sm_ird[mp][0]->opt_val_int_key_rate_3_down_1_bef_sale(t))
+								 * asset->sm_ird[mp][0]->pct_to_use;	
 			else if (key_rate == 3)
-				rho_indv_asset = (ird_element->opt_val_int_key_rate_4_up_1_bef_sale(t) - ird_element->opt_val_int_key_rate_4_down_1_bef_sale(t))
-								 * asset->sm_ird[mp]->pct_to_use;	
+				rho_indv_asset = (company->sm_asset->sm_ird[mp][0]->opt_val_int_key_rate_4_up_1_bef_sale(t) - company->sm_asset->sm_ird[mp][0]->opt_val_int_key_rate_4_down_1_bef_sale(t))
+								 * asset->sm_ird[mp][0]->pct_to_use;	
 			else if (key_rate == 4)
-				rho_indv_asset = (ird_element->opt_val_int_key_rate_5_up_1_bef_sale(t) - ird_element->opt_val_int_key_rate_5_down_1_bef_sale(t))
-								 * asset->sm_ird[mp]->pct_to_use;	
+				rho_indv_asset = (company->sm_asset->sm_ird[mp][0]->opt_val_int_key_rate_5_up_1_bef_sale(t) - company->sm_asset->sm_ird[mp][0]->opt_val_int_key_rate_5_down_1_bef_sale(t))
+								 * asset->sm_ird[mp][0]->pct_to_use;	
 			else if (key_rate == 5)
-				rho_indv_asset = (ird_element->opt_val_int_key_rate_6_up_1_bef_sale(t) - ird_element->opt_val_int_key_rate_6_down_1_bef_sale(t))
-								 * asset->sm_ird[mp]->pct_to_use;	
+				rho_indv_asset = (company->sm_asset->sm_ird[mp][0]->opt_val_int_key_rate_6_up_1_bef_sale(t) - company->sm_asset->sm_ird[mp][0]->opt_val_int_key_rate_6_down_1_bef_sale(t))
+								 * asset->sm_ird[mp][0]->pct_to_use;	
 			else if (key_rate == 6)
-				rho_indv_asset = (ird_element->opt_val_int_key_rate_7_up_1_bef_sale(t) - ird_element->opt_val_int_key_rate_7_down_1_bef_sale(t))
-								 * asset->sm_ird[mp]->pct_to_use;	
+				rho_indv_asset = (company->sm_asset->sm_ird[mp][0]->opt_val_int_key_rate_7_up_1_bef_sale(t) - company->sm_asset->sm_ird[mp][0]->opt_val_int_key_rate_7_down_1_bef_sale(t))
+								 * asset->sm_ird[mp][0]->pct_to_use;	
 			else if (key_rate == 7)
-				rho_indv_asset = (ird_element->opt_val_int_key_rate_8_up_1_bef_sale(t) - ird_element->opt_val_int_key_rate_8_down_1_bef_sale(t))
-								 * asset->sm_ird[mp]->pct_to_use;	
+				rho_indv_asset = (company->sm_asset->sm_ird[mp][0]->opt_val_int_key_rate_8_up_1_bef_sale(t) - company->sm_asset->sm_ird[mp][0]->opt_val_int_key_rate_8_down_1_bef_sale(t))
+								 * asset->sm_ird[mp][0]->pct_to_use;	
 			else if (key_rate == 8)
-				rho_indv_asset = (ird_element->opt_val_int_key_rate_9_up_1_bef_sale(t) - ird_element->opt_val_int_key_rate_9_down_1_bef_sale(t))
-								 * asset->sm_ird[mp]->pct_to_use;	
+				rho_indv_asset = (company->sm_asset->sm_ird[mp][0]->opt_val_int_key_rate_9_up_1_bef_sale(t) - company->sm_asset->sm_ird[mp][0]->opt_val_int_key_rate_9_down_1_bef_sale(t))
+								 * asset->sm_ird[mp][0]->pct_to_use;	
 			else if (key_rate == 9)
-				rho_indv_asset = (ird_element->opt_val_int_key_rate_10_up_1_bef_sale(t) - ird_element->opt_val_int_key_rate_10_down_1_bef_sale(t))
-								 * asset->sm_ird[mp]->pct_to_use;	
+				rho_indv_asset = (company->sm_asset->sm_ird[mp][0]->opt_val_int_key_rate_10_up_1_bef_sale(t) - company->sm_asset->sm_ird[mp][0]->opt_val_int_key_rate_10_down_1_bef_sale(t))
+								 * asset->sm_ird[mp][0]->pct_to_use;	
 
 			double sold_pct = 0.0;
 
@@ -4960,22 +4959,24 @@ for (int key_rate = 0; key_rate < key_rate_loops; key_rate++)
 				}
 
 			rho_sold = rho_indv_asset * sold_pct;
-			ird_element->Column(col_num_sold_pct_fund_match).SetValue(t, sold_pct); 
-
+			company->sm_asset->sm_ird[mp][0]->sold_pct_fund_match_value = sold_pct;
+			company->sm_asset->sm_ird[mp][0]->Column(col_num_sold_pct_fund_match).Value(t);
+			company->sm_asset->sm_ird[mp][0]->sold_pct_fund_match_value = 0.0;
+			
 			rho_sold_total += rho_sold;
 			rho_asset_remaining -= rho_sold;
 
-			sales_amt += ird_element->mkt_val_sold(t)
-						 * ird_element->pct_to_use;
+			sales_amt += company->sm_asset->sm_ird[mp][0]->mkt_val_sold(t)
+						 * company->sm_asset->sm_ird[mp][0]->pct_to_use;
 
 			if (hedge_strat_detail_flag)
 				{
-				seg->SALFile << ird_element->asset_id << ","
-				             << ird_element->hdg_grp_code << ","
+				seg_element->SALFile << company->sm_asset->sm_ird[mp][0]->asset_id << ","
+				             << company->sm_asset->sm_ird[mp][0]->hdg_grp_code << ","
 							 << rho_indv_asset << ","
 							 << sold_pct << ","
-							 << ird_element->notional_amt_sold(t) * ird_element->pct_to_use << ","
-							 << ird_element->mkt_val_sold(t) * ird_element->pct_to_use << ","
+							 << company->sm_asset->sm_ird[mp][0]->notional_amt_sold(t) * company->sm_asset->sm_ird[mp][0]->pct_to_use << ","
+							 << company->sm_asset->sm_ird[mp][0]->mkt_val_sold(t) * company->sm_asset->sm_ird[mp][0]->pct_to_use << ","
 							 << rho_sold << endl;
 				}
 			}			         
@@ -4989,8 +4990,8 @@ for (int key_rate = 0; key_rate < key_rate_loops; key_rate++)
 
 	if (hedge_strat_detail_flag)
 		{
-		seg->SALFile << "Sales Summary" << endl;
-		seg->SALFile << "RhoNeeded," << greek_needed << endl
+		seg_element->SALFile << "Sales Summary" << endl;
+		seg_element->SALFile << "RhoNeeded," << greek_needed << endl
 					 << "RhoAsset," << rho_asset << endl
 		             << "RhoSold," << rho_sold_total << endl
 					 << "RhoRemaining," << rho_diff << endl;
@@ -4999,8 +5000,8 @@ for (int key_rate = 0; key_rate < key_rate_loops; key_rate++)
 
 if (hedge_strat_detail_flag)
 	{
-	seg->SALFile << endl;
-	seg->SALFile << "End Rho Hedge Sales for "
+	seg_element->SALFile << endl;
+	seg_element->SALFile << "End Rho Hedge Sales for "
 				 << "Hedge Group=" << hedge_grp_id << " " 
 	             << "Period=" << t << " "
 				 << "Year=" << xint(cal_yr(t)) << " "
@@ -5011,7 +5012,6 @@ return sales_amt;
 
 
 }
-
 
 //@@ END
 
@@ -5037,10 +5037,9 @@ double transaction_cost = 0.0;
 double notional_amt_purch = 0.0;
 double notional_amt_sold = 0.0;
 int mp = 0;
-mpmap::iterator mp_map_iter;
+map <int, long, less <int> >::iterator mp_map_iter;
 
 #if defined(__IRD_ASSET_H_)
-IRD_ASSET *ird_element = NULL;
 
 if (ird_mp_map_active.size() > 0)
 	{
@@ -5049,19 +5048,21 @@ if (ird_mp_map_active.size() > 0)
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		ird_element = company->sm_asset->sm_ird[mp];
 
-		if (t < ird_element->commencement_period
-			|| (t > max(0, ird_element->commencement_period)
-				&& fabs(ird_element->notional_amt(t - 1)) < ASSET_ACTIVE_THRESHOLD)
-			|| ird_element->hdg_grp_code.find("Rho|") == string::npos)
+		if (t < company->sm_asset->sm_ird[mp][0]->commencement_period
+			|| (t > max(0, company->sm_asset->sm_ird[mp][0]->commencement_period)
+				&& fabs(company->sm_asset->sm_ird[mp][0]->notional_amt(t - 1)) < ASSET_ACTIVE_THRESHOLD)
+			|| company->sm_asset->sm_ird[mp][0]->hdg_grp_code.find("Rho|") == string::npos)
 			continue;
 
-		notional_amt_sold = ird_element->notional_amt_sold(t) * ird_element->pct_to_use;
-		notional_amt_purch = ird_element->notional_amt_purch(t) * ird_element->pct_to_use;		
+		notional_amt_sold = company->sm_asset->sm_ird[mp][0]->notional_amt_sold(t) * company->sm_asset->sm_ird[mp][0]->pct_to_use;
+		notional_amt_purch = company->sm_asset->sm_ird[mp][0]->notional_amt_purch(t) * company->sm_asset->sm_ird[mp][0]->pct_to_use;		
+
+		hedge_grp_id = hedge_grp_id;
+		double hedge_grp_rho_hedge_transaction_costs_bps_local = hedge_grp_rho_hedge_transaction_costs_bps;
 
 		transaction_cost += (fabs(notional_amt_sold) + fabs(notional_amt_purch)) 
-		                   * hedge_grp_rho_hedge_transaction_costs_bps / 10000.0;
+		                   * hedge_grp_rho_hedge_transaction_costs_bps_local / 10000.0;
 		}			         
 	}
 #endif
@@ -5069,7 +5070,6 @@ if (ird_mp_map_active.size() > 0)
 return transaction_cost;
 
 }
-
 
 //@@ END
 
@@ -5100,7 +5100,6 @@ return liab_greeks[greek_index];
 
 }
 
-
 //@@ END
 
 //@@ START - rho_key_rate_10
@@ -5129,7 +5128,6 @@ return liab_greeks[greek_index];
 
 
 }
-
 
 //@@ END
 
@@ -5160,7 +5158,6 @@ return liab_greeks[greek_index];
 
 }
 
-
 //@@ END
 
 //@@ START - rho_key_rate_3
@@ -5189,7 +5186,6 @@ return liab_greeks[greek_index];
 
 
 }
-
 
 //@@ END
 
@@ -5220,7 +5216,6 @@ return liab_greeks[greek_index];
 
 }
 
-
 //@@ END
 
 //@@ START - rho_key_rate_5
@@ -5249,7 +5244,6 @@ return liab_greeks[greek_index];
 
 
 }
-
 
 //@@ END
 
@@ -5280,7 +5274,6 @@ return liab_greeks[greek_index];
 
 }
 
-
 //@@ END
 
 //@@ START - rho_key_rate_7
@@ -5309,7 +5302,6 @@ return liab_greeks[greek_index];
 
 
 }
-
 
 //@@ END
 
@@ -5340,7 +5332,6 @@ return liab_greeks[greek_index];
 
 }
 
-
 //@@ END
 
 //@@ START - rho_key_rate_9
@@ -5370,7 +5361,6 @@ return liab_greeks[greek_index];
 
 }
 
-
 //@@ END
 
 //@@ START - rho_parallel
@@ -5397,7 +5387,6 @@ return liab_greeks[greek_index];
 
 }
 
-
 //@@ END
 
 //@@ START - short_strike
@@ -5419,7 +5408,6 @@ return index_val(t) * (1.0 + cap_rate(t));
 
 }
 
-
 //@@ END
 
 //@@ START - startup
@@ -5434,16 +5422,13 @@ double HDG_GRP_COMP_UDF::virtual_startup(int t) {
 //^^^
 
 #line 1 "startup.HDG_GRP_COMP.for"
+#if 0 // START_HEADER
+#define __HDG_GRP_COMP_H_
+#endif // END_HEADER
+
 #if 0 // START_EXTERNS
 deptaskinput valn_hedge_input;
-deptaskcols valn_hedge_input_cols;
-deptaskmap valn_hedge_input_pos;
-deptaskmapiter valn_hedge_input_pos_iter;
-
 deptaskinput valn_hedge_final_input;
-deptaskcols valn_hedge_final_input_cols;
-deptaskmap valn_hedge_final_input_pos;
-deptaskmapiter valn_hedge_final_input_pos_iter;
 
 // define sum over command, END_OF_PERIOD is defined globally
 const int BEG_OF_PERIOD = 0;
@@ -5453,18 +5438,20 @@ int VALN_RESULTS_SIZE = 3;
 #endif // END_EXTERNS
 
 #if 0 // START_CLASS
-typedef map <int, long, less <int> > mpmap;
-mpmap fia_mp_map;
-mpmap iul_mp_map;
-mpmap va_mp_map;
-mpmap eio_mp_map_active;
-mpmap ird_mp_map_active;
+map <int, long, less <int> > fia_mp_map;
+map <int, long, less <int> > iul_mp_map;
+map <int, long, less <int> > va_mp_map;
+map <int, long, less <int> > eio_mp_map_active;
+map <int, long, less <int> > ird_mp_map_active;
 map <xstring, double> liab_greeks;
 map <xstring, double> asset_greeks;
 map <xstring, double> asset_greeks_needed;
 
 int hedge_group_count;
 SmartArray < SmartArray <double> >  hedge_valn_array;
+
+SEG_COMP * seg_element;
+vector <string> eqt_price_shock_tbl;
 #endif // END_CLASS
 
 #if 0 // START_CONSTRUCTOR
@@ -5476,10 +5463,11 @@ liab_greeks.clear();
 asset_greeks.clear();
 asset_greeks_needed.clear();
 
+gen2_declarations;
+
 return 1.0;
 
 }
-
 
 //@@ END
 
@@ -5507,7 +5495,6 @@ return 1.0;
 
 }
 
-
 //@@ END
 
 //@@ START - valn_tgt_hedge_shock
@@ -5527,20 +5514,21 @@ if (!hedge_valn_flag)
 
 #if defined(__VA_LIAB_H_)
 int mp = 0;
-mpmap::iterator mp_map_iter;
-VA_LIAB *current_va_element;
-VA_AFUND_LIAB * current_va_account;
+map <int, long, less <int> >::iterator mp_map_iter;
 
 // Determine the Shock ID
 vector<string> shock_string_parts;
 xstring shock_string = company->hedge_valn_shock_list[proj_task_loop_num - 1];
-split_string_usl(shock_string.c_str(), shock_string_parts, "|");//WTW - Gen2 - split_tring internal RAFM function
+split_string_usl(shock_string.c_str(), shock_string_parts, "|");
 shock_id = shock_string_parts[0];
 int current_plan_code_integer = 0;
 
-if (hedge_grp_count_id == 0 && independent_mp_defn == NO)
+if (hedge_grp_count_id == 0)
 	{
-	if (time_step_flag && valn_period != 0 && (valn_period % shock_freq != 0))//Shock is not required in this valuation period
+	shock_id = shock_id;
+	int shock_freq_local = shock_freq;
+
+	if (time_step_flag && valn_period != 0 && (valn_period % shock_freq_local != 0))//Shock is not required in this valuation period
 		{
 		this->pv_charges(0);
 		this->pv_claims(0);
@@ -5548,18 +5536,17 @@ if (hedge_grp_count_id == 0 && independent_mp_defn == NO)
 		}
 	
 	// Clear va_hedge_vals for each Hedge Grp
-	seg->va_hedge_vals.clear();	
+	seg_element->va_hedge_vals.clear();	
 	
 	//perform PV calculations for all model points in first hedge group. Store hedge values by product code and rider type
 	//to allow for hedge group summation based on hedge workbook settings
 
 	// Loops over each MP within a given Segment & Hedge
-	for (mp_map_iter = seg->va_mp_map.begin();
-		 mp_map_iter != seg->va_mp_map.end();
+	for (mp_map_iter = seg_element->va_mp_map.begin();
+		 mp_map_iter != seg_element->va_mp_map.end();
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		current_va_element = liab->sm_va[mp];	
 		
 		if (valn_scens_defn == MODEL_POINT_SPECIFIC)
 			{
@@ -5570,7 +5557,7 @@ if (hedge_grp_count_id == 0 && independent_mp_defn == NO)
 			int hedge_task_loop_num = atoi(hedge_valn_shock_full_id(task_loop_start_pos + 1));
 	
 			// Adjusted by the starting point for each MP
-			double scen_mod_1 = mod(current_va_element->hedge_valn_scen_start_num, rates->gen_scenarios);
+			double scen_mod_1 = mod(liab->sm_va[mp]->hedge_valn_scen_start_num, rates->gen_scenarios);
 			double scen_mod_2 = 0.0;
 			if (mod(scen_mod_1 + hedge_task_loop_num - 1, rates->gen_scenarios) == 0)
 				scen_mod_2 = rates->gen_scenarios;
@@ -5591,28 +5578,36 @@ if (hedge_grp_count_id == 0 && independent_mp_defn == NO)
 		double disc_claim_fee_wb_mp = 0.0;
 	
 		// Set up Equity Price Shock for each MP
-		int num_of_funds = current_va_element->sm_va_account.size();
+		int num_of_funds = liab->sm_va[mp]->sm_va_account.size();
 		for (int fund = 0; fund < num_of_funds; fund++)
 			{
-			if (current_va_element->sm_va_account[fund]->fund_type != SEPARATE || eqt_price_shock_defn == NO)
-				current_va_element->sm_va_account[fund]->shock_size = 0.0;
+			shock_id = shock_id;
+			StrEnum::EnumValue eqt_price_shock_defn_local = eqt_price_shock_defn;
+
+			if (liab->sm_va[mp]->sm_va_account[fund]->fund_type != SEPARATE || eqt_price_shock_defn_local == NO)
+				liab->sm_va[mp]->sm_va_account[fund]->shock_size = 0.0;
 			else
 				{
-				hedge_grp_index_name = current_va_element->sm_va_account[fund]->index_name;
+				hedge_grp_index_name = liab->sm_va[mp]->sm_va_account[fund]->index_name;
 		
+				shock_id = shock_id;
 				double asset_shock = eqt_price_shock;
-				current_va_element->sm_va_account[fund]->shock_size = asset_shock;
+				liab->sm_va[mp]->sm_va_account[fund]->shock_size = asset_shock;
 				}
 			}	
 
 		// Set up Policyholder Shock for each MP - Lapse
-		if (phldr_shock_defn == NO)
-			current_va_element->lapse_shock_size = 0.0;	
+		shock_id = shock_id;
+		StrEnum::EnumValue phldr_shock_defn_local = phldr_shock_defn;
+
+		if (phldr_shock_defn_local == NO)
+			liab->sm_va[mp]->lapse_shock_size = 0.0;	
 		else
 			{
 			decrem_id = "Lapse";
+			shock_id = shock_id;
 			double lapse_shock = phldr_shock;
-			current_va_element->lapse_shock_size = lapse_shock;
+			liab->sm_va[mp]->lapse_shock_size = lapse_shock;
 			}
 			
 		calc_pv_claims_charges(mp, disc_claim_amt_ab_mp, disc_claim_amt_db_mp, 
@@ -5623,60 +5618,60 @@ if (hedge_grp_count_id == 0 && independent_mp_defn == NO)
 		xstring index;
 		
 		//Store GMAB Claims and Charges by Product
-		index = current_va_element->plan_code + "_" + "GMAB" + "_" + "Claims";
-		seg->va_hedge_vals[index] += disc_claim_amt_ab_mp;
+		index = liab->sm_va[mp]->plan_code + "_" + "GMAB" + "_" + "Claims";
+		seg_element->va_hedge_vals[index] += disc_claim_amt_ab_mp;
 
-		index = current_va_element->plan_code + "_" + "GMAB" + "_" + "Fees";
-		seg->va_hedge_vals[index] += disc_claim_fee_ab_mp;
+		index = liab->sm_va[mp]->plan_code + "_" + "GMAB" + "_" + "Fees";
+		seg_element->va_hedge_vals[index] += disc_claim_fee_ab_mp;
 
 		//Store GMAB Claims and Charges in Aggregate
 		index = "ALL_GMAB_Claims";
-		seg->va_hedge_vals[index] += disc_claim_amt_ab_mp;
+		seg_element->va_hedge_vals[index] += disc_claim_amt_ab_mp;
 
 		index = "ALL_GMAB_Fees";
-		seg->va_hedge_vals[index] += disc_claim_fee_ab_mp;
+		seg_element->va_hedge_vals[index] += disc_claim_fee_ab_mp;
 
 		//Store GMDB Claims and Charges by Product
-		index = current_va_element->plan_code + "_" + "GMDB" + "_" + "Claims";
-		seg->va_hedge_vals[index] += disc_claim_amt_db_mp;
+		index = liab->sm_va[mp]->plan_code + "_" + "GMDB" + "_" + "Claims";
+		seg_element->va_hedge_vals[index] += disc_claim_amt_db_mp;
 
-		index = current_va_element->plan_code + "_" + "GMDB" + "_" + "Fees";
-		seg->va_hedge_vals[index] += disc_claim_fee_db_mp;
+		index = liab->sm_va[mp]->plan_code + "_" + "GMDB" + "_" + "Fees";
+		seg_element->va_hedge_vals[index] += disc_claim_fee_db_mp;
 
 		//Store GMDB Claims and Charges in Aggregate
 		index = "ALL_GMDB_Claims";
-		seg->va_hedge_vals[index] += disc_claim_amt_db_mp;
+		seg_element->va_hedge_vals[index] += disc_claim_amt_db_mp;
 
 		index = "ALL_GMDB_Fees";
-		seg->va_hedge_vals[index] += disc_claim_fee_db_mp;
+		seg_element->va_hedge_vals[index] += disc_claim_fee_db_mp;
 
 		//Store GMIB Claims and Charges by Product
-		index = current_va_element->plan_code + "_" + "GMIB" + "_" + "Claims";
-		seg->va_hedge_vals[index] += disc_claim_amt_ib_mp;
+		index = liab->sm_va[mp]->plan_code + "_" + "GMIB" + "_" + "Claims";
+		seg_element->va_hedge_vals[index] += disc_claim_amt_ib_mp;
 
-		index = current_va_element->plan_code + "_" + "GMIB" + "_" + "Fees";
-		seg->va_hedge_vals[index] += disc_claim_fee_ib_mp;
+		index = liab->sm_va[mp]->plan_code + "_" + "GMIB" + "_" + "Fees";
+		seg_element->va_hedge_vals[index] += disc_claim_fee_ib_mp;
 
 		//Store GMIB Claims and Charges in Aggregate
 		index = "ALL_GMIB_Claims";
-		seg->va_hedge_vals[index] += disc_claim_amt_ib_mp;
+		seg_element->va_hedge_vals[index] += disc_claim_amt_ib_mp;
 
 		index = "ALL_GMIB_Fees";
-		seg->va_hedge_vals[index] += disc_claim_fee_ib_mp;
+		seg_element->va_hedge_vals[index] += disc_claim_fee_ib_mp;
 
 		//Store GMWB Claims and Charges by Product
-		index = current_va_element->plan_code + "_" + "GMWB" + "_" + "Claims";
-		seg->va_hedge_vals[index] += disc_claim_amt_wb_mp;
+		index = liab->sm_va[mp]->plan_code + "_" + "GMWB" + "_" + "Claims";
+		seg_element->va_hedge_vals[index] += disc_claim_amt_wb_mp;
 
-		index = current_va_element->plan_code + "_" + "GMWB" + "_" + "Fees";
-		seg->va_hedge_vals[index] += disc_claim_fee_wb_mp;
+		index = liab->sm_va[mp]->plan_code + "_" + "GMWB" + "_" + "Fees";
+		seg_element->va_hedge_vals[index] += disc_claim_fee_wb_mp;
 
 		//Store GMWB Claims and Charges in Aggregate
 		index = "ALL_GMWB_Claims";
-		seg->va_hedge_vals[index] += disc_claim_amt_wb_mp;
+		seg_element->va_hedge_vals[index] += disc_claim_amt_wb_mp;
 
 		index = "ALL_GMWB_Fees";
-		seg->va_hedge_vals[index] += disc_claim_fee_wb_mp;
+		seg_element->va_hedge_vals[index] += disc_claim_fee_wb_mp;
 		}
 	}
 
@@ -5688,7 +5683,6 @@ this->pv_claims(0);
 return 1.0;
 
 }
-
 
 //@@ END
 
@@ -5707,7 +5701,10 @@ double HDG_GRP_COMP_UDF::hdg_grp_comp_vega_hedge_flag(int t) {
 if (!hedge_proj_stmt_flag || !gamma_vega_hedge_flag(t))
 	return 0;
 
-if (hedge_grp_gamma_vega_hedge_type_defn == GAMMA)
+hedge_grp_id = hedge_grp_id;
+StrEnum::EnumValue hedge_grp_gamma_vega_hedge_type_defn_local = hedge_grp_gamma_vega_hedge_type_defn;
+
+if (hedge_grp_gamma_vega_hedge_type_defn_local == GAMMA)
 	return 0;
 
 // Check for existing vega hedge assets. If they exist, vega hedge strategy is not executed at t == 0
@@ -5715,8 +5712,7 @@ if (t == 0)
 	{
 	#if defined(__EIO_ASSET_H_)
 	int mp = 0;
-	mpmap::iterator mp_map_iter;
-	EIO_ASSET *eio_element = NULL;
+	map <int, long, less <int> >::iterator mp_map_iter;
 
 	if (eio_mp_map_active.size() > 0)
 		{
@@ -5725,9 +5721,8 @@ if (t == 0)
 			 mp_map_iter++)
 			{
 			mp = mp_map_iter->first;
-			eio_element = company->sm_asset->sm_eio[mp];
 
-			if (eio_element->hdg_grp_code.find("Vega") < string::npos)
+			if (company->sm_asset->sm_eio[mp][0]->hdg_grp_code.find("Vega") < string::npos)
 				return 0;
 			}			         
 		}
@@ -5737,7 +5732,6 @@ if (t == 0)
 return 1.0;
 
 }
-
 
 //@@ END
 
@@ -5762,8 +5756,8 @@ vega_hedge_sale_amt(t);
 bool hedge_strat_detail_flag = asset->asset_detail_rpt_inv_strat_flag(t);
 if (hedge_strat_detail_flag)
 	{
-	seg->SALFile << endl;
-	seg->SALFile << "Start Vega Hedge Investments for "
+	seg_element->SALFile << endl;
+	seg_element->SALFile << "Start Vega Hedge Investments for "
 				 << "Hedge Group=" << hedge_grp_id << " " 
 	             << "Period=" << t << " "
 				 << "Year=" << xint(cal_yr(t)) << " "
@@ -5777,21 +5771,24 @@ double inv_amt = 0.0;
 map <xstring, double> vega_hedge_coeff;
 map <xstring, double> notional_to_purch;
 int new_mp_num = -1;
-int seg_num = seg->getElementNumber();
+int seg_num = seg_element->getElementNumber();
 int index_loops = 1;
 int index_term_loops = 1;
 
-if (hedge_grp_gamma_vega_hedge_liab_shock_defn == INDEX_SPECIFIC
-	|| hedge_grp_gamma_vega_hedge_liab_shock_defn == INDEX_TERM_SPECIFIC)
+hedge_grp_id = hedge_grp_id;
+StrEnum::EnumValue hedge_grp_gamma_vega_hedge_liab_shock_defn_local = hedge_grp_gamma_vega_hedge_liab_shock_defn;
+
+if (hedge_grp_gamma_vega_hedge_liab_shock_defn_local == INDEX_SPECIFIC
+	|| hedge_grp_gamma_vega_hedge_liab_shock_defn_local == INDEX_TERM_SPECIFIC)
 	index_loops = company->vega_hedge_index_list.size();
 
-if (hedge_grp_gamma_vega_hedge_liab_shock_defn == INDEX_TERM_SPECIFIC)
+if (hedge_grp_gamma_vega_hedge_liab_shock_defn_local == INDEX_TERM_SPECIFIC)
 	index_term_loops = company->vega_hedge_term_list.size();	
 
 for (int index = 0; index < index_loops; index++)
 	{
 	// set lookup key
-	if (hedge_grp_gamma_vega_hedge_liab_shock_defn == PARALLEL)
+	if (hedge_grp_gamma_vega_hedge_liab_shock_defn_local == PARALLEL)
 		hedge_grp_index_name = "Parallel";
 	else
 		hedge_grp_index_name = company->vega_hedge_index_list[index];
@@ -5799,8 +5796,8 @@ for (int index = 0; index < index_loops; index++)
 	for (int index_term = 0; index_term < index_term_loops; index_term++)
 		{
 		// set lookup key
-		if (hedge_grp_gamma_vega_hedge_liab_shock_defn == PARALLEL
-			|| hedge_grp_gamma_vega_hedge_liab_shock_defn == INDEX_SPECIFIC)
+		if (hedge_grp_gamma_vega_hedge_liab_shock_defn_local == PARALLEL
+			|| hedge_grp_gamma_vega_hedge_liab_shock_defn_local == INDEX_SPECIFIC)
 			hedge_grp_index_term = "AllTerms";
 		else
 			hedge_grp_index_term = company->vega_hedge_term_list[index_term];
@@ -5820,6 +5817,11 @@ for (int index = 0; index < index_loops; index++)
 		notional_to_purch[greek_needed_map_index] = ONE_MILLION * vega_hedge_coeff[greek_needed_map_index];
 		double notional_inv = notional_to_purch[greek_needed_map_index]; 
 
+		hedge_grp_id = hedge_grp_id;
+		hedge_grp_index_name = hedge_grp_index_name;
+		hedge_grp_index_term = hedge_grp_index_term;
+		xstring hedge_grp_gamma_vega_hedge_asset_id_local = hedge_grp_gamma_vega_hedge_asset_id;
+
 		if (fabs(notional_inv) > model_point_amount_threshold)
 			{
 			inv_amt += company->sm_inv_strategy[seg_num]->buy_assets_hedging(t, 
@@ -5827,7 +5829,7 @@ for (int index = 0; index < index_loops; index++)
 																			HEDGING,
 																			new_mp_num,
 																			hedge_grp_code,
-																			hedge_grp_gamma_vega_hedge_asset_id,
+																			hedge_grp_gamma_vega_hedge_asset_id_local,
 																			notional_inv,
 																			-1.0,
 																			-1.0);
@@ -5844,13 +5846,13 @@ for (int index = 0; index < index_loops; index++)
 
 if (hedge_strat_detail_flag)
 	{
-	seg->SALFile << endl;
-	seg->SALFile << "Vega Hedge Investments Summary" << endl;
-	seg->SALFile << "IndexName,IndexTermName,VegaNeeded,AssetVega,HedgeCoeff,NotionalPurch" << endl;
+	seg_element->SALFile << endl;
+	seg_element->SALFile << "Vega Hedge Investments Summary" << endl;
+	seg_element->SALFile << "IndexName,IndexTermName,VegaNeeded,AssetVega,HedgeCoeff,NotionalPurch" << endl;
 
 	for (int index = 0; index < index_loops; index++)
 		{
-		if (hedge_grp_gamma_vega_hedge_liab_shock_defn == PARALLEL)
+		if (hedge_grp_gamma_vega_hedge_liab_shock_defn_local == PARALLEL)
 			hedge_grp_index_name = "Parallel";
 		else
 			hedge_grp_index_name = company->delta_gamma_hedge_index_list[index];
@@ -5858,8 +5860,8 @@ if (hedge_strat_detail_flag)
 		for (int index_term = 0; index_term < index_term_loops; index_term++)
 			{
 			// set lookup key
-			if (hedge_grp_gamma_vega_hedge_liab_shock_defn == PARALLEL
-				|| hedge_grp_gamma_vega_hedge_liab_shock_defn == INDEX_SPECIFIC)
+			if (hedge_grp_gamma_vega_hedge_liab_shock_defn_local == PARALLEL
+				|| hedge_grp_gamma_vega_hedge_liab_shock_defn_local == INDEX_SPECIFIC)
 				hedge_grp_index_term = "AllTerms";
 			else
 				hedge_grp_index_term = company->vega_hedge_term_list[index_term];
@@ -5867,7 +5869,7 @@ if (hedge_strat_detail_flag)
 			// Asset greek needed has been updates for sales
 			xstring greek_needed_map_index = "Vega_" + hedge_grp_index_name + "_" + hedge_grp_index_term + "_" + xstring(t);
 			xstring greek_map_index = "Vega_Purchase_" + hedge_grp_index_name + "_" + hedge_grp_index_term + "_" + xstring(t);
-			seg->SALFile << hedge_grp_index_name << ","
+			seg_element->SALFile << hedge_grp_index_name << ","
 						 << hedge_grp_index_term << ","
 						 << asset_greeks_needed[greek_needed_map_index] << ","
 						 << asset_greeks[greek_map_index] << ","
@@ -5882,8 +5884,8 @@ notional_to_purch.clear();
 
 if (hedge_strat_detail_flag)
 	{
-	seg->SALFile << endl;
-	seg->SALFile << "End Vega Hedge Investments for "
+	seg_element->SALFile << endl;
+	seg_element->SALFile << "End Vega Hedge Investments for "
 				 << "Hedge Group=" << hedge_grp_id << " " 
 	             << "Period=" << t << " "
 				 << "Year=" << xint(cal_yr(t)) << " "
@@ -5894,7 +5896,6 @@ if (hedge_strat_detail_flag)
 return inv_amt;
 
 }
-
 
 //@@ END
 
@@ -5920,7 +5921,6 @@ return sum_over_assets("mkt_val", t, VEGA, END_OF_PERIOD);
 
 }
 
-
 //@@ END
 
 //@@ START - vega_hedge_mkt_val_incr
@@ -5941,7 +5941,6 @@ if (t <= start_period || t > final_period)
 return vega_hedge_mkt_val(t) - vega_hedge_mkt_val(t - 1);
 
 }
-
 
 //@@ END
 
@@ -5964,7 +5963,6 @@ return sum_over_assets("opt_pmt", t, VEGA, BEFORE_SALE);
 
 }
 
-
 //@@ END
 
 //@@ START - vega_hedge_prof
@@ -5979,10 +5977,15 @@ double HDG_GRP_COMP_UDF::hdg_grp_comp_vega_hedge_prof(int t) {
 //^^^
 
 #line 1 "vega_hedge_prof.HDG_GRP_COMP.for"
-if (!hedge_proj_stmt_flag || hedge_grp_gamma_vega_hedge_defn == NO || hedge_grp_gamma_vega_hedge_type_defn == GAMMA)
+if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (t <= start_period || t > final_period)
+hedge_grp_id = hedge_grp_id;
+StrEnum::EnumValue hedge_grp_gamma_vega_hedge_defn_local = hedge_grp_gamma_vega_hedge_defn;
+hedge_grp_id = hedge_grp_id;
+StrEnum::EnumValue hedge_grp_gamma_vega_hedge_type_defn_local = hedge_grp_gamma_vega_hedge_type_defn;
+
+if (!hedge_proj_stmt_flag || hedge_grp_gamma_vega_hedge_defn_local == NO || hedge_grp_gamma_vega_hedge_type_defn_local == GAMMA)
 	return NO_AVG;
 
 return vega_hedge_pmt(t)
@@ -5992,7 +5995,6 @@ return vega_hedge_pmt(t)
 	   + vega_hedge_mkt_val_incr(t);
 
 }
-
 
 //@@ END
 
@@ -6022,16 +6024,14 @@ if (!eio_mp_map_active.size())
 // Do not process sales if there are no Vega assets in the active map
 int mp = 0;
 bool vega_hedges = false;
-mpmap::iterator mp_map_iter;
-EIO_ASSET *eio_element = NULL;
+map <int, long, less <int> >::iterator mp_map_iter;
 for (mp_map_iter = eio_mp_map_active.begin();
 	mp_map_iter != eio_mp_map_active.end();
 	mp_map_iter++)
 	{
 	mp = mp_map_iter->first;
-	eio_element = company->sm_asset->sm_eio[mp];
 
-	if (eio_element->hdg_grp_code.find("Vega") < string::npos)
+	if (company->sm_asset->sm_eio[mp][0]->hdg_grp_code.find("Vega") < string::npos)
 		{
 		vega_hedges = true;
 		break;
@@ -6045,8 +6045,8 @@ if (!vega_hedges)
 bool hedge_strat_detail_flag = asset->asset_detail_rpt_inv_strat_flag(t);
 if (hedge_strat_detail_flag)
 	{
-	seg->SALFile << endl;
-	seg->SALFile << "Start Vega Hedge Sales for "
+	seg_element->SALFile << endl;
+	seg_element->SALFile << "Start Vega Hedge Sales for "
 				 << "Hedge Group=" << hedge_grp_id << " " 
 	             << "Period=" << t << " "
 				 << "Year=" << xint(cal_yr(t)) << " "
@@ -6055,22 +6055,26 @@ if (hedge_strat_detail_flag)
 
 double sales_amt = 0.0;
 int new_mp_num = -1;
-int seg_num = seg->getElementNumber();
+int seg_num = seg_element->getElementNumber();
 int index_loops = 1;
 int index_term_loops = 1;
-if (hedge_grp_gamma_vega_hedge_liab_shock_defn == INDEX_SPECIFIC
-	|| hedge_grp_gamma_vega_hedge_liab_shock_defn == INDEX_TERM_SPECIFIC) // Just one loop for parallel hedging
+
+hedge_grp_id = hedge_grp_id;
+StrEnum::EnumValue hedge_grp_gamma_vega_hedge_liab_shock_defn_local = hedge_grp_gamma_vega_hedge_liab_shock_defn;
+
+if (hedge_grp_gamma_vega_hedge_liab_shock_defn_local == INDEX_SPECIFIC
+	|| hedge_grp_gamma_vega_hedge_liab_shock_defn_local == INDEX_TERM_SPECIFIC) // Just one loop for parallel hedging
 	index_loops = company->vega_hedge_index_list.size();
 
-if (hedge_grp_gamma_vega_hedge_liab_shock_defn == INDEX_TERM_SPECIFIC)
+if (hedge_grp_gamma_vega_hedge_liab_shock_defn_local == INDEX_TERM_SPECIFIC)
 	index_term_loops = company->vega_hedge_term_list.size();
 
 for (int index = 0; index < index_loops; index++)
 	{
 	int mp = 0;
-	mpmap::iterator mp_map_iter;
+	map <int, long, less <int> >::iterator mp_map_iter;
 	xstring index_name;
-	if (hedge_grp_gamma_vega_hedge_liab_shock_defn == PARALLEL)
+	if (hedge_grp_gamma_vega_hedge_liab_shock_defn_local == PARALLEL)
 		index_name = "Parallel";
 	else
 		index_name = company->vega_hedge_index_list[index];
@@ -6078,8 +6082,8 @@ for (int index = 0; index < index_loops; index++)
 	for (int index_term = 0; index_term < index_term_loops; index_term++)
 		{
 		xstring index_term_name;
-		if (hedge_grp_gamma_vega_hedge_liab_shock_defn == PARALLEL
-			|| hedge_grp_gamma_vega_hedge_liab_shock_defn == INDEX_SPECIFIC)
+		if (hedge_grp_gamma_vega_hedge_liab_shock_defn_local == PARALLEL
+			|| hedge_grp_gamma_vega_hedge_liab_shock_defn_local == INDEX_SPECIFIC)
 			index_term_name = "AllTerms";
 		else
 			{
@@ -6103,18 +6107,17 @@ for (int index = 0; index < index_loops; index++)
 
 		if (hedge_strat_detail_flag)
 			{
-			seg->SALFile << endl;
-			seg->SALFile << "Processing Hedge Sales for Index " << index_name << " Index Term " << index_term_name << endl;
-			seg->SALFile << "VegaNeeded," << greek_needed << endl
+			seg_element->SALFile << endl;
+			seg_element->SALFile << "Processing Hedge Sales for Index " << index_name << " Index Term " << index_term_name << endl;
+			seg_element->SALFile << "VegaNeeded," << greek_needed << endl
 						 << "VegaAsset," << vega_asset << endl
 						 << "VegaDiff," << vega_diff << endl;
 
-			seg->SALFile << endl;
-			seg->SALFile << "AssetID,HedgeGrpCode,VegaAsset,SoldPct,NotionalSold,MktValSold,VegaSold" << endl;
+			seg_element->SALFile << endl;
+			seg_element->SALFile << "AssetID,HedgeGrpCode,VegaAsset,SoldPct,NotionalSold,MktValSold,VegaSold" << endl;
 			}
 
 		#if defined(__EIO_ASSET_H_)
-		EIO_ASSET *eio_element = NULL;
 
 		if (eio_mp_map_active.size() > 0)
 			{
@@ -6126,41 +6129,39 @@ for (int index = 0; index < index_loops; index++)
 					mp_map_iter++)
 				{
 				mp = mp_map_iter->first;
-				eio_element = company->sm_asset->sm_eio[mp];
 
-				if (eio_element->hdg_grp_code.find("Vega") == string::npos)
+				if (company->sm_asset->sm_eio[mp][0]->hdg_grp_code.find("Vega") == string::npos)
 					continue;
 
-				if ((hedge_grp_gamma_vega_hedge_liab_shock_defn == INDEX_SPECIFIC
-					 || hedge_grp_gamma_vega_hedge_liab_shock_defn == INDEX_TERM_SPECIFIC)
-					&& eio_element->hdg_grp_code.find(index_name) == string::npos)
+				if ((hedge_grp_gamma_vega_hedge_liab_shock_defn_local == INDEX_SPECIFIC
+					 || hedge_grp_gamma_vega_hedge_liab_shock_defn_local == INDEX_TERM_SPECIFIC)
+					&& company->sm_asset->sm_eio[mp][0]->hdg_grp_code.find(index_name) == string::npos)
 					continue;
 
-				if (hedge_grp_gamma_vega_hedge_liab_shock_defn == INDEX_TERM_SPECIFIC
-					&& eio_element->hdg_grp_code.find(index_term_name) == string::npos)
+				if (hedge_grp_gamma_vega_hedge_liab_shock_defn_local == INDEX_TERM_SPECIFIC
+					&& company->sm_asset->sm_eio[mp][0]->hdg_grp_code.find(index_term_name) == string::npos)
 					continue;
 
-				if (t < eio_element->commencement_period
-					|| (t == eio_element->commencement_period
-						&& eio_element->purchased_bom_flag)
-					|| (t > max(0, eio_element->commencement_period)
-						&& (fabs(eio_element->notional_amt_bef_sale(t)) < ASSET_ACTIVE_THRESHOLD)
-							|| eio_element->Column(col_num_sold_pct).Exists(t)))
+				if (t < company->sm_asset->sm_eio[mp][0]->commencement_period
+					|| (t == company->sm_asset->sm_eio[mp][0]->commencement_period
+						&& company->sm_asset->sm_eio[mp][0]->purchased_bom_flag)
+					|| (t > max(0, company->sm_asset->sm_eio[mp][0]->commencement_period)
+						&& (fabs(company->sm_asset->sm_eio[mp][0]->notional_amt_bef_sale(t)) < ASSET_ACTIVE_THRESHOLD)))
 					continue;
 
 				// calculate Vega for asset. Option values have already been determined in the strategy setup
 				if (index_term_name == "AllTerms")
-					vega_indv_asset = (eio_element->opt_val_vol_up_1_bef_sale(t) - eio_element->opt_val_vol_down_1_bef_sale(t))
-									  * asset->sm_eio[mp]->pct_to_use;	
+					vega_indv_asset = (company->sm_asset->sm_eio[mp][0]->opt_val_vol_up_1_bef_sale(t) - company->sm_asset->sm_eio[mp][0]->opt_val_vol_down_1_bef_sale(t))
+									  * asset->sm_eio[mp][0]->pct_to_use;	
 				else if (index_term == 0)
-					vega_indv_asset = (eio_element->opt_val_vol_term_1_up_1_bef_sale(t) - eio_element->opt_val_vol_term_1_down_1_bef_sale(t))
-									  * asset->sm_eio[mp]->pct_to_use;	
+					vega_indv_asset = (company->sm_asset->sm_eio[mp][0]->opt_val_vol_term_1_up_1_bef_sale(t) - company->sm_asset->sm_eio[mp][0]->opt_val_vol_term_1_down_1_bef_sale(t))
+									  * asset->sm_eio[mp][0]->pct_to_use;	
 				else if (index_term == 1)
-					vega_indv_asset = (eio_element->opt_val_vol_term_2_up_1_bef_sale(t) - eio_element->opt_val_vol_term_2_down_1_bef_sale(t))
-									  * asset->sm_eio[mp]->pct_to_use;	
+					vega_indv_asset = (company->sm_asset->sm_eio[mp][0]->opt_val_vol_term_2_up_1_bef_sale(t) - company->sm_asset->sm_eio[mp][0]->opt_val_vol_term_2_down_1_bef_sale(t))
+									  * asset->sm_eio[mp][0]->pct_to_use;	
 				else if (index_term == 2)
-					vega_indv_asset = (eio_element->opt_val_vol_term_3_up_1_bef_sale(t) - eio_element->opt_val_vol_term_3_down_1_bef_sale(t))
-									  * asset->sm_eio[mp]->pct_to_use;	
+					vega_indv_asset = (company->sm_asset->sm_eio[mp][0]->opt_val_vol_term_3_up_1_bef_sale(t) - company->sm_asset->sm_eio[mp][0]->opt_val_vol_term_3_down_1_bef_sale(t))
+									  * asset->sm_eio[mp][0]->pct_to_use;	
 
 				double sold_pct = 0.0;
 
@@ -6198,22 +6199,24 @@ for (int index = 0; index < index_loops; index++)
 					}
 
 				vega_sold = vega_indv_asset * sold_pct;
-				eio_element->Column(col_num_sold_pct).SetValue(t, sold_pct); 
-
+				company->sm_asset->sm_eio[mp][0]->sold_pct_value = sold_pct;
+				company->sm_asset->sm_eio[mp][0]->Column(col_num_sold_pct).Value(t);
+				company->sm_asset->sm_eio[mp][0]->sold_pct_value = 0.0;
+			
 				vega_sold_total += vega_sold;
 				vega_asset_remaining -= vega_sold;
 
-				sales_amt += eio_element->mkt_val_sold(t)
-							 * eio_element->pct_to_use;
+				sales_amt += company->sm_asset->sm_eio[mp][0]->mkt_val_sold(t)
+							 * company->sm_asset->sm_eio[mp][0]->pct_to_use;
 
 				if (hedge_strat_detail_flag)
 					{
-					seg->SALFile << eio_element->asset_id << ","
-								 << eio_element->hdg_grp_code << ","
+					seg_element->SALFile << company->sm_asset->sm_eio[mp][0]->asset_id << ","
+								 << company->sm_asset->sm_eio[mp][0]->hdg_grp_code << ","
 								 << vega_indv_asset << ","
 								 << sold_pct << ","
-								 << eio_element->notional_amt_sold(t) * eio_element->pct_to_use << ","
-								 << eio_element->mkt_val_sold(t) * eio_element->pct_to_use << ","
+								 << company->sm_asset->sm_eio[mp][0]->notional_amt_sold(t) * company->sm_asset->sm_eio[mp][0]->pct_to_use << ","
+								 << company->sm_asset->sm_eio[mp][0]->mkt_val_sold(t) * company->sm_asset->sm_eio[mp][0]->pct_to_use << ","
 								 << vega_sold << endl;
 					}
 				}			         
@@ -6227,8 +6230,8 @@ for (int index = 0; index < index_loops; index++)
 
 		if (hedge_strat_detail_flag)
 			{
-			seg->SALFile << "Sales Summary" << endl;
-			seg->SALFile << "VegaNeeded," << greek_needed << endl
+			seg_element->SALFile << "Sales Summary" << endl;
+			seg_element->SALFile << "VegaNeeded," << greek_needed << endl
 						 << "VegaAsset," << vega_asset << endl
 						 << "VegaSold," << vega_sold_total << endl
 						 << "VegaRemaining," << vega_diff << endl;
@@ -6238,8 +6241,8 @@ for (int index = 0; index < index_loops; index++)
 
 if (hedge_strat_detail_flag)
 	{
-	seg->SALFile << endl;
-	seg->SALFile << "End Vega Hedge Sales for "
+	seg_element->SALFile << endl;
+	seg_element->SALFile << "End Vega Hedge Sales for "
 				 << "Hedge Group=" << hedge_grp_id << " " 
 	             << "Period=" << t << " "
 				 << "Year=" << xint(cal_yr(t)) << " "
@@ -6250,7 +6253,6 @@ return sales_amt;
 
 
 }
-
 
 //@@ END
 
@@ -6276,10 +6278,9 @@ double transaction_cost = 0.0;
 double notional_amt_purch = 0.0;
 double notional_amt_sold = 0.0;
 int mp = 0;
-mpmap::iterator mp_map_iter;
+map <int, long, less <int> >::iterator mp_map_iter;
 
 #if defined(__EIO_ASSET_H_)
-EIO_ASSET *eio_element = NULL;
 
 if (eio_mp_map_active.size() > 0)
 	{
@@ -6288,21 +6289,23 @@ if (eio_mp_map_active.size() > 0)
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		eio_element = company->sm_asset->sm_eio[mp];
 
-		if (t < eio_element->commencement_period
-			|| (t == eio_element->commencement_period
-				&& eio_element->purchased_bom_flag)
-			|| (t > max(0, eio_element->commencement_period)
-				&& fabs(eio_element->notional_amt(t - 1)) < ASSET_ACTIVE_THRESHOLD)
-			|| eio_element->hdg_grp_code.find("Vega") < string:: npos)
+		if (t < company->sm_asset->sm_eio[mp][0]->commencement_period
+			|| (t == company->sm_asset->sm_eio[mp][0]->commencement_period
+				&& company->sm_asset->sm_eio[mp][0]->purchased_bom_flag)
+			|| (t > max(0, company->sm_asset->sm_eio[mp][0]->commencement_period)
+				&& fabs(company->sm_asset->sm_eio[mp][0]->notional_amt(t - 1)) < ASSET_ACTIVE_THRESHOLD)
+			|| company->sm_asset->sm_eio[mp][0]->hdg_grp_code.find("Vega") < string:: npos)
 			continue;
 
-		notional_amt_sold = eio_element->notional_amt_sold(t) * eio_element->pct_to_use;
-		notional_amt_purch = eio_element->notional_amt_purch(t) * eio_element->pct_to_use;		
+		notional_amt_sold = company->sm_asset->sm_eio[mp][0]->notional_amt_sold(t) * company->sm_asset->sm_eio[mp][0]->pct_to_use;
+		notional_amt_purch = company->sm_asset->sm_eio[mp][0]->notional_amt_purch(t) * company->sm_asset->sm_eio[mp][0]->pct_to_use;		
+
+		hedge_grp_id = hedge_grp_id;
+		double hedge_grp_gamma_vega_hedge_transaction_costs_bps_local = hedge_grp_gamma_vega_hedge_transaction_costs_bps;
 
 		transaction_cost += (fabs(notional_amt_sold) + fabs(notional_amt_purch)) 
-		                   * hedge_grp_gamma_vega_hedge_transaction_costs_bps / 10000.0;
+		                   * hedge_grp_gamma_vega_hedge_transaction_costs_bps_local / 10000.0;
 		}			         
 	}
 #endif
@@ -6310,7 +6313,6 @@ if (eio_mp_map_active.size() > 0)
 return transaction_cost;
 
 }
-
 
 //@@ END
 
@@ -6339,7 +6341,6 @@ greek_index = "Vega_" + company->vega_hedge_index_list[0] + "_AllTerms_" + xstri
 return liab_greeks[greek_index];
 
 }
-
 
 //@@ END
 
@@ -6372,7 +6373,6 @@ return liab_greeks[greek_index];
 
 }
 
-
 //@@ END
 
 //@@ START - vega_index_1_term_2
@@ -6403,7 +6403,6 @@ greek_index = "Vega_" + company->vega_hedge_index_list[0] + "_" + company->vega_
 return liab_greeks[greek_index];
 
 }
-
 
 //@@ END
 
@@ -6436,7 +6435,6 @@ return liab_greeks[greek_index];
 
 }
 
-
 //@@ END
 
 //@@ START - vega_index_2
@@ -6464,7 +6462,6 @@ greek_index = "Vega_" + company->vega_hedge_index_list[1] + "_AllTerms_" + xstri
 return liab_greeks[greek_index];
 
 }
-
 
 //@@ END
 
@@ -6497,7 +6494,6 @@ return liab_greeks[greek_index];
 
 }
 
-
 //@@ END
 
 //@@ START - vega_index_2_term_2
@@ -6528,7 +6524,6 @@ greek_index = "Vega_" + company->vega_hedge_index_list[1] + "_" + company->vega_
 return liab_greeks[greek_index];
 
 }
-
 
 //@@ END
 
@@ -6561,7 +6556,6 @@ return liab_greeks[greek_index];
 
 }
 
-
 //@@ END
 
 //@@ START - vega_index_3
@@ -6589,7 +6583,6 @@ greek_index = "Vega_" + company->vega_hedge_index_list[2] + "_AllTerms_" + xstri
 return liab_greeks[greek_index];
 
 }
-
 
 //@@ END
 
@@ -6622,7 +6615,6 @@ return liab_greeks[greek_index];
 
 }
 
-
 //@@ END
 
 //@@ START - vega_index_3_term_2
@@ -6653,7 +6645,6 @@ greek_index = "Vega_" + company->vega_hedge_index_list[2] + "_" + company->vega_
 return liab_greeks[greek_index];
 
 }
-
 
 //@@ END
 
@@ -6686,7 +6677,6 @@ return liab_greeks[greek_index];
 
 }
 
-
 //@@ END
 
 //@@ START - vega_index_4
@@ -6714,7 +6704,6 @@ greek_index = "Vega_" + company->vega_hedge_index_list[3] + "_AllTerms_" + xstri
 return liab_greeks[greek_index];
 
 }
-
 
 //@@ END
 
@@ -6747,7 +6736,6 @@ return liab_greeks[greek_index];
 
 }
 
-
 //@@ END
 
 //@@ START - vega_index_4_term_2
@@ -6778,7 +6766,6 @@ greek_index = "Vega_" + company->vega_hedge_index_list[3] + "_" + company->vega_
 return liab_greeks[greek_index];
 
 }
-
 
 //@@ END
 
@@ -6811,7 +6798,6 @@ return liab_greeks[greek_index];
 
 }
 
-
 //@@ END
 
 //@@ START - vega_index_5
@@ -6839,7 +6825,6 @@ greek_index = "Vega_" + company->vega_hedge_index_list[4] + "_AllTerms_" + xstri
 return liab_greeks[greek_index];
 
 }
-
 
 //@@ END
 
@@ -6872,7 +6857,6 @@ return liab_greeks[greek_index];
 
 }
 
-
 //@@ END
 
 //@@ START - vega_index_5_term_2
@@ -6903,7 +6887,6 @@ greek_index = "Vega_" + company->vega_hedge_index_list[4] + "_" + company->vega_
 return liab_greeks[greek_index];
 
 }
-
 
 //@@ END
 
@@ -6936,7 +6919,6 @@ return liab_greeks[greek_index];
 
 }
 
-
 //@@ END
 
 //@@ START - vega_index_6
@@ -6964,7 +6946,6 @@ greek_index = "Vega_" + company->vega_hedge_index_list[5] + "_AllTerms_" + xstri
 return liab_greeks[greek_index];
 
 }
-
 
 //@@ END
 
@@ -6997,7 +6978,6 @@ return liab_greeks[greek_index];
 
 }
 
-
 //@@ END
 
 //@@ START - vega_index_6_term_2
@@ -7028,7 +7008,6 @@ greek_index = "Vega_" + company->vega_hedge_index_list[5] + "_" + company->vega_
 return liab_greeks[greek_index];
 
 }
-
 
 //@@ END
 
@@ -7061,7 +7040,6 @@ return liab_greeks[greek_index];
 
 }
 
-
 //@@ END
 
 //@@ START - vega_parallel
@@ -7087,7 +7065,6 @@ return liab_greeks[greek_index];
 
 }
 
-
 //@@ END
 
 //@@ START - final_period
@@ -7102,7 +7079,6 @@ int HDG_GRP_COMP_UDF::hdg_grp_comp_final_period() {
 return last_proj_period;
 
 }
-
 
 //@@ END
 
@@ -7119,7 +7095,6 @@ return add_mths_to_date(proj_date, valn_period);
 
 }
 
-
 //@@ END
 
 //@@ START - proj_start_date
@@ -7131,10 +7106,9 @@ int HDG_GRP_COMP_UDF::hdg_grp_comp_proj_start_date() {
 
 
 #line 1 "proj_start_date.HDG_GRP_COMP.for"
-return MonthNumberFromDate(proj_start_yr, proj_start_mth);
+return day_number_from_date(proj_start_yr, proj_start_mth, 1);
 
 }
-
 
 //@@ END
 
@@ -7156,7 +7130,6 @@ return proj_mth + 1;
 
 }
 
-
 //@@ END
 
 //@@ START - proj_start_yr
@@ -7177,7 +7150,6 @@ return get_yr_from_date(proj_date_adj);
 
 }
 
-
 //@@ END
 
 //@@ START - start_period
@@ -7192,7 +7164,6 @@ int HDG_GRP_COMP_UDF::hdg_grp_comp_start_period() {
 return 0;
 
 }
-
 
 //@@ END
 
@@ -7328,7 +7299,7 @@ else if (greek_type == RHO || greek_type == RHO_CONVEXITY)
 		}
 	}
 
-int seg_num = seg->getElementNumber();
+int seg_num = seg_element->getElementNumber();
 xstring hedge_grp_code = hedge_grp_id;
 bool hedge_strat_detail_flag = asset->asset_detail_rpt_inv_strat_flag(t);
 double opt_val_baseline_detail = 0.0;
@@ -7355,6 +7326,15 @@ xstring opt_val_vol_col_name_base = "opt_val_vol";
 xstring notional_amt_col_name = notional_amt_col_name_base;
 xstring opt_val_col_name = "";
 
+hedge_grp_id = hedge_grp_id;
+StrEnum::EnumValue hedge_grp_delta_hedge_liab_shock_defn_local = hedge_grp_delta_hedge_liab_shock_defn;
+hedge_grp_id = hedge_grp_id;
+StrEnum::EnumValue hedge_grp_gamma_vega_hedge_liab_shock_defn_local = hedge_grp_gamma_vega_hedge_liab_shock_defn;
+hedge_grp_id = hedge_grp_id;
+StrEnum::EnumValue hedge_grp_rho_hedge_liab_shock_defn_local = hedge_grp_rho_hedge_liab_shock_defn;
+hedge_grp_id = hedge_grp_id;
+StrEnum::EnumValue hedge_grp_rho_convex_hedge_liab_shock_defn_local = hedge_grp_rho_convex_hedge_liab_shock_defn;
+
 if (greek_type == DELTA || greek_type == GAMMA)
 	{
 	if (greek_timing != PURCH && num_eio_elements_in_hedge_grp == 0)
@@ -7362,31 +7342,32 @@ if (greek_type == DELTA || greek_type == GAMMA)
 
 	if (hedge_strat_detail_flag)
 		{
-		seg->SALFile << endl;
-		seg->SALFile << greek_type_string << " Calculation for "
+		seg_element->SALFile << endl;
+		seg_element->SALFile << greek_type_string << " Calculation for "
 					 << "Hedge Group=" << hedge_grp_id << " " 
 					 << "Calc Timing=" << greek_timing_string << " " 	
 					 << "Period=" << t << " "
 					 << "Year=" << xint(cal_yr(t)) << " "
 					 << "Month=" << xint(cal_mth(t)) << endl;
 
-		seg->SALFile << endl;
-		seg->SALFile << "ShockId,AssetId,HedgeGroupCode,NotAmt,OptVal" << endl;
+		seg_element->SALFile << endl;
+		seg_element->SALFile << "ShockId,AssetId,HedgeGroupCode,NotAmt,OptVal" << endl;
 		}
 
 	rates->clear_shifted_rates_maps();
 
 	int index_loops = 1;
-	if ((greek_type == DELTA && hedge_grp_delta_hedge_liab_shock_defn == INDEX_SPECIFIC)
-		|| (greek_type == GAMMA && hedge_grp_gamma_vega_hedge_liab_shock_defn == INDEX_SPECIFIC))
+
+	if ((greek_type == DELTA && hedge_grp_delta_hedge_liab_shock_defn_local == INDEX_SPECIFIC)
+		|| (greek_type == GAMMA && hedge_grp_gamma_vega_hedge_liab_shock_defn_local == INDEX_SPECIFIC))
 		index_loops = company->delta_gamma_hedge_index_list.size();
 
 	int shock_start_num = 1;
 	if (greek_type == GAMMA)
 		shock_start_num = 0; // process the baseline shock
-		
-	// 20191021 STW: fix compiler error while converting from RAFM 2.6 to RAFM 2.8
-	int shock;
+
+	int shock = shock_start_num;
+
 	for (shock = shock_start_num; shock <= company->delta_gamma_hedge_shock_list.size(); shock++)
 		{
 		if (shock == 0)
@@ -7407,14 +7388,14 @@ if (greek_type == DELTA || greek_type == GAMMA)
 
 			// Skip the shock(s) not needed based on the delta hedging liability shock definition
 			if (greek_type == DELTA
-				&& (hedge_grp_delta_hedge_liab_shock_defn == PARALLEL && shock_index != "Parallel"
-					|| hedge_grp_delta_hedge_liab_shock_defn == INDEX_SPECIFIC && shock_index == "Parallel"))
+				&& (hedge_grp_delta_hedge_liab_shock_defn_local == PARALLEL && shock_index != "Parallel"
+					|| hedge_grp_delta_hedge_liab_shock_defn_local == INDEX_SPECIFIC && shock_index == "Parallel"))
 				continue;
 
 			// Skip the shock(s) not needed based on the delta hedging liability shock definition
 			if (greek_type == GAMMA
-				&& (hedge_grp_gamma_vega_hedge_liab_shock_defn == PARALLEL && shock_index != "Parallel"
-					|| hedge_grp_gamma_vega_hedge_liab_shock_defn == INDEX_SPECIFIC && shock_index == "Parallel"))
+				&& (hedge_grp_gamma_vega_hedge_liab_shock_defn_local == PARALLEL && shock_index != "Parallel"
+					|| hedge_grp_gamma_vega_hedge_liab_shock_defn_local == INDEX_SPECIFIC && shock_index == "Parallel"))
 				continue;
 
 			if (shock_id.find("Up") < string::npos)
@@ -7432,8 +7413,8 @@ if (greek_type == DELTA || greek_type == GAMMA)
 		for (int index = 0; index < index_loops; index++)
 			{
 			xstring index_name;
-			if ((greek_type == DELTA && hedge_grp_delta_hedge_liab_shock_defn == PARALLEL)
-				|| (greek_type == GAMMA && hedge_grp_gamma_vega_hedge_liab_shock_defn == PARALLEL))
+			if ((greek_type == DELTA && hedge_grp_delta_hedge_liab_shock_defn_local == PARALLEL)
+				|| (greek_type == GAMMA && hedge_grp_gamma_vega_hedge_liab_shock_defn_local == PARALLEL))
 				index_name = "Parallel"; 
 			else
 				index_name = company->delta_gamma_hedge_index_list[index];
@@ -7452,17 +7433,20 @@ if (greek_type == DELTA || greek_type == GAMMA)
 				if (shock_index == "Parallel")
 					{
 					// For parallel, need to loop over all indexes specified in the equity price shock table 
-					double eqt_price_shock_tbl_count = 0.0;
-					ExtSrcValTable eqt_price_shock_tbl;
-					eqt_price_shock_tbl_count = GetColumnKeyValuesCount(eqt_price_shock);
-					eqt_price_shock_tbl = GetColumnKeyValues(eqt_price_shock);
-					if (eqt_price_shock_tbl_count > 0)
+
+					eqt_price_shock_tbl.resize(0);
+
+					if (eqt_price_shock_selected != "NONE")
+						split_string_usl(eqt_price_shock_selected.c_str(), eqt_price_shock_tbl, ",");
+
+					if (eqt_price_shock_tbl.size() > 0)
 						{
 						// Start at column zero since we don't have any blank columns
-						for (int col = 0; col < eqt_price_shock_tbl_count; col++)
+						for (int col = 0; col < eqt_price_shock_tbl.size(); col++)
 							{
 							// Set lookup key
-							hedge_grp_index_name = eqt_price_shock_tbl[0][col].AsString();
+							shock_id = shock_id;
+							hedge_grp_index_name = eqt_price_shock_tbl[col];
 
 							rates->index_val_shifts[hedge_grp_index_name] = eqt_price_shock;
 							}
@@ -7470,6 +7454,7 @@ if (greek_type == DELTA || greek_type == GAMMA)
 					}
 				else
 					{
+					shock_id = shock_id;
 					hedge_grp_index_name = index_name;
 					rates->index_val_shifts[hedge_grp_index_name] = eqt_price_shock;
 					}
@@ -7483,11 +7468,9 @@ if (greek_type == DELTA || greek_type == GAMMA)
 				{
 				// calculate the option values for the assets in the map
 				int mp = 0;
-				mpmap::iterator mp_map_iter;
+				map <int, long, less <int> >::iterator mp_map_iter;
 
 				#if defined(__EIO_ASSET_H_)
-				EIO_ASSET *eio_element = NULL;
-
 				if (eio_mp_map_active.size() > 0)
 					{
 					for (mp_map_iter = eio_mp_map_active.begin();
@@ -7495,54 +7478,53 @@ if (greek_type == DELTA || greek_type == GAMMA)
 						 mp_map_iter++)
 						{
 						mp = mp_map_iter->first;
-						eio_element = company->sm_asset->sm_eio[mp];
 						xstring notional_amt_col_name_final = notional_amt_col_name;
 						xstring opt_val_col_name_final = opt_val_col_name;
 
 						hedge_grp_code = hedge_grp_id + "|" + greek_type_string + "|" + hedge_grp_index_name;
 						// Skip any equity futures in the group for the GAMMA hedging
 						// For Delta hedging, need to consider all equity options for delta residuals
-						if (greek_type == GAMMA && eio_element->hdg_grp_code != hedge_grp_code)
+						if (greek_type == GAMMA && company->sm_asset->sm_eio[mp][0]->hdg_grp_code != hedge_grp_code)
 							continue;
 
 						// For Delta, when the asset is not linked to the index, we skip it
 						if (greek_type == DELTA && shock_index != "Parallel"
-							&& eio_element->hdg_grp_code.find(hedge_grp_index_name) == string::npos)
+							&& company->sm_asset->sm_eio[mp][0]->hdg_grp_code.find(hedge_grp_index_name) == string::npos)
 							continue;
 
 						// For Delta, we check the notional_amt value for the GAMMA assets since they may have been sold
-						if (greek_type == DELTA && eio_element->hdg_grp_code.find("Gamma") < string::npos
-							&& (t > max(0, eio_element->commencement_period)
-								&& fabs(eio_element->notional_amt(t)) < ASSET_ACTIVE_THRESHOLD))
+						if (greek_type == DELTA && company->sm_asset->sm_eio[mp][0]->hdg_grp_code.find("Gamma") < string::npos
+							&& (t > max(0, company->sm_asset->sm_eio[mp][0]->commencement_period)
+								&& fabs(company->sm_asset->sm_eio[mp][0]->notional_amt(t)) < ASSET_ACTIVE_THRESHOLD))
 							continue;
 
-						if (t < eio_element->commencement_period
-							|| (t == eio_element->commencement_period
-								&& eio_element->purchased_bom_flag)
-							|| (t > max(0, eio_element->commencement_period)
-								&& fabs(eio_element->notional_amt_bef_sale(t)) < ASSET_ACTIVE_THRESHOLD))
+						if (t < company->sm_asset->sm_eio[mp][0]->commencement_period
+							|| (t == company->sm_asset->sm_eio[mp][0]->commencement_period
+								&& company->sm_asset->sm_eio[mp][0]->purchased_bom_flag)
+							|| (t > max(0, company->sm_asset->sm_eio[mp][0]->commencement_period)
+								&& fabs(company->sm_asset->sm_eio[mp][0]->notional_amt_bef_sale(t)) < ASSET_ACTIVE_THRESHOLD))
 							continue;
 
-						if (greek_timing == BEFORE_SALE	&& eio_element->hdg_grp_code.find(greek_type_string) < string::npos)
+						if (greek_timing == BEFORE_SALE	&& company->sm_asset->sm_eio[mp][0]->hdg_grp_code.find(greek_type_string) < string::npos)
 							{
 							notional_amt_col_name_final += "_bef_sale";
 							opt_val_col_name_final += "_bef_sale";
 							}
 
 						if (shock_direction == BASELINE)
-							opt_val_baseline[index][0] += opt_val_shock_detail = eio_element->Column(opt_val_col_name_final).Value(t)
-															                     * eio_element->pct_to_use;
+							opt_val_baseline[index][0] += opt_val_shock_detail = company->sm_asset->sm_eio[mp][0]->Column(opt_val_col_name_final).Value(t)
+															                     * company->sm_asset->sm_eio[mp][0]->pct_to_use;
 						else if (shock_direction == UP)
-							opt_val_up_1[index][0] += opt_val_shock_detail = eio_element->Column(opt_val_col_name_final).Value(t)
-													                         * eio_element->pct_to_use;
+							opt_val_up_1[index][0] += opt_val_shock_detail = company->sm_asset->sm_eio[mp][0]->Column(opt_val_col_name_final).Value(t)
+													                         * company->sm_asset->sm_eio[mp][0]->pct_to_use;
 						else if (shock_direction == DOWN)
-							opt_val_down_1[index][0] += opt_val_shock_detail = eio_element->Column(opt_val_col_name_final).Value(t)
-							                                                   * eio_element->pct_to_use;
+							opt_val_down_1[index][0] += opt_val_shock_detail = company->sm_asset->sm_eio[mp][0]->Column(opt_val_col_name_final).Value(t)
+							                                                   * company->sm_asset->sm_eio[mp][0]->pct_to_use;
 						if (hedge_strat_detail_flag)
-							seg->SALFile << detail_shock_id << "," 
-										 << eio_element->asset_id << ","
-										 << eio_element->hdg_grp_code << ","
-										 << eio_element->Column(notional_amt_col_name_final).Value(t) * eio_element->pct_to_use << ","
+							seg_element->SALFile << detail_shock_id << "," 
+										 << company->sm_asset->sm_eio[mp][0]->asset_id << ","
+										 << company->sm_asset->sm_eio[mp][0]->hdg_grp_code << ","
+										 << company->sm_asset->sm_eio[mp][0]->Column(notional_amt_col_name_final).Value(t) * company->sm_asset->sm_eio[mp][0]->pct_to_use << ","
 										 << opt_val_shock_detail << endl;
 						}			         
 					}
@@ -7556,9 +7538,18 @@ if (greek_type == DELTA || greek_type == GAMMA)
 
 				xstring hedge_asset_id;
 				if (greek_type == DELTA)
+					{
+					hedge_grp_id = hedge_grp_id;
+					hedge_grp_index_name = hedge_grp_index_name;
 					hedge_asset_id = hedge_grp_delta_hedge_asset_id;
+					}
 				else
+					{
+					hedge_grp_id = hedge_grp_id;
+					hedge_grp_index_term = hedge_grp_index_term;
+					hedge_grp_index_name = hedge_grp_index_name;
 					hedge_asset_id = hedge_grp_gamma_vega_hedge_asset_id;
+					}
 
 				xstring purch_hedge_index_name = get_purch_asset_index_name(seg_num, index_name, hedge_asset_id);
 				
@@ -7583,23 +7574,21 @@ if (greek_type == DELTA || greek_type == GAMMA)
 				xstring opt_val_col_name_final = opt_val_col_name + "_bef_sale";
 
 				#if defined(__EIO_ASSET_H_)
-				EIO_ASSET *eio_element = NULL;
-				eio_element = asset->sm_eio[new_mp_num];
 
 				if (shock_direction == BASELINE)
-					opt_val_baseline[index][0] += opt_val_shock_detail = eio_element->Column(opt_val_col_name_final).Value(t);
+					opt_val_baseline[index][0] += opt_val_shock_detail = asset->sm_eio[new_mp_num][0]->Column(opt_val_col_name_final).Value(t);
 				else if (shock_direction == UP)
-					opt_val_up_1[index][0] += opt_val_shock_detail = eio_element->Column(opt_val_col_name_final).Value(t);
+					opt_val_up_1[index][0] += opt_val_shock_detail = asset->sm_eio[new_mp_num][0]->Column(opt_val_col_name_final).Value(t);
 				else if (shock_direction == DOWN)
-					opt_val_down_1[index][0] += opt_val_shock_detail = eio_element->Column(opt_val_col_name_final).Value(t);
+					opt_val_down_1[index][0] += opt_val_shock_detail = asset->sm_eio[new_mp_num][0]->Column(opt_val_col_name_final).Value(t);
 
 				if (hedge_strat_detail_flag)
 					{
 					if (hedge_strat_detail_flag)
-						seg->SALFile << detail_shock_id << "," 
-									 << eio_element->asset_id << ","
-									 << eio_element->hdg_grp_code << ","
-									 << eio_element->Column(notional_amt_col_name_final).Value(t) << ","
+						seg_element->SALFile << detail_shock_id << "," 
+									 << asset->sm_eio[new_mp_num][0]->asset_id << ","
+									 << asset->sm_eio[new_mp_num][0]->hdg_grp_code << ","
+									 << asset->sm_eio[new_mp_num][0]->Column(notional_amt_col_name_final).Value(t) << ","
 									 << opt_val_shock_detail << endl;
 					}
 
@@ -7617,15 +7606,15 @@ if (greek_type == DELTA || greek_type == GAMMA)
 		{
 		if (hedge_strat_detail_flag)
 			{
-			seg->SALFile << endl << greek_type_string << " " << greek_timing_string << " Results" << endl;
-			seg->SALFile << "IndexName," << greek_type_string << endl;
+			seg_element->SALFile << endl << greek_type_string << " " << greek_timing_string << " Results" << endl;
+			seg_element->SALFile << "IndexName," << greek_type_string << endl;
 			}
 
 		for (int index = 0; index < index_loops; index++)
 			{
 			xstring index_name;
-			if ((greek_type == DELTA && hedge_grp_delta_hedge_liab_shock_defn == PARALLEL)
-				|| (greek_type == GAMMA && hedge_grp_gamma_vega_hedge_liab_shock_defn == PARALLEL))
+			if ((greek_type == DELTA && hedge_grp_delta_hedge_liab_shock_defn_local == PARALLEL)
+				|| (greek_type == GAMMA && hedge_grp_gamma_vega_hedge_liab_shock_defn_local == PARALLEL))
 				index_name = "Parallel"; 
 			else
 				index_name = company->delta_gamma_hedge_index_list[index];
@@ -7638,7 +7627,7 @@ if (greek_type == DELTA || greek_type == GAMMA)
 				asset_greeks[map_index] = opt_val_up_1[index][0] + opt_val_down_1[index][0] - 2.0 * opt_val_baseline[index][0];
 
 			if (hedge_strat_detail_flag)
-				seg->SALFile << index_name << ","
+				seg_element->SALFile << index_name << ","
 							 << asset_greeks[map_index] << endl;
 			}
 		}
@@ -7650,30 +7639,32 @@ else if (greek_type == VEGA)
 
 	if (hedge_strat_detail_flag)
 		{
-		seg->SALFile << endl;
-		seg->SALFile << greek_type_string << " Calculation for "
+		seg_element->SALFile << endl;
+		seg_element->SALFile << greek_type_string << " Calculation for "
 					 << "Hedge Group=" << hedge_grp_id << " " 
 					 << "Calc Timing=" << greek_timing_string << " " 	
 					 << "Period=" << t << " "
 					 << "Year=" << xint(cal_yr(t)) << " "
 					 << "Month=" << xint(cal_mth(t)) << endl;
 
-		seg->SALFile << endl;
-		seg->SALFile << "ShockId,AssetId,HedgeGroupCode,NotAmt,OptVal" << endl;
+		seg_element->SALFile << endl;
+		seg_element->SALFile << "ShockId,AssetId,HedgeGroupCode,NotAmt,OptVal" << endl;
 		}
 
 	rates->clear_shifted_rates_maps();
 
 	int index_loops = 1;
-	if (hedge_grp_gamma_vega_hedge_liab_shock_defn == INDEX_SPECIFIC
-		|| hedge_grp_gamma_vega_hedge_liab_shock_defn == INDEX_TERM_SPECIFIC)
+	if (hedge_grp_gamma_vega_hedge_liab_shock_defn_local == INDEX_SPECIFIC
+		|| hedge_grp_gamma_vega_hedge_liab_shock_defn_local == INDEX_TERM_SPECIFIC)
 		index_loops = company->vega_hedge_index_list.size();
 
 	int index_term_loops = 1;
-	if (hedge_grp_gamma_vega_hedge_liab_shock_defn == INDEX_TERM_SPECIFIC)
+	if (hedge_grp_gamma_vega_hedge_liab_shock_defn_local == INDEX_TERM_SPECIFIC)
 		index_term_loops = company->vega_hedge_term_list.size();	
 
-	for (int shock = 0; shock < company->vega_hedge_shock_list.size(); shock++)
+	int shock = 0;
+
+	for (shock = 0; shock < company->vega_hedge_shock_list.size(); shock++)
 		{
 		opt_val_col_name = opt_val_vol_col_name_base;
 
@@ -7683,17 +7674,17 @@ else if (greek_type == VEGA)
 		shock_index = shock_id(0, shock_id.find("EqtVol"));
 
 		// Skip the shock(s) not needed based on the gamma vega hedging liability shock definition
-		if ((hedge_grp_gamma_vega_hedge_liab_shock_defn == PARALLEL && shock_index != "Parallel")
-			|| (hedge_grp_gamma_vega_hedge_liab_shock_defn == INDEX_SPECIFIC && shock_index == "Parallel")
-			|| (hedge_grp_gamma_vega_hedge_liab_shock_defn == INDEX_TERM_SPECIFIC && shock_index == "Parallel"))
+		if ((hedge_grp_gamma_vega_hedge_liab_shock_defn_local == PARALLEL && shock_index != "Parallel")
+			|| (hedge_grp_gamma_vega_hedge_liab_shock_defn_local == INDEX_SPECIFIC && shock_index == "Parallel")
+			|| (hedge_grp_gamma_vega_hedge_liab_shock_defn_local == INDEX_TERM_SPECIFIC && shock_index == "Parallel"))
 			continue;
 
 		// Skip the AllTerms shocks if the gamma vega hedging liability shock definition is Index Term Specific
-		if (hedge_grp_gamma_vega_hedge_liab_shock_defn == INDEX_TERM_SPECIFIC && shock_id.find("AllTerms") < string::npos)
+		if (hedge_grp_gamma_vega_hedge_liab_shock_defn_local == INDEX_TERM_SPECIFIC && shock_id.find("AllTerms") < string::npos)
 			continue;
 
 		// Skip the Term specific shocks if the gamma vega hedging liability shock definition is Index Specific
-		if (hedge_grp_gamma_vega_hedge_liab_shock_defn == INDEX_SPECIFIC && shock_id.find("AllTerms") == string::npos)
+		if (hedge_grp_gamma_vega_hedge_liab_shock_defn_local == INDEX_SPECIFIC && shock_id.find("AllTerms") == string::npos)
 			continue;
 
 		if (shock_id.find("Up") < string::npos)
@@ -7704,7 +7695,7 @@ else if (greek_type == VEGA)
 		for (int index = 0; index < index_loops; index++)
 			{
 			// set lookup key
-			if (hedge_grp_gamma_vega_hedge_liab_shock_defn == PARALLEL)
+			if (hedge_grp_gamma_vega_hedge_liab_shock_defn_local == PARALLEL)
 				hedge_grp_index_name = "Parallel";
 			else
 				hedge_grp_index_name = company->vega_hedge_index_list[index];
@@ -7721,13 +7712,17 @@ else if (greek_type == VEGA)
 
 				// setup the shifted rates map
 				xstring map_index = hedge_grp_index_name + "_" + xstring(term);
+
+				shock_id = shock_id;
+				hedge_grp_rate_term = hedge_grp_rate_term;
+				hedge_grp_index_name = hedge_grp_index_name;
 				rates->index_vols_shifts[map_index] = eqt_vol_shock;
 				}
 
 			for (int index_term = 0; index_term < index_term_loops; index_term++)
 				{
-				if (hedge_grp_gamma_vega_hedge_liab_shock_defn == PARALLEL
-					|| hedge_grp_gamma_vega_hedge_liab_shock_defn == INDEX_SPECIFIC)
+				if (hedge_grp_gamma_vega_hedge_liab_shock_defn_local == PARALLEL
+					|| hedge_grp_gamma_vega_hedge_liab_shock_defn_local == INDEX_SPECIFIC)
 					hedge_grp_index_term = "AllTerms";
 				else
 					hedge_grp_index_term = company->vega_hedge_term_list[index_term]; 
@@ -7737,17 +7732,16 @@ else if (greek_type == VEGA)
 					continue;
 
 				// Only process the AllTerms index term when the liab shock defn is Index Specific
-				if (hedge_grp_gamma_vega_hedge_liab_shock_defn == INDEX_SPECIFIC && hedge_grp_index_term != "AllTerms")
+				if (hedge_grp_gamma_vega_hedge_liab_shock_defn_local == INDEX_SPECIFIC && hedge_grp_index_term != "AllTerms")
 					continue;
 
 				if (greek_timing == BEFORE_SALE || greek_timing == END_OF_PERIOD)
 					{
 					// calculate the option values for the assets in the map
 					int mp = 0;
-					mpmap::iterator mp_map_iter;
+					map <int, long, less <int> >::iterator mp_map_iter;
 
 					#if defined(__EIO_ASSET_H_)
-					EIO_ASSET *eio_element = NULL;
 
 					if (eio_mp_map_active.size() > 0)
 						{
@@ -7756,19 +7750,18 @@ else if (greek_type == VEGA)
 							 mp_map_iter++)
 							{
 							mp = mp_map_iter->first;
-							eio_element = company->sm_asset->sm_eio[mp];
 							xstring notional_amt_col_name_final = notional_amt_col_name;
 							xstring opt_val_col_name_final = opt_val_col_name;
 
 							hedge_grp_code = hedge_grp_id + "|" + greek_type_string + "|" + hedge_grp_index_name + "|" + hedge_grp_index_term;
-							if (eio_element->hdg_grp_code != hedge_grp_code)
+							if (company->sm_asset->sm_eio[mp][0]->hdg_grp_code != hedge_grp_code)
 								continue;
 
-							if (t < eio_element->commencement_period
-								|| (t == eio_element->commencement_period
-									&& eio_element->purchased_bom_flag)
-								|| (t > max(0, eio_element->commencement_period)
-									&& fabs(eio_element->notional_amt_bef_sale(t)) < ASSET_ACTIVE_THRESHOLD))
+							if (t < company->sm_asset->sm_eio[mp][0]->commencement_period
+								|| (t == company->sm_asset->sm_eio[mp][0]->commencement_period
+									&& company->sm_asset->sm_eio[mp][0]->purchased_bom_flag)
+								|| (t > max(0, company->sm_asset->sm_eio[mp][0]->commencement_period)
+									&& fabs(company->sm_asset->sm_eio[mp][0]->notional_amt_bef_sale(t)) < ASSET_ACTIVE_THRESHOLD))
 								continue;
 
 							if (hedge_grp_index_term != "AllTerms")
@@ -7779,24 +7772,24 @@ else if (greek_type == VEGA)
 							else // if (shock_direction == DOWN)
 								opt_val_col_name_final += "_down_1";
 
-							if (greek_timing == BEFORE_SALE	&& eio_element->hdg_grp_code.find(greek_type_string) < string::npos)
+							if (greek_timing == BEFORE_SALE	&& company->sm_asset->sm_eio[mp][0]->hdg_grp_code.find(greek_type_string) < string::npos)
 								{
 								notional_amt_col_name_final += "_bef_sale";
 								opt_val_col_name_final += "_bef_sale";
 								}
 
 							if (shock_direction == UP)
-								opt_val_up_1[index][index_term] += opt_val_shock_detail = eio_element->Column(opt_val_col_name_final).Value(t)
-																                          * eio_element->pct_to_use;
+								opt_val_up_1[index][index_term] += opt_val_shock_detail = company->sm_asset->sm_eio[mp][0]->Column(opt_val_col_name_final).Value(t)
+																                          * company->sm_asset->sm_eio[mp][0]->pct_to_use;
 							else // if (shock_direction == DOWN)
-								opt_val_down_1[index][index_term] += opt_val_shock_detail = eio_element->Column(opt_val_col_name_final).Value(t)
-																                            * eio_element->pct_to_use;
+								opt_val_down_1[index][index_term] += opt_val_shock_detail = company->sm_asset->sm_eio[mp][0]->Column(opt_val_col_name_final).Value(t)
+																                            * company->sm_asset->sm_eio[mp][0]->pct_to_use;
 
 							if (hedge_strat_detail_flag)
-								seg->SALFile << detail_shock_id << "," 
-											 << eio_element->asset_id << ","
-											 << eio_element->hdg_grp_code << ","
-											 << eio_element->Column(notional_amt_col_name_final).Value(t) * eio_element->pct_to_use << ","
+								seg_element->SALFile << detail_shock_id << "," 
+											 << company->sm_asset->sm_eio[mp][0]->asset_id << ","
+											 << company->sm_asset->sm_eio[mp][0]->hdg_grp_code << ","
+											 << company->sm_asset->sm_eio[mp][0]->Column(notional_amt_col_name_final).Value(t) * company->sm_asset->sm_eio[mp][0]->pct_to_use << ","
 											 << opt_val_shock_detail << endl;
 							}			         
 						}
@@ -7811,13 +7804,18 @@ else if (greek_type == VEGA)
 
 					// Setup purchase asset. Will create new index option model point
 					double notional_amt_to_purch = ONE_MILLION;
+					
+					hedge_grp_id = hedge_grp_id;
+					hedge_grp_index_term = hedge_grp_index_term;
+					hedge_grp_index_name = hedge_grp_index_name;
+					xstring hedge_grp_gamma_vega_hedge_asset_id_local = hedge_grp_gamma_vega_hedge_asset_id;
 
 					company->sm_inv_strategy[seg_num]->buy_assets_hedging(t, 
 																		  NO, //save_assets
 																		  HEDGING,
 																		  new_mp_num,
 																		  hedge_grp_code,
-																		  hedge_grp_gamma_vega_hedge_asset_id,
+																		  hedge_grp_gamma_vega_hedge_asset_id_local,
 																		  notional_amt_to_purch,
 																		  -1.0,
 																		  -1.0);
@@ -7834,19 +7832,17 @@ else if (greek_type == VEGA)
 						opt_val_col_name_final += "_down_1_bef_sale";
 
 					#if defined(__EIO_ASSET_H_)
-					EIO_ASSET *eio_element = NULL;
-					eio_element = asset->sm_eio[new_mp_num];
 
 					if (shock_direction == UP)
-						opt_val_up_1[index][index_term] += opt_val_shock_detail = eio_element->Column(opt_val_col_name_final).Value(t);
+						opt_val_up_1[index][index_term] += opt_val_shock_detail = asset->sm_eio[new_mp_num][0]->Column(opt_val_col_name_final).Value(t);
 					else // if (shock_direction == DOWN)
-						opt_val_down_1[index][index_term] += opt_val_shock_detail = eio_element->Column(opt_val_col_name_final).Value(t);
+						opt_val_down_1[index][index_term] += opt_val_shock_detail = asset->sm_eio[new_mp_num][0]->Column(opt_val_col_name_final).Value(t);
 
 					if (hedge_strat_detail_flag)
-						seg->SALFile << detail_shock_id << "," 
-									 << eio_element->asset_id << ","
-									 << eio_element->hdg_grp_code << ","
-									 << eio_element->Column(notional_amt_col_name_final).Value(t) * eio_element->pct_to_use << ","
+						seg_element->SALFile << detail_shock_id << "," 
+									 << asset->sm_eio[new_mp_num][0]->asset_id << ","
+									 << asset->sm_eio[new_mp_num][0]->hdg_grp_code << ","
+									 << asset->sm_eio[new_mp_num][0]->Column(notional_amt_col_name_final).Value(t) * asset->sm_eio[new_mp_num][0]->pct_to_use << ","
 									 << opt_val_shock_detail << endl;
 
 					// Remove the temporarily created index option model point
@@ -7861,14 +7857,14 @@ else if (greek_type == VEGA)
 
 	if (hedge_strat_detail_flag)
 		{
-		seg->SALFile << endl << greek_type_string << " " << greek_timing_string << " Results" << endl;
-		seg->SALFile << "IndexName,IndexTermName" << greek_type_string << endl;
+		seg_element->SALFile << endl << greek_type_string << " " << greek_timing_string << " Results" << endl;
+		seg_element->SALFile << "IndexName,IndexTermName" << greek_type_string << endl;
 		}
 
 	for (int index = 0; index < index_loops; index++)
 		{
 		xstring index_name;
-		if (hedge_grp_gamma_vega_hedge_liab_shock_defn == PARALLEL)
+		if (hedge_grp_gamma_vega_hedge_liab_shock_defn_local == PARALLEL)
 			index_name = "Parallel";
 		else
 			index_name = company->vega_hedge_index_list[index];
@@ -7876,8 +7872,8 @@ else if (greek_type == VEGA)
 		xstring index_term_name;
 		for (int index_term = 0; index_term < index_term_loops; index_term++)
 			{
-			if (hedge_grp_gamma_vega_hedge_liab_shock_defn == PARALLEL
-				|| hedge_grp_gamma_vega_hedge_liab_shock_defn == INDEX_SPECIFIC)
+			if (hedge_grp_gamma_vega_hedge_liab_shock_defn_local == PARALLEL
+				|| hedge_grp_gamma_vega_hedge_liab_shock_defn_local == INDEX_SPECIFIC)
 				index_term_name = "AllTerms";
 			else
 				index_term_name = company->vega_hedge_term_list[index_term]; 
@@ -7886,7 +7882,7 @@ else if (greek_type == VEGA)
 			asset_greeks[map_index] = opt_val_up_1[index][index_term] - opt_val_down_1[index][index_term];
 
 			if (hedge_strat_detail_flag)
-				seg->SALFile << index_name << ","
+				seg_element->SALFile << index_name << ","
 							 << index_term_name << ","				
 							 << asset_greeks[map_index] << endl;
 			}
@@ -7900,31 +7896,31 @@ else if (greek_type == RHO || greek_type == RHO_CONVEXITY)
 
 	if (hedge_strat_detail_flag)
 		{
-		seg->SALFile << endl;
-		seg->SALFile << greek_type_string << " Calculation for "
+		seg_element->SALFile << endl;
+		seg_element->SALFile << greek_type_string << " Calculation for "
 					 << "Hedge Group=" << hedge_grp_id << " " 
 					 << "Calc Timing=" << greek_timing_string << " " 	
 					 << "Period=" << t << " "
 					 << "Year=" << xint(cal_yr(t)) << " "
 					 << "Month=" << xint(cal_mth(t)) << endl;
 
-		seg->SALFile << endl;
-		seg->SALFile << "ShockId,AssetId,HedgeGroupCode,NotAmt,OptVal" << endl;
+		seg_element->SALFile << endl;
+		seg_element->SALFile << "ShockId,AssetId,HedgeGroupCode,NotAmt,OptVal" << endl;
 		}
 
 	rates->clear_shifted_rates_maps();
 
 	int key_rate_loops = 1;
-	if ((greek_type == RHO && hedge_grp_rho_hedge_liab_shock_defn == KEY_RATE_SPECIFIC)
-		|| (greek_type == RHO_CONVEXITY && hedge_grp_rho_convex_hedge_liab_shock_defn == KEY_RATE_SPECIFIC))
+	if ((greek_type == RHO && hedge_grp_rho_hedge_liab_shock_defn_local == KEY_RATE_SPECIFIC)
+		|| (greek_type == RHO_CONVEXITY && hedge_grp_rho_convex_hedge_liab_shock_defn_local == KEY_RATE_SPECIFIC))
 		key_rate_loops = company->rho_hedge_key_rate_list.size();
 
 	int shock_start_num = 1;
 	if (greek_type == RHO_CONVEXITY)
 		shock_start_num = 0;
-		
-	// 20191021 STW: fix compiler error while converting from RAFM 2.6 to RAFM 2.8
-	int shock;
+
+	int shock = shock_start_num;
+
 	for (shock = shock_start_num; shock <= company->rho_hedge_shock_list.size(); shock++)
 		{
 		if (shock == 0)
@@ -7945,14 +7941,14 @@ else if (greek_type == RHO || greek_type == RHO_CONVEXITY)
 
 			// Skip the shock(s) not needed based on the rho hedging liability shock definition
 			if (greek_type == RHO 
-				&& (hedge_grp_rho_hedge_liab_shock_defn == PARALLEL && shock_index != "Parallel")
-					|| (hedge_grp_rho_hedge_liab_shock_defn == KEY_RATE_SPECIFIC && shock_index == "Parallel"))
+				&& (hedge_grp_rho_hedge_liab_shock_defn_local == PARALLEL && shock_index != "Parallel")
+					|| (hedge_grp_rho_hedge_liab_shock_defn_local == KEY_RATE_SPECIFIC && shock_index == "Parallel"))
 				continue;
 
 			// Skip the shock(s) not needed based on the rho convexity hedging liability shock definition
 			if (greek_type == RHO_CONVEXITY 
-				&& (hedge_grp_rho_convex_hedge_liab_shock_defn == PARALLEL && shock_index != "Parallel")
-					|| (hedge_grp_rho_convex_hedge_liab_shock_defn == KEY_RATE_SPECIFIC && shock_index == "Parallel"))
+				&& (hedge_grp_rho_convex_hedge_liab_shock_defn_local == PARALLEL && shock_index != "Parallel")
+					|| (hedge_grp_rho_convex_hedge_liab_shock_defn_local == KEY_RATE_SPECIFIC && shock_index == "Parallel"))
 				continue;
 
 			if (shock_id.find("Up") < string::npos)
@@ -7964,8 +7960,8 @@ else if (greek_type == RHO || greek_type == RHO_CONVEXITY)
 		for (int key_rate = 0; key_rate < key_rate_loops; key_rate++)
 			{
 			// set lookup key
-			if ((greek_type == RHO && hedge_grp_rho_hedge_liab_shock_defn == PARALLEL)
-				|| (greek_type == RHO_CONVEXITY && hedge_grp_rho_convex_hedge_liab_shock_defn == PARALLEL))
+			if ((greek_type == RHO && hedge_grp_rho_hedge_liab_shock_defn_local == PARALLEL)
+				|| (greek_type == RHO_CONVEXITY && hedge_grp_rho_convex_hedge_liab_shock_defn_local == PARALLEL))
 				hedge_grp_key_rate = "Parallel";
 			else
 				hedge_grp_key_rate = company->rho_hedge_key_rate_list[key_rate];
@@ -7987,6 +7983,10 @@ else if (greek_type == RHO || greek_type == RHO_CONVEXITY)
 
 					// setup the shifted rates map
 					xstring map_index = "Govt_" + xstring(term);
+
+					shock_id = shock_id;
+					hedge_grp_yld_curve_id = hedge_grp_yld_curve_id;
+					hedge_grp_rate_term = hedge_grp_rate_term;
 					rates->yld_rates_shifts[map_index] = int_rate_shock;
 					}
 				}
@@ -7995,11 +7995,10 @@ else if (greek_type == RHO || greek_type == RHO_CONVEXITY)
 				{
 				// calculate the option values for the assets in the map
 				int mp = 0;
-				mpmap::iterator mp_map_iter;
+				map <int, long, less <int> >::iterator mp_map_iter;
 
 				// Process Index options for rho convexity and rho residuals
 				#if defined(__EIO_ASSET_H_) 
-				EIO_ASSET *eio_element = NULL;
 
 				if (eio_mp_map_active.size() > 0)
 					{
@@ -8008,15 +8007,14 @@ else if (greek_type == RHO || greek_type == RHO_CONVEXITY)
 						 mp_map_iter++)
 						{
 						mp = mp_map_iter->first;
-						eio_element = company->sm_asset->sm_eio[mp];
 						xstring notional_amt_col_name_final = notional_amt_col_name;
 						xstring opt_val_col_name_final = opt_val_col_name;
 
 						// Check the notional_amt value for the Delta and Gamma assets since they may have been sold
-						if ((eio_element->hdg_grp_code.find("Gamma") < string::npos
-							 || eio_element->hdg_grp_code.find("Delta") < string::npos)
-							&& (t > max(0, eio_element->commencement_period)
-								&& fabs(eio_element->notional_amt(t)) < ASSET_ACTIVE_THRESHOLD))
+						if ((company->sm_asset->sm_eio[mp][0]->hdg_grp_code.find("Gamma") < string::npos
+							 || company->sm_asset->sm_eio[mp][0]->hdg_grp_code.find("Delta") < string::npos)
+							&& (t > max(0, company->sm_asset->sm_eio[mp][0]->commencement_period)
+								&& fabs(company->sm_asset->sm_eio[mp][0]->notional_amt(t)) < ASSET_ACTIVE_THRESHOLD))
 							continue;
 
 						if (shock_direction == BASELINE)
@@ -8032,28 +8030,28 @@ else if (greek_type == RHO || greek_type == RHO_CONVEXITY)
 								opt_val_col_name_final += "_down_1";
 							}
 
-						if (greek_timing == BEFORE_SALE	&& eio_element->hdg_grp_code.find(greek_type_string) < string::npos)
+						if (greek_timing == BEFORE_SALE	&& company->sm_asset->sm_eio[mp][0]->hdg_grp_code.find(greek_type_string) < string::npos)
 							{
 							notional_amt_col_name_final += "_bef_sale";
 							opt_val_col_name_final += "_bef_sale";
 							}
 	
 						if (shock_direction == BASELINE)
-							opt_val_baseline[key_rate][0] += opt_val_shock_detail = eio_element->Column(opt_val_col_name_final).Value(t)
-															                        * eio_element->pct_to_use;
+							opt_val_baseline[key_rate][0] += opt_val_shock_detail = company->sm_asset->sm_eio[mp][0]->Column(opt_val_col_name_final).Value(t)
+															                        * company->sm_asset->sm_eio[mp][0]->pct_to_use;
 						else if (shock_direction == UP)
-							opt_val_up_1[key_rate][0] += opt_val_shock_detail = eio_element->Column(opt_val_col_name_final).Value(t)
-														                        * eio_element->pct_to_use;
+							opt_val_up_1[key_rate][0] += opt_val_shock_detail = company->sm_asset->sm_eio[mp][0]->Column(opt_val_col_name_final).Value(t)
+														                        * company->sm_asset->sm_eio[mp][0]->pct_to_use;
 						else if (shock_direction == DOWN)
-							opt_val_down_1[key_rate][0] += opt_val_shock_detail = eio_element->Column(opt_val_col_name_final).Value(t)
-														                          * eio_element->pct_to_use;
+							opt_val_down_1[key_rate][0] += opt_val_shock_detail = company->sm_asset->sm_eio[mp][0]->Column(opt_val_col_name_final).Value(t)
+														                          * company->sm_asset->sm_eio[mp][0]->pct_to_use;
 
 						if (hedge_strat_detail_flag)
 							{
-							seg->SALFile << detail_shock_id << "," 
-										 << eio_element->asset_id << ","
-										 << eio_element->hdg_grp_code << ","
-										 << eio_element->Column(notional_amt_col_name_final).Value(t) * eio_element->pct_to_use << ","
+							seg_element->SALFile << detail_shock_id << "," 
+										 << company->sm_asset->sm_eio[mp][0]->asset_id << ","
+										 << company->sm_asset->sm_eio[mp][0]->hdg_grp_code << ","
+										 << company->sm_asset->sm_eio[mp][0]->Column(notional_amt_col_name_final).Value(t) * company->sm_asset->sm_eio[mp][0]->pct_to_use << ","
 										 << opt_val_shock_detail << endl;
 							}
 						}
@@ -8061,7 +8059,6 @@ else if (greek_type == RHO || greek_type == RHO_CONVEXITY)
 				#endif
 
 				#if defined(__IRD_ASSET_H_)
-				IRD_ASSET *ird_element = NULL;
 
 				if (ird_mp_map_active.size() > 0)
 					{
@@ -8070,23 +8067,22 @@ else if (greek_type == RHO || greek_type == RHO_CONVEXITY)
 						mp_map_iter++)
 						{
 						mp = mp_map_iter->first;
-						ird_element = company->sm_asset->sm_ird[mp];
 						xstring notional_amt_col_name_final = notional_amt_col_name;
 						xstring opt_val_col_name_final = opt_val_col_name;
 
 						hedge_grp_code = hedge_grp_id + "|" + greek_type_string + "|" + hedge_grp_key_rate;
-						if (greek_type == RHO_CONVEXITY && ird_element->hdg_grp_code != hedge_grp_code)
+						if (greek_type == RHO_CONVEXITY && company->sm_asset->sm_ird[mp][0]->hdg_grp_code != hedge_grp_code)
 							continue;
 
 						// For Rho, we check the notional_amt value for the RhoConvexity assets since they may have been sold
-						if (greek_type == RHO && ird_element->hdg_grp_code.find("RhoConvexity") < string::npos
-							&& (t > max(0, ird_element->commencement_period)
-								&& fabs(ird_element->notional_amt(t)) < ASSET_ACTIVE_THRESHOLD))
+						if (greek_type == RHO && company->sm_asset->sm_ird[mp][0]->hdg_grp_code.find("RhoConvexity") < string::npos
+							&& (t > max(0, company->sm_asset->sm_ird[mp][0]->commencement_period)
+								&& fabs(company->sm_asset->sm_ird[mp][0]->notional_amt(t)) < ASSET_ACTIVE_THRESHOLD))
 							continue;
 
-						if (t < ird_element->commencement_period
-							|| (t > max(0, ird_element->commencement_period)
-								&& fabs(ird_element->notional_amt_bef_sale(t)) < ASSET_ACTIVE_THRESHOLD))
+						if (t < company->sm_asset->sm_ird[mp][0]->commencement_period
+							|| (t > max(0, company->sm_asset->sm_ird[mp][0]->commencement_period)
+								&& fabs(company->sm_asset->sm_ird[mp][0]->notional_amt_bef_sale(t)) < ASSET_ACTIVE_THRESHOLD))
 							continue;
 
 						if (shock_direction == BASELINE)
@@ -8103,32 +8099,32 @@ else if (greek_type == RHO || greek_type == RHO_CONVEXITY)
 							}
 
 						if (greek_type == RHO && greek_timing == BEFORE_SALE
-							&& ird_element->hdg_grp_code.find("RhoConvexity") < string::npos)
+							&& company->sm_asset->sm_ird[mp][0]->hdg_grp_code.find("RhoConvexity") < string::npos)
 							{
 							; // Use after sale results from RhoConvexity assets
 							}								
-						else if (greek_timing == BEFORE_SALE && ird_element->hdg_grp_code.find(greek_type_string) < string::npos)
+						else if (greek_timing == BEFORE_SALE && company->sm_asset->sm_ird[mp][0]->hdg_grp_code.find(greek_type_string) < string::npos)
 							{
 							notional_amt_col_name_final += "_bef_sale";
 							opt_val_col_name_final += "_bef_sale";
 							}
 	
 						if (shock_direction == BASELINE)
-							opt_val_baseline[key_rate][0] += opt_val_shock_detail = ird_element->Column(opt_val_col_name_final).Value(t)
-															                        * ird_element->pct_to_use;
+							opt_val_baseline[key_rate][0] += opt_val_shock_detail = company->sm_asset->sm_ird[mp][0]->Column(opt_val_col_name_final).Value(t)
+															                        * company->sm_asset->sm_ird[mp][0]->pct_to_use;
 						else if (shock_direction == UP)
-							opt_val_up_1[key_rate][0] += opt_val_shock_detail = ird_element->Column(opt_val_col_name_final).Value(t)
-														                        * ird_element->pct_to_use;
+							opt_val_up_1[key_rate][0] += opt_val_shock_detail = company->sm_asset->sm_ird[mp][0]->Column(opt_val_col_name_final).Value(t)
+														                        * company->sm_asset->sm_ird[mp][0]->pct_to_use;
 						else if (shock_direction == DOWN)
-							opt_val_down_1[key_rate][0] += opt_val_shock_detail = ird_element->Column(opt_val_col_name_final).Value(t)
-														                          * ird_element->pct_to_use;
+							opt_val_down_1[key_rate][0] += opt_val_shock_detail = company->sm_asset->sm_ird[mp][0]->Column(opt_val_col_name_final).Value(t)
+														                          * company->sm_asset->sm_ird[mp][0]->pct_to_use;
 
 						if (hedge_strat_detail_flag)
 							{
-							seg->SALFile << detail_shock_id << "," 
-										 << ird_element->asset_id << ","
-										 << ird_element->hdg_grp_code << ","
-										 << ird_element->Column(notional_amt_col_name_final).Value(t) * ird_element->pct_to_use << ","
+							seg_element->SALFile << detail_shock_id << "," 
+										 << company->sm_asset->sm_ird[mp][0]->asset_id << ","
+										 << company->sm_asset->sm_ird[mp][0]->hdg_grp_code << ","
+										 << company->sm_asset->sm_ird[mp][0]->Column(notional_amt_col_name_final).Value(t) * company->sm_asset->sm_ird[mp][0]->pct_to_use << ","
 										 << opt_val_shock_detail << endl;
 							}
 						}
@@ -8144,9 +8140,17 @@ else if (greek_type == RHO || greek_type == RHO_CONVEXITY)
 
 				xstring hedge_asset_id;
 				if (greek_type == RHO)
+					{
+					hedge_grp_id = hedge_grp_id;
+					hedge_grp_key_rate = hedge_grp_key_rate;
 					hedge_asset_id = hedge_grp_rho_hedge_asset_id;
+					}
 				else
+					{
+					hedge_grp_id = hedge_grp_id;
+					hedge_grp_key_rate = hedge_grp_key_rate;
 					hedge_asset_id = hedge_grp_rho_convex_hedge_asset_id;
+					}
 
 				// Setup purchase asset. Will create new interest rate derivative model point
 				double notional_amt_to_purch = ONE_MILLION;
@@ -8162,12 +8166,10 @@ else if (greek_type == RHO || greek_type == RHO_CONVEXITY)
 																		-1.0);
 
 				#if defined(__IRD_ASSET_H_)
-				IRD_ASSET * ird_element;
-				ird_element = asset->sm_ird[new_mp_num];
 
 				// Turn on pricing swap flag
-				if (ird_element->contract_defn == SWAP)
-					ird_element->price_new_purch_swap_contract_flag = true;
+				if (asset->sm_ird[new_mp_num][0]->contract_defn == SWAP)
+					asset->sm_ird[new_mp_num][0]->price_new_purch_swap_contract_flag = true;
 
 				xstring notional_amt_col_name_final = notional_amt_col_name + "_bef_sale";
 				xstring opt_val_col_name_final = opt_val_col_name;
@@ -8186,24 +8188,24 @@ else if (greek_type == RHO || greek_type == RHO_CONVEXITY)
 					}
 
 				if (shock_direction == BASELINE)
-					opt_val_baseline[key_rate][0] += opt_val_shock_detail = ird_element->Column(opt_val_col_name_final).Value(t);
+					opt_val_baseline[key_rate][0] += opt_val_shock_detail = asset->sm_ird[new_mp_num][0]->Column(opt_val_col_name_final).Value(t);
 				else if (shock_direction == UP)
-					opt_val_up_1[key_rate][0] += opt_val_shock_detail = ird_element->Column(opt_val_col_name_final).Value(t);
+					opt_val_up_1[key_rate][0] += opt_val_shock_detail = asset->sm_ird[new_mp_num][0]->Column(opt_val_col_name_final).Value(t);
 				else if (shock_direction == DOWN)
-					opt_val_down_1[key_rate][0] += opt_val_shock_detail = ird_element->Column(opt_val_col_name_final).Value(t);
+					opt_val_down_1[key_rate][0] += opt_val_shock_detail = asset->sm_ird[new_mp_num][0]->Column(opt_val_col_name_final).Value(t);
 
 				if (hedge_strat_detail_flag)
 					{
-					seg->SALFile << detail_shock_id << "," 
-							     << ird_element->asset_id << ","
-								 << ird_element->hdg_grp_code << ","
-								 << ird_element->Column(notional_amt_col_name_final).Value(t) * ird_element->pct_to_use << ","
+					seg_element->SALFile << detail_shock_id << "," 
+							     << asset->sm_ird[new_mp_num][0]->asset_id << ","
+								 << asset->sm_ird[new_mp_num][0]->hdg_grp_code << ","
+								 << asset->sm_ird[new_mp_num][0]->Column(notional_amt_col_name_final).Value(t) * asset->sm_ird[new_mp_num][0]->pct_to_use << ","
 								 << opt_val_shock_detail << endl;
 					}
 
 				// Turn off pricing swap flag
-				if (ird_element->contract_defn == SWAP)
-					ird_element->price_new_purch_swap_contract_flag = false;
+				if (asset->sm_ird[new_mp_num][0]->contract_defn == SWAP)
+					asset->sm_ird[new_mp_num][0]->price_new_purch_swap_contract_flag = false;
 
 				// Remove the temporarily created interest rate derivative model point
 				asset->sm_ird.resize(num_ird_elements);
@@ -8219,14 +8221,14 @@ else if (greek_type == RHO || greek_type == RHO_CONVEXITY)
 		{
 		if (hedge_strat_detail_flag)
 			{
-			seg->SALFile << endl << greek_type_string << " " << greek_timing_string << " Results" << endl;
-			seg->SALFile << "KeyRateTermName," << greek_type_string << endl;
+			seg_element->SALFile << endl << greek_type_string << " " << greek_timing_string << " Results" << endl;
+			seg_element->SALFile << "KeyRateTermName," << greek_type_string << endl;
 			}
 
 		xstring key_rate_term_name;
 		for (int key_rate = 0; key_rate < key_rate_loops; key_rate++)
 			{
-			if (hedge_grp_rho_hedge_liab_shock_defn == PARALLEL)
+			if (hedge_grp_rho_hedge_liab_shock_defn_local == PARALLEL)
 				key_rate_term_name = "Parallel";
 			else
 				key_rate_term_name = company->rho_hedge_key_rate_list[key_rate]; 
@@ -8239,7 +8241,7 @@ else if (greek_type == RHO || greek_type == RHO_CONVEXITY)
 				asset_greeks[map_index] = opt_val_up_1[key_rate][0] + opt_val_down_1[key_rate][0] - 2.0 * opt_val_baseline[key_rate][0];
 
 			if (hedge_strat_detail_flag)
-				seg->SALFile << key_rate_term_name << ","
+				seg_element->SALFile << key_rate_term_name << ","
 							 << asset_greeks[map_index] << endl;
 			}
 		}
@@ -8273,16 +8275,6 @@ void HDG_GRP_COMP::calc_pv_claims_charges(int mp, double &disc_claim_amt_ab_mp, 
 #if defined(__VA_LIAB_H_)
 // These items are the references to the VA model point values
 // The values for these items MUST match the values from the VA startup declarations
-static int POLICIES_MP = 6;
-static int ANN_CLAIMS_GMWB_MP = 37;
-static int ANN_CLAIMS_GMIB_MP = 38;
-static int GMDB_CHG_MP = 21;
-static int GMIB_CHG_MP = 22;
-static int GMWB_CHG_MP = 23;
-static int GMAB_CHG_MP = 24;
-static int GMAB_MATURITIES_MP = 39;
-static int DTH_CLAIMS_GMDB_MP = 40;
-
 double disc_factor = 1.0;
 double disc_factor_mthly = 0.0;
 if (hedge_disc_rate_defn == DETERMINISTIC)
@@ -8319,7 +8311,7 @@ for (int time = 0; time <= final_period; time++)
 		continue;
 
 	if (time > liab->sm_va[mp]->commencement_period + 1
-		&& fabs(liab->sm_va[mp]->va_mp_vals[POLICIES_MP][time - 1]) < rate_ratio_threshold)
+		&& fabs(liab->sm_va[mp]->policies_inf(time - 1)) < rate_ratio_threshold)
 		continue;
 
 	//Terminate calculations when GMAB has matured		
@@ -8330,30 +8322,28 @@ for (int time = 0; time <= final_period; time++)
 		&& !liab->sm_va[mp]->gmwb_flag)
 		break;
 
-	liab->sm_va[mp]->mp_processed(time);
-
 	if (liab->sm_va[mp]->gmdb_flag)
 		{
-		claim_amt_t_gmdb += liab->sm_va[mp]->va_mp_vals[DTH_CLAIMS_GMDB_MP][time]; 
-		claim_fee_t_gmdb += liab->sm_va[mp]->va_mp_vals[GMDB_CHG_MP][time];
+		claim_amt_t_gmdb += liab->sm_va[mp]->dth_claims_gmdb(time); 
+		claim_fee_t_gmdb += liab->sm_va[mp]->gmdb_chg(time);
 		}
 				
 	if (liab->sm_va[mp]->gmab_flag)
 		{
-		claim_amt_t_gmab += liab->sm_va[mp]->va_mp_vals[GMAB_MATURITIES_MP][time]; 
-		claim_fee_t_gmab += liab->sm_va[mp]->va_mp_vals[GMAB_CHG_MP][time];
+		claim_amt_t_gmab += liab->sm_va[mp]->maturity_claims_gmab(time); 
+		claim_fee_t_gmab += liab->sm_va[mp]->gmab_chg(time);
 		}
 				
 	if (liab->sm_va[mp]->gmib_flag)
 		{
-		claim_amt_t_gmib += liab->sm_va[mp]->va_mp_vals[ANN_CLAIMS_GMIB_MP][time];
-		claim_fee_t_gmib += liab->sm_va[mp]->va_mp_vals[GMIB_CHG_MP][time];
+		claim_amt_t_gmib += liab->sm_va[mp]->ann_claims_gmib(time);
+		claim_fee_t_gmib += liab->sm_va[mp]->gmib_chg(time);
 		}
 
 	if (liab->sm_va[mp]->gmwb_flag) 
 		{
-		claim_amt_t_gmwb += liab->sm_va[mp]->va_mp_vals[ANN_CLAIMS_GMWB_MP][time];
-		claim_fee_t_gmwb += liab->sm_va[mp]->va_mp_vals[GMWB_CHG_MP][time];
+		claim_amt_t_gmwb += liab->sm_va[mp]->ann_claims_gmwb(time);
+		claim_fee_t_gmwb += liab->sm_va[mp]->gmwb_chg(time);
 		}
 	
 	//Calculate discount rate
@@ -8408,8 +8398,8 @@ calc_asset_greeks(t, DELTA, BEFORE_SALE);
 
 if (hedge_strat_detail_flag)
 	{
-	seg->SALFile << endl;
-	seg->SALFile << "Delta Hedge Strategy Setup for "
+	seg_element->SALFile << endl;
+	seg_element->SALFile << "Delta Hedge Strategy Setup for "
 				 << "Hedge Group=" << hedge_grp_id << " " 
 	             << "Period=" << t << " "
 				 << "Year=" << xint(cal_yr(t)) << " "
@@ -8418,13 +8408,16 @@ if (hedge_strat_detail_flag)
 
 // Write detail header
 if (hedge_strat_detail_flag)
-	seg->SALFile << "IndexName,DeltaLiab,DeltaTolPctLiab,DeltaTolDollar,DeltaAssetMax,DeltaAssetMin,DeltaAsset,DeltaHedgePct,AssetDeltaNeeded" << endl;
+	seg_element->SALFile << "IndexName,DeltaLiab,DeltaTolPctLiab,DeltaTolDollar,DeltaAssetMax,DeltaAssetMin,DeltaAsset,DeltaHedgePct,AssetDeltaNeeded" << endl;
 
-if (hedge_grp_delta_hedge_liab_shock_defn == PARALLEL)
+hedge_grp_id = hedge_grp_id;
+StrEnum::EnumValue hedge_grp_delta_hedge_liab_shock_defn_local = hedge_grp_delta_hedge_liab_shock_defn;
+
+if (hedge_grp_delta_hedge_liab_shock_defn_local == PARALLEL)
 	{
 	// Find the parallel shock from the delta_hedge_shock_list
-	// 20191021 STW: fix compiler error while converting from RAFM 2.6 to RAFM 2.8
-	int shock_element;
+	int shock_element = 0;
+
 	for (shock_element = 0; shock_element < company->delta_gamma_hedge_shock_list.size(); shock_element++)
 		{
 		xstring shock_string = company->delta_gamma_hedge_shock_list[shock_element]; 
@@ -8449,8 +8442,16 @@ if (hedge_grp_delta_hedge_liab_shock_defn == PARALLEL)
 	// Set lookup key
 	hedge_grp_index_name = "Parallel";
 
+	hedge_grp_id = hedge_grp_id;
+	hedge_grp_index_name = hedge_grp_index_name;
 	delta_tolerance_liab = hedge_grp_delta_hedge_tolerance_pct_liab_delta;
+
+	hedge_grp_id = hedge_grp_id;
+	hedge_grp_index_name = hedge_grp_index_name;
 	delta_tolerance_dollar = hedge_grp_delta_hedge_tolerance_dollar;
+
+	hedge_grp_id = hedge_grp_id;
+	hedge_grp_index_name = hedge_grp_index_name;
 	delta_hedge_pct = hedge_grp_delta_hedge_pct;
 
 	xstring liab_greek_map_index = "Delta_Parallel_" + xstring(t);
@@ -8477,7 +8478,7 @@ if (hedge_grp_delta_hedge_liab_shock_defn == PARALLEL)
 		asset_greeks_needed[greek_needed_map] = delta_asset;	
 
 	if (hedge_strat_detail_flag)
-		seg->SALFile << "Parallel," 
+		seg_element->SALFile << "Parallel," 
 			         << delta_liab << ","
 					 << delta_tolerance_liab << ","
 					 << delta_tolerance_dollar << ","
@@ -8487,7 +8488,7 @@ if (hedge_grp_delta_hedge_liab_shock_defn == PARALLEL)
 					 << delta_hedge_pct << ","
 					 << asset_greeks_needed[greek_needed_map] << endl;
 	}
-else // hedge_grp_delta_hedge_liab_shock_defn == INDEX_SPECIFIC
+else // hedge_grp_delta_hedge_liab_shock_defn_local == INDEX_SPECIFIC
 	{
 	for (int index = 0; index < company->delta_gamma_hedge_index_list.size(); index++)
 		{
@@ -8498,8 +8499,8 @@ else // hedge_grp_delta_hedge_liab_shock_defn == INDEX_SPECIFIC
 			continue;
 
 		// Find the index shock from the delta_hedge_shock_list
-		// 20191021 STW: fix compiler error while converting from RAFM 2.6 to RAFM 2.8
-		int shock_element;
+		int shock_element = 0;
+
 		for (shock_element = 0; shock_element < company->delta_gamma_hedge_shock_list.size(); shock_element++)
 			{
 			xstring shock_string = company->delta_gamma_hedge_shock_list[shock_element]; 
@@ -8520,8 +8521,16 @@ else // hedge_grp_delta_hedge_liab_shock_defn == INDEX_SPECIFIC
 			throw FatalError(message);
 			}
 
+		hedge_grp_id = hedge_grp_id;
+		hedge_grp_index_name = hedge_grp_index_name;
 		delta_tolerance_liab = hedge_grp_delta_hedge_tolerance_pct_liab_delta;
+		
+		hedge_grp_id = hedge_grp_id;
+		hedge_grp_index_name = hedge_grp_index_name;
 		delta_tolerance_dollar = hedge_grp_delta_hedge_tolerance_dollar;
+		
+		hedge_grp_id = hedge_grp_id;
+		hedge_grp_index_name = hedge_grp_index_name;
 		delta_hedge_pct = hedge_grp_delta_hedge_pct;
 
 		xstring liab_greek_map_index = "Delta_" + hedge_grp_index_name + "_" + xstring(t);
@@ -8548,7 +8557,7 @@ else // hedge_grp_delta_hedge_liab_shock_defn == INDEX_SPECIFIC
 			asset_greeks_needed[greek_needed_map] = delta_asset;	
 
 		if (hedge_strat_detail_flag)
-			seg->SALFile << hedge_grp_index_name << "," 
+			seg_element->SALFile << hedge_grp_index_name << "," 
 						 << delta_liab << ","
 						 << delta_tolerance_liab << ","
 						 << delta_tolerance_dollar << ","
@@ -8584,8 +8593,8 @@ calc_asset_greeks(t, GAMMA, BEFORE_SALE);
 
 if (hedge_strat_detail_flag)
 	{
-	seg->SALFile << endl;
-	seg->SALFile << "Gamma Hedge Strategy Setup for "
+	seg_element->SALFile << endl;
+	seg_element->SALFile << "Gamma Hedge Strategy Setup for "
 				 << "Hedge Group=" << hedge_grp_id << " " 
 	             << "Period=" << t << " "
 				 << "Year=" << xint(cal_yr(t)) << " "
@@ -8594,13 +8603,16 @@ if (hedge_strat_detail_flag)
 
 // Write detail header
 if (hedge_strat_detail_flag)
-	seg->SALFile << "IndexName,GammaLiab,GammaTolPctLiab,GammaTolDollar,GammaAssetMax,GammaAssetMin,GammaAsset,GammaHedgePct,AssetGammaNeeded" << endl;
+	seg_element->SALFile << "IndexName,GammaLiab,GammaTolPctLiab,GammaTolDollar,GammaAssetMax,GammaAssetMin,GammaAsset,GammaHedgePct,AssetGammaNeeded" << endl;
 
-if (hedge_grp_gamma_vega_hedge_liab_shock_defn == PARALLEL)
+hedge_grp_id = hedge_grp_id;
+StrEnum::EnumValue hedge_grp_gamma_vega_hedge_liab_shock_defn_local = hedge_grp_gamma_vega_hedge_liab_shock_defn;
+
+if (hedge_grp_gamma_vega_hedge_liab_shock_defn_local == PARALLEL)
 	{
 	// Find the parallel shock from the gamma_hedge_shock_list
-	// 20191021 STW: fix compiler error while converting from RAFM 2.6 to RAFM 2.8
-	int shock_element;
+	int shock_element = 0;
+
 	for (shock_element = 0; shock_element < company->delta_gamma_hedge_shock_list.size(); shock_element++)
 		{
 		xstring shock_string = company->delta_gamma_hedge_shock_list[shock_element]; 
@@ -8624,9 +8636,17 @@ if (hedge_grp_gamma_vega_hedge_liab_shock_defn == PARALLEL)
 	// set lookup keys
 	hedge_grp_index_name = "Parallel";
 	hedge_grp_index_term = "AllTerms";
-
+	hedge_grp_id = hedge_grp_id;
 	gamma_tolerance_liab = hedge_grp_gamma_vega_hedge_tolerance_pct_liab_gamma_vega;
+
+	hedge_grp_index_name = "Parallel";
+	hedge_grp_index_term = "AllTerms";
+	hedge_grp_id = hedge_grp_id;
 	gamma_tolerance_dollar = hedge_grp_gamma_vega_hedge_tolerance_dollar;
+	
+	hedge_grp_index_name = "Parallel";
+	hedge_grp_index_term = "AllTerms";
+	hedge_grp_id = hedge_grp_id;
 	gamma_hedge_pct = hedge_grp_gamma_vega_hedge_pct;
 
 	xstring liab_greek_map_index = "Gamma_Parallel_" + xstring(t);
@@ -8653,7 +8673,7 @@ if (hedge_grp_gamma_vega_hedge_liab_shock_defn == PARALLEL)
 		asset_greeks_needed[greek_needed_map] = gamma_asset;	
 
 	if (hedge_strat_detail_flag)
-		seg->SALFile << "Parallel," 
+		seg_element->SALFile << "Parallel," 
 			         << gamma_liab << ","
 					 << gamma_tolerance_liab << ","
 					 << gamma_tolerance_dollar << ","
@@ -8663,7 +8683,7 @@ if (hedge_grp_gamma_vega_hedge_liab_shock_defn == PARALLEL)
 					 << gamma_hedge_pct << ","
 					 << asset_greeks_needed[greek_needed_map] << endl;
 	}
-else // hedge_grp_gamma_vega_hedge_liab_shock_defn == INDEX_SPECIFIC
+else // hedge_grp_gamma_vega_hedge_liab_shock_defn_local == INDEX_SPECIFIC
 	{
 	for (int index = 0; index < company->delta_gamma_hedge_index_list.size(); index++)
 		{
@@ -8672,8 +8692,8 @@ else // hedge_grp_gamma_vega_hedge_liab_shock_defn == INDEX_SPECIFIC
 		hedge_grp_index_term = "AllTerms";
 	
 		// Find the index shock from the delta_gamma_hedge_shock_list
-		// 20191021 STW: fix compiler error while converting from RAFM 2.6 to RAFM 2.8
-		int shock_element;
+		int shock_element = 0;
+
 		for (shock_element = 0; shock_element < company->delta_gamma_hedge_shock_list.size(); shock_element++)
 			{
 			xstring shock_string = company->delta_gamma_hedge_shock_list[shock_element]; 
@@ -8694,8 +8714,19 @@ else // hedge_grp_gamma_vega_hedge_liab_shock_defn == INDEX_SPECIFIC
 			throw FatalError(message);
 			}
 
+		hedge_grp_index_name = hedge_grp_index_name;
+		hedge_grp_index_term = hedge_grp_index_term;
+		hedge_grp_id = hedge_grp_id;
 		gamma_tolerance_liab = hedge_grp_gamma_vega_hedge_tolerance_pct_liab_gamma_vega;
+
+		hedge_grp_index_name = hedge_grp_index_name;
+		hedge_grp_index_term = hedge_grp_index_term;
+		hedge_grp_id = hedge_grp_id;
 		gamma_tolerance_dollar = hedge_grp_gamma_vega_hedge_tolerance_dollar;
+
+		hedge_grp_index_name = hedge_grp_index_name;
+		hedge_grp_index_term = hedge_grp_index_term;
+		hedge_grp_id = hedge_grp_id;
 		gamma_hedge_pct = hedge_grp_gamma_vega_hedge_pct;
 
 		xstring liab_greek_map_index = "Gamma_" + hedge_grp_index_name + "_" + xstring(t);
@@ -8722,7 +8753,7 @@ else // hedge_grp_gamma_vega_hedge_liab_shock_defn == INDEX_SPECIFIC
 			asset_greeks_needed[greek_needed_map] = gamma_asset;	
 
 		if (hedge_strat_detail_flag)
-			seg->SALFile << hedge_grp_index_name << "," 
+			seg_element->SALFile << hedge_grp_index_name << "," 
 						 << gamma_liab << ","
 						 << gamma_tolerance_liab << ","
 						 << gamma_tolerance_dollar << ","
@@ -8752,28 +8783,10 @@ if (hedge_proj_stmt_flag)
 		{
 		first_time = false;
 
-		string database_name = working_directory() + "hedge_grp_get_hedge_valn_final_results.db";
-		openDatabase(database_name);
-		string table_name = readCsvFile(file_name.getStdStr());
+		OutputFileReader ofr;
+		valn_hedge_final_input = ofr.readFile(file_name.getStdStr(), {"group", "task_loop", "period", "econ_res"});
 
-		// Retrieve valuation results
-		xstring report_columns = xstring("_econ_res");
-		
-		xstring select_concat = xstring("SELECT (TRIM(_group) | TRIM(_period)) AS vgroup, ");
-		
-		xstring sql = (xstring)"SELECT TRIM(_group) AS vgroup, "
-					  + (xstring)"CAST(_task_loop AS INTEGER) AS vtaskloop, "
-					  + (xstring)"CAST(_period AS INTEGER) AS vperiod, "
-					  + report_columns
-					  + (xstring)" FROM '"
-					  + table_name
-					  + (xstring)"' ORDER BY vgroup, vperiod";
-		
-		executeQuery(sql.getStdStr(), valn_hedge_final_input_cols, valn_hedge_final_input);
-		closeDatabase();
-		remove(database_name.c_str());
-
-		if (!valn_hedge_final_input_cols.size())
+		if (!valn_hedge_final_input.size())
 			{
 			throw FatalError("Could not read Hedge Final file: " 
 							  + file_name + " "
@@ -8793,7 +8806,7 @@ if (hedge_proj_stmt_flag)
 			output_period = xstring(valn_hedge_final_input[row][2]);
 			storage_index = output_task_loop + "|" + output_group_name + "|" + output_period;
 
-			seg->va_hedge_final_vals[storage_index] = atof(valn_hedge_final_input[row][3].c_str());
+			seg_element->va_hedge_final_vals[storage_index] = atof(valn_hedge_final_input[row][3].c_str());
 			}
 		}
 
@@ -8809,7 +8822,29 @@ if (hedge_proj_stmt_flag)
 	double econ_res_down = 0.;
 	double baseline = 0.;
 
-	hedge_group_name = proj_task_loop_num_string + "|" + seg_id + "|" + group;
+	hedge_group_name = proj_task_loop_num_string + "|" + get_base_group_name(group, true);
+
+	hedge_grp_id = hedge_grp_id;
+	StrEnum::EnumValue hedge_grp_delta_hedge_defn_local = hedge_grp_delta_hedge_defn;
+	hedge_grp_id = hedge_grp_id;
+	StrEnum::EnumValue hedge_grp_delta_hedge_liab_shock_defn_local = hedge_grp_delta_hedge_liab_shock_defn;
+	
+	hedge_grp_id = hedge_grp_id;
+	StrEnum::EnumValue hedge_grp_gamma_vega_hedge_defn_local = hedge_grp_gamma_vega_hedge_defn;
+	hedge_grp_id = hedge_grp_id;
+	StrEnum::EnumValue hedge_grp_gamma_vega_hedge_liab_shock_defn_local = hedge_grp_gamma_vega_hedge_liab_shock_defn;
+	hedge_grp_id = hedge_grp_id;
+	StrEnum::EnumValue hedge_grp_gamma_vega_hedge_type_defn_local = hedge_grp_gamma_vega_hedge_type_defn;
+
+	hedge_grp_id = hedge_grp_id;
+	StrEnum::EnumValue hedge_grp_rho_hedge_defn_local = hedge_grp_rho_hedge_defn;
+	hedge_grp_id = hedge_grp_id;
+	StrEnum::EnumValue hedge_grp_rho_hedge_liab_shock_defn_local = hedge_grp_rho_hedge_liab_shock_defn;
+	
+	hedge_grp_id = hedge_grp_id;
+	StrEnum::EnumValue hedge_grp_rho_convex_hedge_defn_local = hedge_grp_rho_convex_hedge_defn;
+	hedge_grp_id = hedge_grp_id;
+	StrEnum::EnumValue hedge_grp_rho_convex_hedge_liab_shock_defn_local = hedge_grp_rho_convex_hedge_liab_shock_defn;
 
 	for (time = 0; time <= last_proj_period; time++)
 		{
@@ -8819,22 +8854,22 @@ if (hedge_proj_stmt_flag)
 		econ_res_lookup = hedge_group_name + "|Baseline|" + xstring(time);
 		greek_index = "Baseline_" + xstring(time);
 
-		liab_greeks[greek_index] = seg->va_hedge_final_vals[econ_res_lookup];
+		liab_greeks[greek_index] = seg_element->va_hedge_final_vals[econ_res_lookup];
 		baseline = liab_greeks[greek_index];
-
-		if (hedge_grp_delta_hedge_defn == YES)//Calculate Group Delta Values by time period
+		
+		if (hedge_grp_delta_hedge_defn_local == YES)//Calculate Group Delta Values by time period
 			{
-			if (hedge_grp_delta_hedge_liab_shock_defn == INDEX_SPECIFIC)
+			if (hedge_grp_delta_hedge_liab_shock_defn_local == INDEX_SPECIFIC)
 				{
 				for (int i = 0; i < company->delta_gamma_hedge_index_list.size(); i++)
 					{					
 					//Up Shock
 					econ_res_lookup = hedge_group_name + "|" + company->delta_gamma_hedge_index_list[i] + "EqtPriceUp|" + xstring(time);
-					econ_res_up = seg->va_hedge_final_vals[econ_res_lookup];
+					econ_res_up = seg_element->va_hedge_final_vals[econ_res_lookup];
 
 					//Down Shock
 					econ_res_lookup = hedge_group_name + "|" + company->delta_gamma_hedge_index_list[i] + "EqtPriceDown|" + xstring(time);
-					econ_res_down = seg->va_hedge_final_vals[econ_res_lookup];
+					econ_res_down = seg_element->va_hedge_final_vals[econ_res_lookup];
 
 					greek_index = "Delta_" + company->delta_gamma_hedge_index_list[i] + "_" + xstring(time);
 					liab_greeks[greek_index] = econ_res_up - econ_res_down;
@@ -8844,32 +8879,32 @@ if (hedge_proj_stmt_flag)
 				{
 				//Up Shock
 				econ_res_lookup = hedge_group_name + "|ParallelEqtPriceUp|" + xstring(time);
-				econ_res_up = seg->va_hedge_final_vals[econ_res_lookup];
+				econ_res_up = seg_element->va_hedge_final_vals[econ_res_lookup];
 
 				//Down Shock
 				econ_res_lookup = hedge_group_name + "|ParallelEqtPriceDown|" + xstring(time);
-				econ_res_down = seg->va_hedge_final_vals[econ_res_lookup];
+				econ_res_down = seg_element->va_hedge_final_vals[econ_res_lookup];
 
 				greek_index = "Delta_Parallel_" + xstring(time);
 				liab_greeks[greek_index] = econ_res_up - econ_res_down;
 				}
 			}
 		
-		if (hedge_grp_gamma_vega_hedge_defn == YES)//Calculate Group Gamma/Vega Values by time period
+		if (hedge_grp_gamma_vega_hedge_defn_local == YES)//Calculate Group Gamma/Vega Values by time period
 			{
-			if (hedge_grp_gamma_vega_hedge_liab_shock_defn == INDEX_SPECIFIC)
+			if (hedge_grp_gamma_vega_hedge_liab_shock_defn_local == INDEX_SPECIFIC)
 				{
-				if (hedge_grp_gamma_vega_hedge_type_defn == GAMMA)
+				if (hedge_grp_gamma_vega_hedge_type_defn_local == GAMMA)
 					{
 					for (int i = 0; i < company->delta_gamma_hedge_index_list.size(); i++)
 						{					
 						//Up Shock
 						econ_res_lookup = hedge_group_name + "|" + company->delta_gamma_hedge_index_list[i] + "EqtPriceUp" + "|" + xstring(time);
-						econ_res_up = seg->va_hedge_final_vals[econ_res_lookup];
+						econ_res_up = seg_element->va_hedge_final_vals[econ_res_lookup];
 
 						//Down Shock
 						econ_res_lookup = hedge_group_name + "|" + company->delta_gamma_hedge_index_list[i] + "EqtPriceDown" + "|" + xstring(time);
-						econ_res_down = seg->va_hedge_final_vals[econ_res_lookup];
+						econ_res_down = seg_element->va_hedge_final_vals[econ_res_lookup];
 
 						greek_index = "Gamma_" + company->delta_gamma_hedge_index_list[i] + "_" + xstring(time);
 						liab_greeks[greek_index] = econ_res_up + econ_res_down - baseline * 2.0;
@@ -8883,11 +8918,11 @@ if (hedge_proj_stmt_flag)
 							{
 							//Up Shock
 							econ_res_lookup = hedge_group_name + "|" + company->vega_hedge_index_term_list[i] + "Up|" + xstring(time);
-							econ_res_up = seg->va_hedge_final_vals[econ_res_lookup];
+							econ_res_up = seg_element->va_hedge_final_vals[econ_res_lookup];
 
 							//Down Shock
 							econ_res_lookup = hedge_group_name + "|" + company->vega_hedge_index_term_list[i] + "Down|" + xstring(time);
-							econ_res_down = seg->va_hedge_final_vals[econ_res_lookup];
+							econ_res_down = seg_element->va_hedge_final_vals[econ_res_lookup];
 
 							xstring index = company->vega_hedge_index_term_list[i](0,company->vega_hedge_index_term_list[i].find("EqtVolAllTerms"));
 							
@@ -8897,7 +8932,7 @@ if (hedge_proj_stmt_flag)
 						}				
 					}
 				}
-			else if (hedge_grp_gamma_vega_hedge_liab_shock_defn == INDEX_TERM_SPECIFIC && hedge_grp_gamma_vega_hedge_type_defn == VEGA)
+			else if (hedge_grp_gamma_vega_hedge_liab_shock_defn_local == INDEX_TERM_SPECIFIC && hedge_grp_gamma_vega_hedge_type_defn_local == VEGA)
 				{
 				for (int i = 0; i < company->vega_hedge_index_term_list.size(); i++)
 					{										
@@ -8905,11 +8940,11 @@ if (hedge_proj_stmt_flag)
 						{
 						//Up Shock
 						econ_res_lookup = hedge_group_name + "|" + company->vega_hedge_index_term_list[i] + "Up|" + xstring(time);
-						econ_res_up = seg->va_hedge_final_vals[econ_res_lookup];
+						econ_res_up = seg_element->va_hedge_final_vals[econ_res_lookup];
 
 						//Down Shock
 						econ_res_lookup = hedge_group_name + "|" + company->vega_hedge_index_term_list[i] + "Down|" + xstring(time);
-						econ_res_down = seg->va_hedge_final_vals[econ_res_lookup];
+						econ_res_down = seg_element->va_hedge_final_vals[econ_res_lookup];
 
 						int EqtVolPos = company->vega_hedge_index_term_list[i].find("EqtVol") + 6;
 						int length = company->vega_hedge_index_term_list[i].length();
@@ -8926,41 +8961,41 @@ if (hedge_proj_stmt_flag)
 				{
 				xstring econ_res_lookup_shock;
 
-				if (hedge_grp_gamma_vega_hedge_type_defn == GAMMA)
+				if (hedge_grp_gamma_vega_hedge_type_defn_local == GAMMA)
 					econ_res_lookup_shock = "EqtPrice";
 				else
 					econ_res_lookup_shock = "EqtVol";
 
 				//Up Shock
 				econ_res_lookup = hedge_group_name + "|Parallel" + econ_res_lookup_shock + "Up|" + xstring(time);
-				econ_res_up = seg->va_hedge_final_vals[econ_res_lookup];
+				econ_res_up = seg_element->va_hedge_final_vals[econ_res_lookup];
 
 				//Down Shock
 				econ_res_lookup = hedge_group_name + "|Parallel" + econ_res_lookup_shock + "Down|" + xstring(time);
-				econ_res_down = seg->va_hedge_final_vals[econ_res_lookup];
+				econ_res_down = seg_element->va_hedge_final_vals[econ_res_lookup];
 
-				greek_index = hedge_grp_gamma_vega_hedge_type_defn + "_Parallel_" + xstring(time);
+				greek_index = hedge_grp_gamma_vega_hedge_type_defn_local + "_Parallel_" + xstring(time);
 
-				if (hedge_grp_gamma_vega_hedge_type_defn == GAMMA)
+				if (hedge_grp_gamma_vega_hedge_type_defn_local == GAMMA)
 					liab_greeks[greek_index] = econ_res_up + econ_res_down - baseline * 2.;
 				else
 					liab_greeks[greek_index] = econ_res_up - econ_res_down;
 				}
 			}
 
-		if (hedge_grp_rho_hedge_defn == YES)//Calculate Group Rho Values by time period
+		if (hedge_grp_rho_hedge_defn_local == YES)//Calculate Group Rho Values by time period
 			{
-			if (hedge_grp_rho_hedge_liab_shock_defn == KEY_RATE_SPECIFIC)
+			if (hedge_grp_rho_hedge_liab_shock_defn_local == KEY_RATE_SPECIFIC)
 				{
 				for (int i = 0; i < company->rho_hedge_key_rate_list.size(); i++)
 					{					
 					//Up Shock
 					econ_res_lookup = hedge_group_name + "|" + company->rho_hedge_key_rate_list[i] + "IntRateUp|" + xstring(time);
-					econ_res_up = seg->va_hedge_final_vals[econ_res_lookup];
+					econ_res_up = seg_element->va_hedge_final_vals[econ_res_lookup];
 
 					//Down Shock
 					econ_res_lookup = hedge_group_name + "|" + company->rho_hedge_key_rate_list[i] + "IntRateDown|" + xstring(time);
-					econ_res_down = seg->va_hedge_final_vals[econ_res_lookup];
+					econ_res_down = seg_element->va_hedge_final_vals[econ_res_lookup];
 
 					greek_index = "Rho_" + company->rho_hedge_key_rate_list[i] + "_" + xstring(time);
 					liab_greeks[greek_index] = econ_res_up - econ_res_down;
@@ -8970,30 +9005,30 @@ if (hedge_proj_stmt_flag)
 				{
 				//Up Shock
 				econ_res_lookup = hedge_group_name + "|ParallelIntRateUp|" + xstring(time);
-				econ_res_up = seg->va_hedge_final_vals[econ_res_lookup];
+				econ_res_up = seg_element->va_hedge_final_vals[econ_res_lookup];
 
 				//Down Shock
 				econ_res_lookup = hedge_group_name + "|ParallelIntRateDown|" + xstring(time);
-				econ_res_down = seg->va_hedge_final_vals[econ_res_lookup];
+				econ_res_down = seg_element->va_hedge_final_vals[econ_res_lookup];
 
 				greek_index = "Rho_Parallel_" + xstring(time);
 				liab_greeks[greek_index] = econ_res_up - econ_res_down;
 				}
 			}
 
-		if (hedge_grp_rho_convex_hedge_defn == YES)//Calculate Group Rho Convexity Values by time period
+		if (hedge_grp_rho_convex_hedge_defn_local == YES)//Calculate Group Rho Convexity Values by time period
 			{
-			if (hedge_grp_rho_convex_hedge_liab_shock_defn == KEY_RATE_SPECIFIC)
+			if (hedge_grp_rho_convex_hedge_liab_shock_defn_local == KEY_RATE_SPECIFIC)
 				{
 				for (int i = 0; i < company->rho_hedge_key_rate_list.size(); i++)
 					{					
 					//Up Shock
 					econ_res_lookup = hedge_group_name + "|" + company->rho_hedge_key_rate_list[i] + "IntRateUp|" + xstring(time);
-					econ_res_up = seg->va_hedge_final_vals[econ_res_lookup];
+					econ_res_up = seg_element->va_hedge_final_vals[econ_res_lookup];
 
 					//Down Shock
 					econ_res_lookup = hedge_group_name + "|" + company->rho_hedge_key_rate_list[i] + "IntRateDown|" + xstring(time);
-					econ_res_down = seg->va_hedge_final_vals[econ_res_lookup];
+					econ_res_down = seg_element->va_hedge_final_vals[econ_res_lookup];
 
 					greek_index = "RhoConvexity_" + company->rho_hedge_key_rate_list[i] + "_" + xstring(time);
 					liab_greeks[greek_index] = econ_res_up + econ_res_down - baseline * 2.0;
@@ -9003,11 +9038,11 @@ if (hedge_proj_stmt_flag)
 				{
 				//Up Shock
 				econ_res_lookup = hedge_group_name + "|ParallelIntRateUp|" + xstring(time);
-				econ_res_up = seg->va_hedge_final_vals[econ_res_lookup];
+				econ_res_up = seg_element->va_hedge_final_vals[econ_res_lookup];
 
 				//Down Shock
 				econ_res_lookup = hedge_group_name + "|ParallelIntRateDown|" + xstring(time);
-				econ_res_down = seg->va_hedge_final_vals[econ_res_lookup];
+				econ_res_down = seg_element->va_hedge_final_vals[econ_res_lookup];
 
 				greek_index = "RhoConvexity_Parallel_" + xstring(time);
 				liab_greeks[greek_index] = econ_res_up + econ_res_down - baseline * 2.0;
@@ -9036,97 +9071,45 @@ if (hedge_valn_final_flag || !valn_flag)
 		{
 		first_time = false;
 
-		string database_name = working_directory() + "hedge_grp_get_hedge_valn_results.db";
-		openDatabase(database_name);
-		string table_name = readCsvFile(file_name.getStdStr());
+		OutputFileReader ofr;
+		valn_hedge_input = ofr.readFile(file_name.getStdStr(), {"group", "period", "pv_claims", "pv_charges"});
 
-		// Retrieve valuation results
-		xstring report_columns = xstring("_pv_claims, _pv_charges");
-
-		xstring sql = (xstring)"SELECT TRIM(_group) AS vgroup, "
-					  + (xstring)"CAST(_period AS INTEGER) AS vperiod, "
-					  + report_columns
-					  + (xstring)" FROM '"
-					  + table_name 
-		   			  + (xstring)"' WHERE vperiod == 0 ORDER BY vgroup";
-
-		executeQuery(sql.getStdStr(), valn_hedge_input_cols, valn_hedge_input);
-		closeDatabase();
-		remove(database_name.c_str());
-
-		if (!valn_hedge_input_cols.size())
+		if (!valn_hedge_input.size())
 			{
 			throw FatalError("Could not read Hedge valuation file: " 
 							  + file_name + " "
 							  + "Please check your data.");
 			}
-
-		// Create map of group start positions, group is column 0 of query results
-		// Strip any leading "|" character
-		xstring output_group_name;
-		output_group_name = xstring(valn_hedge_input[0][0]);
-
-		if (output_group_name(0, 1) == "|")
-			output_group_name = output_group_name(1, output_group_name.length()-1);   
-
-		valn_hedge_input_pos[output_group_name] = 0;
-
-		for (int row = 1; row < valn_hedge_input.size(); row++)
-			{
-			if (!eq(valn_hedge_input[row][0], valn_hedge_input[row - 1][0]))
-				{
-				output_group_name = xstring(valn_hedge_input[row][0]);
-
-				if (output_group_name(0, 1) == "|")
-					output_group_name = output_group_name(1, output_group_name.length()-1);   
-
-				valn_hedge_input_pos[output_group_name] = row;
-				}
-			}
 		}
 	
-	xstring group_name;
-	group_name = seg_id + "|" + group;
-	
-	// Find group start position
-	int valn_hedge_input_row = 0;
-	int valn_hedge_next_input_row = valn_hedge_input.size();	
-	if ((valn_hedge_input_pos_iter 
-		 = valn_hedge_input_pos.find(group_name)) != valn_hedge_input_pos.end())
-		{
-		valn_hedge_input_row = valn_hedge_input_pos_iter->second;
+	xstring group_name = get_base_group_name(group, true);
 
-		// Determine the number of rows for the group
-		deptaskmapiter temp_iter;
-		for (temp_iter = valn_hedge_input_pos.begin();
-			 temp_iter != valn_hedge_input_pos.end();
-			 temp_iter++) 
-			 {
-			 if (temp_iter->second > valn_hedge_input_row)
-				valn_hedge_next_input_row = min(valn_hedge_next_input_row, temp_iter->second);
-			 }
+	int proj_task_loops = 0;
 
-		int start_row = valn_hedge_input_row;
-		int end_row = valn_hedge_next_input_row;
-		int proj_task_loops = 0;
-
-		// Initialize the array values to 0
-		hedge_valn_array[hedge_grp_bucket_id][AVG_PV_CLAIMS] = 0.0;
-		hedge_valn_array[hedge_grp_bucket_id][AVG_PV_CHARGES] = 0.0;		
+	// Initialize the array values to 0
+	hedge_valn_array[hedge_grp_bucket_id][AVG_PV_CLAIMS] = 0.0;
+	hedge_valn_array[hedge_grp_bucket_id][AVG_PV_CHARGES] = 0.0;		
 		
-		for (int row = start_row; row < end_row; row++)
-			{
-			proj_task_loops += 1;
-			hedge_valn_array[hedge_grp_bucket_id][AVG_PV_CLAIMS] += atof(valn_hedge_input[row][2].c_str());
-			hedge_valn_array[hedge_grp_bucket_id][AVG_PV_CHARGES] += atof(valn_hedge_input[row][3].c_str());	
-			}
+	for (int row = 0; row < valn_hedge_input.size(); row++)
+		{
+		if (!eq(valn_hedge_input[row][0], group_name))
+			continue;
+	
+		if (!eq(valn_hedge_input[row][1], "0"))
+			continue;
+	
+		hedge_valn_array[hedge_grp_bucket_id][AVG_PV_CLAIMS] += atof(valn_hedge_input[row][2].c_str());
+		hedge_valn_array[hedge_grp_bucket_id][AVG_PV_CHARGES] += atof(valn_hedge_input[row][3].c_str());	
+		proj_task_loops += 1;
 
-		if (proj_task_loops > 0)
-			{
-			hedge_valn_array[hedge_grp_bucket_id][AVG_PV_CLAIMS] /= proj_task_loops;
-			hedge_valn_array[hedge_grp_bucket_id][AVG_PV_CHARGES] /= proj_task_loops;
-			}
-		}	
+		}
+
+	if (proj_task_loops > 0)
+		{
+		hedge_valn_array[hedge_grp_bucket_id][AVG_PV_CLAIMS] /= proj_task_loops;
+		hedge_valn_array[hedge_grp_bucket_id][AVG_PV_CHARGES] /= proj_task_loops;
+		}
+	
 	}
 return;
 }
@@ -9147,12 +9130,17 @@ for (int panum = 0; panum < company->sm_inv_strategy[seg_num]->purch_asset_max_n
 	if (company->sm_inv_strategy[seg_num]->purch_assets_port_defn[panum] == HEDGING)
 		{
 		xstring purch_assets_id = company->sm_inv_strategy[seg_num]->purch_assets_id[panum];	
-		if (purch_assets_id == hedge_grp_delta_hedge_asset_id)
+		
+		hedge_grp_id = hedge_grp_id;
+		hedge_grp_index_name = hedge_grp_index_name;
+		xstring hedge_grp_delta_hedge_asset_id_local = hedge_grp_delta_hedge_asset_id;
+		
+		if (purch_assets_id == hedge_grp_delta_hedge_asset_id_local)
 			{
 			// Set lookup key
 			company->sm_inv_strategy[seg_num]->purch_asset_id = purch_assets_id;
 
-			return company->sm_inv_strategy[seg_num]->inv_strategy->purch_eio_asset_index;
+			return company->sm_inv_strategy[seg_num]->purch_eio_asset_index;
 			}
 		}
 	}
@@ -9205,8 +9193,8 @@ calc_asset_greeks(t, RHO_CONVEXITY, BEFORE_SALE);
 
 if (hedge_strat_detail_flag)
 	{
-	seg->SALFile << endl;
-	seg->SALFile << "Rho Convexity Hedge Strategy Setup for "
+	seg_element->SALFile << endl;
+	seg_element->SALFile << "Rho Convexity Hedge Strategy Setup for "
 				 << "Hedge Group=" << hedge_grp_id << " " 
 	             << "Period=" << t << " "
 				 << "Year=" << xint(cal_yr(t)) << " "
@@ -9215,13 +9203,16 @@ if (hedge_strat_detail_flag)
 
 // Write detail header
 if (hedge_strat_detail_flag)
-	seg->SALFile << "KeyRateTermName,RhoConvexLiab,RhoConvexTolPctLiab,RhoConvexTolDollar,RhoConvexAssetMax,RhoConvexAssetMin,RhoConvexAsset,RhoConvexHedgePct,AssetRhoConvexNeeded" << endl;
+	seg_element->SALFile << "KeyRateTermName,RhoConvexLiab,RhoConvexTolPctLiab,RhoConvexTolDollar,RhoConvexAssetMax,RhoConvexAssetMin,RhoConvexAsset,RhoConvexHedgePct,AssetRhoConvexNeeded" << endl;
 
-if (hedge_grp_rho_convex_hedge_liab_shock_defn == PARALLEL)
+hedge_grp_id = hedge_grp_id;
+StrEnum::EnumValue hedge_grp_rho_convex_hedge_liab_shock_defn_local = hedge_grp_rho_convex_hedge_liab_shock_defn;
+
+if (hedge_grp_rho_convex_hedge_liab_shock_defn_local == PARALLEL)
 	{
 	// Find the parallel shock from the rho_convex_hedge_shock_list
-	// 20191021 STW: fix compiler error while converting from RAFM 2.6 to RAFM 2.8
-	int shock_element;
+	int shock_element = 0;
+
 	for (shock_element = 0; shock_element < company->rho_hedge_shock_list.size(); shock_element++)
 		{
 		xstring shock_string = company->rho_hedge_shock_list[shock_element]; 
@@ -9244,9 +9235,15 @@ if (hedge_grp_rho_convex_hedge_liab_shock_defn == PARALLEL)
 
 	// set lookup key
 	hedge_grp_key_rate = "Parallel";
-
+	hedge_grp_id = hedge_grp_id;
 	rho_convex_tolerance_liab = hedge_grp_rho_convex_hedge_tolerance_pct_liab_rho_convex;
+
+	hedge_grp_key_rate = "Parallel";
+	hedge_grp_id = hedge_grp_id;
 	rho_convex_tolerance_dollar = hedge_grp_rho_convex_hedge_tolerance_dollar;
+	
+	hedge_grp_key_rate = "Parallel";
+	hedge_grp_id = hedge_grp_id;
 	rho_convex_hedge_pct = hedge_grp_rho_convex_hedge_pct;
 
 	xstring liab_greek_map_index = "RhoConvexity_Parallel_" + xstring(t);
@@ -9273,7 +9270,7 @@ if (hedge_grp_rho_convex_hedge_liab_shock_defn == PARALLEL)
 		asset_greeks_needed[greek_needed_map] = rho_convex_asset;
 
 	if (hedge_strat_detail_flag)
-		seg->SALFile << "Parallel," 
+		seg_element->SALFile << "Parallel," 
 			         << rho_convex_liab << ","
 					 << rho_convex_tolerance_liab << ","
 					 << rho_convex_tolerance_dollar << ","
@@ -9283,15 +9280,15 @@ if (hedge_grp_rho_convex_hedge_liab_shock_defn == PARALLEL)
 					 << rho_convex_hedge_pct << ","
 					 << asset_greeks_needed[greek_needed_map] << endl;
 	}
-else // hedge_grp_rho_convex_hedge_liab_shock_defn == KEY_RATE_SPECIFIC
+else // hedge_grp_rho_convex_hedge_liab_shock_defn_local == KEY_RATE_SPECIFIC
 	{
 	for (int key_rate = 0; key_rate < company->rho_hedge_key_rate_list.size(); key_rate++)
 		{
 		hedge_grp_key_rate = company->rho_hedge_key_rate_list[key_rate];
 
 		// Find the interest rate shock from the rho_hedge_shock_list
-		// 20191021 STW: fix compiler error while converting from RAFM 2.6 to RAFM 2.8
-		int shock_element;
+		int shock_element = 0;
+
 		for (shock_element = 0; shock_element < company->rho_hedge_shock_list.size(); shock_element++)
 			{
 			xstring shock_string = company->rho_hedge_shock_list[shock_element]; 
@@ -9312,8 +9309,16 @@ else // hedge_grp_rho_convex_hedge_liab_shock_defn == KEY_RATE_SPECIFIC
 			throw FatalError(message);
 			}
 
+		hedge_grp_key_rate = hedge_grp_key_rate;
+		hedge_grp_id = hedge_grp_id;
 		rho_convex_tolerance_liab = hedge_grp_rho_convex_hedge_tolerance_pct_liab_rho_convex;
+
+		hedge_grp_key_rate = hedge_grp_key_rate;
+		hedge_grp_id = hedge_grp_id;
 		rho_convex_tolerance_dollar = hedge_grp_rho_convex_hedge_tolerance_dollar;
+		
+		hedge_grp_key_rate = hedge_grp_key_rate;
+		hedge_grp_id = hedge_grp_id;
 		rho_convex_hedge_pct = hedge_grp_rho_convex_hedge_pct;
 
 		xstring liab_greek_map_index = "RhoConvexity_" + hedge_grp_key_rate + "_" + xstring(t);
@@ -9340,7 +9345,7 @@ else // hedge_grp_rho_convex_hedge_liab_shock_defn == KEY_RATE_SPECIFIC
 			asset_greeks_needed[greek_needed_map] = rho_convex_asset;
 
 		if (hedge_strat_detail_flag)
-			seg->SALFile << hedge_grp_key_rate << "," 
+			seg_element->SALFile << hedge_grp_key_rate << "," 
 						 << rho_convex_liab << ","
 						 << rho_convex_tolerance_liab << ","
 						 << rho_convex_tolerance_dollar << ","
@@ -9375,8 +9380,8 @@ calc_asset_greeks(t, RHO, BEFORE_SALE);
 
 if (hedge_strat_detail_flag)
 	{
-	seg->SALFile << endl;
-	seg->SALFile << "Rho Hedge Strategy Setup for "
+	seg_element->SALFile << endl;
+	seg_element->SALFile << "Rho Hedge Strategy Setup for "
 				 << "Hedge Group=" << hedge_grp_id << " " 
 	             << "Period=" << t << " "
 				 << "Year=" << xint(cal_yr(t)) << " "
@@ -9385,13 +9390,16 @@ if (hedge_strat_detail_flag)
 
 // Write detail header
 if (hedge_strat_detail_flag)
-	seg->SALFile << "KeyRateTermName,RhoLiab,RhoTolPctLiab,RhoTolDollar,RhoAssetMax,RhoAssetMin,RhoAsset,RhoHedgePct,AssetRhoNeeded" << endl;
+	seg_element->SALFile << "KeyRateTermName,RhoLiab,RhoTolPctLiab,RhoTolDollar,RhoAssetMax,RhoAssetMin,RhoAsset,RhoHedgePct,AssetRhoNeeded" << endl;
 
-if (hedge_grp_rho_hedge_liab_shock_defn == PARALLEL)
+hedge_grp_id = hedge_grp_id;
+StrEnum::EnumValue hedge_grp_rho_hedge_liab_shock_defn_local = hedge_grp_rho_hedge_liab_shock_defn;
+
+if (hedge_grp_rho_hedge_liab_shock_defn_local == PARALLEL)
 	{
 	// Find the parallel shock from the rho_hedge_shock_list
-	// 20191021 STW: fix compiler error while converting from RAFM 2.6 to RAFM 2.8
-	int shock_element;
+	int shock_element = 0;
+
 	for (shock_element = 0; shock_element < company->rho_hedge_shock_list.size(); shock_element++)
 		{
 		xstring shock_string = company->rho_hedge_shock_list[shock_element]; 
@@ -9414,9 +9422,15 @@ if (hedge_grp_rho_hedge_liab_shock_defn == PARALLEL)
 
 	// set lookup key
 	hedge_grp_key_rate = "Parallel";
-
+	hedge_grp_id = hedge_grp_id;
 	rho_tolerance_liab = hedge_grp_rho_hedge_tolerance_pct_liab_rho;
+
+	hedge_grp_key_rate = "Parallel";
+	hedge_grp_id = hedge_grp_id;
 	rho_tolerance_dollar = hedge_grp_rho_hedge_tolerance_dollar;
+
+	hedge_grp_key_rate = "Parallel";
+	hedge_grp_id = hedge_grp_id;
 	rho_hedge_pct = hedge_grp_rho_hedge_pct;
 
 	xstring liab_greek_map_index = "Rho_Parallel_" + xstring(t);
@@ -9443,7 +9457,7 @@ if (hedge_grp_rho_hedge_liab_shock_defn == PARALLEL)
 		asset_greeks_needed[greek_needed_map] = rho_asset;
 
 	if (hedge_strat_detail_flag)
-		seg->SALFile << "Parallel," 
+		seg_element->SALFile << "Parallel," 
 			         << rho_liab << ","
 					 << rho_tolerance_liab << ","
 					 << rho_tolerance_dollar << ","
@@ -9453,16 +9467,16 @@ if (hedge_grp_rho_hedge_liab_shock_defn == PARALLEL)
 					 << rho_hedge_pct << ","
 					 << asset_greeks_needed[greek_needed_map] << endl;
 	}
-else // hedge_grp_rho_hedge_liab_shock_defn == KEY_RATE_SPECIFIC
+else // hedge_grp_rho_hedge_liab_shock_defn_local == KEY_RATE_SPECIFIC
 	{
 	for (int key_rate = 0; key_rate < company->rho_hedge_key_rate_list.size(); key_rate++)
 		{
 		hedge_grp_key_rate = company->rho_hedge_key_rate_list[key_rate];
 
 		// Find the interest rate shock from the rho_hedge_shock_list
-	// 20191021 STW: fix compiler error while converting from RAFM 2.6 to RAFM 2.8
-	int shock_element;
-	for (shock_element = 0; shock_element < company->rho_hedge_shock_list.size(); shock_element++)
+		int shock_element = 0;
+
+		for (shock_element = 0; shock_element < company->rho_hedge_shock_list.size(); shock_element++)
 			{
 			xstring shock_string = company->rho_hedge_shock_list[shock_element]; 
 			if (shock_string.find(hedge_grp_key_rate) < string::npos)
@@ -9482,8 +9496,16 @@ else // hedge_grp_rho_hedge_liab_shock_defn == KEY_RATE_SPECIFIC
 			throw FatalError(message);
 			}
 
+		hedge_grp_key_rate = hedge_grp_key_rate;
+		hedge_grp_id = hedge_grp_id;
 		rho_tolerance_liab = hedge_grp_rho_hedge_tolerance_pct_liab_rho;
+		
+		hedge_grp_key_rate = hedge_grp_key_rate;
+		hedge_grp_id = hedge_grp_id;
 		rho_tolerance_dollar = hedge_grp_rho_hedge_tolerance_dollar;
+		
+		hedge_grp_key_rate = hedge_grp_key_rate;
+		hedge_grp_id = hedge_grp_id;
 		rho_hedge_pct = hedge_grp_rho_hedge_pct;
 
 		xstring liab_greek_map_index = "Rho_" + hedge_grp_key_rate + "_" + xstring(t);
@@ -9510,7 +9532,7 @@ else // hedge_grp_rho_hedge_liab_shock_defn == KEY_RATE_SPECIFIC
 			asset_greeks_needed[greek_needed_map] = rho_asset;
 
 		if (hedge_strat_detail_flag)
-			seg->SALFile << hedge_grp_key_rate << ","
+			seg_element->SALFile << hedge_grp_key_rate << ","
 						 << rho_liab << ","
 						 << rho_tolerance_liab << ","
 						 << rho_tolerance_dollar << ","
@@ -9527,7 +9549,7 @@ return;
 
 
 #line 1 "sum_over_assets.HDG_GRP_COMP.for"                                                                                   
-double HDG_GRP_COMP::sum_over_assets(const xstring &colname, int t, int greek_type, int sum_over_timing)
+double HDG_GRP_COMP::sum_over_assets(const xstring &/* CiProxyFormula */colname, const int /* CiProxyTime */ t, int greek_type, int sum_over_timing)
 {
 // The following table lists valid greek_type values.  
 //   = DELTA           for delta  hedge assets
@@ -9542,7 +9564,7 @@ double col_val = 0.0;
 int colnum = 0;
 int mp = 0;
 xstring greek_type_string;
-mpmap::iterator mp_map_iter;
+map <int, long, less <int> >::iterator mp_map_iter;
 
 // ensure order of asset processing
 if (sum_over_timing >= BEFORE_SALE && t > start_period)
@@ -9574,10 +9596,9 @@ if (greek_type != SUM_OVER_ALL)
 	}
 
 #if defined(__EIO_ASSET_H_)
-EIO_ASSET *eio_element = NULL;
 if (eio_mp_map_active.size() > 0)
 	{
-	colnum = company->sm_asset->sm_eio[0]->Column(colname).Number();
+	colnum = company->sm_asset->sm_eio[0][0]->Column(colname).Number();
 	if (colnum >= 0)
 		{
 		for (mp_map_iter = eio_mp_map_active.begin();
@@ -9585,20 +9606,19 @@ if (eio_mp_map_active.size() > 0)
 			 mp_map_iter++)
 			{
 			mp = mp_map_iter->first;
-			eio_element = company->sm_asset->sm_eio[mp];
 
-			if (t < eio_element->commencement_period
-				|| (t == eio_element->commencement_period
-					&& eio_element->purchased_bom_flag)
-				|| (t > max(0, eio_element->commencement_period)
-					&& fabs(eio_element->notional_amt(t - 1)) < ASSET_ACTIVE_THRESHOLD))
+			if (t < company->sm_asset->sm_eio[mp][0]->commencement_period
+				|| (t == company->sm_asset->sm_eio[mp][0]->commencement_period
+					&& company->sm_asset->sm_eio[mp][0]->purchased_bom_flag)
+				|| (t > max(0, company->sm_asset->sm_eio[mp][0]->commencement_period)
+					&& fabs(company->sm_asset->sm_eio[mp][0]->notional_amt(t - 1)) < ASSET_ACTIVE_THRESHOLD))
 				continue;
 
-			if (greek_type != SUM_OVER_ALL && eio_element->hdg_grp_code.find(greek_type_string) == string::npos)
+			if (greek_type != SUM_OVER_ALL && company->sm_asset->sm_eio[mp][0]->hdg_grp_code.find(greek_type_string) == string::npos)
 				continue;
 					
-			col_val = eio_element->Column(colnum).Value(t);
-			col_val *= eio_element->pct_to_use;
+			col_val = company->sm_asset->sm_eio[mp][0]->Column(colnum).Value(t);
+			col_val *= company->sm_asset->sm_eio[mp][0]->pct_to_use;
 
 			total += col_val;
 			}			         
@@ -9607,10 +9627,9 @@ if (eio_mp_map_active.size() > 0)
 #endif
 
 #if defined(__IRD_ASSET_H_)
-IRD_ASSET *ird_element = NULL;
 if (ird_mp_map_active.size() > 0)
 	{
-	colnum = company->sm_asset->sm_ird[0]->Column(colname).Number();
+	colnum = company->sm_asset->sm_ird[0][0]->Column(colname).Number();
 	if (colnum >= 0)
 		{
 		for (mp_map_iter = ird_mp_map_active.begin();
@@ -9618,18 +9637,17 @@ if (ird_mp_map_active.size() > 0)
 			 mp_map_iter++)
 			{
 			mp = mp_map_iter->first;
-			ird_element = company->sm_asset->sm_ird[mp];
 
-			if (t < ird_element->commencement_period
-				|| (t > max(0, ird_element->commencement_period)
-					&& fabs(ird_element->notional_amt(t - 1)) < ASSET_ACTIVE_THRESHOLD))
+			if (t < company->sm_asset->sm_ird[mp][0]->commencement_period
+				|| (t > max(0, company->sm_asset->sm_ird[mp][0]->commencement_period)
+					&& fabs(company->sm_asset->sm_ird[mp][0]->notional_amt(t - 1)) < ASSET_ACTIVE_THRESHOLD))
 				continue;
 
-			if (greek_type != SUM_OVER_ALL && ird_element->hdg_grp_code.find(greek_type_string) == string::npos)
+			if (greek_type != SUM_OVER_ALL && company->sm_asset->sm_ird[mp][0]->hdg_grp_code.find(greek_type_string) == string::npos)
 				continue;
 
-			col_val = ird_element->Column(colnum).Value(t);
-			col_val *= ird_element->pct_to_use;
+			col_val = company->sm_asset->sm_ird[mp][0]->Column(colnum).Value(t);
+			col_val *= company->sm_asset->sm_ird[mp][0]->pct_to_use;
 
 			total += col_val;
 			}			         
@@ -9643,57 +9661,55 @@ return total;
 
 
 #line 1 "sum_over_liabilities.HDG_GRP_COMP.for"                                                                                   
-double HDG_GRP_COMP::sum_over_liabilities(const xstring &colname, int t, int sum_timing)
+double HDG_GRP_COMP::sum_over_liabilities(const xstring &/* CiProxyFormula */colname, const int /* CiProxyTime */ t, int sum_timing)
 { 
 double total = 0.0;
 int mp = 0;
 int colnum = 0;
-mpmap::iterator mp_map_iter;
-
+map <int, long, less <int> >::iterator mp_map_iter;
+{
 #if defined(__FIA_LIAB_H_)
-if (seg->fia_mp_map.size())
+if (seg_element->fia_mp_map.size())
 	{
-	FIA_LIAB *current_fia_element;
 	colnum = liab->sm_fia[0]->sm_fia_account[0]->Column(colname).Number();	
 
 	if (colnum >= 0)
 		{ 
-		for (mp_map_iter = seg->fia_mp_map.begin();
-		     mp_map_iter != seg->fia_mp_map.end();
+		for (mp_map_iter = seg_element->fia_mp_map.begin();
+		     mp_map_iter != seg_element->fia_mp_map.end();
 		     mp_map_iter++)
 			{
 			mp = mp_map_iter->first;
-			current_fia_element = liab->sm_fia[mp];
 
-			if (t < current_fia_element->commencement_period
-				|| t > current_fia_element->maturity_period)
+			if (t < liab->sm_fia[mp]->commencement_period
+				|| t > liab->sm_fia[mp]->maturity_period)
 				continue;
 
 			// Skip new issue commencement period
-			if (current_fia_element->elapsed_mths <= 0
-				&& t == current_fia_element->commencement_period)
+			if (liab->sm_fia[mp]->elapsed_mths <= 0
+				&& t == liab->sm_fia[mp]->commencement_period)
 				continue;
 
-			if (t != current_fia_element->commencement_period
-				&& fabs(current_fia_element->policies_b(t)) < rate_ratio_threshold)
+			if (t != liab->sm_fia[mp]->commencement_period
+				&& fabs(liab->sm_fia[mp]->policies_b(t)) < rate_ratio_threshold)
 				continue;
 			
-			for (int account = 0; account < current_fia_element->sm_fia_account.size(); account++)
+			for (int account = 0; account < liab->sm_fia[mp]->sm_fia_account.size(); account++)
 				{
-				if (current_fia_element->sm_fia_account[account]->hedge_grp_code == hedge_grp_id)
-					total += current_fia_element->sm_fia_account[account]->Column(colnum).Value(t);
+				if (liab->sm_fia[mp]->sm_fia_account[account]->hedge_grp_code == hedge_grp_id)
+					total += liab->sm_fia[mp]->sm_fia_account[account]->Column(colnum).Value(t);
 				}
 			}
 		}
 	}
 #endif
-
+}
+{
 #if defined(__IUL_LIAB_H_)
 double units_basis = 0.0;
 
-if (seg->iul_mp_map.size())
+if (seg_element->iul_mp_map.size())
 	{
-	IUL_LIAB *current_iul_element;
 	colnum = liab->sm_iul[0]->sm_iul_account[0][0]->Column(colname).Number();	
 
 	int bucket_num = getElementNumber(1);
@@ -9702,40 +9718,39 @@ if (seg->iul_mp_map.size())
 
 	if (colnum >= 0)
 		{ 
-		for (mp_map_iter = seg->iul_mp_map.begin();
-		     mp_map_iter != seg->iul_mp_map.end();
+		for (mp_map_iter = seg_element->iul_mp_map.begin();
+		     mp_map_iter != seg_element->iul_mp_map.end();
 		     mp_map_iter++)
 			{
 			mp = mp_map_iter->first;
-			current_iul_element = liab->sm_iul[mp];
 
-			if (t < current_iul_element->commencement_period
-				|| t > current_iul_element->maturity_period)
+			if (t < liab->sm_iul[mp]->commencement_period
+				|| t > liab->sm_iul[mp]->maturity_period)
 				continue;
 
 			// Skip new issues commencement period
-			if (current_iul_element->commencement_period >= 0
-				&& t == current_iul_element->commencement_period)
+			if (liab->sm_iul[mp]->commencement_period >= 0
+				&& t == liab->sm_iul[mp]->commencement_period)
 				continue;
 
-			if (t > current_iul_element->start_period
-				&& fabs(current_iul_element->units_inf(t - 1)) < rate_ratio_threshold)
+			if (t > liab->sm_iul[mp]->start_period
+				&& fabs(liab->sm_iul[mp]->units_inf(t - 1)) < rate_ratio_threshold)
 				continue;
 
 			if (sum_timing == BEG_OF_PERIOD)
-				units_basis = current_iul_element->units_inf(t - 1);
+				units_basis = liab->sm_iul[mp]->units_inf(t - 1);
 			else
-				units_basis = current_iul_element->units_inf(t);
+				units_basis = liab->sm_iul[mp]->units_inf(t);
 			
-			for (int account = 0; account < current_iul_element->sm_iul_account.size(); account++)
+			for (int account = 0; account < liab->sm_iul[mp]->sm_iul_account.size(); account++)
 				{
-				for (int bucket = 0; bucket < current_iul_element->sm_iul_account[account].size(); bucket++)
+				for (int bucket = 0; bucket < liab->sm_iul[mp]->sm_iul_account[account].size(); bucket++)
 					{
 					// amounts from iul account buckets are "per unit"
 					// validate that bucket is linked to hedge group
-					if (current_iul_element->sm_iul_account[account][bucket]->hedge_grp_code == hedge_grp_code)
+					if (liab->sm_iul[mp]->sm_iul_account[account][bucket]->hedge_grp_code == hedge_grp_code)
 						{
-						total += current_iul_element->sm_iul_account[account][bucket]->Column(colnum).Value(t)
+						total += liab->sm_iul[mp]->sm_iul_account[account][bucket]->Column(colnum).Value(t)
 								 * units_basis;
 						}
 					}
@@ -9744,45 +9759,55 @@ if (seg->iul_mp_map.size())
 		}
 	}
 #endif
-
+}
+{
 #if defined(__VA_LIAB_H_)
-if (seg->va_mp_map.size())
+if (seg_element->va_mp_map.size())
 	{
-	VA_LIAB *current_va_element;
 	colnum = liab->sm_va[0]->Column(colname).Number();	
 
 	if (colnum >= 0)
 		{ 
-		for (mp_map_iter = seg->va_mp_map.begin();
-		     mp_map_iter != seg->va_mp_map.end();
+		for (mp_map_iter = seg_element->va_mp_map.begin();
+		     mp_map_iter != seg_element->va_mp_map.end();
 		     mp_map_iter++)
 			{
 			mp = mp_map_iter->first;
-			current_va_element = liab->sm_va[mp];
 
-			if (t < current_va_element->commencement_period
-				|| t > current_va_element->maturity_period)
+			if (t < liab->sm_va[mp]->commencement_period
+				|| t > liab->sm_va[mp]->maturity_period)
 				continue;
 
 			// Skip new issue commencement period
-			if (current_va_element->elapsed_mths <= 0
-				&& t == current_va_element->commencement_period)
+			if (liab->sm_va[mp]->elapsed_mths <= 0
+				&& t == liab->sm_va[mp]->commencement_period)
 				continue;
 
-			if (t != current_va_element->commencement_period
-				&& fabs(current_va_element->policies_b(t)) < rate_ratio_threshold)
+			if (t != liab->sm_va[mp]->commencement_period
+				&& fabs(liab->sm_va[mp]->policies_b(t)) < rate_ratio_threshold)
 				continue;
 
-			if (hedge_grp_plan_codes == "ALL" || hedge_grp_plan_codes.find(current_va_element->plan_code) < string::npos)
+			hedge_grp_id = hedge_grp_id;
+			xstring hedge_grp_plan_codes_local = hedge_grp_plan_codes;
+			hedge_grp_id = hedge_grp_id;
+			StrEnum::EnumValue hedge_grp_gmab_defn_local = hedge_grp_gmab_defn;
+			hedge_grp_id = hedge_grp_id;
+			StrEnum::EnumValue hedge_grp_gmdb_defn_local = hedge_grp_gmdb_defn;
+			hedge_grp_id = hedge_grp_id;
+			StrEnum::EnumValue hedge_grp_gmib_defn_local = hedge_grp_gmib_defn;
+			hedge_grp_id = hedge_grp_id;
+			StrEnum::EnumValue hedge_grp_gmwb_defn_local = hedge_grp_gmwb_defn;
+
+			if (hedge_grp_plan_codes_local == "ALL" || hedge_grp_plan_codes_local.find(liab->sm_va[mp]->plan_code) < string::npos)
 				{
-				if (hedge_grp_gmab_defn == YES && current_va_element->gmab_ind && colname.find("gmab") < string::npos)
-					total += current_va_element->Column(colnum).Value(t);
-				else if (hedge_grp_gmdb_defn == YES && current_va_element->gmdb_ind && colname.find("gmdb") < string::npos)
-					total += current_va_element->Column(colnum).Value(t);
-				else if (hedge_grp_gmib_defn == YES && current_va_element->gmib_ind && colname.find("gmib") < string::npos)
-					total += current_va_element->Column(colnum).Value(t);
-				else if (hedge_grp_gmwb_defn == YES && current_va_element->gmwb_ind && colname.find("gmwb") < string::npos)
-					total += current_va_element->Column(colnum).Value(t);
+				if (hedge_grp_gmab_defn_local == YES && liab->sm_va[mp]->gmab_ind && colname.find("gmab") < string::npos)
+					total += liab->sm_va[mp]->Column(colnum).Value(t);
+				else if (hedge_grp_gmdb_defn_local == YES && liab->sm_va[mp]->gmdb_ind && colname.find("gmdb") < string::npos)
+					total += liab->sm_va[mp]->Column(colnum).Value(t);
+				else if (hedge_grp_gmib_defn_local == YES && liab->sm_va[mp]->gmib_ind && colname.find("gmib") < string::npos)
+					total += liab->sm_va[mp]->Column(colnum).Value(t);
+				else if (hedge_grp_gmwb_defn_local == YES && liab->sm_va[mp]->gmwb_ind && colname.find("gmwb") < string::npos)
+					total += liab->sm_va[mp]->Column(colnum).Value(t);
 				else
 					continue;
 				}
@@ -9792,7 +9817,7 @@ if (seg->va_mp_map.size())
 		}
 	}
 #endif
-
+}
 return total;
 }
 
@@ -9817,8 +9842,8 @@ calc_asset_greeks(t, VEGA, BEFORE_SALE);
 
 if (hedge_strat_detail_flag)
 	{
-	seg->SALFile << endl;
-	seg->SALFile << "Vega Hedge Strategy Setup for "
+	seg_element->SALFile << endl;
+	seg_element->SALFile << "Vega Hedge Strategy Setup for "
 				 << "Hedge Group=" << hedge_grp_id << " " 
 	             << "Period=" << t << " "
 				 << "Year=" << xint(cal_yr(t)) << " "
@@ -9827,13 +9852,16 @@ if (hedge_strat_detail_flag)
 
 // Write detail header
 if (hedge_strat_detail_flag)
-	seg->SALFile << "IndexName,IndexTermName,VegaLiab,VegaTolPctLiab,VegaTolDollar,VegaAssetMax,VegaAssetMin,VegaAsset,VegaHedgePct,AssetVegaNeeded" << endl;
+	seg_element->SALFile << "IndexName,IndexTermName,VegaLiab,VegaTolPctLiab,VegaTolDollar,VegaAssetMax,VegaAssetMin,VegaAsset,VegaHedgePct,AssetVegaNeeded" << endl;
 
-if (hedge_grp_gamma_vega_hedge_liab_shock_defn == PARALLEL)
+hedge_grp_id = hedge_grp_id;
+StrEnum::EnumValue hedge_grp_gamma_vega_hedge_liab_shock_defn_local = hedge_grp_gamma_vega_hedge_liab_shock_defn;
+
+if (hedge_grp_gamma_vega_hedge_liab_shock_defn_local == PARALLEL)
 	{
 	// Find the parallel shock from the vega_hedge_shock_list
-	// 20191021 STW: fix compiler error while converting from RAFM 2.6 to RAFM 2.8
-	int shock_element;
+	int shock_element = 0;
+
 	for (shock_element = 0; shock_element < company->vega_hedge_shock_list.size(); shock_element++)
 		{
 		xstring shock_string = company->vega_hedge_shock_list[shock_element]; 
@@ -9857,9 +9885,17 @@ if (hedge_grp_gamma_vega_hedge_liab_shock_defn == PARALLEL)
 	// set lookup keys
 	hedge_grp_index_name = "Parallel";
 	hedge_grp_index_term = "AllTerms";
-
+	hedge_grp_id = hedge_grp_id;
 	vega_tolerance_liab = hedge_grp_gamma_vega_hedge_tolerance_pct_liab_gamma_vega;
+	
+	hedge_grp_index_name = "Parallel";
+	hedge_grp_index_term = "AllTerms";
+	hedge_grp_id = hedge_grp_id;
 	vega_tolerance_dollar = hedge_grp_gamma_vega_hedge_tolerance_dollar;
+	
+	hedge_grp_index_name = "Parallel";
+	hedge_grp_index_term = "AllTerms";
+	hedge_grp_id = hedge_grp_id;
 	vega_hedge_pct = hedge_grp_gamma_vega_hedge_pct;
 
 	xstring liab_greek_map_index = "Vega_Parallel_AllTerms_" + xstring(t);
@@ -9886,7 +9922,7 @@ if (hedge_grp_gamma_vega_hedge_liab_shock_defn == PARALLEL)
 		asset_greeks_needed[greek_needed_map] = vega_asset; 
 
 	if (hedge_strat_detail_flag)
-		seg->SALFile << "Parallel,AllTerms" 
+		seg_element->SALFile << "Parallel,AllTerms" 
 			         << vega_liab << ","
 					 << vega_tolerance_liab << ","
 					 << vega_tolerance_dollar << ","
@@ -9896,15 +9932,15 @@ if (hedge_grp_gamma_vega_hedge_liab_shock_defn == PARALLEL)
 					 << vega_hedge_pct << ","
 					 << asset_greeks_needed[greek_needed_map] << endl;
 	}
-else if (hedge_grp_gamma_vega_hedge_liab_shock_defn == INDEX_SPECIFIC)
+else if (hedge_grp_gamma_vega_hedge_liab_shock_defn_local == INDEX_SPECIFIC)
 	{
 	for (int index = 0; index < company->vega_hedge_index_list.size(); index++)
 		{
 		xstring index_name = company->vega_hedge_index_list[index];
 
 		// Find the index shock from the vega_hedge_shock_list
-		// 20191021 STW: fix compiler error while converting from RAFM 2.6 to RAFM 2.8
-		int shock_element;
+		int shock_element = 0;
+
 		for (shock_element = 0; shock_element < company->vega_hedge_shock_list.size(); shock_element++)
 			{
 			xstring shock_string = company->vega_hedge_shock_list[shock_element]; 
@@ -9929,9 +9965,17 @@ else if (hedge_grp_gamma_vega_hedge_liab_shock_defn == INDEX_SPECIFIC)
 		// set lookup keys
 		hedge_grp_index_name = company->vega_hedge_index_list[index];
 		hedge_grp_index_term = "AllTerms";
-
+		hedge_grp_id = hedge_grp_id;
 		vega_tolerance_liab = hedge_grp_gamma_vega_hedge_tolerance_pct_liab_gamma_vega;
+		
+		hedge_grp_index_name = company->vega_hedge_index_list[index];
+		hedge_grp_index_term = "AllTerms";
+		hedge_grp_id = hedge_grp_id;
 		vega_tolerance_dollar = hedge_grp_gamma_vega_hedge_tolerance_dollar;
+		
+		hedge_grp_index_name = company->vega_hedge_index_list[index];
+		hedge_grp_index_term = "AllTerms";
+		hedge_grp_id = hedge_grp_id;
 		vega_hedge_pct = hedge_grp_gamma_vega_hedge_pct;
 
 		xstring liab_greek_map_index = "Vega_" + hedge_grp_index_name + "_AllTerms_" + xstring(t);
@@ -9958,7 +10002,7 @@ else if (hedge_grp_gamma_vega_hedge_liab_shock_defn == INDEX_SPECIFIC)
 			asset_greeks_needed[greek_needed_map] = vega_asset; 
 
 		if (hedge_strat_detail_flag)
-			seg->SALFile << hedge_grp_index_name << ","
+			seg_element->SALFile << hedge_grp_index_name << ","
 						 << "AllTerms," 
 						 << vega_liab << ","
 						 << vega_tolerance_liab << ","
@@ -9970,7 +10014,7 @@ else if (hedge_grp_gamma_vega_hedge_liab_shock_defn == INDEX_SPECIFIC)
 						 << asset_greeks_needed[greek_needed_map] << endl;
 		}
 	}
-else // hedge_grp_gamma_vega_hedge_liab_shock_defn == INDEX_TERM_SPECIFIC
+else // hedge_grp_gamma_vega_hedge_liab_shock_defn_local == INDEX_TERM_SPECIFIC
 	{
 	for (int index = 0; index < company->vega_hedge_index_list.size(); index++)
 		{
@@ -9985,8 +10029,8 @@ else // hedge_grp_gamma_vega_hedge_liab_shock_defn == INDEX_TERM_SPECIFIC
 				continue;
 
 			// Find the index and term shock from the vega_hedge_shock_list
-			// 20191021 STW: fix compiler error while converting from RAFM 2.6 to RAFM 2.8
-			int shock_element;
+			int shock_element = 0;
+
 			for (shock_element = 0; shock_element < company->vega_hedge_shock_list.size(); shock_element++)
 				{
 				xstring shock_string = company->vega_hedge_shock_list[shock_element]; 
@@ -10011,9 +10055,17 @@ else // hedge_grp_gamma_vega_hedge_liab_shock_defn == INDEX_TERM_SPECIFIC
 			// set lookup keys
 			hedge_grp_index_name = company->vega_hedge_index_list[index];
 			hedge_grp_index_term = company->vega_hedge_term_list[index_term];
-
+			hedge_grp_id = hedge_grp_id;
 			vega_tolerance_liab = hedge_grp_gamma_vega_hedge_tolerance_pct_liab_gamma_vega;
+			
+			hedge_grp_index_name = company->vega_hedge_index_list[index];
+			hedge_grp_index_term = company->vega_hedge_term_list[index_term];
+			hedge_grp_id = hedge_grp_id;
 			vega_tolerance_dollar = hedge_grp_gamma_vega_hedge_tolerance_dollar;
+			
+			hedge_grp_index_name = company->vega_hedge_index_list[index];
+			hedge_grp_index_term = company->vega_hedge_term_list[index_term];
+			hedge_grp_id = hedge_grp_id;
 			vega_hedge_pct = hedge_grp_gamma_vega_hedge_pct;
 
 			xstring liab_greek_map_index = "Vega_" + hedge_grp_index_name + "_" + hedge_grp_index_term + "_" + xstring(t);
@@ -10040,7 +10092,7 @@ else // hedge_grp_gamma_vega_hedge_liab_shock_defn == INDEX_TERM_SPECIFIC
 				asset_greeks_needed[greek_needed_map] = vega_asset; 
 
 			if (hedge_strat_detail_flag)
-				seg->SALFile << hedge_grp_index_name << ","
+				seg_element->SALFile << hedge_grp_index_name << ","
 							 << hedge_grp_index_term << ","
 							 << vega_liab << ","
 							 << vega_tolerance_liab << ","
@@ -10581,6 +10633,17 @@ namespace {
 	};
 	const EnumList eqt_vol_shock_defnEnumList(2, eqt_vol_shock_defnChoicePairs);
 
+	// EnumList for gen2_declarations                                                                                       
+	const ChoicePair gen2_declarationsChoicePairs[] = {
+		ChoicePair(StrEnum::UNDEFINED, StrEnum::undefinedString)
+		,ChoicePair(StrEnum::DELTA, "Delta")
+		,ChoicePair(StrEnum::GAMMA, "Gamma")
+		,ChoicePair(StrEnum::VEGA, "Vega")
+		,ChoicePair(StrEnum::RHO, "Rho")
+		,ChoicePair(StrEnum::RHO_CONVEXITY, "Rho Convexity")
+	};
+	const EnumList gen2_declarationsEnumList(5, gen2_declarationsChoicePairs);
+
 	// EnumList for hedge_disc_rate_defn                                                                                       
 	const ChoicePair hedge_disc_rate_defnChoicePairs[] = {
 		ChoicePair(StrEnum::UNDEFINED, StrEnum::undefinedString)
@@ -10741,14 +10804,6 @@ namespace {
 	};
 	const EnumList hedge_grp_rho_hedge_strat_defnEnumList(1, hedge_grp_rho_hedge_strat_defnChoicePairs);
 
-	// EnumList for independent_mp_defn                                                                                       
-	const ChoicePair independent_mp_defnChoicePairs[] = {
-		ChoicePair(StrEnum::UNDEFINED, StrEnum::undefinedString)
-		,ChoicePair(StrEnum::YES, "Yes")
-		,ChoicePair(StrEnum::NO, "No")
-	};
-	const EnumList independent_mp_defnEnumList(2, independent_mp_defnChoicePairs);
-
 	// EnumList for int_rate_shock_defn                                                                                       
 	const ChoicePair int_rate_shock_defnChoicePairs[] = {
 		ChoicePair(StrEnum::UNDEFINED, StrEnum::undefinedString)
@@ -10819,175 +10874,179 @@ TableMgr<VariantTable> HDG_GRP_COMP::mgr_;
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &eqt_price_shock_defnEnumList, Feature(true)),
 	Descriptor(5, Attribute::STRING,	"eqt_price_shock_id", -1, (size_t)&modelOffset->eqt_price_shock_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(6, Attribute::DOUBLE,	"eqt_vol_shock", Descriptor::NOT_INDEXED, (size_t)&modelOffset->eqt_vol_shock,
+	Descriptor(6, Attribute::STRING,	"eqt_price_shock_selected", -1, (size_t)&modelOffset->eqt_price_shock_selected,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(7, Attribute::STR_ENUM,	"eqt_vol_shock_defn", -1, (size_t)&modelOffset->eqt_vol_shock_defn,
+	Descriptor(7, Attribute::DOUBLE,	"eqt_vol_shock", Descriptor::NOT_INDEXED, (size_t)&modelOffset->eqt_vol_shock,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
+	Descriptor(8, Attribute::STR_ENUM,	"eqt_vol_shock_defn", -1, (size_t)&modelOffset->eqt_vol_shock_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &eqt_vol_shock_defnEnumList, Feature(true)),
-	Descriptor(8, Attribute::STRING,	"eqt_vol_shock_id", -1, (size_t)&modelOffset->eqt_vol_shock_id,
+	Descriptor(9, Attribute::STRING,	"eqt_vol_shock_id", -1, (size_t)&modelOffset->eqt_vol_shock_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(9, Attribute::STRING,	"hedge_disc_rate_comp_id", -1, (size_t)&modelOffset->hedge_disc_rate_comp_id,
+	Descriptor(10, Attribute::STR_ENUM,	"gen2_declarations", -1, (size_t)&modelOffset->gen2_declarations,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, &gen2_declarationsEnumList, Feature(true)),
+	Descriptor(11, Attribute::STRING,	"hedge_disc_rate_comp_id", -1, (size_t)&modelOffset->hedge_disc_rate_comp_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(10, Attribute::STR_ENUM,	"hedge_disc_rate_defn", -1, (size_t)&modelOffset->hedge_disc_rate_defn,
+	Descriptor(12, Attribute::STR_ENUM,	"hedge_disc_rate_defn", -1, (size_t)&modelOffset->hedge_disc_rate_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &hedge_disc_rate_defnEnumList, Feature(true)),
-	Descriptor(11, Attribute::DOUBLE,	"hedge_disc_rate_fixed", Descriptor::NOT_INDEXED, (size_t)&modelOffset->hedge_disc_rate_fixed,
+	Descriptor(13, Attribute::DOUBLE,	"hedge_disc_rate_fixed", Descriptor::NOT_INDEXED, (size_t)&modelOffset->hedge_disc_rate_fixed,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(12, Attribute::STRING,	"hedge_grp_asset_id", -1, (size_t)&modelOffset->hedge_grp_asset_id,
+	Descriptor(14, Attribute::STRING,	"hedge_grp_asset_id", -1, (size_t)&modelOffset->hedge_grp_asset_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(13, Attribute::INT,	"hedge_grp_bucket_id", -1, (size_t)&modelOffset->hedge_grp_bucket_id,
+	Descriptor(15, Attribute::INT,	"hedge_grp_bucket_id", -1, (size_t)&modelOffset->hedge_grp_bucket_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(14, Attribute::INT,	"hedge_grp_count_id", -1, (size_t)&modelOffset->hedge_grp_count_id,
+	Descriptor(16, Attribute::INT,	"hedge_grp_count_id", -1, (size_t)&modelOffset->hedge_grp_count_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(15, Attribute::STR_ENUM,	"hedge_grp_crediting_defn", -1, (size_t)&modelOffset->hedge_grp_crediting_defn,
+	Descriptor(17, Attribute::STR_ENUM,	"hedge_grp_crediting_defn", -1, (size_t)&modelOffset->hedge_grp_crediting_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &hedge_grp_crediting_defnEnumList, Feature(true)),
-	Descriptor(16, Attribute::INT,	"hedge_grp_crediting_mths", -1, (size_t)&modelOffset->hedge_grp_crediting_mths,
+	Descriptor(18, Attribute::INT,	"hedge_grp_crediting_mths", -1, (size_t)&modelOffset->hedge_grp_crediting_mths,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(17, Attribute::STRING,	"hedge_grp_delta_hedge_asset_id", -1, (size_t)&modelOffset->hedge_grp_delta_hedge_asset_id,
+	Descriptor(19, Attribute::STRING,	"hedge_grp_delta_hedge_asset_id", -1, (size_t)&modelOffset->hedge_grp_delta_hedge_asset_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(18, Attribute::STR_ENUM,	"hedge_grp_delta_hedge_defn", -1, (size_t)&modelOffset->hedge_grp_delta_hedge_defn,
+	Descriptor(20, Attribute::STR_ENUM,	"hedge_grp_delta_hedge_defn", -1, (size_t)&modelOffset->hedge_grp_delta_hedge_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &hedge_grp_delta_hedge_defnEnumList, Feature(true)),
-	Descriptor(19, Attribute::STR_ENUM,	"hedge_grp_delta_hedge_liab_shock_defn", -1, (size_t)&modelOffset->hedge_grp_delta_hedge_liab_shock_defn,
+	Descriptor(21, Attribute::STR_ENUM,	"hedge_grp_delta_hedge_liab_shock_defn", -1, (size_t)&modelOffset->hedge_grp_delta_hedge_liab_shock_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &hedge_grp_delta_hedge_liab_shock_defnEnumList, Feature(true)),
-	Descriptor(20, Attribute::DOUBLE,	"hedge_grp_delta_hedge_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->hedge_grp_delta_hedge_pct,
+	Descriptor(22, Attribute::DOUBLE,	"hedge_grp_delta_hedge_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->hedge_grp_delta_hedge_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(21, Attribute::INT,	"hedge_grp_delta_hedge_rebal_freq", -1, (size_t)&modelOffset->hedge_grp_delta_hedge_rebal_freq,
+	Descriptor(23, Attribute::INT,	"hedge_grp_delta_hedge_rebal_freq", -1, (size_t)&modelOffset->hedge_grp_delta_hedge_rebal_freq,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(22, Attribute::STR_ENUM,	"hedge_grp_delta_hedge_strat_defn", -1, (size_t)&modelOffset->hedge_grp_delta_hedge_strat_defn,
+	Descriptor(24, Attribute::STR_ENUM,	"hedge_grp_delta_hedge_strat_defn", -1, (size_t)&modelOffset->hedge_grp_delta_hedge_strat_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &hedge_grp_delta_hedge_strat_defnEnumList, Feature(true)),
-	Descriptor(23, Attribute::DOUBLE,	"hedge_grp_delta_hedge_tolerance_dollar", Descriptor::NOT_INDEXED, (size_t)&modelOffset->hedge_grp_delta_hedge_tolerance_dollar,
+	Descriptor(25, Attribute::DOUBLE,	"hedge_grp_delta_hedge_tolerance_dollar", Descriptor::NOT_INDEXED, (size_t)&modelOffset->hedge_grp_delta_hedge_tolerance_dollar,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(24, Attribute::DOUBLE,	"hedge_grp_delta_hedge_tolerance_pct_liab_delta", Descriptor::NOT_INDEXED, (size_t)&modelOffset->hedge_grp_delta_hedge_tolerance_pct_liab_delta,
+	Descriptor(26, Attribute::DOUBLE,	"hedge_grp_delta_hedge_tolerance_pct_liab_delta", Descriptor::NOT_INDEXED, (size_t)&modelOffset->hedge_grp_delta_hedge_tolerance_pct_liab_delta,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(25, Attribute::DOUBLE,	"hedge_grp_delta_hedge_transaction_costs_bps", Descriptor::NOT_INDEXED, (size_t)&modelOffset->hedge_grp_delta_hedge_transaction_costs_bps,
+	Descriptor(27, Attribute::DOUBLE,	"hedge_grp_delta_hedge_transaction_costs_bps", Descriptor::NOT_INDEXED, (size_t)&modelOffset->hedge_grp_delta_hedge_transaction_costs_bps,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(26, Attribute::STR_ENUM,	"hedge_grp_dyn_lever", -1, (size_t)&modelOffset->hedge_grp_dyn_lever,
+	Descriptor(28, Attribute::STR_ENUM,	"hedge_grp_dyn_lever", -1, (size_t)&modelOffset->hedge_grp_dyn_lever,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &hedge_grp_dyn_leverEnumList, Feature(true)),
-	Descriptor(27, Attribute::STRING,	"hedge_grp_gamma_vega_hedge_asset_id", -1, (size_t)&modelOffset->hedge_grp_gamma_vega_hedge_asset_id,
+	Descriptor(29, Attribute::STRING,	"hedge_grp_gamma_vega_hedge_asset_id", -1, (size_t)&modelOffset->hedge_grp_gamma_vega_hedge_asset_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(28, Attribute::STR_ENUM,	"hedge_grp_gamma_vega_hedge_defn", -1, (size_t)&modelOffset->hedge_grp_gamma_vega_hedge_defn,
+	Descriptor(30, Attribute::STR_ENUM,	"hedge_grp_gamma_vega_hedge_defn", -1, (size_t)&modelOffset->hedge_grp_gamma_vega_hedge_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &hedge_grp_gamma_vega_hedge_defnEnumList, Feature(true)),
-	Descriptor(29, Attribute::STR_ENUM,	"hedge_grp_gamma_vega_hedge_liab_shock_defn", -1, (size_t)&modelOffset->hedge_grp_gamma_vega_hedge_liab_shock_defn,
+	Descriptor(31, Attribute::STR_ENUM,	"hedge_grp_gamma_vega_hedge_liab_shock_defn", -1, (size_t)&modelOffset->hedge_grp_gamma_vega_hedge_liab_shock_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &hedge_grp_gamma_vega_hedge_liab_shock_defnEnumList, Feature(true)),
-	Descriptor(30, Attribute::DOUBLE,	"hedge_grp_gamma_vega_hedge_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->hedge_grp_gamma_vega_hedge_pct,
+	Descriptor(32, Attribute::DOUBLE,	"hedge_grp_gamma_vega_hedge_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->hedge_grp_gamma_vega_hedge_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(31, Attribute::INT,	"hedge_grp_gamma_vega_hedge_rebal_freq", -1, (size_t)&modelOffset->hedge_grp_gamma_vega_hedge_rebal_freq,
+	Descriptor(33, Attribute::INT,	"hedge_grp_gamma_vega_hedge_rebal_freq", -1, (size_t)&modelOffset->hedge_grp_gamma_vega_hedge_rebal_freq,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(32, Attribute::STR_ENUM,	"hedge_grp_gamma_vega_hedge_strat_defn", -1, (size_t)&modelOffset->hedge_grp_gamma_vega_hedge_strat_defn,
+	Descriptor(34, Attribute::STR_ENUM,	"hedge_grp_gamma_vega_hedge_strat_defn", -1, (size_t)&modelOffset->hedge_grp_gamma_vega_hedge_strat_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &hedge_grp_gamma_vega_hedge_strat_defnEnumList, Feature(true)),
-	Descriptor(33, Attribute::DOUBLE,	"hedge_grp_gamma_vega_hedge_tolerance_dollar", Descriptor::NOT_INDEXED, (size_t)&modelOffset->hedge_grp_gamma_vega_hedge_tolerance_dollar,
+	Descriptor(35, Attribute::DOUBLE,	"hedge_grp_gamma_vega_hedge_tolerance_dollar", Descriptor::NOT_INDEXED, (size_t)&modelOffset->hedge_grp_gamma_vega_hedge_tolerance_dollar,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(34, Attribute::DOUBLE,	"hedge_grp_gamma_vega_hedge_tolerance_pct_liab_gamma_vega", Descriptor::NOT_INDEXED, (size_t)&modelOffset->hedge_grp_gamma_vega_hedge_tolerance_pct_liab_gamma_vega,
+	Descriptor(36, Attribute::DOUBLE,	"hedge_grp_gamma_vega_hedge_tolerance_pct_liab_gamma_vega", Descriptor::NOT_INDEXED, (size_t)&modelOffset->hedge_grp_gamma_vega_hedge_tolerance_pct_liab_gamma_vega,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(35, Attribute::DOUBLE,	"hedge_grp_gamma_vega_hedge_transaction_costs_bps", Descriptor::NOT_INDEXED, (size_t)&modelOffset->hedge_grp_gamma_vega_hedge_transaction_costs_bps,
+	Descriptor(37, Attribute::DOUBLE,	"hedge_grp_gamma_vega_hedge_transaction_costs_bps", Descriptor::NOT_INDEXED, (size_t)&modelOffset->hedge_grp_gamma_vega_hedge_transaction_costs_bps,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(36, Attribute::STR_ENUM,	"hedge_grp_gamma_vega_hedge_type_defn", -1, (size_t)&modelOffset->hedge_grp_gamma_vega_hedge_type_defn,
+	Descriptor(38, Attribute::STR_ENUM,	"hedge_grp_gamma_vega_hedge_type_defn", -1, (size_t)&modelOffset->hedge_grp_gamma_vega_hedge_type_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &hedge_grp_gamma_vega_hedge_type_defnEnumList, Feature(true)),
-	Descriptor(37, Attribute::STR_ENUM,	"hedge_grp_gmab_defn", -1, (size_t)&modelOffset->hedge_grp_gmab_defn,
+	Descriptor(39, Attribute::STR_ENUM,	"hedge_grp_gmab_defn", -1, (size_t)&modelOffset->hedge_grp_gmab_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &hedge_grp_gmab_defnEnumList, Feature(true)),
-	Descriptor(38, Attribute::STR_ENUM,	"hedge_grp_gmdb_defn", -1, (size_t)&modelOffset->hedge_grp_gmdb_defn,
+	Descriptor(40, Attribute::STR_ENUM,	"hedge_grp_gmdb_defn", -1, (size_t)&modelOffset->hedge_grp_gmdb_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &hedge_grp_gmdb_defnEnumList, Feature(true)),
-	Descriptor(39, Attribute::STR_ENUM,	"hedge_grp_gmib_defn", -1, (size_t)&modelOffset->hedge_grp_gmib_defn,
+	Descriptor(41, Attribute::STR_ENUM,	"hedge_grp_gmib_defn", -1, (size_t)&modelOffset->hedge_grp_gmib_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &hedge_grp_gmib_defnEnumList, Feature(true)),
-	Descriptor(40, Attribute::STR_ENUM,	"hedge_grp_gmwb_defn", -1, (size_t)&modelOffset->hedge_grp_gmwb_defn,
+	Descriptor(42, Attribute::STR_ENUM,	"hedge_grp_gmwb_defn", -1, (size_t)&modelOffset->hedge_grp_gmwb_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &hedge_grp_gmwb_defnEnumList, Feature(true)),
-	Descriptor(41, Attribute::STRING,	"hedge_grp_id", -1, (size_t)&modelOffset->hedge_grp_id,
+	Descriptor(43, Attribute::STRING,	"hedge_grp_id", -1, (size_t)&modelOffset->hedge_grp_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(42, Attribute::STRING,	"hedge_grp_index", -1, (size_t)&modelOffset->hedge_grp_index,
+	Descriptor(44, Attribute::STRING,	"hedge_grp_index", -1, (size_t)&modelOffset->hedge_grp_index,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(43, Attribute::STRING,	"hedge_grp_index_name", -1, (size_t)&modelOffset->hedge_grp_index_name,
+	Descriptor(45, Attribute::STRING,	"hedge_grp_index_name", -1, (size_t)&modelOffset->hedge_grp_index_name,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(44, Attribute::STRING,	"hedge_grp_index_term", -1, (size_t)&modelOffset->hedge_grp_index_term,
+	Descriptor(46, Attribute::STRING,	"hedge_grp_index_term", -1, (size_t)&modelOffset->hedge_grp_index_term,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(45, Attribute::STRING,	"hedge_grp_key_rate", -1, (size_t)&modelOffset->hedge_grp_key_rate,
+	Descriptor(47, Attribute::STRING,	"hedge_grp_key_rate", -1, (size_t)&modelOffset->hedge_grp_key_rate,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(46, Attribute::STRING,	"hedge_grp_plan_codes", -1, (size_t)&modelOffset->hedge_grp_plan_codes,
+	Descriptor(48, Attribute::STRING,	"hedge_grp_plan_codes", -1, (size_t)&modelOffset->hedge_grp_plan_codes,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(47, Attribute::DOUBLE,	"hedge_grp_rate_term", Descriptor::NOT_INDEXED, (size_t)&modelOffset->hedge_grp_rate_term,
+	Descriptor(49, Attribute::DOUBLE,	"hedge_grp_rate_term", Descriptor::NOT_INDEXED, (size_t)&modelOffset->hedge_grp_rate_term,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(48, Attribute::INT,	"hedge_grp_rebal_freq", -1, (size_t)&modelOffset->hedge_grp_rebal_freq,
+	Descriptor(50, Attribute::INT,	"hedge_grp_rebal_freq", -1, (size_t)&modelOffset->hedge_grp_rebal_freq,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(49, Attribute::STRING,	"hedge_grp_rho_convex_hedge_asset_id", -1, (size_t)&modelOffset->hedge_grp_rho_convex_hedge_asset_id,
+	Descriptor(51, Attribute::STRING,	"hedge_grp_rho_convex_hedge_asset_id", -1, (size_t)&modelOffset->hedge_grp_rho_convex_hedge_asset_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(50, Attribute::STR_ENUM,	"hedge_grp_rho_convex_hedge_defn", -1, (size_t)&modelOffset->hedge_grp_rho_convex_hedge_defn,
+	Descriptor(52, Attribute::STR_ENUM,	"hedge_grp_rho_convex_hedge_defn", -1, (size_t)&modelOffset->hedge_grp_rho_convex_hedge_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &hedge_grp_rho_convex_hedge_defnEnumList, Feature(true)),
-	Descriptor(51, Attribute::STR_ENUM,	"hedge_grp_rho_convex_hedge_liab_shock_defn", -1, (size_t)&modelOffset->hedge_grp_rho_convex_hedge_liab_shock_defn,
+	Descriptor(53, Attribute::STR_ENUM,	"hedge_grp_rho_convex_hedge_liab_shock_defn", -1, (size_t)&modelOffset->hedge_grp_rho_convex_hedge_liab_shock_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &hedge_grp_rho_convex_hedge_liab_shock_defnEnumList, Feature(true)),
-	Descriptor(52, Attribute::DOUBLE,	"hedge_grp_rho_convex_hedge_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->hedge_grp_rho_convex_hedge_pct,
+	Descriptor(54, Attribute::DOUBLE,	"hedge_grp_rho_convex_hedge_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->hedge_grp_rho_convex_hedge_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(53, Attribute::INT,	"hedge_grp_rho_convex_hedge_rebal_freq", -1, (size_t)&modelOffset->hedge_grp_rho_convex_hedge_rebal_freq,
+	Descriptor(55, Attribute::INT,	"hedge_grp_rho_convex_hedge_rebal_freq", -1, (size_t)&modelOffset->hedge_grp_rho_convex_hedge_rebal_freq,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(54, Attribute::STR_ENUM,	"hedge_grp_rho_convex_hedge_strat_defn", -1, (size_t)&modelOffset->hedge_grp_rho_convex_hedge_strat_defn,
+	Descriptor(56, Attribute::STR_ENUM,	"hedge_grp_rho_convex_hedge_strat_defn", -1, (size_t)&modelOffset->hedge_grp_rho_convex_hedge_strat_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &hedge_grp_rho_convex_hedge_strat_defnEnumList, Feature(true)),
-	Descriptor(55, Attribute::DOUBLE,	"hedge_grp_rho_convex_hedge_tolerance_dollar", Descriptor::NOT_INDEXED, (size_t)&modelOffset->hedge_grp_rho_convex_hedge_tolerance_dollar,
+	Descriptor(57, Attribute::DOUBLE,	"hedge_grp_rho_convex_hedge_tolerance_dollar", Descriptor::NOT_INDEXED, (size_t)&modelOffset->hedge_grp_rho_convex_hedge_tolerance_dollar,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(56, Attribute::DOUBLE,	"hedge_grp_rho_convex_hedge_tolerance_pct_liab_rho_convex", Descriptor::NOT_INDEXED, (size_t)&modelOffset->hedge_grp_rho_convex_hedge_tolerance_pct_liab_rho_convex,
+	Descriptor(58, Attribute::DOUBLE,	"hedge_grp_rho_convex_hedge_tolerance_pct_liab_rho_convex", Descriptor::NOT_INDEXED, (size_t)&modelOffset->hedge_grp_rho_convex_hedge_tolerance_pct_liab_rho_convex,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(57, Attribute::DOUBLE,	"hedge_grp_rho_convex_hedge_transaction_costs_bps", Descriptor::NOT_INDEXED, (size_t)&modelOffset->hedge_grp_rho_convex_hedge_transaction_costs_bps,
+	Descriptor(59, Attribute::DOUBLE,	"hedge_grp_rho_convex_hedge_transaction_costs_bps", Descriptor::NOT_INDEXED, (size_t)&modelOffset->hedge_grp_rho_convex_hedge_transaction_costs_bps,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(58, Attribute::STRING,	"hedge_grp_rho_hedge_asset_id", -1, (size_t)&modelOffset->hedge_grp_rho_hedge_asset_id,
+	Descriptor(60, Attribute::STRING,	"hedge_grp_rho_hedge_asset_id", -1, (size_t)&modelOffset->hedge_grp_rho_hedge_asset_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(59, Attribute::STR_ENUM,	"hedge_grp_rho_hedge_defn", -1, (size_t)&modelOffset->hedge_grp_rho_hedge_defn,
+	Descriptor(61, Attribute::STR_ENUM,	"hedge_grp_rho_hedge_defn", -1, (size_t)&modelOffset->hedge_grp_rho_hedge_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &hedge_grp_rho_hedge_defnEnumList, Feature(true)),
-	Descriptor(60, Attribute::STR_ENUM,	"hedge_grp_rho_hedge_liab_shock_defn", -1, (size_t)&modelOffset->hedge_grp_rho_hedge_liab_shock_defn,
+	Descriptor(62, Attribute::STR_ENUM,	"hedge_grp_rho_hedge_liab_shock_defn", -1, (size_t)&modelOffset->hedge_grp_rho_hedge_liab_shock_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &hedge_grp_rho_hedge_liab_shock_defnEnumList, Feature(true)),
-	Descriptor(61, Attribute::DOUBLE,	"hedge_grp_rho_hedge_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->hedge_grp_rho_hedge_pct,
+	Descriptor(63, Attribute::DOUBLE,	"hedge_grp_rho_hedge_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->hedge_grp_rho_hedge_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(62, Attribute::INT,	"hedge_grp_rho_hedge_rebal_freq", -1, (size_t)&modelOffset->hedge_grp_rho_hedge_rebal_freq,
+	Descriptor(64, Attribute::INT,	"hedge_grp_rho_hedge_rebal_freq", -1, (size_t)&modelOffset->hedge_grp_rho_hedge_rebal_freq,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(63, Attribute::STR_ENUM,	"hedge_grp_rho_hedge_strat_defn", -1, (size_t)&modelOffset->hedge_grp_rho_hedge_strat_defn,
+	Descriptor(65, Attribute::STR_ENUM,	"hedge_grp_rho_hedge_strat_defn", -1, (size_t)&modelOffset->hedge_grp_rho_hedge_strat_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &hedge_grp_rho_hedge_strat_defnEnumList, Feature(true)),
-	Descriptor(64, Attribute::DOUBLE,	"hedge_grp_rho_hedge_tolerance_dollar", Descriptor::NOT_INDEXED, (size_t)&modelOffset->hedge_grp_rho_hedge_tolerance_dollar,
+	Descriptor(66, Attribute::DOUBLE,	"hedge_grp_rho_hedge_tolerance_dollar", Descriptor::NOT_INDEXED, (size_t)&modelOffset->hedge_grp_rho_hedge_tolerance_dollar,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(65, Attribute::DOUBLE,	"hedge_grp_rho_hedge_tolerance_pct_liab_rho", Descriptor::NOT_INDEXED, (size_t)&modelOffset->hedge_grp_rho_hedge_tolerance_pct_liab_rho,
+	Descriptor(67, Attribute::DOUBLE,	"hedge_grp_rho_hedge_tolerance_pct_liab_rho", Descriptor::NOT_INDEXED, (size_t)&modelOffset->hedge_grp_rho_hedge_tolerance_pct_liab_rho,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(66, Attribute::DOUBLE,	"hedge_grp_rho_hedge_transaction_costs_bps", Descriptor::NOT_INDEXED, (size_t)&modelOffset->hedge_grp_rho_hedge_transaction_costs_bps,
+	Descriptor(68, Attribute::DOUBLE,	"hedge_grp_rho_hedge_transaction_costs_bps", Descriptor::NOT_INDEXED, (size_t)&modelOffset->hedge_grp_rho_hedge_transaction_costs_bps,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(67, Attribute::STRING,	"hedge_grp_yld_curve_id", -1, (size_t)&modelOffset->hedge_grp_yld_curve_id,
+	Descriptor(69, Attribute::STRING,	"hedge_grp_yld_curve_id", -1, (size_t)&modelOffset->hedge_grp_yld_curve_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(68, Attribute::STR_ENUM,	"independent_mp_defn", -1, (size_t)&modelOffset->independent_mp_defn,
-				Descriptor::NOT_SHARED, false, false, (size_t)0, &independent_mp_defnEnumList, Feature(true)),
-	Descriptor(69, Attribute::DOUBLE,	"int_rate_shock", Descriptor::NOT_INDEXED, (size_t)&modelOffset->int_rate_shock,
+	Descriptor(70, Attribute::DOUBLE,	"int_rate_shock", Descriptor::NOT_INDEXED, (size_t)&modelOffset->int_rate_shock,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(70, Attribute::STR_ENUM,	"int_rate_shock_defn", -1, (size_t)&modelOffset->int_rate_shock_defn,
+	Descriptor(71, Attribute::STR_ENUM,	"int_rate_shock_defn", -1, (size_t)&modelOffset->int_rate_shock_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &int_rate_shock_defnEnumList, Feature(true)),
-	Descriptor(71, Attribute::STRING,	"int_rate_shock_id", -1, (size_t)&modelOffset->int_rate_shock_id,
+	Descriptor(72, Attribute::STRING,	"int_rate_shock_id", -1, (size_t)&modelOffset->int_rate_shock_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(72, Attribute::DOUBLE,	"phldr_shock", Descriptor::NOT_INDEXED, (size_t)&modelOffset->phldr_shock,
+	Descriptor(73, Attribute::DOUBLE,	"phldr_shock", Descriptor::NOT_INDEXED, (size_t)&modelOffset->phldr_shock,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(73, Attribute::STR_ENUM,	"phldr_shock_defn", -1, (size_t)&modelOffset->phldr_shock_defn,
+	Descriptor(74, Attribute::STR_ENUM,	"phldr_shock_defn", -1, (size_t)&modelOffset->phldr_shock_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &phldr_shock_defnEnumList, Feature(true)),
-	Descriptor(74, Attribute::STRING,	"phldr_shock_id", -1, (size_t)&modelOffset->phldr_shock_id,
+	Descriptor(75, Attribute::STRING,	"phldr_shock_id", -1, (size_t)&modelOffset->phldr_shock_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(75, Attribute::STRING,	"proj_date", -1, (size_t)&modelOffset->proj_date,
+	Descriptor(76, Attribute::STRING,	"proj_date", -1, (size_t)&modelOffset->proj_date,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(76, Attribute::STRING,	"scen_file_name_addn", -1, (size_t)&modelOffset->scen_file_name_addn,
+	Descriptor(77, Attribute::STRING,	"scen_file_name_addn", -1, (size_t)&modelOffset->scen_file_name_addn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(77, Attribute::STRING,	"seg_id", -1, (size_t)&modelOffset->seg_id,
+	Descriptor(78, Attribute::STRING,	"seg_id", -1, (size_t)&modelOffset->seg_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(78, Attribute::INT,	"shock_freq", -1, (size_t)&modelOffset->shock_freq,
+	Descriptor(79, Attribute::INT,	"shock_freq", -1, (size_t)&modelOffset->shock_freq,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(79, Attribute::STRING,	"shock_id", -1, (size_t)&modelOffset->shock_id,
+	Descriptor(80, Attribute::STRING,	"shock_id", -1, (size_t)&modelOffset->shock_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(80, Attribute::STRING,	"valn_hedge_final_results", -1, (size_t)&modelOffset->valn_hedge_final_results,
+	Descriptor(81, Attribute::STRING,	"shock_id_selected", -1, (size_t)&modelOffset->shock_id_selected,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(81, Attribute::STRING,	"valn_hedge_results", -1, (size_t)&modelOffset->valn_hedge_results,
+	Descriptor(82, Attribute::STRING,	"valn_hedge_final_results", -1, (size_t)&modelOffset->valn_hedge_final_results,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(82, Attribute::STR_ENUM,	"valn_scens_defn", -1, (size_t)&modelOffset->valn_scens_defn,
+	Descriptor(83, Attribute::STRING,	"valn_hedge_results", -1, (size_t)&modelOffset->valn_hedge_results,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
+	Descriptor(84, Attribute::STR_ENUM,	"valn_scens_defn", -1, (size_t)&modelOffset->valn_scens_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &valn_scens_defnEnumList, Feature(true)),
-	Descriptor(83, Attribute::INT,	"valn_scens_to_run", -1, (size_t)&modelOffset->valn_scens_to_run,
+	Descriptor(85, Attribute::INT,	"valn_scens_to_run", -1, (size_t)&modelOffset->valn_scens_to_run,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(84, Attribute::INT,	"msnumelement", -1, (size_t)&modelOffset->msnumelement,
+	Descriptor(86, Attribute::INT,	"msnumelement", -1, (size_t)&modelOffset->msnumelement,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(85, Attribute::SCALAR_INT,	"final_period", -1, (size_t)&modelOffset->final_period,
+	Descriptor(87, Attribute::SCALAR_INT,	"final_period", -1, (size_t)&modelOffset->final_period,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&HDG_GRP_COMP_UDF::hdg_grp_comp_final_period)),
-	Descriptor(86, Attribute::SCALAR_STRING,	"proj_date_adj", -1, (size_t)&modelOffset->proj_date_adj,
+	Descriptor(88, Attribute::SCALAR_STRING,	"proj_date_adj", -1, (size_t)&modelOffset->proj_date_adj,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((sF)&HDG_GRP_COMP_UDF::hdg_grp_comp_proj_date_adj)),
-	Descriptor(87, Attribute::SCALAR_INT,	"proj_start_date", -1, (size_t)&modelOffset->proj_start_date,
+	Descriptor(89, Attribute::SCALAR_INT,	"proj_start_date", -1, (size_t)&modelOffset->proj_start_date,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&HDG_GRP_COMP_UDF::hdg_grp_comp_proj_start_date)),
-	Descriptor(88, Attribute::SCALAR_INT,	"proj_start_mth", -1, (size_t)&modelOffset->proj_start_mth,
+	Descriptor(90, Attribute::SCALAR_INT,	"proj_start_mth", -1, (size_t)&modelOffset->proj_start_mth,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&HDG_GRP_COMP_UDF::hdg_grp_comp_proj_start_mth)),
-	Descriptor(89, Attribute::SCALAR_INT,	"proj_start_yr", -1, (size_t)&modelOffset->proj_start_yr,
+	Descriptor(91, Attribute::SCALAR_INT,	"proj_start_yr", -1, (size_t)&modelOffset->proj_start_yr,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&HDG_GRP_COMP_UDF::hdg_grp_comp_proj_start_yr)),
-	Descriptor(90, Attribute::SCALAR_INT,	"start_period", -1, (size_t)&modelOffset->start_period,
+	Descriptor(92, Attribute::SCALAR_INT,	"start_period", -1, (size_t)&modelOffset->start_period,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&HDG_GRP_COMP_UDF::hdg_grp_comp_start_period)),
 	};
 
@@ -11083,8 +11142,10 @@ TableMgr<VariantTable> HDG_GRP_COMP::mgr_;
 	&HDG_GRP_COMP::descriptor_0[88],
 	&HDG_GRP_COMP::descriptor_0[89],
 	&HDG_GRP_COMP::descriptor_0[90],
+	&HDG_GRP_COMP::descriptor_0[91],
+	&HDG_GRP_COMP::descriptor_0[92],
 	nullptr};
-	const size_t HDG_GRP_COMP::sDescriptorCount = 91;
+	const size_t HDG_GRP_COMP::sDescriptorCount = 93;
 
 //factory
 HDG_GRP_COMP* HDG_GRP_COMP::makeThis(int isSubmodel, ModelClass* owner, HDG_GRP_COMP* peer, 
@@ -11195,13 +11256,8 @@ typedef xstring (HDG_GRP_COMP_UDF::*sPFs) (xstring);
 
 // constructor if this model class is the base class of another model class
 HDG_GRP_COMP::HDG_GRP_COMP(int columnCount, Descriptor* mocd[], Product* persObj) : ModelClass(columnCount, mocd, persObj), Variable(*this)
-  , sm_bond_is(0)
-  , sm_bond_pv(0)
-  , sm_bond_ym(0)
-  , sm_mtg_is(0)
-  , sm_mtg_pv(0)
-  , sm_mtg_ym(0)
 
+	, adco(company_asset_adco)
 	, ann_pba(company_seg_ann_pba)
 	, asset(company_asset)
 	, epl(company_liab_epl)
@@ -11224,13 +11280,8 @@ HDG_GRP_COMP::HDG_GRP_COMP(int columnCount, Descriptor* mocd[], Product* persObj
 HDG_GRP_COMP::HDG_GRP_COMP(const xstring &modelClassName,
 		int isSm, ModelClass *owner, ModelClass *peer, int mainRebase,
 		const char *name, ModelClass* arrayPersistentObj) : ModelClass(152, HDG_GRP_COMP::descriptorTable, arrayPersistentObj), Variable(*this)
-  , sm_bond_is(0)
-  , sm_bond_pv(0)
-  , sm_bond_ym(0)
-  , sm_mtg_is(0)
-  , sm_mtg_pv(0)
-  , sm_mtg_ym(0)
 
+	, adco(company_asset_adco)
 	, ann_pba(company_seg_ann_pba)
 	, asset(company_asset)
 	, epl(company_liab_epl)
@@ -11263,11 +11314,14 @@ HDG_GRP_COMP::HDG_GRP_COMP(const xstring &modelClassName,
        isMainModel = !isSm;
 		modelName = name;
 
-#ifdef __CREATE_COMP_COMP_CLASS_
+#ifdef __CREATE_AA_COMP_COMP_CLASS_
        company = 0;
 #endif
 #ifdef __CREATE_ASSET_ASSET_CLASS_
        company_asset = 0;
+#endif
+#ifdef __CREATE_ADCO_ASSET_CLASS_
+       company_asset_adco = 0;
 #endif
 #ifdef __CREATE_INVSTRAT_ASSET_CLASS_
        company_inv_strategy = 0;
@@ -11347,11 +11401,14 @@ HDG_GRP_COMP::HDG_GRP_COMP(const xstring &modelClassName,
 
  void HDG_GRP_COMP::copy_names() {
 
-#ifdef __CREATE_COMP_COMP_CLASS_
-		company = (COMP_COMP*)(findUnique("company"));
+#ifdef __CREATE_AA_COMP_COMP_CLASS_
+		company = (AA_COMP_COMP*)(findUnique("company"));
 #endif
 #ifdef __CREATE_ASSET_ASSET_CLASS_
 		company_asset = (ASSET_ASSET*)(findUnique("company|asset"));
+#endif
+#ifdef __CREATE_ADCO_ASSET_CLASS_
+		company_asset_adco = (ADCO_ASSET*)(findUnique("company|asset|adco"));
 #endif
 #ifdef __CREATE_INVSTRAT_ASSET_CLASS_
 		company_inv_strategy = (INVSTRAT_ASSET*)(findUnique("company|inv_strategy"));
@@ -11584,12 +11641,6 @@ HDG_GRP_COMP_persistent_object::HDG_GRP_COMP_persistent_object(const xstring &mo
 			HDG_GRP_COMP(modelClassName, isSm, owner, peer, mainRebase, name, arrayPersistentObj), 
 			mReadArray(true),
 			pfl(0)
-	, sm_bond_is(HDG_GRP_COMP::sm_bond_is)
-	, sm_bond_pv(HDG_GRP_COMP::sm_bond_pv)
-	, sm_bond_ym(HDG_GRP_COMP::sm_bond_ym)
-	, sm_mtg_is(HDG_GRP_COMP::sm_mtg_is)
-	, sm_mtg_pv(HDG_GRP_COMP::sm_mtg_pv)
-	, sm_mtg_ym(HDG_GRP_COMP::sm_mtg_ym)
 
 	{
 
@@ -11669,7 +11720,7 @@ void HDG_GRP_COMP::after_startup(int decrement) {
 //ms_BeforeStartup END@2
 
 HVector<ModelClass::ddfStruct> HDG_GRP_COMP::ddfVector;
-BitArray HDG_GRP_COMP::dataVariables(91);
+BitArray HDG_GRP_COMP::dataVariables(93);
 bool HDG_GRP_COMP::hasBeenWritten = false;
 
 

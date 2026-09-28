@@ -1,13 +1,12 @@
 ﻿
 //MODELCLASS BEGIN
+//MODELCLASS aa_comp_comp
 //MODELCLASS adco_asset
 //MODELCLASS ann_pba_pba
 //MODELCLASS asset_asset
-//MODELCLASS automation
 //MODELCLASS a_subport_asset
 //MODELCLASS bond_asset
 //MODELCLASS bond_cf_asset
-//MODELCLASS comp_comp
 //MODELCLASS eio_asset
 //MODELCLASS epa_asset
 //MODELCLASS epl_liab
@@ -15,16 +14,14 @@
 //MODELCLASS fiacarvm_liab
 //MODELCLASS fia_liab
 //MODELCLASS hdg_grp_comp
-//MODELCLASS intex_asset
 //MODELCLASS invstrat_asset
 //MODELCLASS liab_liab
+//MODELCLASS mrb_gaap
 //MODELCLASS mtg_asset
 //MODELCLASS mtg_cf_asset
 //MODELCLASS rates_economy
 //MODELCLASS seg_comp
-//MODELCLASS sfas133_gaap
 //MODELCLASS sfas97rd_gaap
-//MODELCLASS util_rafm
 //MODELCLASS END
 
 #if defined(MICROSOFT)
@@ -75,13 +72,12 @@ extern MemCount gMem;
 extern MY_DLL Parmfile *p;
 #include "column2.h"
 #include "ModelClass\bond_cf_asset_udf.h"
+#include "ModelClass\aa_comp_comp.h"
 #include "ModelClass\adco_asset.h"
 #include "ModelClass\ann_pba_pba.h"
 #include "ModelClass\asset_asset.h"
-#include "ModelClass\automation.h"
 #include "ModelClass\a_subport_asset.h"
 #include "ModelClass\bond_asset.h"
-#include "ModelClass\comp_comp.h"
 #include "ModelClass\eio_asset.h"
 #include "ModelClass\epa_asset.h"
 #include "ModelClass\epl_liab.h"
@@ -89,16 +85,14 @@ extern MY_DLL Parmfile *p;
 #include "ModelClass\fiacarvm_liab.h"
 #include "ModelClass\fia_liab.h"
 #include "ModelClass\hdg_grp_comp.h"
-#include "ModelClass\intex_asset.h"
 #include "ModelClass\invstrat_asset.h"
 #include "ModelClass\liab_liab.h"
+#include "ModelClass\mrb_gaap.h"
 #include "ModelClass\mtg_asset.h"
 #include "ModelClass\mtg_cf_asset.h"
 #include "ModelClass\rates_economy.h"
 #include "ModelClass\seg_comp.h"
-#include "ModelClass\sfas133_gaap.h"
 #include "ModelClass\sfas97rd_gaap.h"
-#include "ModelClass\util_rafm.h"
 #pragma optimize( "gs", on )
 
 #include "generatedCppHeader.h"
@@ -109,7 +103,7 @@ extern MY_DLL Parmfile *p;
 //Redundant includes only for snip test:
 //iomanip included for "setprecision()"
 #include <iomanip>
-#include <strstream> //WTW - Gen2
+#include <strstream>
 typedef vector<vector<string>> sowfinput;
 typedef vector<string> sowfcols;
 typedef map <xstring, long, less <xstring> > sowfmap;
@@ -120,7 +114,9 @@ typedef vector<vector<string>> deptaskinput;
 typedef vector<string> deptaskcols;
 typedef map <xstring, long, less <xstring> > deptaskmap;
 typedef deptaskmap::iterator deptaskmapiter;
-//extern MY_DLL strstream log_screen; //WTW - Gen2 - MY_DLL is not supported
+const int pv = 0;
+const int is = 1;
+const int ym = 2;
 const int EFFECTIVE_RATE = 0;
 const int EFFECTIVE_ANNUAL = 1;
 const int NOMINAL_SEMIANNUAL = 2;
@@ -138,9 +134,8 @@ const double LEAST_ANNUAL_GROWTH_RATE = -0.9999;
 const double LEAST_BOND_EQUIVALENT_RATE = 0.0001;
 const double SPOT_SHIFT_FOR_EFFECTIVE_DURATION_CALCULATION = 0.0001;
 const double ONE_MILLION = 1000000.0;
-//WTW - Gen2 - Move Extern definitions to rates header
-//const double MINIMUM_MONTHLY_YIELD_RATIO = -0.9; // annual yield = (1.0-0.9)^12 = 1.0e-12
-//const double MAXIMUM_MONTHLY_YIELD_RATIO	 = 999999999.0; // annual yield = (1.0+999999999.0)^12 = 1.0e+120
+const double MINIMUM_MONTHLY_YIELD_RATIO = -0.9; // annual yield = (1.0-0.9)^12 = 1.0e-12
+const double MAXIMUM_MONTHLY_YIELD_RATIO	 = 999999999.0; // annual yield = (1.0+999999999.0)^12 = 1.0e+120
 const int DECIMALS_TO_ROUND = 6;
 const int ROUND_NEGATIVE_TOZERO = 0;
 const int ROUND_NEAR = 1;
@@ -154,11 +149,10 @@ const int SUM_OVER_NEGATIVE = -101;
 const int TIER = -98;
 const int ANY_GROUP = -99;
 const bool DO_NOT_ISSUE_WARNINGS = false;
-//WTW - Gen2 - Move Extern definitions to rates header
-//const int CALL_CODE = 1; 
-//const int PUT_CODE = 2; 
-//const int CONTINUOUS_PAYOUT_CODE = 3;
-//const int FUTURES_CODE = 4;
+const int CALL_CODE = 1;
+const int PUT_CODE = 2;
+const int CONTINUOUS_PAYOUT_CODE = 3;
+const int FUTURES_CODE = 4;
 // Model point type
 const int NEW_PURCH = 0;
 const int INIT_MP = 1;
@@ -208,11 +202,13 @@ const int HEDGE_CASH_FLOW = 0;
 const int HEDGE_MKT_VAL = 1;
 const int HEDGE_ARRAY_SIZE = 2;
 // global calculation flags
-//extern bool pricing_flag;//WTW - Gen2 - Move Extern definitions to rates header
+extern bool pricing_flag;
 extern bool factors_flag;
 extern bool nb_flag;
 extern bool alm_flag;
 extern bool tcm_flag;
+extern bool pba_disc_rate_flag;
+extern int pba_segment_size;
 extern bool avr_flag;
 extern bool imr_flag;
 extern bool gaap_flag;
@@ -220,17 +216,12 @@ extern bool tgt_cap_flag;
 extern bool stoch_flag;
 extern bool valn_flag;
 extern bool time_step_flag;
-extern bool sfas133_valn_flag;
+extern bool mrb_valn_flag;
 extern bool sop031_valn_flag;
 extern bool sfas97rd_valn_flag;
-extern bool sfas97lp_valn_flag;
-extern bool sfas97lp_gpr_valn_flag;
 extern bool sfas91_valn_flag;
-extern bool sfas60_valn_flag;
-extern bool sfas60_gpr_valn_flag;
+extern bool gaap_ldti_valn_flag;
 extern bool sfas120_nlp_valn_flag;
-extern bool sfas120_valn_flag;
-extern bool sfas120_gpr_valn_flag;
 extern bool loc_gpr_valn_flag;
 extern bool pba_valn_flag;
 extern bool pba_scen_amt_valn_flag;
@@ -239,6 +230,7 @@ extern bool res_scen_amt_valn_flag;
 extern bool res_det_res_valn_flag;
 extern bool res_ag38_8d_valn_flag;
 extern bool std_scen_valn_flag;
+extern bool std_scen_prescribed_assump_flag;
 extern bool rbc_std_scen_valn_flag;
 extern bool rbc_std_scen_step2_valn_flag;
 extern bool res_std_scen_valn_flag;
@@ -261,33 +253,32 @@ extern double aggregate_amount_threshold;
 extern double model_point_amount_threshold;
 extern double rate_ratio_threshold;
 extern vector<string> valn_periods;
+
 // utility functions - elaborated in rates/economy externs
-//WTW - Gen2 - Move Extern definitions to rates header
-/*extern double round_result(int rounding, int negative, double x, int n);
+extern double round_result(int rounding, int negative, double x, int n);
 extern double factorial(int n);
 extern int n_choose_k(int n, int k);
 extern xstring check_date_format(const xstring &date);
+extern int month_from_day_number(int nSerialDate);
+extern int year_from_day_number(int nSerialDate);
+extern int day_from_day_number(int nSerialDate);
+extern int month_number_from_date(int year, int month); 
+extern int day_number_from_date(int nYear, int nMonth, int nDay);
 extern int get_mth_from_date(const xstring &date);
 extern int get_yr_from_date(const xstring &date);
 extern int get_day_from_date(const xstring &date);
-extern int month_from_day_number(int nSerialDate);//WTW - Gen2 - add new formula to replace unsupported MonthFromDayNumber() function
-extern int year_from_day_number(int nSerialDate);//WTW - Gen2 - add new formula to replace unsupported YearFromDayNumber() function
-extern int day_from_day_number(int nSerialDate);//WTW - Gen2 - add new formula to replace unsupported DayFromDayNumber() function
-extern int month_number_from_date(int year, int month); //WTW - Gen2 - add new formula to replace unsupported MonthNumberFromDate() function
-extern int day_number_from_date(int nYear, int nMonth, int nDay); //WTW - Gen2 - add new formula to replace unsupported DayNumberFromDate() function
 extern int get_end_of_mth_day(int yr, int mth);
 extern xstring add_mths_to_date(const xstring &date, int mths);
 extern int get_mth_from_adj_date(const xstring &date, int mths);
 extern double convert_rate_basis(double orig_rate, double orig_rate_basis, double new_rate_basis);
 extern double convert_decrem_rate_basis(double orig_rate, double orig_rate_basis, double new_rate_basis);
-extern long int determine_tbl_size(int sNumberOfDims, ...);
 extern xstring get_file_name(const xstring &source_file);
 extern xstring get_file_path(const xstring &source_file);
-extern xstring get_base_group_name(const xstring &tag, bool seriatim_flag = false);
+extern xstring get_base_group_name(const xstring &tag, bool split_flag = false);
 extern xstring get_string_of_date(double date);
 extern xstring get_string_of_enum_val(StrEnum::EnumValue type);
 extern int date_diff(xstring first_date, xstring second_date);
-extern int number_of_decimals(double xxx, int digits);//WTW - Gen2 - replace preprocessor #define with formula
+extern int number_of_decimals(double xxx,int digits);
 extern xstring write_string(double value, int string_length, int significant_digits);
 extern xstring write_array_to_string(SmartArray <double> value_array, int low, int high);
 extern void read_from_string(xstring temp_string, SmartArray <double> &temp_array);
@@ -308,25 +299,8 @@ extern double bs_opt_val_continuous_highest_gain(int call_or_put, double current
 extern double bs_opt_val_highest_gain(int call_or_put, double current_price, double observed_max, double observed_min, double strike_price, double length_of_sampling_period, int sampling_freq, double yrs_to_expiry, double risk_free_rate, double init_div_yld, double index_vol, int scen_int_freq, int scen_index_freq);
 extern double bs_opt_val_mthly_sum_cap(int crediting_mths, int known_index_vals, double sum_capped_amts,  double mthly_cap_rate, double yrs_to_expiry, double risk_free_rate, double init_div_yld, double index_vol, int scen_int_freq, int scen_index_freq);
 extern double cumul_bivariate_normal_distribn(double x, double y, double rho);
-extern double cumul_normal_distribn(double x);*/
+extern double cumul_normal_distribn(double x);
 
-// RAFM SQLite
-#ifndef _RAFMSQLITE_H_
-#define _RAFMSQLITE_H_
-
-#include <string>
-#include <vector>
-
-using namespace std;
-
-// 20210614 STW: upgrade to RAFM 2.9
-/*
-extern void openDatabase(string dbPath);
-extern void closeDatabase();
-extern string readCsvFile(string csvPath);
-extern void executeQuery(string sql, vector<string>& columns, vector<vector<string>>& results);
-*/
-#endif
 #endif
 extern int trace_wanted;
 
@@ -378,8 +352,8 @@ extern int pv_cp_model_point;
 // This macro evaluates the number of decimals in the 'xxx' value that corresponds
 // to 'sig_digits' significant digits. This macro is used to set solving_flag tolerance
 // factors. For example, NUMBER_OF_DECIMALS(50000,11) evaluates to 6.
-#define NUMBER_OF_DECIMALS(xxx,sig_digits) (fabs(xxx) < 0.000000001 ? (sig_digits-1) : (min((sig_digits-1), (int)((sig_digits) - log10(fabs(xxx))))))
-#define SIGNIFICANT_DIGITS 11
+//#define NUMBER_OF_DECIMALS(xxx,sig_digits) (fabs(xxx) < 0.000000001 ? (sig_digits-1) : (min((sig_digits-1), (int)((sig_digits) - log10(fabs(xxx))))))
+static constexpr int SIGNIFICANT_DIGITS = 11;
 
 extern int maximum_t_high_value;
 extern int minimum_t_low_value;
@@ -395,7 +369,6 @@ extern const int& last_proj_task_loop;
 extern const int& proj_task_loop_num;
 extern const int& num_of_proj_task_loops;
 
-extern MY_DLL2 int use_overlay_code;
 extern MY_DLL int trace_level_wanted;
 extern MY_DLL int trace_level;
 extern MY_DLL bool bEmitTurboDebugger;
@@ -409,15 +382,6 @@ extern MY_DLL Parmfile *  p;
 
 	TempTableHolderCollection BOND_CF_ASSET::TTHC;
 void BOND_CF_ASSET::removeSMPointers(ModelClass* modelToRemove){
-
-	if(modelToRemove == sm_bond_is)
-		sm_bond_is = 0;
-
-	if(modelToRemove == sm_bond_pv)
-		sm_bond_pv = 0;
-
-	if(modelToRemove == sm_bond_ym)
-		sm_bond_ym = 0;
 
 }		
 
@@ -439,14 +403,13 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 if (t < bond->commencement_period || t >= bond->maturity_period)
 	return NO_AVG;
 
-if (this != bond_cf)
+if (model_name != BOND_CF)
 	return accr_int_bef_sale(t);
 
 return accr_int_bef_sale(t)
 	   * (1.0 - bond->sold_pct(t));
 
 }
-
 
 //@@ END
 
@@ -468,11 +431,11 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 if (t <= bond->commencement_period || t > bond->maturity_period)
 	return NO_AVG;
 
-if (this == bond_cf)
+if (model_name == BOND_CF)
 	return accr_int(t - 1)
 		   * remaining_pct_aft_dflt(t);
 
-if (t == rebase_period + 1)
+if (t == rebase_time + 1)
 	{
 	if (pv_timing == END_OF_MONTH)
 		return pv_initial_accrued_interest;
@@ -501,7 +464,6 @@ if (pv_timing == END_OF_MONTH
 return accr_int(t - 1);
 
 }
-
 
 //@@ END
 
@@ -533,7 +495,6 @@ if (t == 0 && bond->existing_asset_indicator
 return accr_int_direct(t, par_val_aft_put(t), pmt_rate(t));
 
 }
-
 
 //@@ END
 
@@ -567,7 +528,6 @@ return accr_int_direct(t, local_par_val_aft_sched_pmt, pmt_rate(t - 1));
 
 }
 
-
 //@@ END
 
 //@@ START - accr_int_bef_sale
@@ -597,7 +557,7 @@ if (t == bond->commencement_period && !bond->existing_asset_indicator)
 	{
 	if (bond->yrs_since_last_pmt > model_point_amount_threshold)
 		{
-		if (pv_defn == MARKET_VALUE || this == bond_ym)
+		if (pv_defn == MARKET_VALUE || getElementNumber() == ym)
 			{
 			double local_par_value_bef_sale
 			= max(ONE_MILLION, fabs(bond->purch_amt));
@@ -621,7 +581,6 @@ if (par_val_bef_sale(t) <= 0.0)
 return accr_int_aft_put(t);
 
 }
-
 
 //@@ END
 
@@ -667,7 +626,6 @@ if ((bond->call_defn == AMERICAN && t >= bond->call_first_period)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -722,7 +680,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - call_pct
@@ -757,17 +714,22 @@ if ((bond->call_defn == AMERICAN && t >= bond->call_first_period)
 	// since that function resets calling of pv_calc_parameters function
 	refinancing_rate(t);
 
+	bond->category_id = bond->category_id;
+	double refinancing_cost_pct_local = bond->refinancing_cost_pct;
+
 	call_cost
 	= par_val_aft_sched_pmt(t)
-	  * (call_price_pct(t) - 1.0 + bond->refinancing_cost_pct);
+	  * (call_price_pct(t) - 1.0 + refinancing_cost_pct_local);
 
 	interest_savings = int_savings_pv_bef_call(t) - par_val_aft_sched_pmt(t);
 	
 	// Set lookup key for call_opt_exercise_pct variable
 	bond->int_rate_diff = int_rate_for_call_opt(t) - refinancing_rate(t);
+	bond->category_id = bond->category_id;
+	double call_opt_exercise_pct_local = bond->call_opt_exercise_pct;
 
 	if (interest_savings > call_cost)
-		return bond->call_opt_exercise_pct;
+		return call_opt_exercise_pct_local;
 
 	return 0.0;
 	}
@@ -775,7 +737,6 @@ if ((bond->call_defn == AMERICAN && t >= bond->call_first_period)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -807,7 +768,6 @@ if (bond->call_defn == EUROPEAN && t == bond->call_first_period)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -844,7 +804,7 @@ if (bond->call_price_defn == CASH_FLOW_MAINTENANCE)
 	{
 	double yld_maint_cost_factor = yld_maint_cost_pct(t);
 
-	if (this == bond_cf) // Rebase to reduce sliding windows sizes
+	if (model_name == BOND_CF) // Rebase to reduce sliding windows sizes
 		bond->rebase_bond_cash_flow(t,
 		                            YIELD_MAINTENANCE,
 		                            "bond_cf->call_price_pct",
@@ -866,7 +826,6 @@ if (bond->call_price_defn == RELATED_TO_COUPON)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -890,11 +849,8 @@ if (t <= bond->commencement_period || t > bond->maturity_period)
 
 if (bond->mths_to_next_pmt(t - 1) != 1)
 	return NO_AVG;
-/*log_screen<<"t= "<<t
-<<" par_val_aft_dflt(t)= "<<par_val_aft_dflt(t)
-<<" pmt_rate(t - 1)= "<<pmt_rate(t - 1)
-<<MSG_USER;*/
-if (this == bond_cf)
+
+if (model_name == BOND_CF)
 	return par_val_aft_dflt(t)
 		   * pmt_rate(t - 1)
 		   / bond->pmt_freq;
@@ -904,7 +860,6 @@ return par_val_bom_aft_rebase(t)
 	   / bond->pmt_freq;
 
 }
-
 
 //@@ END
 
@@ -933,7 +888,10 @@ if (par_val_aft_sched_pmt(t) > 0.0
 		|| (bond->put_defn == AMERICAN && t >= bond->put_first_period)
 		|| (bond->put_defn == EUROPEAN && t == bond->put_first_period)))
 	{
-	if (bond->opt_int_diff_defn == COUPON_RATE)
+	bond->category_id = bond->category_id;
+	StrEnum::EnumValue opt_int_diff_defn_local = bond->opt_int_diff_defn;
+
+	if (opt_int_diff_defn_local == COUPON_RATE)
 		return ((1.0 + convert_rate_basis(pmt_rate(t),
 							   bond->pmt_freq,
 							   NOMINAL_SEMIANNUAL)
@@ -941,8 +899,8 @@ if (par_val_aft_sched_pmt(t) > 0.0
 					- 1.0)
 			   * NOMINAL_SEMIANNUAL;
 
-	else if (bond->opt_int_diff_defn == NET_YIELD
-			 || (bond->opt_int_diff_defn == NET_YIELD_AT_ISSUE
+	else if (opt_int_diff_defn_local == NET_YIELD
+			 || (opt_int_diff_defn_local == NET_YIELD_AT_ISSUE
 				 && bond->net_yld_at_issue_flag == NO))
 		return ((1.0 + convert_rate_basis(bond->net_yld(t - 1),
 							   12,
@@ -951,7 +909,7 @@ if (par_val_aft_sched_pmt(t) > 0.0
 				- 1.0)
 			   * NOMINAL_SEMIANNUAL;
 
-	else if (bond->opt_int_diff_defn == NET_YIELD_AT_ISSUE
+	else if (opt_int_diff_defn_local == NET_YIELD_AT_ISSUE
 			 && bond->net_yld_at_issue_flag == YES)
 		return bond->net_yld_at_issue;
 	}
@@ -959,7 +917,6 @@ if (par_val_aft_sched_pmt(t) > 0.0
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -993,7 +950,7 @@ if ((bond->call_defn == AMERICAN && t >= bond->call_first_period)
 	|| (bond->put_defn == AMERICAN && t >= bond->put_first_period)
 	|| (bond->put_defn == EUROPEAN && t == bond->put_first_period))
 	{
-	if (this != bond_cf)
+	if (model_name != BOND_CF)
 		{
 		interest_savings_present_value
 		= (bond_cf->int_savings_pv_bef_call(t)
@@ -1018,7 +975,7 @@ if ((bond->call_defn == AMERICAN && t >= bond->call_first_period)
 			bond->asset_detail_rpt_pv_output();
 			}
 
-		if (bond_is->rebase_period < t)
+		if (bond->sm_bond_cf_var[0][is]->rebase_time < t)
 			{
 			bond->rebase_bond_cash_flow(t,
 					INTEREST_SAVINGS,
@@ -1029,12 +986,12 @@ if ((bond->call_defn == AMERICAN && t >= bond->call_first_period)
 		// save current pv parameters
 		pv_calc_parameters(t, SAVE);
 		
-		bond_is->pv_calc_parameters(t,
+		bond->sm_bond_cf_var[0][is]->pv_calc_parameters(t,
 					INTEREST_SAVINGS_BEFORE_CALLS,
 					xint(bond->maturity_period - t));
 
 		interest_savings_present_value
-		= bond_is->pv_calc(t,
+		= bond->sm_bond_cf_var[0][is]->pv_calc(t,
 				refinancing_rate(t),
 				temp, // calculated_derivative
 				temp  // calculated_modified_duration
@@ -1063,7 +1020,6 @@ return interest_savings_present_value;
 
 }
 
-
 //@@ END
 
 //@@ START - par_val
@@ -1084,14 +1040,13 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 if (t < bond->commencement_period || t >= bond->maturity_period)
 	return NO_AVG;
 
-if (this != bond_cf)
+if (model_name != BOND_CF)
 	return par_val_bef_sale(t);
 
 return par_val_bef_sale(t)
 	   * (1.0 - bond->sold_pct(t));
 
 }
-
 
 //@@ END
 
@@ -1132,7 +1087,6 @@ return par_val_aft_call;
 
 }
 
-
 //@@ END
 
 //@@ START - par_val_aft_dflt
@@ -1153,14 +1107,13 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 if (t <= bond->commencement_period || t > bond->maturity_period)
 	return NO_AVG;
 
-if (this == bond_cf)
+if (model_name == BOND_CF)
 	return par_val(t - 1)
 		   * remaining_pct_aft_dflt(t);
 
 return par_val_bom_aft_rebase(t);
 
 }
-
 
 //@@ END
 
@@ -1206,7 +1159,6 @@ return par_val_aft_put;
 
 }
 
-
 //@@ END
 
 //@@ START - par_val_aft_sched_pmt
@@ -1227,7 +1179,7 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 if (t <= bond->commencement_period || t > bond->maturity_period)
 	return NO_AVG;
 
-if (this == bond_cf)
+if (model_name == BOND_CF)
 	{
 	if (fabs(par_val_aft_dflt(t)) < model_point_amount_threshold)
 		return 0.0;
@@ -1272,7 +1224,6 @@ return par_val_aft_sched_pmt;
 
 }
 
-
 //@@ END
 
 //@@ START - par_val_bef_sale
@@ -1297,7 +1248,7 @@ if (t == 0 && bond->existing_asset_indicator
 
 if(t == bond->commencement_period && !bond->existing_asset_indicator)
 	{
-	if (pv_defn == MARKET_VALUE || this == bond_ym)
+	if (pv_defn == MARKET_VALUE || getElementNumber() == ym)
 		return max(ONE_MILLION, fabs(bond->purch_amt));
 	if ((bond->port_defn == INVESTMENT)
 		&& bond->mkt_val_per_unit_par != 0.0)
@@ -1314,7 +1265,6 @@ if (par_val_aft_put(t) <= 0.0)
 return par_val_aft_put(t);
 
 }
-
 
 //@@ END
 
@@ -1378,7 +1328,7 @@ if (t == bond->commencement_period)
 	return bond->coupon_rate_at_issue;
 	}
 
-if (this == bond_cf)
+if (model_name == BOND_CF)
 	{
 	if (bond->pmt_rate_defn == FLOATING_RATE)
 		{
@@ -1394,11 +1344,11 @@ if (this == bond_cf)
 	return pmt_rate(t - 1);
 	}
 
-if (t <= rebase_period)
+if (t <= rebase_time)
 	return bond_cf->pmt_rate(t);
 
 int lookup_t
-= max(rebase_period,
+= max(rebase_time,
 	  xint(t + bond->mths_to_next_pmt(t - 1) - bond->pmt_mths - 1));
 
 if (bond->pmt_rate_defn == FLOATING_RATE)
@@ -1418,7 +1368,6 @@ if (bond->pmt_rate_defn == FLOATING_RATE)
 return pmt_rate(lookup_t);
 
 }
-
 
 //@@ END
 
@@ -1474,7 +1423,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - put_inc
@@ -1528,7 +1476,6 @@ if (include_call_and_put == YES)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -1584,6 +1531,7 @@ if ((bond->put_defn == AMERICAN && t >= bond->put_first_period)
 		// Set lookup key for put_opt_exercise_pct variable
 		bond->int_rate_diff = refinancing_rate(t) - int_rate_for_put_opt;
 		
+		bond->category_id = bond->category_id;
 		return bond->put_opt_exercise_pct;
 		}
 	// else
@@ -1593,7 +1541,6 @@ if ((bond->put_defn == AMERICAN && t >= bond->put_first_period)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -1625,7 +1572,6 @@ if (bond->put_defn == EUROPEAN && t == bond->put_first_period)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -1669,7 +1615,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - refinancing_rate
@@ -1708,9 +1653,9 @@ if ((bond->call_defn == AMERICAN && t >= bond->call_first_period)
 	weighted_average_life_local = bond->weighted_avg_life_opt_sensitivity(t);
 	refinancing_rate_option_spread_local = bond->refinancing_rate_opt_sprd;
 
-	if (this != bond_cf && t > rebase_period)
+	if (model_name != BOND_CF && t > rebase_time)
 		{
-		valuation_period = max(rebase_period, bond->commencement_period);
+		valuation_period = max(rebase_time, bond->commencement_period);
 
 		if (pv_timing == END_OF_MONTH
 			|| bond->use_eom_scen_rates == YES)
@@ -1736,7 +1681,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - remaining_pct_aft_dflt
@@ -1760,7 +1704,6 @@ if (t < bond->commencement_period || t > bond->maturity_period)
 return (1.0 - bond->dflt_pct(t));
 
 }
-
 
 //@@ END
 
@@ -1799,7 +1742,6 @@ return remaining_pct_aft_sched_pmt;
 
 }
 
-
 //@@ END
 
 //@@ START - renewal_rate
@@ -1829,7 +1771,7 @@ if (bond->pmt_rate_defn == FIXED_RATE)
 
 // Set the initial renewal rate for adjustable rate bonds
 // Used to set initial payment rate.
-if (this == bond_cf)
+if (model_name == BOND_CF)
 	{
 	if (bond->use_eom_scen_rates == YES)
 		scenario_month = bond->cal_mth(t);
@@ -1839,25 +1781,25 @@ if (this == bond_cf)
 	if (t == 0 && bond->existing_asset_indicator)
 		{
 		base_index_rate
-		= rates->get_int_rate(t + (bond->mths_to_next_reset(t) 
+		= rates_ptr->get_int_rate(t + (bond->mths_to_next_reset(t) 
 					                - bond->adj_reset_mths),
                               bond->adj_reset_category_id,
 					          GET_YIELD_RATE,
 					          bond->adj_reset_scen_yr,
 					          0.0,
 					          bond->pmt_freq,
-					          shift_defn,bond->portfolio_sprd_adj_aig);//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+					          shift_defn, bond->port_sprd_adj_crbg);//CRBG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
 		}
 	else
 		{
 		base_index_rate
-		= rates->get_int_rate(t,
+		= rates_ptr->get_int_rate(t,
 		                      bond->adj_reset_category_id,
 					          GET_YIELD_RATE,
 					          bond->adj_reset_scen_yr,
 					          0.0,
 					          bond->pmt_freq, 
-					          shift_defn,bond->portfolio_sprd_adj_aig);//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+					          shift_defn, bond->port_sprd_adj_crbg);//CRBG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
 		}
 
 	return (base_index_rate)
@@ -1865,7 +1807,7 @@ if (this == bond_cf)
 		   + bond->adj_reset_renewal_addn;
 	}
 
-valuation_period = max(rebase_period, bond->commencement_period);
+valuation_period = max(rebase_time, bond->commencement_period);
 
 // For net yield calculations for bonds, hold coupon rate constant.
 // This method is described on pages 1154-1157 of Fabozzi's "Handbook of
@@ -1878,8 +1820,8 @@ if (pv_defn == NET_YIELD)
 // on the forward rates curve as of the rebase period.
 if (pv_defn == MARKET_VALUE
 	|| pv_defn == MARKET_VALUE_SHIFTED
-	|| this == bond_is
-	|| this == bond_ym)
+	|| getElementNumber() == is
+	|| getElementNumber() == ym)
 	{
 	if (bond->use_eom_scen_rates == YES
 		|| pv_timing == END_OF_MONTH)
@@ -1888,13 +1830,13 @@ if (pv_defn == MARKET_VALUE
 		scenario_month = - 1;
 
 	base_index_rate
-	= convert_rate_basis(rates->get_int_rate(valuation_period + scenario_month,
+	= convert_rate_basis(rates_ptr->get_int_rate(valuation_period + scenario_month,
 	                                         bond->adj_reset_category_id,
 									         GET_FORWARD_RATE,
 									         (t - valuation_period) / 12.0,
 									         bond->adj_reset_scen_yr,
 									         NOMINAL_SEMIANNUAL,
-									         shift_defn,bond->portfolio_sprd_adj_aig),//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+									         shift_defn, bond->port_sprd_adj_crbg),
 			                                 NOMINAL_SEMIANNUAL,
 			                                 bond->pmt_freq); 
 
@@ -1906,7 +1848,6 @@ if (pv_defn == MARKET_VALUE
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -1937,7 +1878,6 @@ if (bond->sinking_fund_defn == YES)
 return 0.0;
 
 }
-
 
 //@@ END
 
@@ -1980,7 +1920,6 @@ return pmt_amt;
 
 }
 
-
 //@@ END
 
 //@@ START - sinking_fund_pmt_inc
@@ -2017,7 +1956,6 @@ return (accr_int_aft_dflt(t)
 	   / par_val_aft_dflt(t);
 
 }
-
 
 //@@ END
 
@@ -2077,8 +2015,8 @@ extern int pv_cp_model_point;
 // This macro evaluates the number of decimals in the 'xxx' value that corresponds
 // to 'sig_digits' significant digits. This macro is used to set solving_flag tolerance
 // factors. For example, NUMBER_OF_DECIMALS(50000,11) evaluates to 6.
-#define NUMBER_OF_DECIMALS(xxx,sig_digits) (fabs(xxx) < 0.000000001 ? (sig_digits-1) : (min((sig_digits-1), (int)((sig_digits) - log10(fabs(xxx))))))
-#define SIGNIFICANT_DIGITS 11
+//#define NUMBER_OF_DECIMALS(xxx,sig_digits) (fabs(xxx) < 0.000000001 ? (sig_digits-1) : (min((sig_digits-1), (int)((sig_digits) - log10(fabs(xxx))))))
+static constexpr int SIGNIFICANT_DIGITS = 11;
 
 extern int maximum_t_high_value;
 extern int minimum_t_low_value;
@@ -2087,6 +2025,13 @@ extern int minimum_t_low_value;
 #if 0 // START_CLASS
 bool ny_call_adj;
 bool ny_put_adj;
+
+#if defined(ASSET_ONLY_MODEL)
+RATES_ECONOMY /*modelobject_name: BOND_RATES*/ *rates_ptr;
+#else
+RATES_ECONOMY /*modelobject_name: RATES*/ *rates_ptr;
+#endif
+
 #endif // END_CLASS
 
 #if 0 // START_CONSTRUCTOR
@@ -2094,13 +2039,11 @@ ny_call_adj = false;
 ny_put_adj = false;
 #endif // END_CONSTRUCTOR
 
-rebase_period = minimum_t_low_value - 1;
-
 t_low = bond->calculated_t_low;
 t_high = bond->calculated_t_high;
 
 //parameterizing the cash flow models.
-if (this == bond_cf)
+if (model_name == BOND_CF)
 	{
 	pv_defn = "Cash Flows";
 	opt_pricing_defn = "No";
@@ -2112,7 +2055,7 @@ if (this == bond_cf)
 	use_spot_rates = "No";
 	}
 
-else if (this == bond_pv)
+else if (getElementNumber() == pv)
 	{
 	pv_defn = "Market Value";
 	opt_pricing_defn = "Yes";
@@ -2125,7 +2068,7 @@ else if (this == bond_pv)
 	use_spot_rates = "Yes";
 	}
 
-else if (this == bond_is)
+else if (getElementNumber() == is)
 	{
 	pv_defn = "Interest Savings Before Calls";
 	opt_pricing_defn = "No";
@@ -2137,7 +2080,7 @@ else if (this == bond_is)
 	use_spot_rates = "No";
 	}
 
-else if (this == bond_ym)
+else if (getElementNumber() == ym)
 	{
 	pv_defn = "Yield Maintenance";
 	opt_pricing_defn = "No";
@@ -2149,18 +2092,9 @@ else if (this == bond_ym)
 	use_spot_rates = "No";
 	}
 
-// Setup experience rates pointer
-if (!isRebaseClone)
-	{
-	bond_pv->rates = rates;
-	bond_is->rates = rates;
-	bond_ym->rates = rates;
-	}
-
 return 1.0;
 
 }
-
 
 //@@ END
 
@@ -2180,14 +2114,14 @@ if (t < bond->commencement_period || t > bond->maturity_period)
 	return NO_AVG;
 
 if (bond->call_price_defn != CASH_FLOW_MAINTENANCE
-	|| this == bond_cf
+	|| model_name == BOND_CF
 	|| pv_defn == NET_YIELD
-	|| this == bond_ym)
+	|| getElementNumber() == ym)
 	return 1.0;
 
 double yield_maintenance_cash_flow_factor = 0;
 
-if (t == rebase_period + 1)
+if (t == rebase_time + 1)
 	yield_maintenance_cash_flow_factor
 	= 1.0;
 else
@@ -2206,7 +2140,6 @@ return yield_maintenance_cash_flow_factor
 	   * remaining_pct_aft_sched_pmt(t);
 
 }
-
 
 //@@ END
 
@@ -2238,7 +2171,7 @@ double yield_maintenance_present_value = 0;
 yield_plus_addn
 = max(0.0, yld_maint_rate(t) + bond->yld_maint_addn);
 
-if (this == bond_cf)
+if (model_name == BOND_CF)
 	bond_equivalent_payment_rate
 	= int_rate_for_call_opt(t);
 else
@@ -2323,14 +2256,14 @@ ym_first = false;
 		double temp = 0;
 		int pv_detail_period = 0;
 
-		if (this == bond_cf)
+		if (model_name == BOND_CF)
 			pv_detail_period = t;
 		else
 			{
-			if (bond->commencement_period > rebase_period)
+			if (bond->commencement_period > rebase_time)
 				pv_detail_period = bond->commencement_period;
 			else
-				pv_detail_period = rebase_period;
+				pv_detail_period = rebase_time;
 			}
 
 		if (bond->asset_detail_rpt_pv_flag(pv_detail_period))
@@ -2346,36 +2279,27 @@ ym_first = false;
 			bond->asset_detail_rpt_pv_output();
 			}
 
-		if (this == bond_cf)
+		if (model_name == BOND_CF)
 			adjusted_rebase_period = t;
-		else if (this == bond_pv)
-			adjusted_rebase_period = max(bond->commencement_period, bond_pv->rebase_period);
+		else if (getElementNumber() == pv)
+			adjusted_rebase_period = max(bond->commencement_period, bond->sm_bond_cf_var[0][pv]->rebase_time);
 		else
 			{
-			if (this == bond_is)
+			if (getElementNumber() == is)
 				throw FatalError("this is bond_is in bond_cf->yld_maint_cost_pct");
-			else if (this == bond_ym)
+			else if (getElementNumber() == ym)
 				throw FatalError("this is bond_ym in bond_cf->yld_maint_cost_pct");
 			else
 				throw FatalError("this is unknown in bond_cf->yld_maint_cost_pct");
 			}
 
-		if (bond_ym->isShrunk)
+		if (bond->sm_bond_cf_var[0][ym]->rebase_time < adjusted_rebase_period)
 			{
 			bond->rebase_bond_cash_flow(adjusted_rebase_period,
 						YIELD_MAINTENANCE,
 						"bond_cf->yld_maint_cost_pct", modelName);
 
-			bond_ym->pv_calc_parameters(adjusted_rebase_period,
-						YIELD_MAINTENANCE);
-			}
-		else if (bond_ym->rebase_period < adjusted_rebase_period)
-			{
-			bond->rebase_bond_cash_flow(adjusted_rebase_period,
-						YIELD_MAINTENANCE,
-						"bond_cf->yld_maint_cost_pct", modelName);
-
-			bond_ym->pv_calc_parameters(adjusted_rebase_period,
+			bond->sm_bond_cf_var[0][ym]->pv_calc_parameters(adjusted_rebase_period,
 						YIELD_MAINTENANCE);
 			}
 
@@ -2405,9 +2329,9 @@ ym_first = false;
 		//= max(this->rebase_period, max((int)t_low, bond->commencement_period + 1));
 
 		if (pv_defn == MARKET_VALUE_SHIFTED)
-			bond_ym->shift_defn = SPOT_SHIFT;
+			bond->sm_bond_cf_var[0][ym]->shift_defn = SPOT_SHIFT;
 		else
-			bond_ym->shift_defn = NO_SHIFT;
+			bond->sm_bond_cf_var[0][ym]->shift_defn = NO_SHIFT;
 
 		if (pv_simple_flag(t))
 			{
@@ -2416,7 +2340,7 @@ ym_first = false;
 			cost_factor_denominator = par_val + accr_int;
 
 			yield_maintenance_present_value
-			= bond_ym->pv_calc_simple(t,
+			= bond->sm_bond_cf_var[0][ym]->pv_calc_simple(t,
 					convert_rate_basis(yield_plus_addn,
 							NOMINAL_SEMIANNUAL,
 							bond->pmt_freq),
@@ -2454,7 +2378,7 @@ ym_first = false;
 				par_val = par_val_aft_sched_pmt(t);
 				}
 
-			if (this != bond_cf)
+			if (model_name != BOND_CF)
 				adjustment_months = t - adjusted_rebase_period;
 
 			if (adjustment_months == 0)
@@ -2501,8 +2425,8 @@ ym_first = false;
 				if (dont_use_yield_maintenance_pv_tables)
 					{
 					cost_factor_denominator
-					= (bond_ym->par_val_aft_sched_pmt(t)
-					   + bond_ym->accr_int_bef_call(t))
+					= (bond->sm_bond_cf_var[0][ym]->par_val_aft_sched_pmt(t)
+					   + bond->sm_bond_cf_var[0][ym]->accr_int_bef_call(t))
 					  * yld_maint_cash_flow_pct_bef_call(t);
 
 #if YM_UPDATE
@@ -2572,8 +2496,8 @@ ym_first = false;
 					if (initialize_yield_maintenance_pv_tables)
 						{
 						pv_yield_maintenance_par_plus_accrued[0]
-						= bond_ym->par_val_aft_sched_pmt(t)
-						  + bond_ym->accr_int_bef_call(t);
+						= bond->sm_bond_cf_var[0][ym]->par_val_aft_sched_pmt(t)
+						  + bond->sm_bond_cf_var[0][ym]->accr_int_bef_call(t);
 
 #if YM_UPDATE
 	log_screen << "ymm-> " << setw(3) << t
@@ -2594,7 +2518,7 @@ ym_first = false;
 						def_res_int_mult *= monthly_discount_factor;
 
 						discounted_cash_flow
-						= bond_ym->cash_flow(t + month)
+						= bond->sm_bond_cf_var[0][ym]->cash_flow(t + month)
 						  * yld_maint_cash_flow_pct_bef_call(t)
 						  * def_res_int_mult;
 
@@ -2620,11 +2544,11 @@ if (month == 1)
 #endif
 
 							pv_yield_maintenance_cash_flows[month-1]
-							= bond_ym->cash_flow(t + month);
+							= bond->sm_bond_cf_var[0][ym]->cash_flow(t + month);
 
 							pv_yield_maintenance_par_plus_accrued[month]
-							= bond_ym->par_val_aft_sched_pmt(t + month)
-							  + bond_ym->accr_int_bef_call(t + month);
+							= bond->sm_bond_cf_var[0][ym]->par_val_aft_sched_pmt(t + month)
+							  + bond->sm_bond_cf_var[0][ym]->accr_int_bef_call(t + month);
 
 #if YM_UPDATE
 	{
@@ -2701,7 +2625,6 @@ return cost_factor;
 
 }
 
-
 //@@ END
 
 //@@ START - yld_maint_rate
@@ -2725,45 +2648,44 @@ if (t < bond->commencement_period || t > bond->maturity_period)
 int scenario_month = 0;
 int valuation_period = 0;
 
-if (this == bond_cf)
+if (model_name == BOND_CF)
 	valuation_period = t;
 else
-	valuation_period = max(rebase_period, bond->commencement_period);
+	valuation_period = max(rebase_time, bond->commencement_period);
 
 if (bond->use_eom_scen_rates == YES
-	|| (this != bond_cf && pv_timing == END_OF_MONTH))
+	|| (model_name != BOND_CF && pv_timing == END_OF_MONTH))
 	scenario_month = 0;
 else
 	scenario_month = - 1;
 
-if (this == bond_cf)
-	return rates->get_int_rate(t + scenario_month,
+if (model_name == BOND_CF)
+	return rates_ptr->get_int_rate(t + scenario_month,
 	                           "Govt",  
 					           GET_YIELD_RATE,
 					           (bond->maturity_period - t) / 12.0,
 					           0.0,
 					           NOMINAL_SEMIANNUAL,
-					           NO_SHIFT,0);//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+					           NO_SHIFT);
 
 if (pv_defn == MARKET_VALUE_SHIFTED)
-	return rates->get_int_rate(valuation_period + scenario_month,
+	return rates_ptr->get_int_rate(valuation_period + scenario_month,
 	                           "Govt",
 	                           GET_FORWARD_RATE,
 					           (t - valuation_period) / 12.0,
 					           (bond->maturity_period - t) / 12.0,
 					           NOMINAL_SEMIANNUAL,
-					          SPOT_SHIFT,0);//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+					          SPOT_SHIFT);
 
-return rates->get_int_rate(valuation_period + scenario_month,
+return rates_ptr->get_int_rate(valuation_period + scenario_month,
                            "Govt",
                            GET_FORWARD_RATE,
 				           (t - valuation_period) / 12.0,
 				           (bond->maturity_period - t) / 12.0,
 				           NOMINAL_SEMIANNUAL,
-				           NO_SHIFT,0);//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+				           NO_SHIFT);
 
 }
-
 
 //@@ END
 
@@ -2776,10 +2698,9 @@ int BOND_CF_ASSET_UDF::bond_cf_asset_proj_start_date() {
 
 
 #line 1 "proj_start_date.BOND_CF_ASSET.for"
-return MonthNumberFromDate(bond->proj_start_yr, bond->proj_start_mth);
+return day_number_from_date(bond->proj_start_yr, bond->proj_start_mth, 1);
 
 }
-
 
 //@@ END
 
@@ -2897,9 +2818,9 @@ for (months_to_expiry = local_mths_to_next_call;
 	  / (1.0 + estimated_forward_rate / 2.0);
 
 	forward_volatility
-	= max(rates->get_int_vol(t, "Govt", 1.0, last_cash_flow_month / 12.0, EFFECTIVE_ANNUAL)
+	= max(rates_ptr->get_int_vol(t, "Govt", 1.0, last_cash_flow_month / 12.0, EFFECTIVE_ANNUAL)
 		  * last_cash_flow_month
-		  - rates->get_int_vol(t, "Govt", 1.0, months_to_expiry / 12.0, EFFECTIVE_ANNUAL)
+		  - rates_ptr->get_int_vol(t, "Govt", 1.0, months_to_expiry / 12.0, EFFECTIVE_ANNUAL)
 			* months_to_expiry, 0.0)
 	  / (last_cash_flow_month - months_to_expiry);
 	
@@ -2907,7 +2828,7 @@ for (months_to_expiry = local_mths_to_next_call;
 	
 	throw FatalError( " The scenario rates volatility for " + bond->asset_id
 		                  + " is zero.\n ... Please update your scenario rates volatility assumptions for the scenario rates file "
-		                  + replaceWildcards(rates->scen_id)
+		                  + replaceWildcards(rates_ptr->scen_id)
 		                  + " before rerunning this projection task." );
 	
 	price_volatility
@@ -2915,13 +2836,13 @@ for (months_to_expiry = local_mths_to_next_call;
 	  * forward_volatility;
 
 	treasury_spot_rate 
-	= rates->get_int_rate(t, 
+	= rates_ptr->get_int_rate(t, 
 				          "Govt", 
 				          GET_SPOT_RATE,
 	                      months_to_expiry / 12.0,
 	                      0.0,
 	                      NOMINAL_SEMIANNUAL,
-	                      shift_defn,0);//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+	                      shift_defn);
 
 	local_call_amount
 	= pv_call_amount[months_to_expiry];
@@ -3001,7 +2922,7 @@ return local_int_pmt
 #line 1 "par_val_bom_aft_rebase.BOND_CF_ASSET.for"                                                                                   
 double BOND_CF_ASSET::par_val_bom_aft_rebase(int t)
 {
-if (t == rebase_period + 1)
+if (t == rebase_time + 1)
 	{
 	if (pv_timing == END_OF_MONTH)
 		{
@@ -3013,7 +2934,7 @@ if (t == rebase_period + 1)
 
 	if (pv_timing == BEFORE_CALLS_AND_PUTS)
 		{
-		if (this == bond_ym)
+		if (getElementNumber() == ym)
 			{
 			if (t == 1)
 				return par_val_bef_sale(t - 1);
@@ -3025,7 +2946,7 @@ if (t == rebase_period + 1)
 			if ( t > bond->commencement_period + 1 )
 				return par_val_aft_sched_pmt(t - 1);
 			
-			return pv_initial_par_value;/*par_val_aft_sched_pmt(t - 1);*/
+			return pv_initial_par_value;
 			}
 
 		return pv_initial_par_value;
@@ -3127,9 +3048,9 @@ for (months_to_expiry = local_mths_to_next_put;
 
 	forward_volatility
 	= max(0.0,
-	      rates->get_int_vol(t, "Govt", 1.0, last_cash_flow_month / 12.0, EFFECTIVE_ANNUAL)
+	      rates_ptr->get_int_vol(t, "Govt", 1.0, last_cash_flow_month / 12.0, EFFECTIVE_ANNUAL)
 		  * last_cash_flow_month
-		  - rates->get_int_vol(t, "Govt", 1.0, months_to_expiry / 12.0, EFFECTIVE_ANNUAL)
+		  - rates_ptr->get_int_vol(t, "Govt", 1.0, months_to_expiry / 12.0, EFFECTIVE_ANNUAL)
 			* months_to_expiry)
 	  / (last_cash_flow_month - months_to_expiry);
 	
@@ -3137,7 +3058,7 @@ for (months_to_expiry = local_mths_to_next_put;
 	
 	throw FatalError( " The scenario rates volatility for " + bond->asset_id
 		                  + " is zero.\n ... Please update your scenario rates volatility assumptions for the scenario rates file "
-		                  + replaceWildcards(rates->scen_id)
+		                  + replaceWildcards(rates_ptr->scen_id)
 		                  + " before rerunning this projection task." );
 
 	
@@ -3147,13 +3068,13 @@ for (months_to_expiry = local_mths_to_next_put;
 	  * forward_volatility;
 
 	treasury_spot_rate
-	= rates->get_int_rate(t,
+	= rates_ptr->get_int_rate(t,
 	                      "Govt",
 	                      GET_SPOT_RATE,
 	                      months_to_expiry / 12.0,
 	                      0.0,
 	                      NOMINAL_SEMIANNUAL,
-	                      shift_defn,0); //AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+	                      shift_defn); 
 
 	local_put_amount
 	= pv_put_amount[months_to_expiry];
@@ -3322,19 +3243,6 @@ else
 		      - years_to_payment * scen_frequency);
 		}
 
-	if (this->isShrunk)
-		{
-		log_screen << "Error. t=" << t
-				<< " for " << bond->asset_id
-				<< " " << (this==bond_cf ? "bond_cf"
-							: (this==bond_pv ? "bond_pv"
-							: (this==bond_is ? "bond_is"
-							: (this==bond_ym ? "bond_ym" : "???"))))
-				<< " is shrunk in pv_calc |" << modelName
-				<< MSG_ERROR;
-		throw FatalError("");
-		}
-
 	// discount cash flows
 	if (!use_pv_tables)
 		{
@@ -3376,14 +3284,14 @@ else
 				local_discount_rate = spread_to_spot;
 			else
 				{
-				spot_rate
-				= rates->get_int_rate(t, 
+				spot_rate 
+				= rates_ptr->get_int_rate(t, 
 				                      bond->category_id, 
 				                      GET_SPOT_RATE,
 				                      (month - t) / 12.0,
 				                      0.0,
 				                      NOMINAL_SEMIANNUAL,
-				                      shift_defn,bond->portfolio_sprd_adj_aig);//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+				                      shift_defn, bond->port_sprd_adj_crbg); //CRBG logic
 
 				local_discount_rate
 				= spot_rate
@@ -3506,13 +3414,13 @@ else
 			else
 				{
 				spot_rate
-				= rates->get_int_rate(t, 
+				= rates_ptr->get_int_rate(t, 
 				                      bond->category_id, 
 				                      GET_SPOT_RATE,
 				                      (month - t) / 12.0,
 				                      0.0,
 				                      NOMINAL_SEMIANNUAL,
-				                      shift_defn,bond->portfolio_sprd_adj_aig);//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+				                      shift_defn, bond->port_sprd_adj_crbg); //CRBG logic
 
 				local_discount_rate
 				= spot_rate 
@@ -3956,10 +3864,11 @@ if (command == RESTORE)
 	return;
 	}
 
-throw FatalError("Unrecognized command code '" + (xstring)command
+convert_type = command;
+
+throw FatalError("Unrecognized command code '" + convert_type
 				+ "' in bond_cf->pv_calc_parameters");
 
-return;
 }
 
 
@@ -4169,7 +4078,7 @@ calculated_modified_duration
 	* pow(periodic_discount, pmt_freq - 1);
 
 // use rebase_period to reduce sliding windows size
-if (bond->asset_detail_rpt_pv_flag(rebase_period))
+if (bond->asset_detail_rpt_pv_flag(rebase_time))
 	{
 	PVCounter++;
 	PVCText << PVCounter
@@ -4277,7 +4186,7 @@ int cal_mth = xint(bond->cal_mth(t));
 
 maximum_iterations = SOLVE_FOR_SPREAD_MAXIMUM_ITERATIONS;
 
-tolerance = 0.5 / pow(10, NUMBER_OF_DECIMALS(target_value,SIGNIFICANT_DIGITS));
+tolerance = 0.5 / pow(10, number_of_decimals(target_value,SIGNIFICANT_DIGITS));
 
 if (guess_spread_low == SOLVE_FOR_SPREAD_HIGHEST_SPREAD)
 	{
@@ -4590,7 +4499,7 @@ if (pv_defn == NET_YIELD
 		|| (t == bond->commencement_period && !bond->existing_asset_indicator)))
 	pv_timing = "End of Month";
 
-tolerance = 0.5 / pow(10, NUMBER_OF_DECIMALS(target_value,SIGNIFICANT_DIGITS));
+tolerance = 0.5 / pow(10, number_of_decimals(target_value,SIGNIFICANT_DIGITS));
 
 if (bond->asset_detail_rpt_pv_flag(t))
 	{
@@ -4833,23 +4742,6 @@ else
 	if (initialize_pv_tables
 		&& pv_defn != MARKET_VALUE_SHIFTED)
 		pv_initialize_yield_maintenance_table = true;
-
-	if (this->isShrunk)
-		{
-		log_screen << "Error. t=" << t
-				<< " for " << bond->asset_id
-				<< " " << (this==bond_cf ? "bond_cf"
-							: (this==bond_pv ? "bond_pv"
-							: (this==bond_is ? "bond_is"
-							: (this==bond_ym ? "bond_ym" : "???"))))
-				<< " rebase_period=" << rebase_period
-				<< " pv_defn=" << pv_defn
-				<< " pv_tbl_defn=" << pv_tbl_defn
-				<< " pv_timing=" << pv_timing
-				<< " is shrunk in weighted_avg_life_calc |" << modelName
-				<< MSG_ERROR;
-		throw FatalError("");
-		}
 
 	if (use_pv_tables)
 		{
@@ -5133,6 +5025,13 @@ namespace {
 	};
 	const EnumList call_flagEnumList(2, call_flagChoicePairs);
 
+	// EnumList for convert_type                                                                                       
+	const ChoicePair convert_typeChoicePairs[] = {
+		ChoicePair(StrEnum::UNDEFINED, StrEnum::undefinedString)
+		,ChoicePair(StrEnum::_0, "0")
+	};
+	const EnumList convert_typeEnumList(1, convert_typeChoicePairs);
+
 	// EnumList for dflt_appl                                                                                       
 	const ChoicePair dflt_applChoicePairs[] = {
 		ChoicePair(StrEnum::UNDEFINED, StrEnum::undefinedString)
@@ -5156,6 +5055,14 @@ namespace {
 		,ChoicePair(StrEnum::YES, "Yes")
 	};
 	const EnumList infl_indexed_flagEnumList(2, infl_indexed_flagChoicePairs);
+
+	// EnumList for model_name                                                                                       
+	const ChoicePair model_nameChoicePairs[] = {
+		ChoicePair(StrEnum::UNDEFINED, StrEnum::undefinedString)
+		,ChoicePair(StrEnum::BOND_CF, "bond_cf")
+		,ChoicePair(StrEnum::BOND_CF_VAR, "bond_cf_var")
+	};
+	const EnumList model_nameEnumList(2, model_nameChoicePairs);
 
 	// EnumList for opt_pricing_defn                                                                                       
 	const ChoicePair opt_pricing_defnChoicePairs[] = {
@@ -5267,31 +5174,37 @@ TableMgr<VariantTable> BOND_CF_ASSET::mgr_;
 	Attribute::Descriptor BOND_CF_ASSET::descriptor_0[] = {
 	Descriptor(0, Attribute::STR_ENUM,	"call_flag", -1, (size_t)&modelOffset->call_flag,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &call_flagEnumList, Feature(true)),
-	Descriptor(1, Attribute::STR_ENUM,	"dflt_appl", -1, (size_t)&modelOffset->dflt_appl,
+	Descriptor(1, Attribute::STR_ENUM,	"convert_type", -1, (size_t)&modelOffset->convert_type,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, &convert_typeEnumList, Feature(false)),
+	Descriptor(2, Attribute::STR_ENUM,	"dflt_appl", -1, (size_t)&modelOffset->dflt_appl,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &dflt_applEnumList, Feature(true)),
-	Descriptor(2, Attribute::STR_ENUM,	"include_call_and_put", -1, (size_t)&modelOffset->include_call_and_put,
+	Descriptor(3, Attribute::STR_ENUM,	"include_call_and_put", -1, (size_t)&modelOffset->include_call_and_put,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &include_call_and_putEnumList, Feature(true)),
-	Descriptor(3, Attribute::STR_ENUM,	"infl_indexed_flag", -1, (size_t)&modelOffset->infl_indexed_flag,
+	Descriptor(4, Attribute::STR_ENUM,	"infl_indexed_flag", -1, (size_t)&modelOffset->infl_indexed_flag,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &infl_indexed_flagEnumList, Feature(true)),
-	Descriptor(4, Attribute::STR_ENUM,	"opt_pricing_defn", -1, (size_t)&modelOffset->opt_pricing_defn,
+	Descriptor(5, Attribute::STR_ENUM,	"model_name", -1, (size_t)&modelOffset->model_name,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, &model_nameEnumList, Feature(true)),
+	Descriptor(6, Attribute::STR_ENUM,	"opt_pricing_defn", -1, (size_t)&modelOffset->opt_pricing_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &opt_pricing_defnEnumList, Feature(true)),
-	Descriptor(5, Attribute::STR_ENUM,	"put_flag", -1, (size_t)&modelOffset->put_flag,
+	Descriptor(7, Attribute::STR_ENUM,	"put_flag", -1, (size_t)&modelOffset->put_flag,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &put_flagEnumList, Feature(true)),
-	Descriptor(6, Attribute::STR_ENUM,	"pv_defn", -1, (size_t)&modelOffset->pv_defn,
+	Descriptor(8, Attribute::STR_ENUM,	"pv_defn", -1, (size_t)&modelOffset->pv_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &pv_defnEnumList, Feature(true)),
-	Descriptor(7, Attribute::STR_ENUM,	"pv_init_accr_int_wanted", -1, (size_t)&modelOffset->pv_init_accr_int_wanted,
+	Descriptor(9, Attribute::STR_ENUM,	"pv_init_accr_int_wanted", -1, (size_t)&modelOffset->pv_init_accr_int_wanted,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &pv_init_accr_int_wantedEnumList, Feature(true)),
-	Descriptor(8, Attribute::STR_ENUM,	"pv_tbl_defn", -1, (size_t)&modelOffset->pv_tbl_defn,
-				Descriptor::NOT_SHARED, false, false, (size_t)0, &pv_tbl_defnEnumList, Feature(true)),
-	Descriptor(9, Attribute::STR_ENUM,	"pv_timing", -1, (size_t)&modelOffset->pv_timing,
+	Descriptor(10, Attribute::STR_ENUM,	"pv_tbl_defn", -1, (size_t)&modelOffset->pv_tbl_defn,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, &pv_tbl_defnEnumList, Feature(false)),
+	Descriptor(11, Attribute::STR_ENUM,	"pv_timing", -1, (size_t)&modelOffset->pv_timing,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &pv_timingEnumList, Feature(true)),
-	Descriptor(10, Attribute::STR_ENUM,	"shift_defn", -1, (size_t)&modelOffset->shift_defn,
-				Descriptor::NOT_SHARED, false, false, (size_t)0, &shift_defnEnumList, Feature(true)),
-	Descriptor(11, Attribute::STR_ENUM,	"use_spot_rates", -1, (size_t)&modelOffset->use_spot_rates,
-				Descriptor::NOT_SHARED, false, false, (size_t)0, &use_spot_ratesEnumList, Feature(true)),
-	Descriptor(12, Attribute::INT,	"msnumelement", -1, (size_t)&modelOffset->msnumelement,
+	Descriptor(12, Attribute::INT,	"rebase_time", -1, (size_t)&modelOffset->rebase_time,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(13, Attribute::SCALAR_INT,	"proj_start_date", -1, (size_t)&modelOffset->proj_start_date,
+	Descriptor(13, Attribute::STR_ENUM,	"shift_defn", -1, (size_t)&modelOffset->shift_defn,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, &shift_defnEnumList, Feature(true)),
+	Descriptor(14, Attribute::STR_ENUM,	"use_spot_rates", -1, (size_t)&modelOffset->use_spot_rates,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, &use_spot_ratesEnumList, Feature(true)),
+	Descriptor(15, Attribute::INT,	"msnumelement", -1, (size_t)&modelOffset->msnumelement,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
+	Descriptor(16, Attribute::SCALAR_INT,	"proj_start_date", -1, (size_t)&modelOffset->proj_start_date,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&BOND_CF_ASSET_UDF::bond_cf_asset_proj_start_date)),
 	};
 
@@ -5310,8 +5223,11 @@ TableMgr<VariantTable> BOND_CF_ASSET::mgr_;
 	&BOND_CF_ASSET::descriptor_0[11],
 	&BOND_CF_ASSET::descriptor_0[12],
 	&BOND_CF_ASSET::descriptor_0[13],
+	&BOND_CF_ASSET::descriptor_0[14],
+	&BOND_CF_ASSET::descriptor_0[15],
+	&BOND_CF_ASSET::descriptor_0[16],
 	nullptr};
-	const size_t BOND_CF_ASSET::sDescriptorCount = 14;
+	const size_t BOND_CF_ASSET::sDescriptorCount = 17;
 
 //factory
 BOND_CF_ASSET* BOND_CF_ASSET::makeThis(int isSubmodel, ModelClass* owner, BOND_CF_ASSET* peer, 
@@ -5345,27 +5261,6 @@ BOND_CF_ASSET* BOND_CF_ASSET::makeThis(int isSubmodel, ModelClass* owner, BOND_C
 		setVisitorPointersAndMap(name, newP, 'N');
 
 	// create submodels of this model here
-	if (rebasing_wanted && (!peer || peer != newP->sm_calling_model)) {
-	if (find(unusedModels.begin(), unusedModels.end(), name + "|bond_pv") == unusedModels.end()) {
-	newP->sm_bond_pv = BOND_CF_ASSET::makeThis(1, newP, newP, 0, name + "|bond_pv", (BOND_CF_ASSET_persistent_object*)(arrayTemplate?arrayTemplate->sm_bond_pv:0));
-	newP->adopt(newP->sm_bond_pv);
-	}
-	}
-
-	if (rebasing_wanted && (!peer || peer != newP->sm_calling_model)) {
-	if (find(unusedModels.begin(), unusedModels.end(), name + "|bond_is") == unusedModels.end()) {
-	newP->sm_bond_is = BOND_CF_ASSET::makeThis(1, newP, newP, 0, name + "|bond_is", (BOND_CF_ASSET_persistent_object*)(arrayTemplate?arrayTemplate->sm_bond_is:0));
-	newP->adopt(newP->sm_bond_is);
-	}
-	}
-
-	if (rebasing_wanted && (!peer || peer != newP->sm_calling_model)) {
-	if (find(unusedModels.begin(), unusedModels.end(), name + "|bond_ym") == unusedModels.end()) {
-	newP->sm_bond_ym = BOND_CF_ASSET::makeThis(1, newP, newP, 0, name + "|bond_ym", (BOND_CF_ASSET_persistent_object*)(arrayTemplate?arrayTemplate->sm_bond_ym:0));
-	newP->adopt(newP->sm_bond_ym);
-	}
-	}
-
 
 	// only do this for topmodel created
    if (!arrayTemplate && newP == CP) {
@@ -5419,27 +5314,6 @@ BOND_CF_ASSET_persistent_object* BOND_CF_ASSET_persistent_object::makeThis(int i
 		setVisitorPointersAndMap(name, newP, 'N');
 
 	// create submodels of this model here
-	if (rebasing_wanted && (!peer || peer != newP->sm_calling_model)) {
-	if (find(unusedModels.begin(), unusedModels.end(), name + "|bond_pv") == unusedModels.end()) {
-	newP->sm_bond_pv = (BOND_CF_ASSET*)BOND_CF_ASSET_persistent_object::makeThis(1, newP, newP, 0, name + "|bond_pv", (BOND_CF_ASSET_persistent_object*)(arrayTemplate?arrayTemplate->sm_bond_pv:0), fixedArray);
-	newP->adopt(newP->sm_bond_pv);
-	}
-	}
-
-	if (rebasing_wanted && (!peer || peer != newP->sm_calling_model)) {
-	if (find(unusedModels.begin(), unusedModels.end(), name + "|bond_is") == unusedModels.end()) {
-	newP->sm_bond_is = (BOND_CF_ASSET*)BOND_CF_ASSET_persistent_object::makeThis(1, newP, newP, 0, name + "|bond_is", (BOND_CF_ASSET_persistent_object*)(arrayTemplate?arrayTemplate->sm_bond_is:0), fixedArray);
-	newP->adopt(newP->sm_bond_is);
-	}
-	}
-
-	if (rebasing_wanted && (!peer || peer != newP->sm_calling_model)) {
-	if (find(unusedModels.begin(), unusedModels.end(), name + "|bond_ym") == unusedModels.end()) {
-	newP->sm_bond_ym = (BOND_CF_ASSET*)BOND_CF_ASSET_persistent_object::makeThis(1, newP, newP, 0, name + "|bond_ym", (BOND_CF_ASSET_persistent_object*)(arrayTemplate?arrayTemplate->sm_bond_ym:0), fixedArray);
-	newP->adopt(newP->sm_bond_ym);
-	}
-	}
-
 	// only do this for topmodel created
    if (!arrayTemplate && newP == CP) {
 		IsMainRebaseForClonesVisitor().visitAll(CP);
@@ -5464,21 +5338,14 @@ typedef xstring (BOND_CF_ASSET_UDF::*sPFs) (xstring);
 
 // constructor if this model class is the base class of another model class
 BOND_CF_ASSET::BOND_CF_ASSET(int columnCount, Descriptor* mocd[], Product* persObj) : ModelClass(columnCount, mocd, persObj), Variable(*this)
-  , sm_mtg_is(0)
-  , sm_mtg_pv(0)
-  , sm_mtg_ym(0)
 
-  , sm_bond_is(0)
-  , sm_bond_pv(0)
-  , sm_bond_ym(0)
+	, adco(company_asset_adco)
 	, asset(company_asset)
 	, bond(company_asset_bond)
 	, bond_cf(company_asset_bond_bond_cf)
-	, bond_is(company_asset_bond_bond_cf_bond_is)
-	, bond_pv(company_asset_bond_bond_cf_bond_pv)
-	, bond_ym(company_asset_bond_bond_cf_bond_ym)
 	, epl(company_liab_epl)
 	, fia(company_liab_fia)
+	, liab(company_liab)
 	, rates(company_rates)
 {
 	gProxyInitialiser = 0;
@@ -5494,21 +5361,14 @@ BOND_CF_ASSET::BOND_CF_ASSET(int columnCount, Descriptor* mocd[], Product* persO
 BOND_CF_ASSET::BOND_CF_ASSET(const xstring &modelClassName,
 		int isSm, ModelClass *owner, ModelClass *peer, int mainRebase,
 		const char *name, ModelClass* arrayPersistentObj) : ModelClass(36, BOND_CF_ASSET::descriptorTable, arrayPersistentObj), Variable(*this)
-  , sm_mtg_is(0)
-  , sm_mtg_pv(0)
-  , sm_mtg_ym(0)
 
-  , sm_bond_is(0)
-  , sm_bond_pv(0)
-  , sm_bond_ym(0)
+	, adco(company_asset_adco)
 	, asset(company_asset)
 	, bond(company_asset_bond)
 	, bond_cf(company_asset_bond_bond_cf)
-	, bond_is(company_asset_bond_bond_cf_bond_is)
-	, bond_pv(company_asset_bond_bond_cf_bond_pv)
-	, bond_ym(company_asset_bond_bond_cf_bond_ym)
 	, epl(company_liab_epl)
 	, fia(company_liab_fia)
+	, liab(company_liab)
 	, rates(company_rates)
  // Tables...
  // Generic Tables ...
@@ -5534,11 +5394,14 @@ BOND_CF_ASSET::BOND_CF_ASSET(const xstring &modelClassName,
        isMainModel = !isSm;
 		modelName = name;
 
-#ifdef __CREATE_COMP_COMP_CLASS_
+#ifdef __CREATE_AA_COMP_COMP_CLASS_
        company = 0;
 #endif
 #ifdef __CREATE_ASSET_ASSET_CLASS_
        company_asset = 0;
+#endif
+#ifdef __CREATE_ADCO_ASSET_CLASS_
+       company_asset_adco = 0;
 #endif
 #ifdef __CREATE_BOND_ASSET_CLASS_
        company_asset_bond = 0;
@@ -5546,14 +5409,8 @@ BOND_CF_ASSET::BOND_CF_ASSET(const xstring &modelClassName,
 #ifdef __CREATE_BOND_CF_ASSET_CLASS_
        company_asset_bond_bond_cf = 0;
 #endif
-#ifdef __CREATE_BOND_CF_ASSET_CLASS_
-       company_asset_bond_bond_cf_bond_is = 0;
-#endif
-#ifdef __CREATE_BOND_CF_ASSET_CLASS_
-       company_asset_bond_bond_cf_bond_pv = 0;
-#endif
-#ifdef __CREATE_BOND_CF_ASSET_CLASS_
-       company_asset_bond_bond_cf_bond_ym = 0;
+#ifdef __CREATE_LIAB_LIAB_CLASS_
+       company_liab = 0;
 #endif
 #ifdef __CREATE_EPL_LIAB_CLASS_
        company_liab_epl = 0;
@@ -5621,11 +5478,14 @@ BOND_CF_ASSET::BOND_CF_ASSET(const xstring &modelClassName,
 
  void BOND_CF_ASSET::copy_names() {
 
-#ifdef __CREATE_COMP_COMP_CLASS_
-		company = (COMP_COMP*)(findUnique("company"));
+#ifdef __CREATE_AA_COMP_COMP_CLASS_
+		company = (AA_COMP_COMP*)(findUnique("company"));
 #endif
 #ifdef __CREATE_ASSET_ASSET_CLASS_
 		company_asset = (ASSET_ASSET*)(findUnique("company|asset"));
+#endif
+#ifdef __CREATE_ADCO_ASSET_CLASS_
+		company_asset_adco = (ADCO_ASSET*)(findUnique("company|asset|adco"));
 #endif
 #ifdef __CREATE_BOND_ASSET_CLASS_
 		company_asset_bond = (BOND_ASSET*)(findUnique("company|asset|bond"));
@@ -5633,14 +5493,8 @@ BOND_CF_ASSET::BOND_CF_ASSET(const xstring &modelClassName,
 #ifdef __CREATE_BOND_CF_ASSET_CLASS_
 		company_asset_bond_bond_cf = (BOND_CF_ASSET*)(findUnique("company|asset|bond|bond_cf"));
 #endif
-#ifdef __CREATE_BOND_CF_ASSET_CLASS_
-		company_asset_bond_bond_cf_bond_is = (BOND_CF_ASSET*)(findUnique("company|asset|bond|bond_cf|bond_is"));
-#endif
-#ifdef __CREATE_BOND_CF_ASSET_CLASS_
-		company_asset_bond_bond_cf_bond_pv = (BOND_CF_ASSET*)(findUnique("company|asset|bond|bond_cf|bond_pv"));
-#endif
-#ifdef __CREATE_BOND_CF_ASSET_CLASS_
-		company_asset_bond_bond_cf_bond_ym = (BOND_CF_ASSET*)(findUnique("company|asset|bond|bond_cf|bond_ym"));
+#ifdef __CREATE_LIAB_LIAB_CLASS_
+		company_liab = (LIAB_LIAB*)(findUnique("company|liab"));
 #endif
 #ifdef __CREATE_EPL_LIAB_CLASS_
 		company_liab_epl = (EPL_LIAB*)(findUnique("company|liab|epl"));
@@ -5861,13 +5715,7 @@ BOND_CF_ASSET_persistent_object::BOND_CF_ASSET_persistent_object(const xstring &
 			BOND_CF_ASSET(modelClassName, isSm, owner, peer, mainRebase, name, arrayPersistentObj), 
 			mReadArray(true),
 			pfl(0)
-	, sm_mtg_is(BOND_CF_ASSET::sm_mtg_is)
-	, sm_mtg_pv(BOND_CF_ASSET::sm_mtg_pv)
-	, sm_mtg_ym(BOND_CF_ASSET::sm_mtg_ym)
 
-	, sm_bond_is(BOND_CF_ASSET::sm_bond_is)
-	, sm_bond_pv(BOND_CF_ASSET::sm_bond_pv)
-	, sm_bond_ym(BOND_CF_ASSET::sm_bond_ym)
 	{
 
 
@@ -5937,21 +5785,6 @@ void BOND_CF_ASSET::resetValues(int decrement) {
 
 void BOND_CF_ASSET::after_startup(int decrement) {
 // Call startup for submodels
-  if (indexOfChild(sm_bond_pv) >= 0 && ! sm_bond_pv->isShrunk) { // generated for clones only
-  if(sm_bond_pv)
-   sm_bond_pv->doBeforeStartupProcessing(decrement);
-  }
-
-  if (indexOfChild(sm_bond_is) >= 0 && ! sm_bond_is->isShrunk) { // generated for clones only
-  if(sm_bond_is)
-   sm_bond_is->doBeforeStartupProcessing(decrement);
-  }
-
-  if (indexOfChild(sm_bond_ym) >= 0 && ! sm_bond_ym->isShrunk) { // generated for clones only
-  if(sm_bond_ym)
-   sm_bond_ym->doBeforeStartupProcessing(decrement);
-  }
-
 }
 //after_startup END@2
 
@@ -5961,7 +5794,7 @@ void BOND_CF_ASSET::after_startup(int decrement) {
 //ms_BeforeStartup END@2
 
 HVector<ModelClass::ddfStruct> BOND_CF_ASSET::ddfVector;
-BitArray BOND_CF_ASSET::dataVariables(14);
+BitArray BOND_CF_ASSET::dataVariables(17);
 bool BOND_CF_ASSET::hasBeenWritten = false;
 
 

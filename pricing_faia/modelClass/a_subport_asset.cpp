@@ -1,13 +1,12 @@
 ﻿
 //MODELCLASS BEGIN
+//MODELCLASS aa_comp_comp
 //MODELCLASS adco_asset
 //MODELCLASS ann_pba_pba
 //MODELCLASS asset_asset
-//MODELCLASS automation
 //MODELCLASS a_subport_asset
 //MODELCLASS bond_asset
 //MODELCLASS bond_cf_asset
-//MODELCLASS comp_comp
 //MODELCLASS eio_asset
 //MODELCLASS epa_asset
 //MODELCLASS epl_liab
@@ -15,16 +14,14 @@
 //MODELCLASS fiacarvm_liab
 //MODELCLASS fia_liab
 //MODELCLASS hdg_grp_comp
-//MODELCLASS intex_asset
 //MODELCLASS invstrat_asset
 //MODELCLASS liab_liab
+//MODELCLASS mrb_gaap
 //MODELCLASS mtg_asset
 //MODELCLASS mtg_cf_asset
 //MODELCLASS rates_economy
 //MODELCLASS seg_comp
-//MODELCLASS sfas133_gaap
 //MODELCLASS sfas97rd_gaap
-//MODELCLASS util_rafm
 //MODELCLASS END
 
 #if defined(MICROSOFT)
@@ -75,13 +72,12 @@ extern MemCount gMem;
 extern MY_DLL Parmfile *p;
 #include "column2.h"
 #include "ModelClass\a_subport_asset_udf.h"
+#include "ModelClass\aa_comp_comp.h"
 #include "ModelClass\adco_asset.h"
 #include "ModelClass\ann_pba_pba.h"
 #include "ModelClass\asset_asset.h"
-#include "ModelClass\automation.h"
 #include "ModelClass\bond_asset.h"
 #include "ModelClass\bond_cf_asset.h"
-#include "ModelClass\comp_comp.h"
 #include "ModelClass\eio_asset.h"
 #include "ModelClass\epa_asset.h"
 #include "ModelClass\epl_liab.h"
@@ -89,16 +85,14 @@ extern MY_DLL Parmfile *p;
 #include "ModelClass\fiacarvm_liab.h"
 #include "ModelClass\fia_liab.h"
 #include "ModelClass\hdg_grp_comp.h"
-#include "ModelClass\intex_asset.h"
 #include "ModelClass\invstrat_asset.h"
 #include "ModelClass\liab_liab.h"
+#include "ModelClass\mrb_gaap.h"
 #include "ModelClass\mtg_asset.h"
 #include "ModelClass\mtg_cf_asset.h"
 #include "ModelClass\rates_economy.h"
 #include "ModelClass\seg_comp.h"
-#include "ModelClass\sfas133_gaap.h"
 #include "ModelClass\sfas97rd_gaap.h"
-#include "ModelClass\util_rafm.h"
 #pragma optimize( "gs", on )
 
 #include "generatedCppHeader.h"
@@ -109,7 +103,7 @@ extern MY_DLL Parmfile *p;
 //Redundant includes only for snip test:
 //iomanip included for "setprecision()"
 #include <iomanip>
-#include <strstream> //WTW - Gen2
+#include <strstream>
 typedef vector<vector<string>> sowfinput;
 typedef vector<string> sowfcols;
 typedef map <xstring, long, less <xstring> > sowfmap;
@@ -120,7 +114,9 @@ typedef vector<vector<string>> deptaskinput;
 typedef vector<string> deptaskcols;
 typedef map <xstring, long, less <xstring> > deptaskmap;
 typedef deptaskmap::iterator deptaskmapiter;
-//extern MY_DLL strstream log_screen; //WTW - Gen2 - MY_DLL is not supported
+const int pv = 0;
+const int is = 1;
+const int ym = 2;
 const int EFFECTIVE_RATE = 0;
 const int EFFECTIVE_ANNUAL = 1;
 const int NOMINAL_SEMIANNUAL = 2;
@@ -138,9 +134,8 @@ const double LEAST_ANNUAL_GROWTH_RATE = -0.9999;
 const double LEAST_BOND_EQUIVALENT_RATE = 0.0001;
 const double SPOT_SHIFT_FOR_EFFECTIVE_DURATION_CALCULATION = 0.0001;
 const double ONE_MILLION = 1000000.0;
-//WTW - Gen2 - Move Extern definitions to rates header
-//const double MINIMUM_MONTHLY_YIELD_RATIO = -0.9; // annual yield = (1.0-0.9)^12 = 1.0e-12
-//const double MAXIMUM_MONTHLY_YIELD_RATIO	 = 999999999.0; // annual yield = (1.0+999999999.0)^12 = 1.0e+120
+const double MINIMUM_MONTHLY_YIELD_RATIO = -0.9; // annual yield = (1.0-0.9)^12 = 1.0e-12
+const double MAXIMUM_MONTHLY_YIELD_RATIO	 = 999999999.0; // annual yield = (1.0+999999999.0)^12 = 1.0e+120
 const int DECIMALS_TO_ROUND = 6;
 const int ROUND_NEGATIVE_TOZERO = 0;
 const int ROUND_NEAR = 1;
@@ -154,11 +149,10 @@ const int SUM_OVER_NEGATIVE = -101;
 const int TIER = -98;
 const int ANY_GROUP = -99;
 const bool DO_NOT_ISSUE_WARNINGS = false;
-//WTW - Gen2 - Move Extern definitions to rates header
-//const int CALL_CODE = 1; 
-//const int PUT_CODE = 2; 
-//const int CONTINUOUS_PAYOUT_CODE = 3;
-//const int FUTURES_CODE = 4;
+const int CALL_CODE = 1;
+const int PUT_CODE = 2;
+const int CONTINUOUS_PAYOUT_CODE = 3;
+const int FUTURES_CODE = 4;
 // Model point type
 const int NEW_PURCH = 0;
 const int INIT_MP = 1;
@@ -208,11 +202,13 @@ const int HEDGE_CASH_FLOW = 0;
 const int HEDGE_MKT_VAL = 1;
 const int HEDGE_ARRAY_SIZE = 2;
 // global calculation flags
-//extern bool pricing_flag;//WTW - Gen2 - Move Extern definitions to rates header
+extern bool pricing_flag;
 extern bool factors_flag;
 extern bool nb_flag;
 extern bool alm_flag;
 extern bool tcm_flag;
+extern bool pba_disc_rate_flag;
+extern int pba_segment_size;
 extern bool avr_flag;
 extern bool imr_flag;
 extern bool gaap_flag;
@@ -220,17 +216,12 @@ extern bool tgt_cap_flag;
 extern bool stoch_flag;
 extern bool valn_flag;
 extern bool time_step_flag;
-extern bool sfas133_valn_flag;
+extern bool mrb_valn_flag;
 extern bool sop031_valn_flag;
 extern bool sfas97rd_valn_flag;
-extern bool sfas97lp_valn_flag;
-extern bool sfas97lp_gpr_valn_flag;
 extern bool sfas91_valn_flag;
-extern bool sfas60_valn_flag;
-extern bool sfas60_gpr_valn_flag;
+extern bool gaap_ldti_valn_flag;
 extern bool sfas120_nlp_valn_flag;
-extern bool sfas120_valn_flag;
-extern bool sfas120_gpr_valn_flag;
 extern bool loc_gpr_valn_flag;
 extern bool pba_valn_flag;
 extern bool pba_scen_amt_valn_flag;
@@ -239,6 +230,7 @@ extern bool res_scen_amt_valn_flag;
 extern bool res_det_res_valn_flag;
 extern bool res_ag38_8d_valn_flag;
 extern bool std_scen_valn_flag;
+extern bool std_scen_prescribed_assump_flag;
 extern bool rbc_std_scen_valn_flag;
 extern bool rbc_std_scen_step2_valn_flag;
 extern bool res_std_scen_valn_flag;
@@ -261,33 +253,32 @@ extern double aggregate_amount_threshold;
 extern double model_point_amount_threshold;
 extern double rate_ratio_threshold;
 extern vector<string> valn_periods;
+
 // utility functions - elaborated in rates/economy externs
-//WTW - Gen2 - Move Extern definitions to rates header
-/*extern double round_result(int rounding, int negative, double x, int n);
+extern double round_result(int rounding, int negative, double x, int n);
 extern double factorial(int n);
 extern int n_choose_k(int n, int k);
 extern xstring check_date_format(const xstring &date);
+extern int month_from_day_number(int nSerialDate);
+extern int year_from_day_number(int nSerialDate);
+extern int day_from_day_number(int nSerialDate);
+extern int month_number_from_date(int year, int month); 
+extern int day_number_from_date(int nYear, int nMonth, int nDay);
 extern int get_mth_from_date(const xstring &date);
 extern int get_yr_from_date(const xstring &date);
 extern int get_day_from_date(const xstring &date);
-extern int month_from_day_number(int nSerialDate);//WTW - Gen2 - add new formula to replace unsupported MonthFromDayNumber() function
-extern int year_from_day_number(int nSerialDate);//WTW - Gen2 - add new formula to replace unsupported YearFromDayNumber() function
-extern int day_from_day_number(int nSerialDate);//WTW - Gen2 - add new formula to replace unsupported DayFromDayNumber() function
-extern int month_number_from_date(int year, int month); //WTW - Gen2 - add new formula to replace unsupported MonthNumberFromDate() function
-extern int day_number_from_date(int nYear, int nMonth, int nDay); //WTW - Gen2 - add new formula to replace unsupported DayNumberFromDate() function
 extern int get_end_of_mth_day(int yr, int mth);
 extern xstring add_mths_to_date(const xstring &date, int mths);
 extern int get_mth_from_adj_date(const xstring &date, int mths);
 extern double convert_rate_basis(double orig_rate, double orig_rate_basis, double new_rate_basis);
 extern double convert_decrem_rate_basis(double orig_rate, double orig_rate_basis, double new_rate_basis);
-extern long int determine_tbl_size(int sNumberOfDims, ...);
 extern xstring get_file_name(const xstring &source_file);
 extern xstring get_file_path(const xstring &source_file);
-extern xstring get_base_group_name(const xstring &tag, bool seriatim_flag = false);
+extern xstring get_base_group_name(const xstring &tag, bool split_flag = false);
 extern xstring get_string_of_date(double date);
 extern xstring get_string_of_enum_val(StrEnum::EnumValue type);
 extern int date_diff(xstring first_date, xstring second_date);
-extern int number_of_decimals(double xxx, int digits);//WTW - Gen2 - replace preprocessor #define with formula
+extern int number_of_decimals(double xxx,int digits);
 extern xstring write_string(double value, int string_length, int significant_digits);
 extern xstring write_array_to_string(SmartArray <double> value_array, int low, int high);
 extern void read_from_string(xstring temp_string, SmartArray <double> &temp_array);
@@ -308,25 +299,8 @@ extern double bs_opt_val_continuous_highest_gain(int call_or_put, double current
 extern double bs_opt_val_highest_gain(int call_or_put, double current_price, double observed_max, double observed_min, double strike_price, double length_of_sampling_period, int sampling_freq, double yrs_to_expiry, double risk_free_rate, double init_div_yld, double index_vol, int scen_int_freq, int scen_index_freq);
 extern double bs_opt_val_mthly_sum_cap(int crediting_mths, int known_index_vals, double sum_capped_amts,  double mthly_cap_rate, double yrs_to_expiry, double risk_free_rate, double init_div_yld, double index_vol, int scen_int_freq, int scen_index_freq);
 extern double cumul_bivariate_normal_distribn(double x, double y, double rho);
-extern double cumul_normal_distribn(double x);*/
+extern double cumul_normal_distribn(double x);
 
-// RAFM SQLite
-#ifndef _RAFMSQLITE_H_
-#define _RAFMSQLITE_H_
-
-#include <string>
-#include <vector>
-
-using namespace std;
-
-// 20210614 STW: upgrade to RAFM 2.9
-/*
-extern void openDatabase(string dbPath);
-extern void closeDatabase();
-extern string readCsvFile(string csvPath);
-extern void executeQuery(string sql, vector<string>& columns, vector<vector<string>>& results);
-*/
-#endif
 #endif
 extern int trace_wanted;
 
@@ -346,7 +320,6 @@ extern const int& last_proj_task_loop;
 extern const int& proj_task_loop_num;
 extern const int& num_of_proj_task_loops;
 
-extern MY_DLL2 int use_overlay_code;
 extern MY_DLL int trace_level_wanted;
 extern MY_DLL int trace_level;
 extern MY_DLL bool bEmitTurboDebugger;
@@ -387,7 +360,6 @@ return sum_over_assets_subport("accr_div", t, current_sub_port, asset_source_typ
 
 }
 
-
 //@@ END
 
 //@@ START - accr_inc
@@ -414,7 +386,6 @@ return sum_over_assets_subport("accr_inc", t, current_sub_port, asset_source_typ
 
 }
 
-
 //@@ END
 
 //@@ START - accr_int_aft_dflt
@@ -438,7 +409,6 @@ return sum_over_assets_subport("accr_int_aft_dflt", t, current_sub_port, asset_s
 
 }
 
-
 //@@ END
 
 //@@ START - accr_int_dflt
@@ -460,7 +430,6 @@ return dflt_amt(t)
 	   - cost_basis_dflt(t);
 
 }
-
 
 //@@ END
 
@@ -486,7 +455,6 @@ return sum_over_assets_subport("accr_int_rent", t, current_sub_port, asset_sourc
 
 }
 
-
 //@@ END
 
 //@@ START - accr_int_rent_inv
@@ -510,7 +478,6 @@ return sum_over_assets_subport("accr_int_rent", t, current_sub_port, asset_sourc
 
 
 }
-
 
 //@@ END
 
@@ -546,7 +513,6 @@ return min(max(calculated_yield_local, USLIB_MINIMUM_YIELD), USLIB_MAX_DOUBLE);
 
 }
 
-
 //@@ END
 
 //@@ START - asset_yld_denom
@@ -570,7 +536,6 @@ return sum_over_assets_subport("yld_denom", t, current_sub_port, asset_source_ty
 
 }
 
-
 //@@ END
 
 //@@ START - asset_yld_numer
@@ -591,10 +556,10 @@ if (t < 0)
 int current_sub_port = getElementNumber(1);
 
 return sum_over_assets_subport("yld_numer", t, current_sub_port, asset_source_type, SUM_OVER_ALL, BEFORE_SALE)
-       - inv_exp(t);
+       - inv_exp(t)
+	   - excess_dflt_amt(t);
 
 }
-
 
 //@@ END
 
@@ -621,7 +586,6 @@ int current_sub_port = getElementNumber(1);
 return sum_over_assets_subport("base_cost_basis", t, current_sub_port, asset_source_type, SUM_OVER_ALL, END_OF_PERIOD);
 
 }
-
 
 //@@ END
 
@@ -653,7 +617,6 @@ return sum_over_assets_subport("bk_val", t, current_sub_port, asset_source_type,
 
 }
 
-
 //@@ END
 
 //@@ START - bk_val_incr
@@ -675,7 +638,6 @@ return bk_val(t)
 	   - bk_val(t - 1);
 
 }
-
 
 //@@ END
 
@@ -700,7 +662,6 @@ return sum_over_assets_subport("bk_val", t, current_sub_port, asset_source_type,
 
 }
 
-
 //@@ END
 
 //@@ START - bk_val_plus_accr_int
@@ -723,7 +684,6 @@ return bk_val(t)
 
 }
 
-
 //@@ END
 
 //@@ START - cal_mth
@@ -738,10 +698,9 @@ double A_SUBPORT_ASSET_UDF::a_subport_asset_cal_mth(int t) {
 //^^^
 
 #line 1 "cal_mth.A_SUBPORT_ASSET.for"
-return seg->cal_mth(t);
+return seg_element->cal_mth(t);
 
 }
-
 
 //@@ END
 
@@ -757,10 +716,9 @@ double A_SUBPORT_ASSET_UDF::a_subport_asset_cal_yr(int t) {
 //^^^
 
 #line 1 "cal_yr.A_SUBPORT_ASSET.for"
-return seg->cal_yr(t);
+return seg_element->cal_yr(t);
 
 }
-
 
 //@@ END
 
@@ -776,10 +734,9 @@ double A_SUBPORT_ASSET_UDF::a_subport_asset_cal_yr_relative(int t) {
 //^^^
 
 #line 1 "cal_yr_relative.A_SUBPORT_ASSET.for"
-return seg->cal_yr_relative(t);
+return seg_element->cal_yr_relative(t);
 
 }
-
 
 //@@ END
 
@@ -802,7 +759,6 @@ return cap_gain_bef_sale(t) + cap_gain_from_sale(t);
 
 }
 
-
 //@@ END
 
 //@@ START - cap_gain_bef_sale
@@ -824,7 +780,6 @@ return realzd_cap_gain(t)
 	   + unrealzd_cap_gain_incr(t);
 
 }
-
 
 //@@ END
 
@@ -849,7 +804,6 @@ return sum_over_assets_subport("cap_gain_from_sale", t, current_sub_port, asset_
 
 }
 
-
 //@@ END
 
 //@@ START - cash_flow
@@ -872,7 +826,6 @@ int current_sub_port = getElementNumber(1);
 return sum_over_assets_subport("cash_flow", t, current_sub_port, asset_source_type, SUM_OVER_ALL, BEFORE_SALE);
 
 }
-
 
 //@@ END
 
@@ -901,7 +854,6 @@ return sum_over_assets_subport("cost_basis", t, current_sub_port, asset_source_t
 
 }
 
-
 //@@ END
 
 //@@ START - cost_basis_accrual
@@ -924,7 +876,6 @@ int current_sub_port = getElementNumber(1);
 return sum_over_assets_subport("cost_basis_accrual", t, current_sub_port, asset_source_type, SUM_OVER_ALL, BEFORE_SALE);
 
 }
-
 
 //@@ END
 
@@ -949,7 +900,6 @@ return sum_over_assets_subport("cost_basis_dflt", t, current_sub_port, asset_sou
 
 }
 
-
 //@@ END
 
 //@@ START - cost_basis_growth
@@ -973,7 +923,6 @@ return cost_basis_accrual(t)
 	   + cost_basis_incr_index_asset_turnover(t);
 
 }
-
 
 //@@ END
 
@@ -1001,7 +950,6 @@ return sum_over_assets_subport("cost_basis_incr_accr_div", t, current_sub_port, 
 
 }
 
-
 //@@ END
 
 //@@ START - cost_basis_incr_appreciation
@@ -1025,7 +973,6 @@ return sum_over_assets_subport("cost_basis_incr_appreciation", t, current_sub_po
 
 }
 
-
 //@@ END
 
 //@@ START - cost_basis_incr_index_asset_turnover
@@ -1048,7 +995,6 @@ int current_sub_port = getElementNumber(1);
 return sum_over_assets_subport("realzd_cap_gain_turnover", t, current_sub_port, asset_source_type, SUM_OVER_ALL, BEFORE_SALE);
 
 }
-
 
 //@@ END
 
@@ -1074,7 +1020,6 @@ return sum_over_assets_subport("opt_pmt", t, current_sub_port, asset_source_type
 
 }
 
-
 //@@ END
 
 //@@ START - cost_basis_purch
@@ -1096,172 +1041,158 @@ int current_sub_port = getElementNumber(1);
 int current_asset_source = getElementNumber();
 int mp = 0;
 double total = 0.0;
-mpmap::iterator mp_map_iter;
+map <int, long, less <int> >::iterator mp_map_iter;
 
 #if defined(__BOND_ASSET_H_)
-BOND_ASSET *current_bond_element;
-if (seg->bond_mp_map_active.size() > 0)
+if (seg_element->bond_mp_map_active.size() > 0)
 	{
-	for (mp_map_iter = seg->bond_mp_map_active.begin();
-		 mp_map_iter != seg->bond_mp_map_active.end();
+	for (mp_map_iter = seg_element->bond_mp_map_active.begin();
+		 mp_map_iter != seg_element->bond_mp_map_active.end();
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		current_bond_element = asset->sm_bond[mp];
 
 		if (current_asset_source == 1)
 			continue;
 
-		if (current_bond_element->existing_asset_indicator
-			|| current_bond_element->purch_asset_sub_port != current_sub_port
-			|| current_bond_element->commencement_period < t)
+		if (asset->sm_bond[mp][0]->existing_asset_indicator
+			|| asset->sm_bond[mp][0]->purch_asset_sub_port != current_sub_port
+			|| asset->sm_bond[mp][0]->commencement_period < t)
 			continue;
 
-		total += current_bond_element->cost_basis_purch(t);
+		total += asset->sm_bond[mp][0]->cost_basis_purch(t);
 		}
 	}
 #endif
 
 #if defined(__MTG_ASSET_H_)
-MTG_ASSET *current_mtg_element;
-if (seg->mtg_mp_map_active.size() > 0)
+if (seg_element->mtg_mp_map_active.size() > 0)
 	{
-	for (mp_map_iter = seg->mtg_mp_map_active.begin();
-		 mp_map_iter != seg->mtg_mp_map_active.end();
+	for (mp_map_iter = seg_element->mtg_mp_map_active.begin();
+		 mp_map_iter != seg_element->mtg_mp_map_active.end();
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		current_mtg_element = asset->sm_mtg[mp];
 
 		if (current_asset_source == 1)
 			continue;
 
-		if (current_mtg_element->existing_asset_indicator
-			|| current_mtg_element->purch_asset_sub_port != current_sub_port
-			|| current_mtg_element->commencement_period < t)
+		if (asset->sm_mtg[mp][0]->existing_asset_indicator
+			|| asset->sm_mtg[mp][0]->purch_asset_sub_port != current_sub_port
+			|| asset->sm_mtg[mp][0]->commencement_period < t)
 			continue;
 
-		total += current_mtg_element->cost_basis_purch(t);
+		total += asset->sm_mtg[mp][0]->cost_basis_purch(t);
 		}
 	}
 #endif
 
 #if defined(__SEC_ASSET_H_)
-SEC_ASSET *current_sec_element;
-if (seg->sec_mp_map_active.size() > 0)
+if (seg_element->sec_mp_map_active.size() > 0)
 	{
-	for (mp_map_iter = seg->sec_mp_map_active.begin();
-		 mp_map_iter != seg->sec_mp_map_active.end();
+	for (mp_map_iter = seg_element->sec_mp_map_active.begin();
+		 mp_map_iter != seg_element->sec_mp_map_active.end();
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		current_sec_element = asset->sm_sec[mp];
 
 		if (current_asset_source == 1)
 			continue;
 
-		if (current_sec_element->existing_asset_indicator
-			|| current_sec_element->purch_asset_sub_port != current_sub_port
-			|| current_sec_element->commencement_period < t)
+		if (asset->sm_sec[mp]->existing_asset_indicator
+			|| asset->sm_sec[mp]->purch_asset_sub_port != current_sub_port
+			|| asset->sm_sec[mp]->commencement_period < t)
 			continue;
 
-		total += current_sec_element->cost_basis_purch(t);
+		total += asset->sm_sec[mp]->cost_basis_purch(t);
 		}
 	}
 #endif
 
 #if defined(__IRD_ASSET_H_)
-IRD_ASSET *current_ird_element;
-if (seg->ird_mp_map_active.size() > 0)
+if (seg_element->ird_mp_map_active.size() > 0)
 	{
-	for (mp_map_iter = seg->ird_mp_map_active.begin();
-		 mp_map_iter != seg->ird_mp_map_active.end();
+	for (mp_map_iter = seg_element->ird_mp_map_active.begin();
+		 mp_map_iter != seg_element->ird_mp_map_active.end();
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		current_ird_element = asset->sm_ird[mp];
 
 		if (current_asset_source == 1)
 			continue;
 
-		if (current_ird_element->existing_asset_indicator
-			|| current_ird_element->purch_asset_sub_port != current_sub_port
-			|| current_ird_element->commencement_period < t)
+		if (asset->sm_ird[mp][0]->existing_asset_indicator
+			|| asset->sm_ird[mp][0]->purch_asset_sub_port != current_sub_port
+			|| asset->sm_ird[mp][0]->commencement_period < t)
 			continue;
 
-		total += current_ird_element->cost_basis_purch(t);
+		total += asset->sm_ird[mp][0]->cost_basis_purch(t);
 		}
 	}
 #endif
 
 #if defined(__RE_ASSET_H_)
-RE_ASSET *current_re_element;
-if (seg->re_mp_map_active.size() > 0)
+if (seg_element->re_mp_map_active.size() > 0)
 	{
-	for (mp_map_iter = seg->re_mp_map_active.begin();
-		 mp_map_iter != seg->re_mp_map_active.end();
+	for (mp_map_iter = seg_element->re_mp_map_active.begin();
+		 mp_map_iter != seg_element->re_mp_map_active.end();
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		current_re_element = asset->sm_re[mp];
 
 		if (current_asset_source == 1)
 			continue;
 
-		if (current_re_element->existing_asset_indicator
-			|| current_re_element->purch_asset_sub_port != current_sub_port
-			|| current_re_element->commencement_period < t)
+		if (asset->sm_re[mp]->existing_asset_indicator
+			|| asset->sm_re[mp]->purch_asset_sub_port != current_sub_port
+			|| asset->sm_re[mp]->commencement_period < t)
 			continue;
 
-		total += current_re_element->cost_basis_purch(t);
+		total += asset->sm_re[mp]->cost_basis_purch(t);
 		}
 	}
 #endif
 
 #if defined(__EQT_ASSET_H_)
-EQT_ASSET *current_eqt_element;
-if (seg->eqt_mp_map_active.size() > 0)
+if (seg_element->eqt_mp_map_active.size() > 0)
 	{
-	for (mp_map_iter = seg->eqt_mp_map_active.begin();
-		 mp_map_iter != seg->eqt_mp_map_active.end();
+	for (mp_map_iter = seg_element->eqt_mp_map_active.begin();
+		 mp_map_iter != seg_element->eqt_mp_map_active.end();
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		current_eqt_element = asset->sm_eqt[mp];
 
 		if (current_asset_source == 1)
 			continue;
 
-		if (current_eqt_element->existing_asset_indicator
-			|| current_eqt_element->purch_asset_sub_port != current_sub_port
-			|| current_eqt_element->commencement_period < t)
+		if (asset->sm_eqt[mp]->existing_asset_indicator
+			|| asset->sm_eqt[mp]->purch_asset_sub_port != current_sub_port
+			|| asset->sm_eqt[mp]->commencement_period < t)
 			continue;
 
-		total += current_eqt_element->cost_basis_purch(t);
+		total += asset->sm_eqt[mp]->cost_basis_purch(t);
 		}
 	}
 #endif
 
 #if defined(__EIO_ASSET_H_)
-EIO_ASSET *current_eio_element;
-if (seg->eio_mp_map_active.size() > 0)
+if (seg_element->eio_mp_map_active.size() > 0)
 	{
-	for (mp_map_iter = seg->eio_mp_map_active.begin();
-		 mp_map_iter != seg->eio_mp_map_active.end();
+	for (mp_map_iter = seg_element->eio_mp_map_active.begin();
+		 mp_map_iter != seg_element->eio_mp_map_active.end();
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		current_eio_element = asset->sm_eio[mp];
 
 		if (current_asset_source == 1)
 			continue;
 
-		if (current_eio_element->existing_asset_indicator
-			|| current_eio_element->purch_asset_sub_port != current_sub_port
-			|| current_eio_element->commencement_period + current_eio_element->purchased_bom_flag < t)
+		if (asset->sm_eio[mp][0]->existing_asset_indicator
+			|| asset->sm_eio[mp][0]->purch_asset_sub_port != current_sub_port
+			|| asset->sm_eio[mp][0]->commencement_period + asset->sm_eio[mp][0]->purchased_bom_flag < t)
 			continue;
 
-		total += current_eio_element->cost_basis_purch(t);
+		total += asset->sm_eio[mp][0]->cost_basis_purch(t);
 		}
 	}
 #endif
@@ -1269,7 +1200,6 @@ if (seg->eio_mp_map_active.size() > 0)
 return total;
 
 }
-
 
 //@@ END
 
@@ -1294,7 +1224,6 @@ return sum_over_assets_subport("cost_basis_sold", t, current_sub_port, asset_sou
 
 }
 
-
 //@@ END
 
 //@@ START - cost_basis_sched_prin_pmt
@@ -1317,7 +1246,6 @@ int current_sub_port = getElementNumber(1);
 return sum_over_assets_subport("sched_prin_pmt", t, current_sub_port, asset_source_type, SUM_OVER_ALL, BEFORE_SALE);
 
 }
-
 
 //@@ END
 
@@ -1345,7 +1273,6 @@ return cost_basis_purch(t)
 
 }
 
-
 //@@ END
 
 //@@ START - cost_basis_transfer
@@ -1368,380 +1295,364 @@ int current_asset_source = getElementNumber();
 double result = 0.0;
 int mp;
 double total = 0.0;
-mpmap::iterator mp_map_iter;
+map <int, long, less <int> >::iterator mp_map_iter;
 	
 #if defined(__BOND_ASSET_H_)
-BOND_ASSET *current_bond_element;
-if (seg->bond_mp_map_active.size() > 0)
+if (seg_element->bond_mp_map_active.size() > 0)
 	{
-	for (mp_map_iter = seg->bond_mp_map_active.begin();
-		 mp_map_iter != seg->bond_mp_map_active.end();
+	for (mp_map_iter = seg_element->bond_mp_map_active.begin();
+		 mp_map_iter != seg_element->bond_mp_map_active.end();
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		current_bond_element = asset->sm_bond[mp];
 
 		if (current_asset_source == 2
-			&& (current_bond_element->existing_asset_indicator == INIT_MP 
-			 ||current_bond_element->existing_asset_indicator == PROXY_BOND))
+			&& (asset->sm_bond[mp][0]->existing_asset_indicator == INIT_MP 
+			 ||asset->sm_bond[mp][0]->existing_asset_indicator == PROXY_BOND))
 			continue;
 
 		if (current_asset_source == 1
-			&& (current_bond_element->existing_asset_indicator == NEW_PURCH
-			    || current_bond_element->existing_asset_indicator == PRIOR_PURCH))
+			&& (asset->sm_bond[mp][0]->existing_asset_indicator == NEW_PURCH
+			    || asset->sm_bond[mp][0]->existing_asset_indicator == PRIOR_PURCH))
 			continue;
 					
-		if ((current_bond_element->commencement_period < t
-			 && current_bond_element->notional_amt(t - 1) < ASSET_ACTIVE_THRESHOLD)
-			|| current_bond_element->notional_amt_bef_sale(t) < ASSET_ACTIVE_THRESHOLD)
+		if ((asset->sm_bond[mp][0]->commencement_period < t
+			 && asset->sm_bond[mp][0]->notional_amt(t - 1) < ASSET_ACTIVE_THRESHOLD)
+			|| asset->sm_bond[mp][0]->notional_amt_bef_sale(t) < ASSET_ACTIVE_THRESHOLD)
 			continue;
 
-		if (current_bond_element->commencement_period)
+		if (asset->sm_bond[mp][0]->commencement_period)
 			{
-			if (current_sub_port == current_bond_element->purch_asset_sub_port
-				&& current_sub_port != current_bond_element->sub_port_id(t))
-				total -= current_bond_element->cost_basis_purch(t);
+			if (current_sub_port == asset->sm_bond[mp][0]->purch_asset_sub_port
+				&& current_sub_port != asset->sm_bond[mp][0]->sub_port_id(t))
+				total -= asset->sm_bond[mp][0]->cost_basis_purch(t);
 
-			else if (current_sub_port != current_bond_element->purch_asset_sub_port
-					 && current_sub_port == current_bond_element->sub_port_id(t))
-				total += current_bond_element->cost_basis_purch(t);
+			else if (current_sub_port != asset->sm_bond[mp][0]->purch_asset_sub_port
+					 && current_sub_port == asset->sm_bond[mp][0]->sub_port_id(t))
+				total += asset->sm_bond[mp][0]->cost_basis_purch(t);
 			}
 		else
 			{
-			if (current_sub_port == current_bond_element->sub_port_id(t - 1)
-				&& current_sub_port != current_bond_element->sub_port_id(t))
-				total -= current_bond_element->cost_basis(t);
+			if (current_sub_port == asset->sm_bond[mp][0]->sub_port_id(t - 1)
+				&& current_sub_port != asset->sm_bond[mp][0]->sub_port_id(t))
+				total -= asset->sm_bond[mp][0]->cost_basis(t);
 
-			else if (current_sub_port != current_bond_element->sub_port_id(t - 1)
-					 && current_sub_port == current_bond_element->sub_port_id(t))
-				total += current_bond_element->cost_basis(t);
+			else if (current_sub_port != asset->sm_bond[mp][0]->sub_port_id(t - 1)
+					 && current_sub_port == asset->sm_bond[mp][0]->sub_port_id(t))
+				total += asset->sm_bond[mp][0]->cost_basis(t);
 			}
 		}
 	}
 #endif
 
 #if defined(__MTG_ASSET_H_)
-MTG_ASSET *current_mtg_element;
-if (seg->mtg_mp_map_active.size() > 0)
+if (seg_element->mtg_mp_map_active.size() > 0)
 	{
-	for (mp_map_iter = seg->mtg_mp_map_active.begin();
-		 mp_map_iter != seg->mtg_mp_map_active.end();
+	for (mp_map_iter = seg_element->mtg_mp_map_active.begin();
+		 mp_map_iter != seg_element->mtg_mp_map_active.end();
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		current_mtg_element = asset->sm_mtg[mp];
 
 		if (current_asset_source == 2
-			&& current_mtg_element->existing_asset_indicator == INIT_MP)
+			&& asset->sm_mtg[mp][0]->existing_asset_indicator == INIT_MP)
 			continue;
 
 		if (current_asset_source == 1
-			&& (current_mtg_element->existing_asset_indicator == NEW_PURCH
-			    || current_mtg_element->existing_asset_indicator == PRIOR_PURCH))
+			&& (asset->sm_mtg[mp][0]->existing_asset_indicator == NEW_PURCH
+			    || asset->sm_mtg[mp][0]->existing_asset_indicator == PRIOR_PURCH))
 			continue;
 
-		if ((current_mtg_element->commencement_period < t
-			 && current_mtg_element->notional_amt(t - 1) < ASSET_ACTIVE_THRESHOLD)
-			|| current_mtg_element->notional_amt_bef_sale(t) < ASSET_ACTIVE_THRESHOLD)
+		if ((asset->sm_mtg[mp][0]->commencement_period < t
+			 && asset->sm_mtg[mp][0]->notional_amt(t - 1) < ASSET_ACTIVE_THRESHOLD)
+			|| asset->sm_mtg[mp][0]->notional_amt_bef_sale(t) < ASSET_ACTIVE_THRESHOLD)
 			continue;
 
-		if (current_mtg_element->commencement_period)
+		if (asset->sm_mtg[mp][0]->commencement_period)
 			{
-			if (current_sub_port == current_mtg_element->purch_asset_sub_port
-				&& current_sub_port != current_mtg_element->sub_port_id(t))
-				total -= current_mtg_element->cost_basis_purch(t);
+			if (current_sub_port == asset->sm_mtg[mp][0]->purch_asset_sub_port
+				&& current_sub_port != asset->sm_mtg[mp][0]->sub_port_id(t))
+				total -= asset->sm_mtg[mp][0]->cost_basis_purch(t);
 
-			else if (current_sub_port != current_mtg_element->purch_asset_sub_port
-					 && current_sub_port == current_mtg_element->sub_port_id(t))
-				total += current_mtg_element->cost_basis_purch(t);
+			else if (current_sub_port != asset->sm_mtg[mp][0]->purch_asset_sub_port
+					 && current_sub_port == asset->sm_mtg[mp][0]->sub_port_id(t))
+				total += asset->sm_mtg[mp][0]->cost_basis_purch(t);
 			}
 		else
 			{
-			if (current_sub_port == current_mtg_element->sub_port_id(t - 1)
-				&& current_sub_port != current_mtg_element->sub_port_id(t))
-				total -= current_mtg_element->cost_basis(t);
+			if (current_sub_port == asset->sm_mtg[mp][0]->sub_port_id(t - 1)
+				&& current_sub_port != asset->sm_mtg[mp][0]->sub_port_id(t))
+				total -= asset->sm_mtg[mp][0]->cost_basis(t);
 
-			else if (current_sub_port != current_mtg_element->sub_port_id(t - 1)
-					 && current_sub_port == current_mtg_element->sub_port_id(t))
-				total += current_mtg_element->cost_basis(t);
+			else if (current_sub_port != asset->sm_mtg[mp][0]->sub_port_id(t - 1)
+					 && current_sub_port == asset->sm_mtg[mp][0]->sub_port_id(t))
+				total += asset->sm_mtg[mp][0]->cost_basis(t);
 			}
 		}
 	}
 #endif
 
 #if defined(__SEC_ASSET_H_)
-SEC_ASSET *current_sec_element;
-if (seg->sec_mp_map_active.size() > 0)
+if (seg_element->sec_mp_map_active.size() > 0)
 	{
-	for (mp_map_iter = seg->sec_mp_map_active.begin();
-		 mp_map_iter != seg->sec_mp_map_active.end();
+	for (mp_map_iter = seg_element->sec_mp_map_active.begin();
+		 mp_map_iter != seg_element->sec_mp_map_active.end();
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		current_sec_element = asset->sm_sec[mp];
 
 		if (current_asset_source == 2
-			&& current_sec_element->existing_asset_indicator == INIT_MP)
+			&& asset->sm_sec[mp]->existing_asset_indicator == INIT_MP)
 			continue;
 
 		if (current_asset_source == 1
-			&& (current_sec_element->existing_asset_indicator == NEW_PURCH
-			    || current_sec_element->existing_asset_indicator == PRIOR_PURCH))
+			&& (asset->sm_sec[mp]->existing_asset_indicator == NEW_PURCH
+			    || asset->sm_sec[mp]->existing_asset_indicator == PRIOR_PURCH))
 			continue;
 
-		if ((current_sec_element->commencement_period < t
-			 && current_sec_element->notional_amt(t - 1) < model_point_amount_threshold)
-			|| current_sec_element->notional_amt_bef_sale(t) < model_point_amount_threshold)
+		if ((asset->sm_sec[mp]->commencement_period < t
+			 && asset->sm_sec[mp]->notional_amt(t - 1) < model_point_amount_threshold)
+			|| asset->sm_sec[mp]->notional_amt_bef_sale(t) < model_point_amount_threshold)
 			continue;
 
-		if (current_sec_element->commencement_period)
+		if (asset->sm_sec[mp]->commencement_period)
 			{
-			if (current_sub_port == current_sec_element->purch_asset_sub_port
-				&& current_sub_port != current_sec_element->sub_port_id(t))
-				total -= current_sec_element->cost_basis_purch(t);
+			if (current_sub_port == asset->sm_sec[mp]->purch_asset_sub_port
+				&& current_sub_port != asset->sm_sec[mp]->sub_port_id(t))
+				total -= asset->sm_sec[mp]->cost_basis_purch(t);
 
-			else if (current_sub_port != current_sec_element->purch_asset_sub_port
-					 && current_sub_port == current_sec_element->sub_port_id(t))
-				total += current_sec_element->cost_basis_purch(t);
+			else if (current_sub_port != asset->sm_sec[mp]->purch_asset_sub_port
+					 && current_sub_port == asset->sm_sec[mp]->sub_port_id(t))
+				total += asset->sm_sec[mp]->cost_basis_purch(t);
 			}
 		else
 			{
-			if (current_sub_port == current_sec_element->sub_port_id(t - 1)
-				&& current_sub_port != current_sec_element->sub_port_id(t))
-				total -= current_sec_element->cost_basis(t);
+			if (current_sub_port == asset->sm_sec[mp]->sub_port_id(t - 1)
+				&& current_sub_port != asset->sm_sec[mp]->sub_port_id(t))
+				total -= asset->sm_sec[mp]->cost_basis(t);
 
-			else if (current_sub_port != current_sec_element->sub_port_id(t - 1)
-					 && current_sub_port == current_sec_element->sub_port_id(t))
-				total += current_sec_element->cost_basis(t);
+			else if (current_sub_port != asset->sm_sec[mp]->sub_port_id(t - 1)
+					 && current_sub_port == asset->sm_sec[mp]->sub_port_id(t))
+				total += asset->sm_sec[mp]->cost_basis(t);
 			}
 		}
 	}
 #endif
 
 #if defined(__IRD_ASSET_H_)
-IRD_ASSET *current_ird_element;
-if (seg->ird_mp_map_active.size() > 0)
+if (seg_element->ird_mp_map_active.size() > 0)
 	{
-	for (mp_map_iter = seg->ird_mp_map_active.begin();
-		 mp_map_iter != seg->ird_mp_map_active.end();
+	for (mp_map_iter = seg_element->ird_mp_map_active.begin();
+		 mp_map_iter != seg_element->ird_mp_map_active.end();
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		current_ird_element = asset->sm_ird[mp];
 
 		if (current_asset_source == 2
-			&& current_ird_element->existing_asset_indicator == INIT_MP)
+			&& asset->sm_ird[mp][0]->existing_asset_indicator == INIT_MP)
 			continue;
 
 		if (current_asset_source == 1
-			&& (current_ird_element->existing_asset_indicator == NEW_PURCH
-			    || current_ird_element->existing_asset_indicator == PRIOR_PURCH))
+			&& (asset->sm_ird[mp][0]->existing_asset_indicator == NEW_PURCH
+			    || asset->sm_ird[mp][0]->existing_asset_indicator == PRIOR_PURCH))
 			continue;
 		
-		if ((current_ird_element->commencement_period < t
-			&& current_ird_element->notional_amt(t - 1) < ASSET_ACTIVE_THRESHOLD)
-			|| current_ird_element->notional_amt_bef_sale(t) < ASSET_ACTIVE_THRESHOLD)
+		if ((asset->sm_ird[mp][0]->commencement_period < t
+			&& asset->sm_ird[mp][0]->notional_amt(t - 1) < ASSET_ACTIVE_THRESHOLD)
+			|| asset->sm_ird[mp][0]->notional_amt_bef_sale(t) < ASSET_ACTIVE_THRESHOLD)
 			continue;
 
-		if (current_ird_element->commencement_period)
+		if (asset->sm_ird[mp][0]->commencement_period)
 			{
-			if (current_sub_port == current_ird_element->purch_asset_sub_port
-				&& current_sub_port != current_ird_element->sub_port_id(t))
-				total -= current_ird_element->cost_basis_purch(t);
+			if (current_sub_port == asset->sm_ird[mp][0]->purch_asset_sub_port
+				&& current_sub_port != asset->sm_ird[mp][0]->sub_port_id(t))
+				total -= asset->sm_ird[mp][0]->cost_basis_purch(t);
 
-			else if (current_sub_port != current_ird_element->purch_asset_sub_port
-					 && current_sub_port == current_ird_element->sub_port_id(t))
-				total += current_ird_element->cost_basis_purch(t);
+			else if (current_sub_port != asset->sm_ird[mp][0]->purch_asset_sub_port
+					 && current_sub_port == asset->sm_ird[mp][0]->sub_port_id(t))
+				total += asset->sm_ird[mp][0]->cost_basis_purch(t);
 			}
 		else
 			{
-			if (current_sub_port == current_ird_element->sub_port_id(t - 1)
-				&& current_sub_port != current_ird_element->sub_port_id(t))
-				total -= current_ird_element->cost_basis(t);
+			if (current_sub_port == asset->sm_ird[mp][0]->sub_port_id(t - 1)
+				&& current_sub_port != asset->sm_ird[mp][0]->sub_port_id(t))
+				total -= asset->sm_ird[mp][0]->cost_basis(t);
 
-			else if (current_sub_port != current_ird_element->sub_port_id(t - 1)
-					 && current_sub_port == current_ird_element->sub_port_id(t))
-				total += current_ird_element->cost_basis(t);
+			else if (current_sub_port != asset->sm_ird[mp][0]->sub_port_id(t - 1)
+					 && current_sub_port == asset->sm_ird[mp][0]->sub_port_id(t))
+				total += asset->sm_ird[mp][0]->cost_basis(t);
 			}
 		}
 	}
 #endif
 
 #if defined(__RE_ASSET_H_)
-RE_ASSET *current_re_element;
 // (no transfers for real estate)
-if (seg->re_mp_map_active.size() > 0)
+if (seg_element->re_mp_map_active.size() > 0)
 	{
-	for (mp_map_iter = seg->re_mp_map_active.begin();
-		 mp_map_iter != seg->re_mp_map_active.end();
+	for (mp_map_iter = seg_element->re_mp_map_active.begin();
+		 mp_map_iter != seg_element->re_mp_map_active.end();
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		current_re_element = asset->sm_re[mp];
 
 		if (current_asset_source == 2
-			&& current_re_element->existing_asset_indicator == INIT_MP)
+			&& asset->sm_re[mp]->existing_asset_indicator == INIT_MP)
 			continue;
 
 		if (current_asset_source == 1
-			&& (current_re_element->existing_asset_indicator == NEW_PURCH
-			    || current_re_element->existing_asset_indicator == PRIOR_PURCH))
+			&& (asset->sm_re[mp]->existing_asset_indicator == NEW_PURCH
+			    || asset->sm_re[mp]->existing_asset_indicator == PRIOR_PURCH))
 			continue;
 
-		if ((current_re_element->commencement_period < t
-			&& current_re_element->notional_amt(t - 1) < ASSET_ACTIVE_THRESHOLD)
-			|| current_re_element->notional_amt_bef_sale(t) < ASSET_ACTIVE_THRESHOLD)
+		if ((asset->sm_re[mp]->commencement_period < t
+			&& asset->sm_re[mp]->notional_amt(t - 1) < ASSET_ACTIVE_THRESHOLD)
+			|| asset->sm_re[mp]->notional_amt_bef_sale(t) < ASSET_ACTIVE_THRESHOLD)
 			continue;
 
-		if (current_re_element->commencement_period)
+		if (asset->sm_re[mp]->commencement_period)
 			{
-			if (current_sub_port == current_re_element->purch_asset_sub_port
-				&& current_sub_port != current_re_element->sub_port_id(t))
-				total -= current_re_element->cost_basis_purch(t);
+			if (current_sub_port == asset->sm_re[mp]->purch_asset_sub_port
+				&& current_sub_port != asset->sm_re[mp]->sub_port_id(t))
+				total -= asset->sm_re[mp]->cost_basis_purch(t);
 
-			else if (current_sub_port != current_re_element->purch_asset_sub_port
-					 && current_sub_port == current_re_element->sub_port_id(t))
-				total += current_re_element->cost_basis_purch(t);
+			else if (current_sub_port != asset->sm_re[mp]->purch_asset_sub_port
+					 && current_sub_port == asset->sm_re[mp]->sub_port_id(t))
+				total += asset->sm_re[mp]->cost_basis_purch(t);
 			}
 		else
 			{
-			if (current_sub_port == current_re_element->sub_port_id(t - 1)
-				&& current_sub_port != current_re_element->sub_port_id(t))
-				total -= current_re_element->cost_basis(t);
+			if (current_sub_port == asset->sm_re[mp]->sub_port_id(t - 1)
+				&& current_sub_port != asset->sm_re[mp]->sub_port_id(t))
+				total -= asset->sm_re[mp]->cost_basis(t);
 
-			else if (current_sub_port != current_re_element->sub_port_id(t - 1)
-					 && current_sub_port == current_re_element->sub_port_id(t))
-				total += current_re_element->cost_basis(t);
+			else if (current_sub_port != asset->sm_re[mp]->sub_port_id(t - 1)
+					 && current_sub_port == asset->sm_re[mp]->sub_port_id(t))
+				total += asset->sm_re[mp]->cost_basis(t);
 			}
 		}
 	}
 #endif
 
 #if defined(__EQT_ASSET_H_)
-EQT_ASSET *current_eqt_element;
 // (no transfers for equities)
-if (seg->eqt_mp_map_active.size() > 0)
+if (seg_element->eqt_mp_map_active.size() > 0)
 	{
-	for (mp_map_iter = seg->eqt_mp_map_active.begin();
-		 mp_map_iter != seg->eqt_mp_map_active.end();
+	for (mp_map_iter = seg_element->eqt_mp_map_active.begin();
+		 mp_map_iter != seg_element->eqt_mp_map_active.end();
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		current_eqt_element = asset->sm_eqt[mp];
 
 		if (current_asset_source == 2
-			&& current_eqt_element->existing_asset_indicator == INIT_MP)
+			&& asset->sm_eqt[mp]->existing_asset_indicator == INIT_MP)
 			continue;
 
 		if (current_asset_source == 1
-			&& (current_eqt_element->existing_asset_indicator == NEW_PURCH
-			    || current_eqt_element->existing_asset_indicator == PRIOR_PURCH))
+			&& (asset->sm_eqt[mp]->existing_asset_indicator == NEW_PURCH
+			    || asset->sm_eqt[mp]->existing_asset_indicator == PRIOR_PURCH))
 			continue;
 
-		if ((current_eqt_element->commencement_period < t
-			&& current_eqt_element->notional_amt(t - 1) < ASSET_ACTIVE_THRESHOLD)
-			|| current_eqt_element->notional_amt_bef_sale(t) < ASSET_ACTIVE_THRESHOLD)
+		if ((asset->sm_eqt[mp]->commencement_period < t
+			&& asset->sm_eqt[mp]->notional_amt(t - 1) < ASSET_ACTIVE_THRESHOLD)
+			|| asset->sm_eqt[mp]->notional_amt_bef_sale(t) < ASSET_ACTIVE_THRESHOLD)
 			continue;
 
-		if (current_eqt_element->commencement_period)
+		if (asset->sm_eqt[mp]->commencement_period)
 			{
-			if (current_sub_port == current_eqt_element->purch_asset_sub_port
-				&& current_sub_port != current_eqt_element->sub_port_id(t))
-				total -= current_eqt_element->cost_basis_purch(t);
+			if (current_sub_port == asset->sm_eqt[mp]->purch_asset_sub_port
+				&& current_sub_port != asset->sm_eqt[mp]->sub_port_id(t))
+				total -= asset->sm_eqt[mp]->cost_basis_purch(t);
 
-			else if (current_sub_port != current_eqt_element->purch_asset_sub_port
-					 && current_sub_port == current_eqt_element->sub_port_id(t))
-				total += current_eqt_element->cost_basis_purch(t);
+			else if (current_sub_port != asset->sm_eqt[mp]->purch_asset_sub_port
+					 && current_sub_port == asset->sm_eqt[mp]->sub_port_id(t))
+				total += asset->sm_eqt[mp]->cost_basis_purch(t);
 			}
 		else
 			{
-			if (current_sub_port == current_eqt_element->sub_port_id(t - 1)
-				&& current_sub_port != current_eqt_element->sub_port_id(t))
-				total -= current_eqt_element->cost_basis(t);
+			if (current_sub_port == asset->sm_eqt[mp]->sub_port_id(t - 1)
+				&& current_sub_port != asset->sm_eqt[mp]->sub_port_id(t))
+				total -= asset->sm_eqt[mp]->cost_basis(t);
 
-			else if (current_sub_port != current_eqt_element->sub_port_id(t - 1)
-					 && current_sub_port == current_eqt_element->sub_port_id(t))
-				total += current_eqt_element->cost_basis(t);
+			else if (current_sub_port != asset->sm_eqt[mp]->sub_port_id(t - 1)
+					 && current_sub_port == asset->sm_eqt[mp]->sub_port_id(t))
+				total += asset->sm_eqt[mp]->cost_basis(t);
 			}
 		}
 	}
 #endif
 
 #if defined(__EIO_ASSET_H_)
-EIO_ASSET *current_eio_element;
-if (seg->eio_mp_map_active.size() > 0)
+if (seg_element->eio_mp_map_active.size() > 0)
 	{
-	for (mp_map_iter = seg->eio_mp_map_active.begin();
-		 mp_map_iter != seg->eio_mp_map_active.end();
+	for (mp_map_iter = seg_element->eio_mp_map_active.begin();
+		 mp_map_iter != seg_element->eio_mp_map_active.end();
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		current_eio_element = asset->sm_eio[mp];
 
 		if (current_asset_source == 2
-			&& current_eio_element->existing_asset_indicator == INIT_MP)
+			&& asset->sm_eio[mp][0]->existing_asset_indicator == INIT_MP)
 			continue;
 
 		if (current_asset_source == 1
-			&& (current_eio_element->existing_asset_indicator == NEW_PURCH
-			    || current_eio_element->existing_asset_indicator == PRIOR_PURCH))
+			&& (asset->sm_eio[mp][0]->existing_asset_indicator == NEW_PURCH
+			    || asset->sm_eio[mp][0]->existing_asset_indicator == PRIOR_PURCH))
 			continue;
 					
-		if ((current_eio_element->commencement_period < t
-			&& current_eio_element->notional_amt(t - 1) < ASSET_ACTIVE_THRESHOLD)
-			|| current_eio_element->notional_amt_bef_sale(t) < ASSET_ACTIVE_THRESHOLD)
+		if ((asset->sm_eio[mp][0]->commencement_period < t
+			&& asset->sm_eio[mp][0]->notional_amt(t - 1) < ASSET_ACTIVE_THRESHOLD)
+			|| asset->sm_eio[mp][0]->notional_amt_bef_sale(t) < ASSET_ACTIVE_THRESHOLD)
 			continue;
 
-		if (current_eio_element->commencement_period)
+		if (asset->sm_eio[mp][0]->commencement_period)
 			{
-			if (current_sub_port == current_eio_element->purch_asset_sub_port
-				&& current_sub_port != current_eio_element->sub_port_id(t))
-				total -= current_eio_element->cost_basis_purch(t);
+			if (current_sub_port == asset->sm_eio[mp][0]->purch_asset_sub_port
+				&& current_sub_port != asset->sm_eio[mp][0]->sub_port_id(t))
+				total -= asset->sm_eio[mp][0]->cost_basis_purch(t);
 
-			else if (current_sub_port != current_eio_element->purch_asset_sub_port
-					 && current_sub_port == current_eio_element->sub_port_id(t))
-				total += current_eio_element->cost_basis_purch(t);
+			else if (current_sub_port != asset->sm_eio[mp][0]->purch_asset_sub_port
+					 && current_sub_port == asset->sm_eio[mp][0]->sub_port_id(t))
+				total += asset->sm_eio[mp][0]->cost_basis_purch(t);
 			}
 		else
 			{
-			if (current_sub_port == current_eio_element->sub_port_id(t - 1)
-				&& current_sub_port != current_eio_element->sub_port_id(t))
-				total -= current_eio_element->cost_basis(t);
+			if (current_sub_port == asset->sm_eio[mp][0]->sub_port_id(t - 1)
+				&& current_sub_port != asset->sm_eio[mp][0]->sub_port_id(t))
+				total -= asset->sm_eio[mp][0]->cost_basis(t);
 
-			else if (current_sub_port != current_eio_element->sub_port_id(t - 1)
-					 && current_sub_port == current_eio_element->sub_port_id(t))
-				total += current_eio_element->cost_basis(t);
+			else if (current_sub_port != asset->sm_eio[mp][0]->sub_port_id(t - 1)
+					 && current_sub_port == asset->sm_eio[mp][0]->sub_port_id(t))
+				total += asset->sm_eio[mp][0]->cost_basis(t);
 			}
 		}
 	}
 #endif
 
 #if defined(__EPA_ASSET_H_)
-EPA_ASSET *current_epa_element;
-if (seg->epa_mp_map_active.size() > 0)
+if (seg_element->epa_mp_map_active.size() > 0)
 	{
-	for (mp_map_iter = seg->epa_mp_map_active.begin();
-		 mp_map_iter != seg->epa_mp_map_active.end();
+	for (mp_map_iter = seg_element->epa_mp_map_active.begin();
+		 mp_map_iter != seg_element->epa_mp_map_active.end();
 		 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		current_epa_element = asset->sm_epa[mp];
 
 		if (current_asset_source == 2)
 			continue;
 
-		if ((current_epa_element->commencement_period < t
-			&& current_epa_element->notional_amt(t - 1) < ASSET_ACTIVE_THRESHOLD)
-			|| current_epa_element->notional_amt_bef_sale(t) < ASSET_ACTIVE_THRESHOLD)
+		if ((asset->sm_epa[mp]->commencement_period < t
+			&& asset->sm_epa[mp]->notional_amt(t - 1) < ASSET_ACTIVE_THRESHOLD)
+			|| asset->sm_epa[mp]->notional_amt_bef_sale(t) < ASSET_ACTIVE_THRESHOLD)
 			continue;
 
-		if (current_sub_port == current_epa_element->sub_port_id(t - 1)
-			&& current_sub_port != current_epa_element->sub_port_id(t))
-			total -= current_epa_element->cost_basis(t);
+		if (current_sub_port == asset->sm_epa[mp]->sub_port_id(t - 1)
+			&& current_sub_port != asset->sm_epa[mp]->sub_port_id(t))
+			total -= asset->sm_epa[mp]->cost_basis(t);
 
-		else if (current_sub_port != current_epa_element->sub_port_id(t - 1)
-				 && current_sub_port == current_epa_element->sub_port_id(t))
-			total += current_epa_element->cost_basis(t);
+		else if (current_sub_port != asset->sm_epa[mp]->sub_port_id(t - 1)
+				 && current_sub_port == asset->sm_epa[mp]->sub_port_id(t))
+			total += asset->sm_epa[mp]->cost_basis(t);
 		}
 	}
 #endif
@@ -1749,7 +1660,6 @@ if (seg->epa_mp_map_active.size() > 0)
 return total;
 
 }
-
 
 //@@ END
 
@@ -1774,7 +1684,6 @@ return sum_over_assets_subport("depreciation", t, current_sub_port, asset_source
 
 }
 
-
 //@@ END
 
 //@@ START - dflt_amt
@@ -1798,7 +1707,6 @@ return sum_over_assets_subport("dflt_amt", t, current_sub_port, asset_source_typ
 
 }
 
-
 //@@ END
 
 //@@ START - eff_dur
@@ -1813,9 +1721,7 @@ double A_SUBPORT_ASSET_UDF::a_subport_asset_eff_dur(int t) {
 //^^^
 
 #line 1 "eff_dur.A_SUBPORT_ASSET.for"
-if (t < 0
-	//20220613 STW: add a condition for model efficiency improvement
-	|| fast_stat_calc_aig == YES)
+if (t <= 0 || company->calc_eff_dur_crbg == NO)
 	return NO_AVG;
 
 if ((mkt_val_times_eff_dur(t) + mkt_val_for_eff_dur(t))== 0
@@ -1827,6 +1733,31 @@ return mkt_val_times_eff_dur(t)
 
 }
 
+//@@ END
+
+//@@ START - excess_dflt_amt
+// Excess Default Amount for PBA                                                                                             
+// Column:EXCESS_DFLT_AMT
+//========================================================
+double A_SUBPORT_ASSET_UDF::a_subport_asset_excess_dflt_amt(int t) {
+//^^^
+
+
+
+//^^^
+
+#line 1 "excess_dflt_amt.A_SUBPORT_ASSET.for"
+if (t <= 0)
+	return NO_AVG;
+
+if (!pba_valn_flag)
+	return NO_AVG;
+
+int current_sub_port = getElementNumber(1);
+
+return sum_over_assets_subport("excess_dflt_amt", t, current_sub_port, asset_source_type, SUM_OVER_ALL, BEFORE_SALE);
+
+}
 
 //@@ END
 
@@ -1849,7 +1780,6 @@ this->setGroup(sub_port_group);
 return 1.0;
 
 }
-
 
 //@@ END
 
@@ -1874,7 +1804,6 @@ return sum_over_assets_subport("int_div_and_rent", t, current_sub_port, asset_so
 
 }
 
-
 //@@ END
 
 //@@ START - int_net
@@ -1896,10 +1825,10 @@ if (t <= 0)
 accr_int_dflt(t);
 
 return int_div_and_rent(t)
-	   - inv_exp(t);
+	   - inv_exp(t)
+	   - excess_dflt_amt(t);
 
 }
-
 
 //@@ END
 
@@ -1924,7 +1853,6 @@ return (bk_val_plus_accr_int(t - 1))
 
 }
 
-
 //@@ END
 
 //@@ START - inv_exp_inv
@@ -1948,7 +1876,6 @@ return (bk_val_inv(t - 1)
 	   * (1.0 / 12.0);
 
 }
-
 
 //@@ END
 
@@ -1981,44 +1908,42 @@ double inv_exp_tax_exempt = 0.0;
 
 #if defined(__BOND_ASSET_H_)
 int mp = 0;
-BOND_ASSET *bond_element = NULL;
-mpmap::iterator mp_map_iter;
+map <int, long, less <int> >::iterator mp_map_iter;
 
-if (seg->bond_mp_map_active.size() > 0)
+if (seg_element->bond_mp_map_active.size() > 0)
 	{
-	for (mp_map_iter = seg->bond_mp_map_active.begin();
-		 mp_map_iter != seg->bond_mp_map_active.end();
+	for (mp_map_iter = seg_element->bond_mp_map_active.begin();
+		 mp_map_iter != seg_element->bond_mp_map_active.end();
 	 	 mp_map_iter++)
 		{
 		mp = mp_map_iter->first;
-		bond_element = company->sm_asset->sm_bond[mp];
 
-		if ((t == bond_element->commencement_period && sub_port_t < t)
-			|| (t > max(0,bond_element->commencement_period)
-				&& fabs(bond_element->notional_amt(t - 1)) < ASSET_ACTIVE_THRESHOLD))
+		if ((t == company->sm_asset->sm_bond[mp][0]->commencement_period && sub_port_t < t)
+			|| (t > max(0,company->sm_asset->sm_bond[mp][0]->commencement_period)
+				&& fabs(company->sm_asset->sm_bond[mp][0]->notional_amt(t - 1)) < ASSET_ACTIVE_THRESHOLD))
 			continue;
 
-		if (fabs(bond_element->tax_exempt_pct) < rate_ratio_threshold)
+		if (fabs(company->sm_asset->sm_bond[mp][0]->tax_exempt_pct) < rate_ratio_threshold)
 			continue; 
 
 		if ((sub_port_id == SUM_OVER_ALL
-				|| sub_port_id == xint(bond_element->sub_port_id(sub_port_t)))
+				|| sub_port_id == xint(company->sm_asset->sm_bond[mp][0]->sub_port_id(sub_port_t)))
 			&& (asset_fund_index == SUM_OVER_ALL
-				|| asset_fund_index == bond_element->asset_fund_index)
+				|| asset_fund_index == company->sm_asset->sm_bond[mp][0]->asset_fund_index)
 			&& (exist_asset_status == TOTAL
 			|| (exist_asset_status == EXISTING 
-				&& (bond_element->existing_asset_indicator == INIT_MP 
-					|| bond_element->existing_asset_indicator == PROXY_BOND)) 
+				&& (company->sm_asset->sm_bond[mp][0]->existing_asset_indicator == INIT_MP 
+					|| company->sm_asset->sm_bond[mp][0]->existing_asset_indicator == PROXY_BOND)) 
 			|| (exist_asset_status == PURCH 
-			    && (bond_element->existing_asset_indicator == NEW_PURCH
-				    || bond_element->existing_asset_indicator == PRIOR_PURCH))))
+			    && (company->sm_asset->sm_bond[mp][0]->existing_asset_indicator == NEW_PURCH
+				    || company->sm_asset->sm_bond[mp][0]->existing_asset_indicator == PRIOR_PURCH))))
 			{
-			bk_val = bond_element->bk_val(t - 1);
-			accr_int = bond_element->accr_int(t - 1); 	
+			bk_val = company->sm_asset->sm_bond[mp][0]->bk_val(t - 1);
+			accr_int = company->sm_asset->sm_bond[mp][0]->accr_int(t - 1); 	
 
 			inv_exp_tax_exempt 
 			+= (bk_val + accr_int)
-				* bond_element->tax_exempt_pct
+				* company->sm_asset->sm_bond[mp][0]->tax_exempt_pct
 				* inv_exp_pct / 12.0;
 			}
 		}			         
@@ -2028,7 +1953,6 @@ if (seg->bond_mp_map_active.size() > 0)
 return inv_exp_tax_exempt;
 
 }
-
 
 //@@ END
 
@@ -2053,7 +1977,6 @@ return sum_over_assets_subport("mkt_val", t, current_sub_port, asset_source_type
 
 }
 
-
 //@@ END
 
 //@@ START - mkt_val_cost_basis_incr
@@ -2073,7 +1996,6 @@ return cost_basis_incr_appreciation(t)
 
 }
 
-
 //@@ END
 
 //@@ START - mkt_val_for_eff_dur
@@ -2083,7 +2005,7 @@ return cost_basis_incr_appreciation(t)
 double A_SUBPORT_ASSET_UDF::a_subport_asset_mkt_val_for_eff_dur(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(46,"mkt_val_for_eff_dur",t);
+	return rebase_value(47,"mkt_val_for_eff_dur",t);
 }
 
 
@@ -2103,7 +2025,6 @@ return sum_over_assets_subport("mkt_val_for_eff_dur", t, current_sub_port, asset
 
 }
 
-
 //@@ END
 
 //@@ START - mkt_val_times_eff_dur
@@ -2113,7 +2034,7 @@ return sum_over_assets_subport("mkt_val_for_eff_dur", t, current_sub_port, asset
 double A_SUBPORT_ASSET_UDF::a_subport_asset_mkt_val_times_eff_dur(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(47,"mkt_val_times_eff_dur",t);
+	return rebase_value(48,"mkt_val_times_eff_dur",t);
 }
 
 
@@ -2132,7 +2053,6 @@ int current_sub_port = getElementNumber(1);
 return sum_over_assets_subport("mkt_val_times_eff_dur", t, current_sub_port, asset_source_type, SUM_OVER_ALL, END_OF_PERIOD);
 
 }
-
 
 //@@ END
 
@@ -2157,7 +2077,6 @@ return sum_over_assets_subport("notional_amt", t, current_sub_port, asset_source
 
 }
 
-
 //@@ END
 
 //@@ START - opt_inc
@@ -2180,7 +2099,6 @@ int current_sub_port = getElementNumber(1);
 return sum_over_assets_subport("opt_inc", t, current_sub_port, asset_source_type, SUM_OVER_ALL, BEFORE_SALE);
 
 }
-
 
 //@@ END
 
@@ -2205,7 +2123,6 @@ return sum_over_assets_subport("opt_pmt", t, current_sub_port, asset_source_type
 
 }
 
-
 //@@ END
 
 //@@ START - realzd_cap_gain
@@ -2228,7 +2145,6 @@ int current_sub_port = getElementNumber(1);
 return sum_over_assets_subport("realzd_cap_gain", t, current_sub_port, asset_source_type, SUM_OVER_ALL, BEFORE_SALE);
 
 }
-
 
 //@@ END
 
@@ -2255,7 +2171,6 @@ return realzd_cap_gain_prin_pmt(t)
 
 }
 
-
 //@@ END
 
 //@@ START - realzd_cap_gain_opt_pmt
@@ -2279,7 +2194,6 @@ return sum_over_assets_subport("realzd_cap_gain_opt_pmt", t, current_sub_port, a
 
 }
 
-
 //@@ END
 
 //@@ START - realzd_cap_gain_prin_pmt
@@ -2301,7 +2215,6 @@ return sched_prin_pmt(t)
 	   - cost_basis_sched_prin_pmt(t);
 
 }
-
 
 //@@ END
 
@@ -2326,7 +2239,6 @@ return sum_over_assets_subport("realzd_cap_gain_sale", t, current_sub_port, asse
 
 }
 
-
 //@@ END
 
 //@@ START - realzd_cap_gain_turnover
@@ -2349,7 +2261,6 @@ int current_sub_port = getElementNumber(1);
 return sum_over_assets_subport("realzd_cap_gain_turnover", t, current_sub_port, asset_source_type, SUM_OVER_ALL, BEFORE_SALE);
 
 }
-
 
 //@@ END
 
@@ -2375,7 +2286,6 @@ return sum_over_assets_subport("accr_int_sold", t, current_sub_port, asset_sourc
 
 }
 
-
 //@@ END
 
 //@@ START - sched_prin_pmt
@@ -2399,7 +2309,6 @@ return sum_over_assets_subport("sched_prin_pmt", t, current_sub_port, asset_sour
 
 }
 
-
 //@@ END
 
 //@@ START - startup
@@ -2414,8 +2323,13 @@ double A_SUBPORT_ASSET_UDF::virtual_startup(int t) {
 //^^^
 
 #line 1 "startup.A_SUBPORT_ASSET.for"
+#if 0 // START_HEADER
+#if defined(GEN2_ALM_RUN)
+	#define __A_SUBPORT_ASSET_H_
+#endif
+#endif // END_HEADER
+
 #if 0 // START_CLASS
-typedef map <int, long, less <int> > mpmap;
 xstring asset_sub_port_description;
 double min_size_existing;
 double min_size_purchase;
@@ -2424,6 +2338,9 @@ double rebal_tolerance_pct;
 double rebal_annual_turnover_pct_max;
 double rebal_annual_turnover_pct_min;
 double inv_exp_pct;
+
+SEG_COMP * seg_element;
+
 #endif // END_CLASS
 
 #if 0 // START_CONSTRUCTOR
@@ -2449,7 +2366,6 @@ return 1.0;
 
 }
 
-
 //@@ END
 
 //@@ START - unrealzd_cap_gain
@@ -2472,7 +2388,6 @@ int current_sub_port = getElementNumber(1);
 return sum_over_assets_subport("unrealzd_cap_gain", t, current_sub_port, asset_source_type, SUM_OVER_ALL, END_OF_PERIOD);
 
 }
-
 
 //@@ END
 
@@ -2499,7 +2414,6 @@ return mkt_val(t)
 
 }
 
-
 //@@ END
 
 //@@ START - unrealzd_cap_gain_incr
@@ -2523,7 +2437,6 @@ return sum_over_assets_subport("unrealzd_cap_gain_incr", t, current_sub_port, as
 
 }
 
-
 //@@ END
 
 //@@ START - unrealzd_cap_gain_released_on_sale
@@ -2546,7 +2459,6 @@ int current_sub_port = getElementNumber(1);
 return sum_over_assets_subport("unrealzd_cap_gain_released_on_sale", t, current_sub_port, asset_source_type, SUM_OVER_ALL, BEFORE_EOM_PURCH);
 
 }
-
 
 //@@ END
 
@@ -2693,7 +2605,7 @@ return "Yes";
 
 
 #line 1 "sum_over_assets_subport.A_SUBPORT_ASSET.for"                                                                                   
-double A_SUBPORT_ASSET::sum_over_assets_subport(const xstring &colname, int t, int sub_port_id, int exist_asset_status, int asset_fund_index, int sum_over_timing)
+double A_SUBPORT_ASSET::sum_over_assets_subport(const xstring &/* CiProxyFormula */colname, const int /* CiProxyTime */ t, int sub_port_id, int exist_asset_status, int asset_fund_index, int sum_over_timing)
 {
 
 // sub_port_id SUM_OVER_ALL for all; otherwise 0,1,2,3,..
@@ -2707,70 +2619,67 @@ double col_val = 0.0;
 int sub_port_t = max(t - 1, 0);
 int colnum = 0;
 int mp = 0;
-mpmap::iterator mp_map_iter;
+map <int, long, less <int> >::iterator mp_map_iter;
 
-if (sum_over_timing >= BEFORE_BOM_PURCH && t > seg->start_period)
+if (sum_over_timing >= BEFORE_BOM_PURCH && t > seg_element->start_period)
 	{
-	seg->asset_less_liab_and_surp(t - 1);
-	seg->cash(t - 1);
-	seg->borrowing(t - 1);
+	seg_element->asset_less_liab_and_surp(t - 1);
+	seg_element->cash(t - 1);
+	seg_element->borrowing(t - 1);
 	}
 
-if (sum_over_timing >= BEFORE_SALE && t > seg->start_period)
-	seg->hedge_inv_amt_bom(t); // beginning of month investment
+if (sum_over_timing >= BEFORE_SALE && t > seg_element->start_period)
+	seg_element->hedge_inv_amt_bom(t); // beginning of month investment
 
-if (sum_over_timing >= BEFORE_PM_SALE && t > seg->start_period)
+if (sum_over_timing >= BEFORE_PM_SALE && t > seg_element->start_period)
 	{
-	company->sm_inv_strategy[seg->seg_num]->cash_flow_planned_sale(t);
-	seg->hedge_sale_amt(t);
-	seg->hedge_inv_amt_eom(t);
-	seg->hedge_exp(t);
+	company->sm_inv_strategy[seg_element->seg_num]->cash_flow_planned_sale(t);
+	seg_element->hedge_sale_amt(t);
+	seg_element->hedge_inv_amt_eom(t);
+	seg_element->hedge_exp(t);
 	}	
 
-if (sum_over_timing >= BEFORE_NCF_SALE && t > seg->start_period)
-	company->sm_inv_strategy[seg->seg_num]->cash_flow_rebal(t);
+if (sum_over_timing >= BEFORE_NCF_SALE && t > seg_element->start_period)
+	company->sm_inv_strategy[seg_element->seg_num]->cash_flow_rebal(t);
 
-if (sum_over_timing >= BEFORE_EOM_PURCH && t > seg->start_period)
-	company->sm_inv_strategy[seg->seg_num]->cash_net_neg_cash_flow_sale(t);
+if (sum_over_timing >= BEFORE_EOM_PURCH && t > seg_element->start_period)
+	company->sm_inv_strategy[seg_element->seg_num]->cash_net_neg_cash_flow_sale(t);
 
 if (sum_over_timing >= END_OF_PERIOD)
 	{
 	sub_port_t = t; // after sub portfolio transfers
-	company->sm_inv_strategy[seg->seg_num]->inv_amt(t);
+	company->sm_inv_strategy[seg_element->seg_num]->inv_amt(t);
 	}
 
 #if defined(__BOND_ASSET_H_)
-BOND_ASSET *bond_element = NULL;
-
-if (seg->bond_mp_map_active.size() > 0)
+if (seg_element->bond_mp_map_active.size() > 0)
 	{
-	colnum = company->sm_asset->sm_bond[0]->Column(colname).Number();
+	colnum = company->sm_asset->sm_bond[0][0]->Column(colname).Number();
 	if (colnum >= 0)
 		{
-		for (mp_map_iter = seg->bond_mp_map_active.begin();
-			 mp_map_iter != seg->bond_mp_map_active.end();
+		for (mp_map_iter = seg_element->bond_mp_map_active.begin();
+			 mp_map_iter != seg_element->bond_mp_map_active.end();
 			 mp_map_iter++)
 			{
 			mp = mp_map_iter->first;
-			bond_element = company->sm_asset->sm_bond[mp];
 
-			if ((t == bond_element->commencement_period && sub_port_t < t)
-				|| (t > max(0,bond_element->commencement_period)
-					&& fabs(bond_element->notional_amt(t - 1)) < ASSET_ACTIVE_THRESHOLD))
+			if ((t == company->sm_asset->sm_bond[mp][0]->commencement_period && sub_port_t < t)
+				|| (t > max(0,company->sm_asset->sm_bond[mp][0]->commencement_period)
+					&& fabs(company->sm_asset->sm_bond[mp][0]->notional_amt(t - 1)) < ASSET_ACTIVE_THRESHOLD))
 				continue;
 
 			if ((sub_port_id == SUM_OVER_ALL
-				 || sub_port_id == xint(bond_element->sub_port_id(sub_port_t)))
+				 || sub_port_id == xint(company->sm_asset->sm_bond[mp][0]->sub_port_id(sub_port_t)))
 				&& (asset_fund_index == SUM_OVER_ALL
-					|| asset_fund_index == bond_element->asset_fund_index)
+					|| asset_fund_index == company->sm_asset->sm_bond[mp][0]->asset_fund_index)
 				&& (exist_asset_status == TOTAL
-				|| (exist_asset_status == EXISTING && (bond_element->existing_asset_indicator == INIT_MP || 
-					bond_element->existing_asset_indicator == PROXY_BOND)) 
-				|| (exist_asset_status == PURCH && (bond_element->existing_asset_indicator == NEW_PURCH
-					|| bond_element->existing_asset_indicator == PRIOR_PURCH))))
+				|| (exist_asset_status == EXISTING && (company->sm_asset->sm_bond[mp][0]->existing_asset_indicator == INIT_MP || 
+					company->sm_asset->sm_bond[mp][0]->existing_asset_indicator == PROXY_BOND)) 
+				|| (exist_asset_status == PURCH && (company->sm_asset->sm_bond[mp][0]->existing_asset_indicator == NEW_PURCH
+					|| company->sm_asset->sm_bond[mp][0]->existing_asset_indicator == PRIOR_PURCH))))
 				{
-				col_val = bond_element->Column(colnum).Value(t);
-				col_val *= bond_element->pct_to_use;
+				col_val = company->sm_asset->sm_bond[mp][0]->Column(colnum).Value(t);
+				col_val *= company->sm_asset->sm_bond[mp][0]->pct_to_use;
 
 				total += col_val;
 				}
@@ -2780,35 +2689,33 @@ if (seg->bond_mp_map_active.size() > 0)
 #endif
 
 #if defined(__MTG_ASSET_H_)
-MTG_ASSET *mtg_element = NULL;
-if (seg->mtg_mp_map_active.size() > 0)
+if (seg_element->mtg_mp_map_active.size() > 0)
 	{
-	colnum = company->sm_asset->sm_mtg[0]->Column(colname).Number();
+	colnum = company->sm_asset->sm_mtg[0][0]->Column(colname).Number();
 	if (colnum >= 0)
 		{
-		for (mp_map_iter = seg->mtg_mp_map_active.begin();
-			 mp_map_iter != seg->mtg_mp_map_active.end();
+		for (mp_map_iter = seg_element->mtg_mp_map_active.begin();
+			 mp_map_iter != seg_element->mtg_mp_map_active.end();
 			 mp_map_iter++)
 			{
 			mp = mp_map_iter->first;
-			mtg_element = company->sm_asset->sm_mtg[mp];
 
-			if ((t == mtg_element->commencement_period && sub_port_t < t)
-				|| (t > max(0,mtg_element->commencement_period)
-					&& fabs(mtg_element->notional_amt(t - 1)) < ASSET_ACTIVE_THRESHOLD))
+			if ((t == company->sm_asset->sm_mtg[mp][0]->commencement_period && sub_port_t < t)
+				|| (t > max(0,company->sm_asset->sm_mtg[mp][0]->commencement_period)
+					&& fabs(company->sm_asset->sm_mtg[mp][0]->notional_amt(t - 1)) < ASSET_ACTIVE_THRESHOLD))
 				continue;
 
 			if ((sub_port_id == SUM_OVER_ALL
-				 || sub_port_id == xint(mtg_element->sub_port_id(sub_port_t)))
+				 || sub_port_id == xint(company->sm_asset->sm_mtg[mp][0]->sub_port_id(sub_port_t)))
 				&& (asset_fund_index == SUM_OVER_ALL
-					|| asset_fund_index == mtg_element->asset_fund_index)
+					|| asset_fund_index == company->sm_asset->sm_mtg[mp][0]->asset_fund_index)
 				&& (exist_asset_status == TOTAL
-				|| (exist_asset_status == EXISTING && mtg_element->existing_asset_indicator == INIT_MP) 
-				|| (exist_asset_status == PURCH && (mtg_element->existing_asset_indicator == NEW_PURCH
-					|| mtg_element->existing_asset_indicator == PRIOR_PURCH))))
+				|| (exist_asset_status == EXISTING && company->sm_asset->sm_mtg[mp][0]->existing_asset_indicator == INIT_MP) 
+				|| (exist_asset_status == PURCH && (company->sm_asset->sm_mtg[mp][0]->existing_asset_indicator == NEW_PURCH
+					|| company->sm_asset->sm_mtg[mp][0]->existing_asset_indicator == PRIOR_PURCH))))
 				{
-				col_val = mtg_element->Column(colnum).Value(t);
-				col_val *= mtg_element->pct_to_use;
+				col_val = company->sm_asset->sm_mtg[mp][0]->Column(colnum).Value(t);
+				col_val *= company->sm_asset->sm_mtg[mp][0]->pct_to_use;
 
 				total += col_val;
 				}
@@ -2818,35 +2725,33 @@ if (seg->mtg_mp_map_active.size() > 0)
 #endif
 
 #if defined(__SEC_ASSET_H_)
-SEC_ASSET *sec_element = NULL;
-if (seg->sec_mp_map_active.size() > 0)
+if (seg_element->sec_mp_map_active.size() > 0)
 	{
 	colnum = company->sm_asset->sm_sec[0]->Column(colname).Number();
 	if (colnum >= 0)
 		{
-		for (mp_map_iter = seg->sec_mp_map_active.begin();
-			 mp_map_iter != seg->sec_mp_map_active.end();
+		for (mp_map_iter = seg_element->sec_mp_map_active.begin();
+			 mp_map_iter != seg_element->sec_mp_map_active.end();
 			 mp_map_iter++)
 			{
 			mp = mp_map_iter->first;
-			sec_element = company->sm_asset->sm_sec[mp];
 
-			if ((t == sec_element->commencement_period && sub_port_t < t)
-				|| (t > max(0,sec_element->commencement_period)
-					&& fabs(sec_element->notional_amt(t - 1)) < ASSET_ACTIVE_THRESHOLD))
+			if ((t == company->sm_asset->sm_sec[mp]->commencement_period && sub_port_t < t)
+				|| (t > max(0,company->sm_asset->sm_sec[mp]->commencement_period)
+					&& fabs(company->sm_asset->sm_sec[mp]->notional_amt(t - 1)) < ASSET_ACTIVE_THRESHOLD))
 				continue;
 
 			if ((sub_port_id == SUM_OVER_ALL
-				 || sub_port_id == xint(sec_element->sub_port_id(sub_port_t)))
+				 || sub_port_id == xint(company->sm_asset->sm_sec[mp]->sub_port_id(sub_port_t)))
 				&& (asset_fund_index == SUM_OVER_ALL
-					|| asset_fund_index == sec_element->asset_fund_index)
+					|| asset_fund_index == company->sm_asset->sm_sec[mp]->asset_fund_index)
 				&& (exist_asset_status == TOTAL
-				|| (exist_asset_status == EXISTING && sec_element->existing_asset_indicator == INIT_MP) 
-				|| (exist_asset_status == PURCH && (sec_element->existing_asset_indicator == NEW_PURCH
-					|| sec_element->existing_asset_indicator == PRIOR_PURCH))))
+				|| (exist_asset_status == EXISTING && company->sm_asset->sm_sec[mp]->existing_asset_indicator == INIT_MP) 
+				|| (exist_asset_status == PURCH && (company->sm_asset->sm_sec[mp]->existing_asset_indicator == NEW_PURCH
+					|| company->sm_asset->sm_sec[mp]->existing_asset_indicator == PRIOR_PURCH))))
 				{
-				col_val = sec_element->Column(colnum).Value(t);
-				col_val *= sec_element->pct_to_use;
+				col_val = company->sm_asset->sm_sec[mp]->Column(colnum).Value(t);
+				col_val *= company->sm_asset->sm_sec[mp]->pct_to_use;
 
 				total += col_val;
 				}
@@ -2856,35 +2761,33 @@ if (seg->sec_mp_map_active.size() > 0)
 #endif
 
 #if defined(__IRD_ASSET_H_)
-IRD_ASSET *ird_element = NULL;
-if (seg->ird_mp_map_active.size() > 0)
+if (seg_element->ird_mp_map_active.size() > 0)
 	{
-	colnum = company->sm_asset->sm_ird[0]->Column(colname).Number();
+	colnum = company->sm_asset->sm_ird[0][0]->Column(colname).Number();
 	if (colnum >= 0)
 		{
-		for (mp_map_iter = seg->ird_mp_map_active.begin();
-			 mp_map_iter != seg->ird_mp_map_active.end();
+		for (mp_map_iter = seg_element->ird_mp_map_active.begin();
+			 mp_map_iter != seg_element->ird_mp_map_active.end();
 			 mp_map_iter++)
 			{
 			mp = mp_map_iter->first;
-			ird_element = company->sm_asset->sm_ird[mp];
 
-			if ((t == ird_element->commencement_period && sub_port_t < t)
-				|| (t > max(0,ird_element->commencement_period)
-					&& fabs(ird_element->notional_amt(t - 1)) < ASSET_ACTIVE_THRESHOLD))
+			if ((t == company->sm_asset->sm_ird[mp][0]->commencement_period && sub_port_t < t)
+				|| (t > max(0,company->sm_asset->sm_ird[mp][0]->commencement_period)
+					&& fabs(company->sm_asset->sm_ird[mp][0]->notional_amt(t - 1)) < ASSET_ACTIVE_THRESHOLD))
 				continue;
 
 			if ((sub_port_id == SUM_OVER_ALL
-				 || sub_port_id == xint(ird_element->sub_port_id(sub_port_t)))
+				 || sub_port_id == xint(company->sm_asset->sm_ird[mp][0]->sub_port_id(sub_port_t)))
 				&& (asset_fund_index == SUM_OVER_ALL
-					|| asset_fund_index == ird_element->asset_fund_index)
+					|| asset_fund_index == company->sm_asset->sm_ird[mp][0]->asset_fund_index)
 				&& (exist_asset_status == TOTAL
-				|| (exist_asset_status == EXISTING && ird_element->existing_asset_indicator == INIT_MP) 
-				|| (exist_asset_status == PURCH && (ird_element->existing_asset_indicator == NEW_PURCH
-					|| ird_element->existing_asset_indicator == PRIOR_PURCH))))
+				|| (exist_asset_status == EXISTING && company->sm_asset->sm_ird[mp][0]->existing_asset_indicator == INIT_MP) 
+				|| (exist_asset_status == PURCH && (company->sm_asset->sm_ird[mp][0]->existing_asset_indicator == NEW_PURCH
+					|| company->sm_asset->sm_ird[mp][0]->existing_asset_indicator == PRIOR_PURCH))))
 				{
-				col_val = ird_element->Column(colnum).Value(t);
-				col_val *= ird_element->pct_to_use;
+				col_val = company->sm_asset->sm_ird[mp][0]->Column(colnum).Value(t);
+				col_val *= company->sm_asset->sm_ird[mp][0]->pct_to_use;
 
 				total += col_val;
 				}
@@ -2894,35 +2797,33 @@ if (seg->ird_mp_map_active.size() > 0)
 #endif
 
 #if defined(__RE_ASSET_H_)
-RE_ASSET *re_element = NULL;
-if (seg->re_mp_map_active.size() > 0)
+if (seg_element->re_mp_map_active.size() > 0)
 	{
 	colnum = company->sm_asset->sm_re[0]->Column(colname).Number();
 	if (colnum >= 0)
 		{
-		for (mp_map_iter = seg->re_mp_map_active.begin();
-			 mp_map_iter != seg->re_mp_map_active.end();
+		for (mp_map_iter = seg_element->re_mp_map_active.begin();
+			 mp_map_iter != seg_element->re_mp_map_active.end();
 			 mp_map_iter++)
 			{
 			mp = mp_map_iter->first;
-			re_element = company->sm_asset->sm_re[mp];
 
-			if ((t == re_element->commencement_period && sub_port_t < t)
-				|| (t > max(0,re_element->commencement_period)
-					&& fabs(re_element->notional_amt(t - 1)) < ASSET_ACTIVE_THRESHOLD))
+			if ((t == company->sm_asset->sm_re[mp]->commencement_period && sub_port_t < t)
+				|| (t > max(0,company->sm_asset->sm_re[mp]->commencement_period)
+					&& fabs(company->sm_asset->sm_re[mp]->notional_amt(t - 1)) < ASSET_ACTIVE_THRESHOLD))
 				continue;
 
 			if ((sub_port_id == SUM_OVER_ALL
-				 || sub_port_id == xint(re_element->sub_port_id(sub_port_t)))
+				 || sub_port_id == xint(company->sm_asset->sm_re[mp]->sub_port_id(sub_port_t)))
 				&& (asset_fund_index == SUM_OVER_ALL
-					|| asset_fund_index == re_element->asset_fund_index)
+					|| asset_fund_index == company->sm_asset->sm_re[mp]->asset_fund_index)
 				&& (exist_asset_status == TOTAL
-				|| (exist_asset_status == EXISTING && re_element->existing_asset_indicator == INIT_MP) 
-				|| (exist_asset_status == PURCH && (re_element->existing_asset_indicator == NEW_PURCH
-					|| re_element->existing_asset_indicator == PRIOR_PURCH))))
+				|| (exist_asset_status == EXISTING && company->sm_asset->sm_re[mp]->existing_asset_indicator == INIT_MP) 
+				|| (exist_asset_status == PURCH && (company->sm_asset->sm_re[mp]->existing_asset_indicator == NEW_PURCH
+					|| company->sm_asset->sm_re[mp]->existing_asset_indicator == PRIOR_PURCH))))
 				{
-				col_val = re_element->Column(colnum).Value(t);
-				col_val *= re_element->pct_to_use;
+				col_val = company->sm_asset->sm_re[mp]->Column(colnum).Value(t);
+				col_val *= company->sm_asset->sm_re[mp]->pct_to_use;
 
 				total += col_val;
 				}
@@ -2932,35 +2833,33 @@ if (seg->re_mp_map_active.size() > 0)
 #endif
 
 #if defined(__EQT_ASSET_H_)
-EQT_ASSET *eqt_element = NULL;
-if (seg->eqt_mp_map_active.size() > 0)
+if (seg_element->eqt_mp_map_active.size() > 0)
 	{
 	colnum = company->sm_asset->sm_eqt[0]->Column(colname).Number();
 	if (colnum >= 0)
 		{
-		for (mp_map_iter = seg->eqt_mp_map_active.begin();
-			 mp_map_iter != seg->eqt_mp_map_active.end();
+		for (mp_map_iter = seg_element->eqt_mp_map_active.begin();
+			 mp_map_iter != seg_element->eqt_mp_map_active.end();
 			 mp_map_iter++)
 			{
 			mp = mp_map_iter->first;
-			eqt_element = company->sm_asset->sm_eqt[mp];
 
-			if ((t == eqt_element->commencement_period && sub_port_t < t)
-				|| (t > max(0,eqt_element->commencement_period)
-					&& fabs(eqt_element->notional_amt(t - 1)) < ASSET_ACTIVE_THRESHOLD))
+			if ((t == company->sm_asset->sm_eqt[mp]->commencement_period && sub_port_t < t)
+				|| (t > max(0,company->sm_asset->sm_eqt[mp]->commencement_period)
+					&& fabs(company->sm_asset->sm_eqt[mp]->notional_amt(t - 1)) < ASSET_ACTIVE_THRESHOLD))
 				continue;
 
 			if ((sub_port_id == SUM_OVER_ALL
-				 || sub_port_id == xint(eqt_element->sub_port_id(sub_port_t)))
+				 || sub_port_id == xint(company->sm_asset->sm_eqt[mp]->sub_port_id(sub_port_t)))
 				&& (asset_fund_index == SUM_OVER_ALL
-					|| asset_fund_index == eqt_element->asset_fund_index)
+					|| asset_fund_index == company->sm_asset->sm_eqt[mp]->asset_fund_index)
 				&& (exist_asset_status == TOTAL
-				|| (exist_asset_status == EXISTING && eqt_element->existing_asset_indicator == INIT_MP) 
-				|| (exist_asset_status == PURCH && (eqt_element->existing_asset_indicator == NEW_PURCH
-					|| eqt_element->existing_asset_indicator == PRIOR_PURCH))))
+				|| (exist_asset_status == EXISTING && company->sm_asset->sm_eqt[mp]->existing_asset_indicator == INIT_MP) 
+				|| (exist_asset_status == PURCH && (company->sm_asset->sm_eqt[mp]->existing_asset_indicator == NEW_PURCH
+					|| company->sm_asset->sm_eqt[mp]->existing_asset_indicator == PRIOR_PURCH))))
 				{
-				col_val = eqt_element->Column(colnum).Value(t);
-				col_val *= eqt_element->pct_to_use;
+				col_val = company->sm_asset->sm_eqt[mp]->Column(colnum).Value(t);
+				col_val *= company->sm_asset->sm_eqt[mp]->pct_to_use;
 
 				total += col_val;
 				}
@@ -2970,35 +2869,33 @@ if (seg->eqt_mp_map_active.size() > 0)
 #endif
 
 #if defined(__EIO_ASSET_H_)
-EIO_ASSET *eio_element = NULL;
-if (seg->eio_mp_map_active.size() > 0)
+if (seg_element->eio_mp_map_active.size() > 0)
 	{
-	colnum = company->sm_asset->sm_eio[0]->Column(colname).Number();
+	colnum = company->sm_asset->sm_eio[0][0]->Column(colname).Number();
 	if (colnum >= 0)
 		{
-		for (mp_map_iter = seg->eio_mp_map_active.begin();
-			 mp_map_iter != seg->eio_mp_map_active.end();
+		for (mp_map_iter = seg_element->eio_mp_map_active.begin();
+			 mp_map_iter != seg_element->eio_mp_map_active.end();
 			 mp_map_iter++)
 			{
 			mp = mp_map_iter->first;
-			eio_element = company->sm_asset->sm_eio[mp];
 
-			if ((t == eio_element->commencement_period && sub_port_t < t)
-				|| (t > max(0,eio_element->commencement_period)
-					&& fabs(eio_element->notional_amt(t - 1)) < ASSET_ACTIVE_THRESHOLD))
+			if ((t == company->sm_asset->sm_eio[mp][0]->commencement_period && sub_port_t < t)
+				|| (t > max(0,company->sm_asset->sm_eio[mp][0]->commencement_period)
+					&& fabs(company->sm_asset->sm_eio[mp][0]->notional_amt(t - 1)) < ASSET_ACTIVE_THRESHOLD))
 				continue;
 
 			if ((sub_port_id == SUM_OVER_ALL
-				 || sub_port_id == xint(eio_element->sub_port_id(sub_port_t)))
+				 || sub_port_id == xint(company->sm_asset->sm_eio[mp][0]->sub_port_id(sub_port_t)))
 				&& (asset_fund_index == SUM_OVER_ALL
-					|| asset_fund_index == eio_element->asset_fund_index)
+					|| asset_fund_index == company->sm_asset->sm_eio[mp][0]->asset_fund_index)
 				&& (exist_asset_status == TOTAL
-				|| (exist_asset_status == EXISTING && eio_element->existing_asset_indicator == INIT_MP) 
-				|| (exist_asset_status == PURCH && (eio_element->existing_asset_indicator == NEW_PURCH
-					|| eio_element->existing_asset_indicator == PRIOR_PURCH))))
+				|| (exist_asset_status == EXISTING && company->sm_asset->sm_eio[mp][0]->existing_asset_indicator == INIT_MP) 
+				|| (exist_asset_status == PURCH && (company->sm_asset->sm_eio[mp][0]->existing_asset_indicator == NEW_PURCH
+					|| company->sm_asset->sm_eio[mp][0]->existing_asset_indicator == PRIOR_PURCH))))
 				{
-				col_val = eio_element->Column(colnum).Value(t);
-				col_val *= eio_element->pct_to_use;
+				col_val = company->sm_asset->sm_eio[mp][0]->Column(colnum).Value(t);
+				col_val *= company->sm_asset->sm_eio[mp][0]->pct_to_use;
 
 				total += col_val;
 				}
@@ -3008,33 +2905,31 @@ if (seg->eio_mp_map_active.size() > 0)
 #endif
 
 #if defined(__EPA_ASSET_H_)
-EPA_ASSET *epa_element = NULL;
-if (seg->epa_mp_map_active.size() > 0)
+if (seg_element->epa_mp_map_active.size() > 0)
 	{
 	colnum = company->sm_asset->sm_epa[0]->Column(colname).Number();
 	if (colnum >= 0)
 		{
-		for (mp_map_iter = seg->epa_mp_map_active.begin();
-			 mp_map_iter != seg->epa_mp_map_active.end();
+		for (mp_map_iter = seg_element->epa_mp_map_active.begin();
+			 mp_map_iter != seg_element->epa_mp_map_active.end();
 			 mp_map_iter++)
 			{
 			mp = mp_map_iter->first;
-			epa_element = company->sm_asset->sm_epa[mp];
 
-			if ((t == epa_element->commencement_period && sub_port_t < t)
-				|| (t > max(0,epa_element->commencement_period)
-					&& fabs(epa_element->notional_amt(t - 1)) < ASSET_ACTIVE_THRESHOLD))
+			if ((t == company->sm_asset->sm_epa[mp]->commencement_period && sub_port_t < t)
+				|| (t > max(0,company->sm_asset->sm_epa[mp]->commencement_period)
+					&& fabs(company->sm_asset->sm_epa[mp]->notional_amt(t - 1)) < ASSET_ACTIVE_THRESHOLD))
 				continue;
 
 			if ((sub_port_id == SUM_OVER_ALL
-				 || sub_port_id == xint(epa_element->sub_port_id(sub_port_t)))
+				 || sub_port_id == xint(company->sm_asset->sm_epa[mp]->sub_port_id(sub_port_t)))
 				&& (asset_fund_index == SUM_OVER_ALL
-					|| asset_fund_index == epa_element->asset_fund_index)
+					|| asset_fund_index == company->sm_asset->sm_epa[mp]->asset_fund_index)
 				&& ((exist_asset_status == TOTAL)
 				|| (exist_asset_status == EXISTING)))
 				{
-				col_val = epa_element->Column(colnum).Value(t);
-				col_val *= epa_element->pct_to_use;
+				col_val = company->sm_asset->sm_epa[mp]->Column(colnum).Value(t);
+				col_val *= company->sm_asset->sm_epa[mp]->pct_to_use;
 
 				total += col_val;
 				}
@@ -3150,57 +3045,59 @@ const CashFlowCommonData A_SUBPORT_ASSET::mCFStaticData_0[] =
                      (dPFi)(dPXi)&A_SUBPORT_ASSET_UDF::a_subport_asset_dflt_amt, 'E','Y', '3', 'P', (size_t)&modelOffset->dflt_amt),
 	CashFlowCommonData(37, "eff_dur", "a_subport_asset_eff_dur",  "eff_dur",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&A_SUBPORT_ASSET_UDF::a_subport_asset_eff_dur, 'E','N', '3', 'P', (size_t)&modelOffset->eff_dur),
-	CashFlowCommonData(38, "initialize", "a_subport_asset_initialize",  "initialize",  CashFlowCommonData::SUM,
+	CashFlowCommonData(38, "excess_dflt_amt", "a_subport_asset_excess_dflt_amt",  "excess_dflt_amt",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&A_SUBPORT_ASSET_UDF::a_subport_asset_excess_dflt_amt, 'E','Y', '3', 'P', (size_t)&modelOffset->excess_dflt_amt),
+	CashFlowCommonData(39, "initialize", "a_subport_asset_initialize",  "initialize",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&A_SUBPORT_ASSET_UDF::a_subport_asset_initialize, 'E','N', '3', 'N', (size_t)&modelOffset->initialize),
-	CashFlowCommonData(39, "int_div_and_rent", "a_subport_asset_int_div_and_rent",  "int_div_and_rent",  CashFlowCommonData::SUM,
+	CashFlowCommonData(40, "int_div_and_rent", "a_subport_asset_int_div_and_rent",  "int_div_and_rent",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&A_SUBPORT_ASSET_UDF::a_subport_asset_int_div_and_rent, 'E','Y', '3', 'P', (size_t)&modelOffset->int_div_and_rent),
-	CashFlowCommonData(40, "int_net", "a_subport_asset_int_net",  "int_net",  CashFlowCommonData::SUM,
+	CashFlowCommonData(41, "int_net", "a_subport_asset_int_net",  "int_net",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&A_SUBPORT_ASSET_UDF::a_subport_asset_int_net, 'E','Y', '3', 'P', (size_t)&modelOffset->int_net),
-	CashFlowCommonData(41, "inv_exp", "a_subport_asset_inv_exp",  "inv_exp",  CashFlowCommonData::SUM,
+	CashFlowCommonData(42, "inv_exp", "a_subport_asset_inv_exp",  "inv_exp",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&A_SUBPORT_ASSET_UDF::a_subport_asset_inv_exp, 'E','Y', '3', 'P', (size_t)&modelOffset->inv_exp),
-	CashFlowCommonData(42, "inv_exp_inv", "a_subport_asset_inv_exp_inv",  "inv_exp_inv",  CashFlowCommonData::SUM,
+	CashFlowCommonData(43, "inv_exp_inv", "a_subport_asset_inv_exp_inv",  "inv_exp_inv",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&A_SUBPORT_ASSET_UDF::a_subport_asset_inv_exp_inv, 'E','Y', '3', 'P', (size_t)&modelOffset->inv_exp_inv),
-	CashFlowCommonData(43, "inv_exp_tax_exempt", "a_subport_asset_inv_exp_tax_exempt",  "inv_exp_tax_exempt",  CashFlowCommonData::SUM,
+	CashFlowCommonData(44, "inv_exp_tax_exempt", "a_subport_asset_inv_exp_tax_exempt",  "inv_exp_tax_exempt",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&A_SUBPORT_ASSET_UDF::a_subport_asset_inv_exp_tax_exempt, 'E','Y', '3', 'P', (size_t)&modelOffset->inv_exp_tax_exempt),
-	CashFlowCommonData(44, "mkt_val", "a_subport_asset_mkt_val",  "mkt_val",  CashFlowCommonData::SUM,
+	CashFlowCommonData(45, "mkt_val", "a_subport_asset_mkt_val",  "mkt_val",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&A_SUBPORT_ASSET_UDF::a_subport_asset_mkt_val, 'E','N', '3', 'P', (size_t)&modelOffset->mkt_val),
-	CashFlowCommonData(45, "mkt_val_cost_basis_incr", "a_subport_asset_mkt_val_cost_basis_incr",  "mkt_val_cost_basis_incr",  CashFlowCommonData::SUM,
+	CashFlowCommonData(46, "mkt_val_cost_basis_incr", "a_subport_asset_mkt_val_cost_basis_incr",  "mkt_val_cost_basis_incr",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&A_SUBPORT_ASSET_UDF::a_subport_asset_mkt_val_cost_basis_incr, 'E','Y', '3', 'P', (size_t)&modelOffset->mkt_val_cost_basis_incr),
-	CashFlowCommonData(46, "mkt_val_for_eff_dur", "a_subport_asset_mkt_val_for_eff_dur",  "mkt_val_for_eff_dur",  CashFlowCommonData::SUM,
+	CashFlowCommonData(47, "mkt_val_for_eff_dur", "a_subport_asset_mkt_val_for_eff_dur",  "mkt_val_for_eff_dur",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&A_SUBPORT_ASSET_UDF::a_subport_asset_mkt_val_for_eff_dur, 'E','N', '3', 'C', (size_t)&modelOffset->mkt_val_for_eff_dur),
-	CashFlowCommonData(47, "mkt_val_times_eff_dur", "a_subport_asset_mkt_val_times_eff_dur",  "mkt_val_times_eff_dur",  CashFlowCommonData::SUM,
+	CashFlowCommonData(48, "mkt_val_times_eff_dur", "a_subport_asset_mkt_val_times_eff_dur",  "mkt_val_times_eff_dur",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&A_SUBPORT_ASSET_UDF::a_subport_asset_mkt_val_times_eff_dur, 'E','N', '3', 'C', (size_t)&modelOffset->mkt_val_times_eff_dur),
-	CashFlowCommonData(48, "notional_amt", "a_subport_asset_notional_amt",  "notional_amt",  CashFlowCommonData::SUM,
+	CashFlowCommonData(49, "notional_amt", "a_subport_asset_notional_amt",  "notional_amt",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&A_SUBPORT_ASSET_UDF::a_subport_asset_notional_amt, 'E','Y', '3', 'P', (size_t)&modelOffset->notional_amt),
-	CashFlowCommonData(49, "opt_inc", "a_subport_asset_opt_inc",  "opt_inc",  CashFlowCommonData::SUM,
+	CashFlowCommonData(50, "opt_inc", "a_subport_asset_opt_inc",  "opt_inc",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&A_SUBPORT_ASSET_UDF::a_subport_asset_opt_inc, 'E','Y', '3', 'P', (size_t)&modelOffset->opt_inc),
-	CashFlowCommonData(50, "opt_pmt", "a_subport_asset_opt_pmt",  "opt_pmt",  CashFlowCommonData::SUM,
+	CashFlowCommonData(51, "opt_pmt", "a_subport_asset_opt_pmt",  "opt_pmt",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&A_SUBPORT_ASSET_UDF::a_subport_asset_opt_pmt, 'E','Y', '3', 'P', (size_t)&modelOffset->opt_pmt),
-	CashFlowCommonData(51, "realzd_cap_gain", "a_subport_asset_realzd_cap_gain",  "realzd_cap_gain",  CashFlowCommonData::SUM,
+	CashFlowCommonData(52, "realzd_cap_gain", "a_subport_asset_realzd_cap_gain",  "realzd_cap_gain",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&A_SUBPORT_ASSET_UDF::a_subport_asset_realzd_cap_gain, 'E','Y', '3', 'P', (size_t)&modelOffset->realzd_cap_gain),
-	CashFlowCommonData(52, "realzd_cap_gain_net", "a_subport_asset_realzd_cap_gain_net",  "realzd_cap_gain_net",  CashFlowCommonData::SUM,
+	CashFlowCommonData(53, "realzd_cap_gain_net", "a_subport_asset_realzd_cap_gain_net",  "realzd_cap_gain_net",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&A_SUBPORT_ASSET_UDF::a_subport_asset_realzd_cap_gain_net, 'E','Y', '3', 'P', (size_t)&modelOffset->realzd_cap_gain_net),
-	CashFlowCommonData(53, "realzd_cap_gain_opt_pmt", "a_subport_asset_realzd_cap_gain_opt_pmt",  "realzd_cap_gain_opt_pmt",  CashFlowCommonData::SUM,
+	CashFlowCommonData(54, "realzd_cap_gain_opt_pmt", "a_subport_asset_realzd_cap_gain_opt_pmt",  "realzd_cap_gain_opt_pmt",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&A_SUBPORT_ASSET_UDF::a_subport_asset_realzd_cap_gain_opt_pmt, 'E','Y', '3', 'P', (size_t)&modelOffset->realzd_cap_gain_opt_pmt),
-	CashFlowCommonData(54, "realzd_cap_gain_prin_pmt", "a_subport_asset_realzd_cap_gain_prin_pmt",  "realzd_cap_gain_prin_pmt",  CashFlowCommonData::SUM,
+	CashFlowCommonData(55, "realzd_cap_gain_prin_pmt", "a_subport_asset_realzd_cap_gain_prin_pmt",  "realzd_cap_gain_prin_pmt",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&A_SUBPORT_ASSET_UDF::a_subport_asset_realzd_cap_gain_prin_pmt, 'E','Y', '3', 'P', (size_t)&modelOffset->realzd_cap_gain_prin_pmt),
-	CashFlowCommonData(55, "realzd_cap_gain_sale", "a_subport_asset_realzd_cap_gain_sale",  "realzd_cap_gain_sale",  CashFlowCommonData::SUM,
+	CashFlowCommonData(56, "realzd_cap_gain_sale", "a_subport_asset_realzd_cap_gain_sale",  "realzd_cap_gain_sale",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&A_SUBPORT_ASSET_UDF::a_subport_asset_realzd_cap_gain_sale, 'E','Y', '3', 'P', (size_t)&modelOffset->realzd_cap_gain_sale),
-	CashFlowCommonData(56, "realzd_cap_gain_turnover", "a_subport_asset_realzd_cap_gain_turnover",  "realzd_cap_gain_turnover",  CashFlowCommonData::SUM,
+	CashFlowCommonData(57, "realzd_cap_gain_turnover", "a_subport_asset_realzd_cap_gain_turnover",  "realzd_cap_gain_turnover",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&A_SUBPORT_ASSET_UDF::a_subport_asset_realzd_cap_gain_turnover, 'E','Y', '3', 'P', (size_t)&modelOffset->realzd_cap_gain_turnover),
-	CashFlowCommonData(57, "sale_inc", "a_subport_asset_sale_inc",  "sale_inc",  CashFlowCommonData::SUM,
+	CashFlowCommonData(58, "sale_inc", "a_subport_asset_sale_inc",  "sale_inc",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&A_SUBPORT_ASSET_UDF::a_subport_asset_sale_inc, 'E','Y', '3', 'P', (size_t)&modelOffset->sale_inc),
-	CashFlowCommonData(58, "sched_prin_pmt", "a_subport_asset_sched_prin_pmt",  "sched_prin_pmt",  CashFlowCommonData::SUM,
+	CashFlowCommonData(59, "sched_prin_pmt", "a_subport_asset_sched_prin_pmt",  "sched_prin_pmt",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&A_SUBPORT_ASSET_UDF::a_subport_asset_sched_prin_pmt, 'E','Y', '3', 'P', (size_t)&modelOffset->sched_prin_pmt),
-	CashFlowCommonData(59, "startup", "a_subport_asset_startup",  "startup",  CashFlowCommonData::AVG,
+	CashFlowCommonData(60, "startup", "a_subport_asset_startup",  "startup",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&A_SUBPORT_ASSET_UDF::virtual_startup, 'E','N', '3', 'N', (size_t)&modelOffset->startup),
-	CashFlowCommonData(60, "unrealzd_cap_gain", "a_subport_asset_unrealzd_cap_gain",  "unrealzd_cap_gain",  CashFlowCommonData::SUM,
+	CashFlowCommonData(61, "unrealzd_cap_gain", "a_subport_asset_unrealzd_cap_gain",  "unrealzd_cap_gain",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&A_SUBPORT_ASSET_UDF::a_subport_asset_unrealzd_cap_gain, 'E','N', '3', 'P', (size_t)&modelOffset->unrealzd_cap_gain),
-	CashFlowCommonData(61, "unrealzd_cap_gain_hidden", "a_subport_asset_unrealzd_cap_gain_hidden",  "unrealzd_cap_gain_hidden",  CashFlowCommonData::SUM,
+	CashFlowCommonData(62, "unrealzd_cap_gain_hidden", "a_subport_asset_unrealzd_cap_gain_hidden",  "unrealzd_cap_gain_hidden",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&A_SUBPORT_ASSET_UDF::a_subport_asset_unrealzd_cap_gain_hidden, 'E','N', '3', 'P', (size_t)&modelOffset->unrealzd_cap_gain_hidden),
-	CashFlowCommonData(62, "unrealzd_cap_gain_incr", "a_subport_asset_unrealzd_cap_gain_incr",  "unrealzd_cap_gain_incr",  CashFlowCommonData::SUM,
+	CashFlowCommonData(63, "unrealzd_cap_gain_incr", "a_subport_asset_unrealzd_cap_gain_incr",  "unrealzd_cap_gain_incr",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&A_SUBPORT_ASSET_UDF::a_subport_asset_unrealzd_cap_gain_incr, 'E','Y', '3', 'P', (size_t)&modelOffset->unrealzd_cap_gain_incr),
-	CashFlowCommonData(63, "unrealzd_cap_gain_released_on_sale", "a_subport_asset_unrealzd_cap_gain_released_on_sale",  "unrealzd_cap_gain_released_on_sale",  CashFlowCommonData::SUM,
+	CashFlowCommonData(64, "unrealzd_cap_gain_released_on_sale", "a_subport_asset_unrealzd_cap_gain_released_on_sale",  "unrealzd_cap_gain_released_on_sale",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&A_SUBPORT_ASSET_UDF::a_subport_asset_unrealzd_cap_gain_released_on_sale, 'E','Y', '3', 'P', (size_t)&modelOffset->unrealzd_cap_gain_released_on_sale)
 };
 const CashFlowCommonData* A_SUBPORT_ASSET::mCFStaticData[] = {
@@ -3268,6 +3165,7 @@ const CashFlowCommonData* A_SUBPORT_ASSET::mCFStaticData[] = {
 	&A_SUBPORT_ASSET::mCFStaticData_0[61],
 	&A_SUBPORT_ASSET::mCFStaticData_0[62],
 	&A_SUBPORT_ASSET::mCFStaticData_0[63],
+	&A_SUBPORT_ASSET::mCFStaticData_0[64],
 	nullptr};
 //const CashFlowCommonData END@2
 
@@ -3304,14 +3202,6 @@ namespace {
 		,ChoicePair(StrEnum::NO, "No")
 	};
 	const EnumList dur_match_defnEnumList(2, dur_match_defnChoicePairs);
-
-	// EnumList for fast_stat_calc_aig                                                                                       
-	const ChoicePair fast_stat_calc_aigChoicePairs[] = {
-		ChoicePair(StrEnum::UNDEFINED, StrEnum::undefinedString)
-		,ChoicePair(StrEnum::YES, "Yes")
-		,ChoicePair(StrEnum::NO, "No")
-	};
-	const EnumList fast_stat_calc_aigEnumList(2, fast_stat_calc_aigChoicePairs);
 
 	// EnumList for port_defn                                                                                       
 	const ChoicePair port_defnChoicePairs[] = {
@@ -3361,41 +3251,39 @@ TableMgr<VariantTable> A_SUBPORT_ASSET::mgr_;
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &asset_typeEnumList, Feature(true)),
 	Descriptor(2, Attribute::STR_ENUM,	"dur_match_defn", -1, (size_t)&modelOffset->dur_match_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &dur_match_defnEnumList, Feature(true)),
-	Descriptor(3, Attribute::STR_ENUM,	"fast_stat_calc_aig", -1, (size_t)&modelOffset->fast_stat_calc_aig,
-				Descriptor::NOT_SHARED, false, false, (size_t)0, &fast_stat_calc_aigEnumList, Feature(true)),
-	Descriptor(4, Attribute::DOUBLE,	"inv_tgt_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->inv_tgt_pct,
+	Descriptor(3, Attribute::DOUBLE,	"inv_tgt_pct", Descriptor::NOT_INDEXED, (size_t)&modelOffset->inv_tgt_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(5, Attribute::DOUBLE,	"inv_tgt_pct_curr_strat", Descriptor::NOT_INDEXED, (size_t)&modelOffset->inv_tgt_pct_curr_strat,
+	Descriptor(4, Attribute::DOUBLE,	"inv_tgt_pct_curr_strat", Descriptor::NOT_INDEXED, (size_t)&modelOffset->inv_tgt_pct_curr_strat,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(6, Attribute::DOUBLE,	"inv_tgt_pct_dur_match", Descriptor::NOT_INDEXED, (size_t)&modelOffset->inv_tgt_pct_dur_match,
+	Descriptor(5, Attribute::DOUBLE,	"inv_tgt_pct_dur_match", Descriptor::NOT_INDEXED, (size_t)&modelOffset->inv_tgt_pct_dur_match,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(7, Attribute::STR_ENUM,	"port_defn", -1, (size_t)&modelOffset->port_defn,
+	Descriptor(6, Attribute::STR_ENUM,	"port_defn", -1, (size_t)&modelOffset->port_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &port_defnEnumList, Feature(true)),
-	Descriptor(8, Attribute::DOUBLE,	"purch_asset_weight_sum", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_asset_weight_sum,
+	Descriptor(7, Attribute::DOUBLE,	"purch_asset_weight_sum", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_asset_weight_sum,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(9, Attribute::DOUBLE,	"purch_asset_weight_sum_curr_strat", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_asset_weight_sum_curr_strat,
+	Descriptor(8, Attribute::DOUBLE,	"purch_asset_weight_sum_curr_strat", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_asset_weight_sum_curr_strat,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(10, Attribute::DOUBLE,	"purch_asset_weight_sum_dur_match", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_asset_weight_sum_dur_match,
+	Descriptor(9, Attribute::DOUBLE,	"purch_asset_weight_sum_dur_match", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_asset_weight_sum_dur_match,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(11, Attribute::DOUBLE,	"purch_asset_weight_sum_normalzd", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_asset_weight_sum_normalzd,
+	Descriptor(10, Attribute::DOUBLE,	"purch_asset_weight_sum_normalzd", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_asset_weight_sum_normalzd,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(12, Attribute::DOUBLE,	"purch_asset_weight_sum_normalzd_curr_strat", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_asset_weight_sum_normalzd_curr_strat,
+	Descriptor(11, Attribute::DOUBLE,	"purch_asset_weight_sum_normalzd_curr_strat", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_asset_weight_sum_normalzd_curr_strat,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(13, Attribute::DOUBLE,	"purch_asset_weight_sum_normalzd_dur_match", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_asset_weight_sum_normalzd_dur_match,
+	Descriptor(12, Attribute::DOUBLE,	"purch_asset_weight_sum_normalzd_dur_match", Descriptor::NOT_INDEXED, (size_t)&modelOffset->purch_asset_weight_sum_normalzd_dur_match,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(14, Attribute::STRING,	"seg_id", -1, (size_t)&modelOffset->seg_id,
+	Descriptor(13, Attribute::STRING,	"seg_id", -1, (size_t)&modelOffset->seg_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(15, Attribute::STRING,	"sub_port_id", -1, (size_t)&modelOffset->sub_port_id,
+	Descriptor(14, Attribute::STRING,	"sub_port_id", -1, (size_t)&modelOffset->sub_port_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(16, Attribute::INT,	"sub_port_updated_flag", -1, (size_t)&modelOffset->sub_port_updated_flag,
+	Descriptor(15, Attribute::INT,	"sub_port_updated_flag", -1, (size_t)&modelOffset->sub_port_updated_flag,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(17, Attribute::INT,	"sub_ports_to_initialize_for_sale", -1, (size_t)&modelOffset->sub_ports_to_initialize_for_sale,
+	Descriptor(16, Attribute::INT,	"sub_ports_to_initialize_for_sale", -1, (size_t)&modelOffset->sub_ports_to_initialize_for_sale,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(18, Attribute::INT,	"sub_ports_to_sell", -1, (size_t)&modelOffset->sub_ports_to_sell,
+	Descriptor(17, Attribute::INT,	"sub_ports_to_sell", -1, (size_t)&modelOffset->sub_ports_to_sell,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(19, Attribute::DOUBLE,	"total_weights_fund_match", Descriptor::NOT_INDEXED, (size_t)&modelOffset->total_weights_fund_match,
+	Descriptor(18, Attribute::DOUBLE,	"total_weights_fund_match", Descriptor::NOT_INDEXED, (size_t)&modelOffset->total_weights_fund_match,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(20, Attribute::INT,	"msnumelement", -1, (size_t)&modelOffset->msnumelement,
+	Descriptor(19, Attribute::INT,	"msnumelement", -1, (size_t)&modelOffset->msnumelement,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
 	};
 
@@ -3420,9 +3308,8 @@ TableMgr<VariantTable> A_SUBPORT_ASSET::mgr_;
 	&A_SUBPORT_ASSET::descriptor_0[17],
 	&A_SUBPORT_ASSET::descriptor_0[18],
 	&A_SUBPORT_ASSET::descriptor_0[19],
-	&A_SUBPORT_ASSET::descriptor_0[20],
 	nullptr};
-	const size_t A_SUBPORT_ASSET::sDescriptorCount = 21;
+	const size_t A_SUBPORT_ASSET::sDescriptorCount = 20;
 
 //factory
 A_SUBPORT_ASSET* A_SUBPORT_ASSET::makeThis(int isSubmodel, ModelClass* owner, A_SUBPORT_ASSET* peer, 
@@ -3533,15 +3420,12 @@ typedef xstring (A_SUBPORT_ASSET_UDF::*sPFs) (xstring);
 
 // constructor if this model class is the base class of another model class
 A_SUBPORT_ASSET::A_SUBPORT_ASSET(int columnCount, Descriptor* mocd[], Product* persObj) : ModelClass(columnCount, mocd, persObj), Variable(*this)
-  , sm_bond_is(0)
-  , sm_bond_pv(0)
-  , sm_bond_ym(0)
-  , sm_mtg_is(0)
-  , sm_mtg_pv(0)
-  , sm_mtg_ym(0)
 
+	, adco(company_asset_adco)
 	, asset(company_asset)
+	, bond(company_asset_bond)
 	, epl(company_liab_epl)
+	, liab(company_liab)
 	, rates(company_rates)
 	, seg(company_seg)
 {
@@ -3557,16 +3441,13 @@ A_SUBPORT_ASSET::A_SUBPORT_ASSET(int columnCount, Descriptor* mocd[], Product* p
 //constructor begincolumn
 A_SUBPORT_ASSET::A_SUBPORT_ASSET(const xstring &modelClassName,
 		int isSm, ModelClass *owner, ModelClass *peer, int mainRebase,
-		const char *name, ModelClass* arrayPersistentObj) : ModelClass(63, A_SUBPORT_ASSET::descriptorTable, arrayPersistentObj), Variable(*this)
-  , sm_bond_is(0)
-  , sm_bond_pv(0)
-  , sm_bond_ym(0)
-  , sm_mtg_is(0)
-  , sm_mtg_pv(0)
-  , sm_mtg_ym(0)
+		const char *name, ModelClass* arrayPersistentObj) : ModelClass(64, A_SUBPORT_ASSET::descriptorTable, arrayPersistentObj), Variable(*this)
 
+	, adco(company_asset_adco)
 	, asset(company_asset)
+	, bond(company_asset_bond)
 	, epl(company_liab_epl)
+	, liab(company_liab)
 	, rates(company_rates)
 	, seg(company_seg)
  // Tables...
@@ -3593,11 +3474,20 @@ A_SUBPORT_ASSET::A_SUBPORT_ASSET(const xstring &modelClassName,
        isMainModel = !isSm;
 		modelName = name;
 
-#ifdef __CREATE_COMP_COMP_CLASS_
+#ifdef __CREATE_AA_COMP_COMP_CLASS_
        company = 0;
 #endif
 #ifdef __CREATE_ASSET_ASSET_CLASS_
        company_asset = 0;
+#endif
+#ifdef __CREATE_ADCO_ASSET_CLASS_
+       company_asset_adco = 0;
+#endif
+#ifdef __CREATE_BOND_ASSET_CLASS_
+       company_asset_bond = 0;
+#endif
+#ifdef __CREATE_LIAB_LIAB_CLASS_
+       company_liab = 0;
 #endif
 #ifdef __CREATE_EPL_LIAB_CLASS_
        company_liab_epl = 0;
@@ -3624,7 +3514,7 @@ A_SUBPORT_ASSET::A_SUBPORT_ASSET(const xstring &modelClassName,
 
 	setSlidingSpace();
 
-	for (int cf_no = 1; cf_no <= 63; cf_no++)
+	for (int cf_no = 1; cf_no <= 64; cf_no++)
 #ifdef CF_MEMORY
 		setPtr_col(cf_no, 0);
 #else
@@ -3665,11 +3555,20 @@ A_SUBPORT_ASSET::A_SUBPORT_ASSET(const xstring &modelClassName,
 
  void A_SUBPORT_ASSET::copy_names() {
 
-#ifdef __CREATE_COMP_COMP_CLASS_
-		company = (COMP_COMP*)(findUnique("company"));
+#ifdef __CREATE_AA_COMP_COMP_CLASS_
+		company = (AA_COMP_COMP*)(findUnique("company"));
 #endif
 #ifdef __CREATE_ASSET_ASSET_CLASS_
 		company_asset = (ASSET_ASSET*)(findUnique("company|asset"));
+#endif
+#ifdef __CREATE_ADCO_ASSET_CLASS_
+		company_asset_adco = (ADCO_ASSET*)(findUnique("company|asset|adco"));
+#endif
+#ifdef __CREATE_BOND_ASSET_CLASS_
+		company_asset_bond = (BOND_ASSET*)(findUnique("company|asset|bond"));
+#endif
+#ifdef __CREATE_LIAB_LIAB_CLASS_
+		company_liab = (LIAB_LIAB*)(findUnique("company|liab"));
 #endif
 #ifdef __CREATE_EPL_LIAB_CLASS_
 		company_liab_epl = (EPL_LIAB*)(findUnique("company|liab|epl"));
@@ -3890,12 +3789,6 @@ A_SUBPORT_ASSET_persistent_object::A_SUBPORT_ASSET_persistent_object(const xstri
 			A_SUBPORT_ASSET(modelClassName, isSm, owner, peer, mainRebase, name, arrayPersistentObj), 
 			mReadArray(true),
 			pfl(0)
-	, sm_bond_is(A_SUBPORT_ASSET::sm_bond_is)
-	, sm_bond_pv(A_SUBPORT_ASSET::sm_bond_pv)
-	, sm_bond_ym(A_SUBPORT_ASSET::sm_bond_ym)
-	, sm_mtg_is(A_SUBPORT_ASSET::sm_mtg_is)
-	, sm_mtg_pv(A_SUBPORT_ASSET::sm_mtg_pv)
-	, sm_mtg_ym(A_SUBPORT_ASSET::sm_mtg_ym)
 
 	{
 
@@ -3975,7 +3868,7 @@ void A_SUBPORT_ASSET::after_startup(int decrement) {
 //ms_BeforeStartup END@2
 
 HVector<ModelClass::ddfStruct> A_SUBPORT_ASSET::ddfVector;
-BitArray A_SUBPORT_ASSET::dataVariables(21);
+BitArray A_SUBPORT_ASSET::dataVariables(20);
 bool A_SUBPORT_ASSET::hasBeenWritten = false;
 
 

@@ -2,6 +2,10 @@
 #define __EPL_LIAB_H_
 #pragma warning ( disable : 4819 )
 
+#if defined(GEN2_ALM_RUN)
+	#define __EPL_LIAB_H_
+#endif
+
 #include <math.h>
 #include "xstring.h"
 #include "Locator.h"
@@ -60,7 +64,6 @@ extern MY_DLL ofstream log_strm;
 #include "StringProxy.h"			// ... contains String Proxies
 #include "StringEnumProxy.h"		// ... contains StringEnum Proxies
 #include "NumProxyNonMembers.h"		// ... min, max
-#include "StringedProxyNonMembers.h"		// ... concatenation for StringEnum
 #include "ArrayProxy.h"			// ... contains Array Proxies
 #include "ScalarProxy.h"			// ... contains Scalar Proxies
 #include "ModelGroupProxy.h"
@@ -70,6 +73,11 @@ extern MY_DLL ofstream log_strm;
 
 
 using namespace StrEnum;
+
+#ifdef __CREATE_AA_COMP_COMP_CLASS_
+class AA_COMP_COMP;
+class AA_COMP_COMP_persistent_object;
+#endif
 
 #ifdef __CREATE_ADCO_ASSET_CLASS_
 class ADCO_ASSET;
@@ -87,11 +95,6 @@ class ASSET_ASSET;
 class ASSET_ASSET_persistent_object;
 #endif
 
-#ifdef __CREATE_AUTOMATION_CLASS_
-class AUTOMATION;
-class AUTOMATION_persistent_object;
-#endif
-
 #ifdef __CREATE_A_SUBPORT_ASSET_CLASS_
 class A_SUBPORT_ASSET;
 class A_SUBPORT_ASSET_persistent_object;
@@ -104,22 +107,21 @@ typedef TMultiDComp<_2D_A_SUBPORT_ASSET, A_SUBPORT_ASSET_persistent_object> _3D_
 class BOND_ASSET;
 class BOND_ASSET_persistent_object;
 typedef TComp<BOND_ASSET, BOND_ASSET_persistent_object> _1D_BOND_ASSET;
+typedef TMultiDComp<_1D_BOND_ASSET, BOND_ASSET_persistent_object> _2D_BOND_ASSET;
 #endif
 
 #ifdef __CREATE_BOND_CF_ASSET_CLASS_
 class BOND_CF_ASSET;
 class BOND_CF_ASSET_persistent_object;
-#endif
-
-#ifdef __CREATE_COMP_COMP_CLASS_
-class COMP_COMP;
-class COMP_COMP_persistent_object;
+typedef TComp<BOND_CF_ASSET, BOND_CF_ASSET_persistent_object> _1D_BOND_CF_ASSET;
+typedef TMultiDComp<_1D_BOND_CF_ASSET, BOND_CF_ASSET_persistent_object> _2D_BOND_CF_ASSET;
 #endif
 
 #ifdef __CREATE_EIO_ASSET_CLASS_
 class EIO_ASSET;
 class EIO_ASSET_persistent_object;
 typedef TComp<EIO_ASSET, EIO_ASSET_persistent_object> _1D_EIO_ASSET;
+typedef TMultiDComp<_1D_EIO_ASSET, EIO_ASSET_persistent_object> _2D_EIO_ASSET;
 #endif
 
 #ifdef __CREATE_EPA_ASSET_CLASS_
@@ -144,6 +146,7 @@ typedef TComp<FIAAFUND_LIAB, FIAAFUND_LIAB_persistent_object> _1D_FIAAFUND_LIAB;
 class FIACARVM_LIAB;
 class FIACARVM_LIAB_persistent_object;
 typedef TComp<FIACARVM_LIAB, FIACARVM_LIAB_persistent_object> _1D_FIACARVM_LIAB;
+typedef TMultiDComp<_1D_FIACARVM_LIAB, FIACARVM_LIAB_persistent_object> _2D_FIACARVM_LIAB;
 #endif
 
 #ifdef __CREATE_FIA_LIAB_CLASS_
@@ -159,11 +162,6 @@ typedef TComp<HDG_GRP_COMP, HDG_GRP_COMP_persistent_object> _1D_HDG_GRP_COMP;
 typedef TMultiDComp<_1D_HDG_GRP_COMP, HDG_GRP_COMP_persistent_object> _2D_HDG_GRP_COMP;
 #endif
 
-#ifdef __CREATE_INTEX_ASSET_CLASS_
-class INTEX_ASSET;
-class INTEX_ASSET_persistent_object;
-#endif
-
 #ifdef __CREATE_INVSTRAT_ASSET_CLASS_
 class INVSTRAT_ASSET;
 class INVSTRAT_ASSET_persistent_object;
@@ -175,15 +173,24 @@ class LIAB_LIAB;
 class LIAB_LIAB_persistent_object;
 #endif
 
+#ifdef __CREATE_MRB_GAAP_CLASS_
+class MRB_GAAP;
+class MRB_GAAP_persistent_object;
+typedef TComp<MRB_GAAP, MRB_GAAP_persistent_object> _1D_MRB_GAAP;
+#endif
+
 #ifdef __CREATE_MTG_ASSET_CLASS_
 class MTG_ASSET;
 class MTG_ASSET_persistent_object;
 typedef TComp<MTG_ASSET, MTG_ASSET_persistent_object> _1D_MTG_ASSET;
+typedef TMultiDComp<_1D_MTG_ASSET, MTG_ASSET_persistent_object> _2D_MTG_ASSET;
 #endif
 
 #ifdef __CREATE_MTG_CF_ASSET_CLASS_
 class MTG_CF_ASSET;
 class MTG_CF_ASSET_persistent_object;
+typedef TComp<MTG_CF_ASSET, MTG_CF_ASSET_persistent_object> _1D_MTG_CF_ASSET;
+typedef TMultiDComp<_1D_MTG_CF_ASSET, MTG_CF_ASSET_persistent_object> _2D_MTG_CF_ASSET;
 #endif
 
 #ifdef __CREATE_RATES_ECONOMY_CLASS_
@@ -197,22 +204,11 @@ class SEG_COMP_persistent_object;
 typedef TComp<SEG_COMP, SEG_COMP_persistent_object> _1D_SEG_COMP;
 #endif
 
-#ifdef __CREATE_SFAS133_GAAP_CLASS_
-class SFAS133_GAAP;
-class SFAS133_GAAP_persistent_object;
-typedef TComp<SFAS133_GAAP, SFAS133_GAAP_persistent_object> _1D_SFAS133_GAAP;
-#endif
-
 #ifdef __CREATE_SFAS97RD_GAAP_CLASS_
 class SFAS97RD_GAAP;
 class SFAS97RD_GAAP_persistent_object;
 typedef TComp<SFAS97RD_GAAP, SFAS97RD_GAAP_persistent_object> _1D_SFAS97RD_GAAP;
 typedef TMultiDComp<_1D_SFAS97RD_GAAP, SFAS97RD_GAAP_persistent_object> _2D_SFAS97RD_GAAP;
-#endif
-
-#ifdef __CREATE_UTIL_RAFM_CLASS_
-class UTIL_RAFM;
-class UTIL_RAFM_persistent_object;
 #endif
 
 
@@ -257,9 +253,10 @@ public :
 	static BitArray dataVariables; 
 	static bool hasBeenWritten;
 
-Schedule * EPLData;
 int epl_last_cash_flow_period;
-map <xstring, long, less <xstring> > sched_byte_pos;
+SmartArray <SmartArray <double>> epl_values;
+
+SEG_COMP *seg_element;
 
 	void init_(){
 		
@@ -272,6 +269,14 @@ epl_last_cash_flow_period = -1;
 
 	}
 
+#ifdef __CREATE_ADCO_ASSET_CLASS_
+	ADCO_ASSET	*company_asset_adco;
+	ADCO_ASSET	*&adco;
+#endif
+#ifdef __CREATE_ASSET_ASSET_CLASS_
+	ASSET_ASSET	*company_asset;
+	ASSET_ASSET	*&asset;
+#endif
 #ifdef __CREATE_A_SUBPORT_ASSET_CLASS_
 	A_SUBPORT_ASSET	*company_asset_asset_sub_port;
 	A_SUBPORT_ASSET	*&asset_sub_port;
@@ -284,20 +289,8 @@ epl_last_cash_flow_period = -1;
 	BOND_CF_ASSET	*company_asset_bond_bond_cf;
 	BOND_CF_ASSET	*&bond_cf;
 #endif
-#ifdef __CREATE_BOND_CF_ASSET_CLASS_
-	BOND_CF_ASSET	*company_asset_bond_bond_cf_bond_is;
-	BOND_CF_ASSET	*&bond_is;
-#endif
-#ifdef __CREATE_BOND_CF_ASSET_CLASS_
-	BOND_CF_ASSET	*company_asset_bond_bond_cf_bond_pv;
-	BOND_CF_ASSET	*&bond_pv;
-#endif
-#ifdef __CREATE_BOND_CF_ASSET_CLASS_
-	BOND_CF_ASSET	*company_asset_bond_bond_cf_bond_ym;
-	BOND_CF_ASSET	*&bond_ym;
-#endif
-#ifdef __CREATE_COMP_COMP_CLASS_
-	COMP_COMP	*company;
+#ifdef __CREATE_AA_COMP_COMP_CLASS_
+	AA_COMP_COMP	*company;
 #endif
 #ifdef __CREATE_EIO_ASSET_CLASS_
 	EIO_ASSET	*company_asset_eio;
@@ -315,9 +308,9 @@ epl_last_cash_flow_period = -1;
 	HDG_GRP_COMP	*company_seg_hedge_grp;
 	HDG_GRP_COMP	*&hedge_grp;
 #endif
-#ifdef __CREATE_INTEX_ASSET_CLASS_
-	INTEX_ASSET	*company_asset_intex;
-	INTEX_ASSET	*&intex;
+#ifdef __CREATE_LIAB_LIAB_CLASS_
+	LIAB_LIAB	*company_liab;
+	LIAB_LIAB	*&liab;
 #endif
 #ifdef __CREATE_MTG_ASSET_CLASS_
 	MTG_ASSET	*company_asset_mtg;
@@ -327,17 +320,9 @@ epl_last_cash_flow_period = -1;
 	MTG_CF_ASSET	*company_asset_mtg_mtg_cf;
 	MTG_CF_ASSET	*&mtg_cf;
 #endif
-#ifdef __CREATE_MTG_CF_ASSET_CLASS_
-	MTG_CF_ASSET	*company_asset_mtg_mtg_cf_mtg_is;
-	MTG_CF_ASSET	*&mtg_is;
-#endif
-#ifdef __CREATE_MTG_CF_ASSET_CLASS_
-	MTG_CF_ASSET	*company_asset_mtg_mtg_cf_mtg_pv;
-	MTG_CF_ASSET	*&mtg_pv;
-#endif
-#ifdef __CREATE_MTG_CF_ASSET_CLASS_
-	MTG_CF_ASSET	*company_asset_mtg_mtg_cf_mtg_ym;
-	MTG_CF_ASSET	*&mtg_ym;
+#ifdef __CREATE_RATES_ECONOMY_CLASS_
+	RATES_ECONOMY	*company_rates;
+	RATES_ECONOMY	*&rates;
 #endif
 #ifdef __CREATE_SEG_COMP_CLASS_
 	SEG_COMP	*company_seg;
@@ -502,8 +487,6 @@ epl_last_cash_flow_period = -1;
  	ColumnAccessor < mCFStaticData_0 > sfas120_ceded_egm_prem_tax;
  	ColumnAccessor < mCFStaticData_0 > sfas120_ceded_egm_surr_benefits;
  	ColumnAccessor < mCFStaticData_0 > sfas120_ceded_endow_claim_cost;
- 	ColumnAccessor < mCFStaticData_0 > sfas120_ceded_gpr;
- 	ColumnAccessor < mCFStaticData_0 > sfas120_ceded_gpr_units_inf;
  	ColumnAccessor < mCFStaticData_0 > sfas120_ceded_gross_prem;
  	ColumnAccessor < mCFStaticData_0 > sfas120_ceded_loc_cost;
  	ColumnAccessor < mCFStaticData_0 > sfas120_ceded_maint_exp_bom;
@@ -511,7 +494,7 @@ epl_last_cash_flow_period = -1;
  	ColumnAccessor < mCFStaticData_0 > sfas120_ceded_maturity_claim_cost;
  	ColumnAccessor < mCFStaticData_0 > sfas120_ceded_modco_liab;
  	ColumnAccessor < mCFStaticData_0 > sfas120_ceded_modco_res_adj;
- 	ColumnAccessor < mCFStaticData_0 > sfas120_ceded_nlp_res_net_prem2;
+ 	ColumnAccessor < mCFStaticData_0 > sfas120_ceded_nlp_res_net_prem;
  	ColumnAccessor < mCFStaticData_0 > sfas120_ceded_nlp_res_prelim;
  	ColumnAccessor < mCFStaticData_0 > sfas120_ceded_prem_tax;
  	ColumnAccessor < mCFStaticData_0 > sfas120_ceded_refund;
@@ -553,8 +536,6 @@ epl_last_cash_flow_period = -1;
  	ColumnAccessor < mCFStaticData_0 > sfas120_gross_egm_reins_cost;
  	ColumnAccessor < mCFStaticData_0 > sfas120_gross_egm_surr_benefits;
  	ColumnAccessor < mCFStaticData_0 > sfas120_gross_endow_claim_cost;
- 	ColumnAccessor < mCFStaticData_0 > sfas120_gross_gpr;
- 	ColumnAccessor < mCFStaticData_0 > sfas120_gross_gpr_units_inf;
  	ColumnAccessor < mCFStaticData_0 > sfas120_gross_gross_prem;
  	ColumnAccessor < mCFStaticData_0 > sfas120_gross_loc_cost;
  	ColumnAccessor < mCFStaticData_0 > sfas120_gross_maint_exp_bom;
@@ -570,16 +551,11 @@ epl_last_cash_flow_period = -1;
  	ColumnAccessor < mCFStaticData_0 > sfas120_gross_surr_claim_cost;
  	ColumnAccessor < mCFStaticData_0 > sfas120_gross_terminal_div;
  	ColumnAccessor < mCFStaticData_0 > sfas60_ceded_acq_exp;
- 	ColumnAccessor < mCFStaticData_0 > sfas60_ceded_ben_res_accrual_valn_basis;
- 	ColumnAccessor < mCFStaticData_0 > sfas60_ceded_ben_res_int_valn_basis;
  	ColumnAccessor < mCFStaticData_0 > sfas60_ceded_ben_res_prelim;
- 	ColumnAccessor < mCFStaticData_0 > sfas60_ceded_benefits_valn_basis;
  	ColumnAccessor < mCFStaticData_0 > sfas60_ceded_capzd_acq_exp;
- 	ColumnAccessor < mCFStaticData_0 > sfas60_ceded_capzd_acq_exp_valn_basis;
  	ColumnAccessor < mCFStaticData_0 > sfas60_ceded_capzd_comm_bom;
  	ColumnAccessor < mCFStaticData_0 > sfas60_ceded_capzd_comm_chargeback;
  	ColumnAccessor < mCFStaticData_0 > sfas60_ceded_capzd_comm_eom;
- 	ColumnAccessor < mCFStaticData_0 > sfas60_ceded_capzd_comm_valn_basis;
  	ColumnAccessor < mCFStaticData_0 > sfas60_ceded_cash_flow_bom;
  	ColumnAccessor < mCFStaticData_0 > sfas60_ceded_claim_res;
  	ColumnAccessor < mCFStaticData_0 > sfas60_ceded_comm_chargeback;
@@ -590,45 +566,30 @@ epl_last_cash_flow_period = -1;
  	ColumnAccessor < mCFStaticData_0 > sfas60_ceded_comm_trail_bom_rider;
  	ColumnAccessor < mCFStaticData_0 > sfas60_ceded_comm_trail_eom;
  	ColumnAccessor < mCFStaticData_0 > sfas60_ceded_conversion_cost;
- 	ColumnAccessor < mCFStaticData_0 > sfas60_ceded_dac_amortzn_valn_basis;
- 	ColumnAccessor < mCFStaticData_0 > sfas60_ceded_dac_int_valn_basis;
  	ColumnAccessor < mCFStaticData_0 > sfas60_ceded_dac_prelim;
  	ColumnAccessor < mCFStaticData_0 > sfas60_ceded_div_applied;
  	ColumnAccessor < mCFStaticData_0 > sfas60_ceded_div_paid;
- 	ColumnAccessor < mCFStaticData_0 > sfas60_ceded_div_valn_basis;
  	ColumnAccessor < mCFStaticData_0 > sfas60_ceded_dth_claim_cost;
  	ColumnAccessor < mCFStaticData_0 > sfas60_ceded_endow_claim_cost;
- 	ColumnAccessor < mCFStaticData_0 > sfas60_ceded_exp_valn_basis;
- 	ColumnAccessor < mCFStaticData_0 > sfas60_ceded_gpr;
- 	ColumnAccessor < mCFStaticData_0 > sfas60_ceded_gpr_units_inf;
  	ColumnAccessor < mCFStaticData_0 > sfas60_ceded_gross_prem;
  	ColumnAccessor < mCFStaticData_0 > sfas60_ceded_hlth_claim_cost;
- 	ColumnAccessor < mCFStaticData_256 > sfas60_ceded_loc_cost;
- 	ColumnAccessor < mCFStaticData_256 > sfas60_ceded_maint_exp_bom;
- 	ColumnAccessor < mCFStaticData_256 > sfas60_ceded_maint_exp_eom;
- 	ColumnAccessor < mCFStaticData_256 > sfas60_ceded_maint_exp_res_accrual_valn_basis;
- 	ColumnAccessor < mCFStaticData_256 > sfas60_ceded_maint_exp_res_int_valn_basis;
- 	ColumnAccessor < mCFStaticData_256 > sfas60_ceded_maint_exp_res_prelim;
- 	ColumnAccessor < mCFStaticData_256 > sfas60_ceded_maturity_claim_cost;
- 	ColumnAccessor < mCFStaticData_256 > sfas60_ceded_modco_liab;
- 	ColumnAccessor < mCFStaticData_256 > sfas60_ceded_modco_res_adj;
- 	ColumnAccessor < mCFStaticData_256 > sfas60_ceded_prem_tax;
- 	ColumnAccessor < mCFStaticData_256 > sfas60_ceded_prem_waiver_res;
- 	ColumnAccessor < mCFStaticData_256 > sfas60_ceded_refund;
- 	ColumnAccessor < mCFStaticData_256 > sfas60_ceded_surr_ben_valn_basis;
- 	ColumnAccessor < mCFStaticData_256 > sfas60_ceded_surr_claim_cost;
- 	ColumnAccessor < mCFStaticData_256 > sfas60_ceded_terminal_div;
- 	ColumnAccessor < mCFStaticData_256 > sfas60_gross_acq_exp;
- 	ColumnAccessor < mCFStaticData_256 > sfas60_gross_ben_res_accrual_valn_basis;
- 	ColumnAccessor < mCFStaticData_256 > sfas60_gross_ben_res_int_valn_basis;
- 	ColumnAccessor < mCFStaticData_256 > sfas60_gross_ben_res_prelim;
- 	ColumnAccessor < mCFStaticData_256 > sfas60_gross_benefits_valn_basis;
- 	ColumnAccessor < mCFStaticData_256 > sfas60_gross_capzd_acq_exp;
- 	ColumnAccessor < mCFStaticData_256 > sfas60_gross_capzd_acq_exp_valn_basis;
- 	ColumnAccessor < mCFStaticData_256 > sfas60_gross_capzd_comm_bom;
+ 	ColumnAccessor < mCFStaticData_0 > sfas60_ceded_loc_cost;
+ 	ColumnAccessor < mCFStaticData_0 > sfas60_ceded_maint_exp_bom;
+ 	ColumnAccessor < mCFStaticData_0 > sfas60_ceded_maint_exp_eom;
+ 	ColumnAccessor < mCFStaticData_0 > sfas60_ceded_maturity_claim_cost;
+ 	ColumnAccessor < mCFStaticData_0 > sfas60_ceded_modco_liab;
+ 	ColumnAccessor < mCFStaticData_0 > sfas60_ceded_modco_res_adj;
+ 	ColumnAccessor < mCFStaticData_0 > sfas60_ceded_prem_tax;
+ 	ColumnAccessor < mCFStaticData_0 > sfas60_ceded_prem_waiver_res;
+ 	ColumnAccessor < mCFStaticData_0 > sfas60_ceded_refund;
+ 	ColumnAccessor < mCFStaticData_0 > sfas60_ceded_surr_claim_cost;
+ 	ColumnAccessor < mCFStaticData_0 > sfas60_ceded_terminal_div;
+ 	ColumnAccessor < mCFStaticData_0 > sfas60_gross_acq_exp;
+ 	ColumnAccessor < mCFStaticData_0 > sfas60_gross_ben_res_prelim;
+ 	ColumnAccessor < mCFStaticData_0 > sfas60_gross_capzd_acq_exp;
+ 	ColumnAccessor < mCFStaticData_0 > sfas60_gross_capzd_comm_bom;
  	ColumnAccessor < mCFStaticData_256 > sfas60_gross_capzd_comm_chargeback;
  	ColumnAccessor < mCFStaticData_256 > sfas60_gross_capzd_comm_eom;
- 	ColumnAccessor < mCFStaticData_256 > sfas60_gross_capzd_comm_valn_basis;
  	ColumnAccessor < mCFStaticData_256 > sfas60_gross_capzd_reins_yrt_cost;
  	ColumnAccessor < mCFStaticData_256 > sfas60_gross_cash_flow_bom;
  	ColumnAccessor < mCFStaticData_256 > sfas60_gross_claim_res;
@@ -640,37 +601,24 @@ epl_last_cash_flow_period = -1;
  	ColumnAccessor < mCFStaticData_256 > sfas60_gross_comm_trail_bom_rider;
  	ColumnAccessor < mCFStaticData_256 > sfas60_gross_comm_trail_eom;
  	ColumnAccessor < mCFStaticData_256 > sfas60_gross_conversion_cost;
- 	ColumnAccessor < mCFStaticData_256 > sfas60_gross_dac_amortzn_valn_basis;
- 	ColumnAccessor < mCFStaticData_256 > sfas60_gross_dac_int_valn_basis;
  	ColumnAccessor < mCFStaticData_256 > sfas60_gross_dac_prelim;
- 	ColumnAccessor < mCFStaticData_256 > sfas60_gross_dac_reins_yrt_asset_amortzn_valn_basis;
- 	ColumnAccessor < mCFStaticData_256 > sfas60_gross_dac_reins_yrt_asset_int_valn_basis;
  	ColumnAccessor < mCFStaticData_256 > sfas60_gross_dac_reins_yrt_asset_prelim;
  	ColumnAccessor < mCFStaticData_256 > sfas60_gross_div_applied;
  	ColumnAccessor < mCFStaticData_256 > sfas60_gross_div_paid;
- 	ColumnAccessor < mCFStaticData_256 > sfas60_gross_div_valn_basis;
  	ColumnAccessor < mCFStaticData_256 > sfas60_gross_dth_claim_cost;
  	ColumnAccessor < mCFStaticData_256 > sfas60_gross_endow_claim_cost;
- 	ColumnAccessor < mCFStaticData_256 > sfas60_gross_exp_valn_basis;
- 	ColumnAccessor < mCFStaticData_256 > sfas60_gross_gpr;
- 	ColumnAccessor < mCFStaticData_256 > sfas60_gross_gpr_units_inf;
  	ColumnAccessor < mCFStaticData_256 > sfas60_gross_gross_prem;
  	ColumnAccessor < mCFStaticData_256 > sfas60_gross_hlth_claim_cost;
  	ColumnAccessor < mCFStaticData_256 > sfas60_gross_loc_cost;
  	ColumnAccessor < mCFStaticData_256 > sfas60_gross_maint_exp_bom;
  	ColumnAccessor < mCFStaticData_256 > sfas60_gross_maint_exp_eom;
- 	ColumnAccessor < mCFStaticData_256 > sfas60_gross_maint_exp_res_accrual_valn_basis;
- 	ColumnAccessor < mCFStaticData_256 > sfas60_gross_maint_exp_res_int_valn_basis;
- 	ColumnAccessor < mCFStaticData_256 > sfas60_gross_maint_exp_res_prelim;
  	ColumnAccessor < mCFStaticData_256 > sfas60_gross_maturity_claim_cost;
  	ColumnAccessor < mCFStaticData_256 > sfas60_gross_pol_loan;
  	ColumnAccessor < mCFStaticData_256 > sfas60_gross_pol_loan_inc;
  	ColumnAccessor < mCFStaticData_256 > sfas60_gross_prem_tax;
  	ColumnAccessor < mCFStaticData_256 > sfas60_gross_prem_waiver_res;
  	ColumnAccessor < mCFStaticData_256 > sfas60_gross_reins_yrt_cost;
- 	ColumnAccessor < mCFStaticData_256 > sfas60_gross_reins_yrt_cost_valn_basis;
  	ColumnAccessor < mCFStaticData_256 > sfas60_gross_stat_res_rider;
- 	ColumnAccessor < mCFStaticData_256 > sfas60_gross_surr_ben_valn_basis;
  	ColumnAccessor < mCFStaticData_256 > sfas60_gross_surr_claim_cost;
  	ColumnAccessor < mCFStaticData_256 > sfas60_gross_terminal_div;
  	ColumnAccessor < mCFStaticData_256 > sfas91_ceded_acq_exp;
@@ -725,16 +673,11 @@ epl_last_cash_flow_period = -1;
  	ColumnAccessor < mCFStaticData_256 > sfas91_gross_res_dth_benefits;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_ceded_acq_exp;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_ceded_ann_claim_cost;
- 	ColumnAccessor < mCFStaticData_256 > sfas97lp_ceded_ben_res_accrual_valn_basis;
- 	ColumnAccessor < mCFStaticData_256 > sfas97lp_ceded_ben_res_int_valn_basis;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_ceded_ben_res_prelim;
- 	ColumnAccessor < mCFStaticData_256 > sfas97lp_ceded_benefits_valn_basis;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_ceded_capzd_acq_exp;
- 	ColumnAccessor < mCFStaticData_256 > sfas97lp_ceded_capzd_acq_exp_valn_basis;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_ceded_capzd_comm_bom;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_ceded_capzd_comm_chargeback;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_ceded_capzd_comm_eom;
- 	ColumnAccessor < mCFStaticData_256 > sfas97lp_ceded_capzd_comm_valn_basis;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_ceded_cash_flow_bom;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_ceded_claim_res;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_ceded_comm_chargeback;
@@ -745,50 +688,32 @@ epl_last_cash_flow_period = -1;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_ceded_comm_trail_bom_rider;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_ceded_comm_trail_eom;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_ceded_conversion_cost;
- 	ColumnAccessor < mCFStaticData_256 > sfas97lp_ceded_dac_amortzn_valn_basis;
- 	ColumnAccessor < mCFStaticData_256 > sfas97lp_ceded_dac_int_valn_basis;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_ceded_dac_prelim;
- 	ColumnAccessor < mCFStaticData_256 > sfas97lp_ceded_deferred_prof_amortzn_valn_basis;
- 	ColumnAccessor < mCFStaticData_256 > sfas97lp_ceded_deferred_prof_int_valn_basis;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_ceded_deferred_prof_liab_prelim;
- 	ColumnAccessor < mCFStaticData_256 > sfas97lp_ceded_deferred_prof_valn_basis;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_ceded_div_applied;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_ceded_div_paid;
- 	ColumnAccessor < mCFStaticData_256 > sfas97lp_ceded_div_valn_basis;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_ceded_dth_claim_cost;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_ceded_endow_claim_cost;
- 	ColumnAccessor < mCFStaticData_256 > sfas97lp_ceded_exp_valn_basis;
- 	ColumnAccessor < mCFStaticData_256 > sfas97lp_ceded_gpr;
- 	ColumnAccessor < mCFStaticData_256 > sfas97lp_ceded_gpr_units_inf;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_ceded_gross_prem;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_ceded_hlth_claim_cost;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_ceded_loc_cost;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_ceded_maint_exp_bom;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_ceded_maint_exp_eom;
- 	ColumnAccessor < mCFStaticData_256 > sfas97lp_ceded_maint_exp_res_accrual_valn_basis;
- 	ColumnAccessor < mCFStaticData_256 > sfas97lp_ceded_maint_exp_res_int_valn_basis;
- 	ColumnAccessor < mCFStaticData_256 > sfas97lp_ceded_maint_exp_res_prelim;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_ceded_maturity_claim_cost;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_ceded_modco_liab;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_ceded_modco_res_adj;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_ceded_prem_tax;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_ceded_prem_waiver_res;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_ceded_refund;
- 	ColumnAccessor < mCFStaticData_256 > sfas97lp_ceded_surr_ben_valn_basis;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_ceded_surr_claim_cost;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_ceded_terminal_div;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_acq_exp;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_ann_claim_cost;
- 	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_ben_res_accrual_valn_basis;
- 	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_ben_res_int_valn_basis;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_ben_res_prelim;
- 	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_benefits_valn_basis;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_capzd_acq_exp;
- 	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_capzd_acq_exp_valn_basis;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_capzd_comm_bom;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_capzd_comm_chargeback;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_capzd_comm_eom;
- 	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_capzd_comm_valn_basis;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_capzd_reins_yrt_cost;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_cash_flow_bom;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_claim_res;
@@ -800,41 +725,25 @@ epl_last_cash_flow_period = -1;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_comm_trail_bom_rider;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_comm_trail_eom;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_conversion_cost;
- 	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_dac_amortzn_valn_basis;
- 	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_dac_int_valn_basis;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_dac_prelim;
- 	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_dac_reins_yrt_asset_amortzn_valn_basis;
- 	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_dac_reins_yrt_asset_int_valn_basis;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_dac_reins_yrt_asset_prelim;
- 	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_deferred_prof_amortzn_valn_basis;
- 	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_deferred_prof_int_valn_basis;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_deferred_prof_liab_prelim;
- 	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_deferred_prof_valn_basis;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_div_applied;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_div_paid;
- 	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_div_valn_basis;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_dth_claim_cost;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_endow_claim_cost;
- 	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_exp_valn_basis;
- 	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_gpr;
- 	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_gpr_units_inf;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_gross_prem;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_hlth_claim_cost;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_loc_cost;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_maint_exp_bom;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_maint_exp_eom;
- 	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_maint_exp_res_accrual_valn_basis;
- 	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_maint_exp_res_int_valn_basis;
- 	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_maint_exp_res_prelim;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_maturity_claim_cost;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_pol_loan;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_pol_loan_inc;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_prem_tax;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_prem_waiver_res;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_reins_yrt_cost;
- 	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_reins_yrt_cost_valn_basis;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_stat_res_rider;
- 	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_surr_ben_valn_basis;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_surr_claim_cost;
  	ColumnAccessor < mCFStaticData_256 > sfas97lp_gross_terminal_div;
  	ColumnAccessor < mCFStaticData_256 > sfas97rd_ceded_acq_exp;
@@ -859,87 +768,89 @@ epl_last_cash_flow_period = -1;
  	ColumnAccessor < mCFStaticData_256 > sfas97rd_ceded_fund_val_aft_int;
  	ColumnAccessor < mCFStaticData_256 > sfas97rd_ceded_fund_val_bef_int;
  	ColumnAccessor < mCFStaticData_256 > sfas97rd_ceded_fund_val_fixed;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_ceded_fund_val_sa;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_ceded_gmab_ben;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_ceded_gmdb_ben;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_ceded_gmib_ben;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_ceded_gmwb_ben;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_ceded_hedge_cash_flow;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_ceded_hedge_mkt_val;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_ceded_host_contract_cred_int;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_ceded_host_contract_val;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_ceded_host_contract_val_bef;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_ceded_inv_inc_fund;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_ceded_loads;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_ceded_loc_cost;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_ceded_maint_exp_bom;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_ceded_maint_exp_eom;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_ceded_modco_liab;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_ceded_modco_res_adj;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_ceded_persist_bon_ref;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_ceded_policies_b;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_ceded_prem_bonus;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_ceded_prem_tax;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_ceded_refund;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_ceded_rider_charges;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_ceded_sfas133_gmab_liab;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_ceded_sfas133_gmib_liab;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_ceded_sfas133_gmwb_liab;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_ceded_sop031_assess;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_ceded_sop031_coi_assess;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_ceded_sop031_coi_ben;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_ceded_sop031_pbr;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_ceded_sop031_pbr_fund_val;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_ceded_ulsg_ben;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_acq_exp;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_cap_gain_fund;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_capzd_acq_exp;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_capzd_comm_bom;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_capzd_comm_chargeback;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_capzd_comm_eom;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_capzd_prem_bonus;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_capzd_reins_yrt_cost;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_cash_flow_bom;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_charges;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_comm_chargeback;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_comm_excess_bom;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_comm_trail_bom;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_credited_int;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_deferred_loads;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_dth_claim_cost;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_egp_gain_inv;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_egp_gain_mort;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_egp_gain_surr;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_embed_deriv_cash_flow;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_fund_val_aft_int;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_fund_val_bef_int;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_fund_val_fixed;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_fund_val_sa;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_gmab_ben;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_gmdb_ben;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_gmib_ben;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_gmwb_ben;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_hedge_cash_flow;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_hedge_mkt_val;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_host_contract_cred_int;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_host_contract_val;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_host_contract_val_bef;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_inv_inc_fund;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_loads;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_loc_cost;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_maint_exp_bom;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_maint_exp_eom;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_persist_bon_ref;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_ceded_fund_val_sa;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_ceded_gmab_ben;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_ceded_gmdb_ben;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_ceded_gmib_ben;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_ceded_gmwb_ben;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_ceded_hedge_cash_flow;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_ceded_hedge_mkt_val;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_ceded_host_contract_cred_int;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_ceded_host_contract_val;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_ceded_host_contract_val_bef;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_ceded_inv_inc_fund;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_ceded_loads;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_ceded_loc_cost;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_ceded_maint_exp_bom;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_ceded_maint_exp_eom;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_ceded_modco_liab;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_ceded_modco_res_adj;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_ceded_mrb_gmab_liab;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_ceded_mrb_gmdb_liab;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_ceded_mrb_gmib_liab;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_ceded_mrb_gmwb_liab;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_ceded_persist_bon_ref;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_ceded_policies_inf;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_ceded_prem_bonus;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_ceded_prem_tax;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_ceded_refund;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_ceded_rider_charges;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_ceded_sop031_assess;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_ceded_sop031_coi_assess;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_ceded_sop031_coi_ben;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_ceded_sop031_pbr;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_ceded_sop031_pbr_fund_val;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_ceded_ulsg_ben;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_gross_acq_exp;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_gross_cap_gain_fund;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_gross_capzd_acq_exp;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_gross_capzd_comm_bom;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_gross_capzd_comm_chargeback;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_gross_capzd_comm_eom;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_gross_capzd_prem_bonus;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_gross_capzd_reins_yrt_cost;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_gross_cash_flow_bom;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_gross_charges;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_gross_comm_chargeback;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_gross_comm_excess_bom;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_gross_comm_trail_bom;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_gross_credited_int;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_gross_deferred_loads;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_gross_dth_claim_cost;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_gross_egp_gain_inv;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_gross_egp_gain_mort;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_gross_egp_gain_surr;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_gross_embed_deriv_cash_flow;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_gross_fund_val_aft_int;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_gross_fund_val_bef_int;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_gross_fund_val_fixed;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_gross_fund_val_sa;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_gross_gmab_ben;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_gross_gmdb_ben;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_gross_gmib_ben;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_gross_gmwb_ben;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_gross_hedge_cash_flow;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_gross_hedge_mkt_val;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_gross_host_contract_cred_int;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_gross_host_contract_val;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_gross_host_contract_val_bef;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_gross_inv_inc_fund;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_gross_loads;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_gross_loc_cost;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_gross_maint_exp_bom;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_gross_maint_exp_eom;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_gross_mrb_gmab_liab;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_gross_mrb_gmdb_liab;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_gross_mrb_gmib_liab;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_gross_mrb_gmwb_liab;
+ 	ColumnAccessor < mCFStaticData_256 > sfas97rd_gross_persist_bon_ref;
  	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_pol_loan;
  	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_pol_loan_inc;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_policies_b;
+ 	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_policies_inf;
  	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_prem_bonus;
  	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_prem_tax;
  	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_reins_yrt_cost;
  	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_rider_charges;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_sfas133_gmab_liab;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_sfas133_gmib_liab;
- 	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_sfas133_gmwb_liab;
  	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_sop031_assess;
  	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_sop031_coi_assess;
  	ColumnAccessor < mCFStaticData_512 > sfas97rd_gross_sop031_coi_ben;
@@ -984,25 +895,12 @@ epl_last_cash_flow_period = -1;
  	ColumnAccessor < mCFStaticData_512 > transfer_cash_flow_sa_eom;
  	ColumnAccessor < mCFStaticData_512 > transfer_to_sa_net;
  	ColumnAccessor < mCFStaticData_512 > va_pba_asset_sa;
- 	ColumnAccessor < mCFStaticData_512 > va_pba_ceded_cap_std_scen_ben_costs;
- 	ColumnAccessor < mCFStaticData_512 > va_pba_ceded_cap_std_scen_margin;
- 	ColumnAccessor < mCFStaticData_512 > va_pba_ceded_res_std_scen_ben_costs;
- 	ColumnAccessor < mCFStaticData_512 > va_pba_ceded_res_std_scen_margin;
- 	ColumnAccessor < mCFStaticData_512 > va_pba_gross_cap_std_scen_ben_costs;
- 	ColumnAccessor < mCFStaticData_512 > va_pba_gross_cap_std_scen_margin;
- 	ColumnAccessor < mCFStaticData_512 > va_pba_gross_res_std_scen_ben_costs;
- 	ColumnAccessor < mCFStaticData_512 > va_pba_gross_res_std_scen_margin;
+ 	ColumnAccessor < mCFStaticData_512 > va_pba_cash_val;
  	ColumnAccessor < mCFStaticData_512 > va_pba_working_res;
  	ColumnAccessor < mCFStaticData_512 > withdrl_benefits;
 //Column Definition END@2
 
  // Temporary Table...
-EPL_LIAB *sm_bond_is;
-EPL_LIAB *sm_bond_pv;
-EPL_LIAB *sm_bond_ym;
-EPL_LIAB *sm_mtg_is;
-EPL_LIAB *sm_mtg_pv;
-EPL_LIAB *sm_mtg_ym;
 int main_rebase_model; //1
 
 public :
@@ -1024,6 +922,9 @@ public :
 	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > data_validation_defn;
   inline xstring	Get_data_validation_defn() {
 		return data_validation_defn; }
+	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > epl_column_headers;
+  inline xstring	Get_epl_column_headers() {
+		return epl_column_headers; }
 	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > epl_file;
   inline xstring	Get_epl_file() {
 		return epl_file; }
@@ -1079,10 +980,6 @@ double get_epl_value(const xstring &col_name, int t);
 // Read EPL File
 #line 1 "read_epl_file.epl_liab.for"
 bool read_epl_file(const xstring &epl_file);
-
-// Set Schedule Byte Markers
-#line 1 "set_sched_byte_markers.epl_liab.for"
-void set_sched_byte_markers(const xstring &sched_file);
 
 
 //factory
@@ -1159,12 +1056,6 @@ public :
 	void write(const xstring& key, long include_submodels = write_submodels);
 
 	ModelClass *Save_main;
-	EPL_LIAB *&sm_bond_is; //
-	EPL_LIAB *&sm_bond_pv; //
-	EPL_LIAB *&sm_bond_ym; //
-	EPL_LIAB *&sm_mtg_is; //
-	EPL_LIAB *&sm_mtg_pv; //
-	EPL_LIAB *&sm_mtg_ym; //
 
 	ProductFeatureList* pfl;
 

@@ -2,6 +2,10 @@
 #define __LIAB_LIAB_H_
 #pragma warning ( disable : 4819 )
 
+#if defined(GEN2_ALM_RUN)
+	#define __LIAB_LIAB_H_
+#endif
+
 #include <math.h>
 #include "xstring.h"
 #include "Locator.h"
@@ -60,7 +64,6 @@ extern MY_DLL ofstream log_strm;
 #include "StringProxy.h"			// ... contains String Proxies
 #include "StringEnumProxy.h"		// ... contains StringEnum Proxies
 #include "NumProxyNonMembers.h"		// ... min, max
-#include "StringedProxyNonMembers.h"		// ... concatenation for StringEnum
 #include "ArrayProxy.h"			// ... contains Array Proxies
 #include "ScalarProxy.h"			// ... contains Scalar Proxies
 #include "ModelGroupProxy.h"
@@ -70,6 +73,11 @@ extern MY_DLL ofstream log_strm;
 
 
 using namespace StrEnum;
+
+#ifdef __CREATE_AA_COMP_COMP_CLASS_
+class AA_COMP_COMP;
+class AA_COMP_COMP_persistent_object;
+#endif
 
 #ifdef __CREATE_ADCO_ASSET_CLASS_
 class ADCO_ASSET;
@@ -87,11 +95,6 @@ class ASSET_ASSET;
 class ASSET_ASSET_persistent_object;
 #endif
 
-#ifdef __CREATE_AUTOMATION_CLASS_
-class AUTOMATION;
-class AUTOMATION_persistent_object;
-#endif
-
 #ifdef __CREATE_A_SUBPORT_ASSET_CLASS_
 class A_SUBPORT_ASSET;
 class A_SUBPORT_ASSET_persistent_object;
@@ -104,22 +107,21 @@ typedef TMultiDComp<_2D_A_SUBPORT_ASSET, A_SUBPORT_ASSET_persistent_object> _3D_
 class BOND_ASSET;
 class BOND_ASSET_persistent_object;
 typedef TComp<BOND_ASSET, BOND_ASSET_persistent_object> _1D_BOND_ASSET;
+typedef TMultiDComp<_1D_BOND_ASSET, BOND_ASSET_persistent_object> _2D_BOND_ASSET;
 #endif
 
 #ifdef __CREATE_BOND_CF_ASSET_CLASS_
 class BOND_CF_ASSET;
 class BOND_CF_ASSET_persistent_object;
-#endif
-
-#ifdef __CREATE_COMP_COMP_CLASS_
-class COMP_COMP;
-class COMP_COMP_persistent_object;
+typedef TComp<BOND_CF_ASSET, BOND_CF_ASSET_persistent_object> _1D_BOND_CF_ASSET;
+typedef TMultiDComp<_1D_BOND_CF_ASSET, BOND_CF_ASSET_persistent_object> _2D_BOND_CF_ASSET;
 #endif
 
 #ifdef __CREATE_EIO_ASSET_CLASS_
 class EIO_ASSET;
 class EIO_ASSET_persistent_object;
 typedef TComp<EIO_ASSET, EIO_ASSET_persistent_object> _1D_EIO_ASSET;
+typedef TMultiDComp<_1D_EIO_ASSET, EIO_ASSET_persistent_object> _2D_EIO_ASSET;
 #endif
 
 #ifdef __CREATE_EPA_ASSET_CLASS_
@@ -144,6 +146,7 @@ typedef TComp<FIAAFUND_LIAB, FIAAFUND_LIAB_persistent_object> _1D_FIAAFUND_LIAB;
 class FIACARVM_LIAB;
 class FIACARVM_LIAB_persistent_object;
 typedef TComp<FIACARVM_LIAB, FIACARVM_LIAB_persistent_object> _1D_FIACARVM_LIAB;
+typedef TMultiDComp<_1D_FIACARVM_LIAB, FIACARVM_LIAB_persistent_object> _2D_FIACARVM_LIAB;
 #endif
 
 #ifdef __CREATE_FIA_LIAB_CLASS_
@@ -159,11 +162,6 @@ typedef TComp<HDG_GRP_COMP, HDG_GRP_COMP_persistent_object> _1D_HDG_GRP_COMP;
 typedef TMultiDComp<_1D_HDG_GRP_COMP, HDG_GRP_COMP_persistent_object> _2D_HDG_GRP_COMP;
 #endif
 
-#ifdef __CREATE_INTEX_ASSET_CLASS_
-class INTEX_ASSET;
-class INTEX_ASSET_persistent_object;
-#endif
-
 #ifdef __CREATE_INVSTRAT_ASSET_CLASS_
 class INVSTRAT_ASSET;
 class INVSTRAT_ASSET_persistent_object;
@@ -175,15 +173,24 @@ class LIAB_LIAB;
 class LIAB_LIAB_persistent_object;
 #endif
 
+#ifdef __CREATE_MRB_GAAP_CLASS_
+class MRB_GAAP;
+class MRB_GAAP_persistent_object;
+typedef TComp<MRB_GAAP, MRB_GAAP_persistent_object> _1D_MRB_GAAP;
+#endif
+
 #ifdef __CREATE_MTG_ASSET_CLASS_
 class MTG_ASSET;
 class MTG_ASSET_persistent_object;
 typedef TComp<MTG_ASSET, MTG_ASSET_persistent_object> _1D_MTG_ASSET;
+typedef TMultiDComp<_1D_MTG_ASSET, MTG_ASSET_persistent_object> _2D_MTG_ASSET;
 #endif
 
 #ifdef __CREATE_MTG_CF_ASSET_CLASS_
 class MTG_CF_ASSET;
 class MTG_CF_ASSET_persistent_object;
+typedef TComp<MTG_CF_ASSET, MTG_CF_ASSET_persistent_object> _1D_MTG_CF_ASSET;
+typedef TMultiDComp<_1D_MTG_CF_ASSET, MTG_CF_ASSET_persistent_object> _2D_MTG_CF_ASSET;
 #endif
 
 #ifdef __CREATE_RATES_ECONOMY_CLASS_
@@ -197,22 +204,11 @@ class SEG_COMP_persistent_object;
 typedef TComp<SEG_COMP, SEG_COMP_persistent_object> _1D_SEG_COMP;
 #endif
 
-#ifdef __CREATE_SFAS133_GAAP_CLASS_
-class SFAS133_GAAP;
-class SFAS133_GAAP_persistent_object;
-typedef TComp<SFAS133_GAAP, SFAS133_GAAP_persistent_object> _1D_SFAS133_GAAP;
-#endif
-
 #ifdef __CREATE_SFAS97RD_GAAP_CLASS_
 class SFAS97RD_GAAP;
 class SFAS97RD_GAAP_persistent_object;
 typedef TComp<SFAS97RD_GAAP, SFAS97RD_GAAP_persistent_object> _1D_SFAS97RD_GAAP;
 typedef TMultiDComp<_1D_SFAS97RD_GAAP, SFAS97RD_GAAP_persistent_object> _2D_SFAS97RD_GAAP;
-#endif
-
-#ifdef __CREATE_UTIL_RAFM_CLASS_
-class UTIL_RAFM;
-class UTIL_RAFM_persistent_object;
 #endif
 
 
@@ -293,19 +289,11 @@ public :
 	BOND_CF_ASSET	*&bond_cf;
 #endif
 #ifdef __CREATE_BOND_CF_ASSET_CLASS_
-	BOND_CF_ASSET	*company_asset_bond_bond_cf_bond_is;
-	BOND_CF_ASSET	*&bond_is;
+	BOND_CF_ASSET	*company_asset_bond_bond_cf_var;
+	BOND_CF_ASSET	*&bond_cf_var;
 #endif
-#ifdef __CREATE_BOND_CF_ASSET_CLASS_
-	BOND_CF_ASSET	*company_asset_bond_bond_cf_bond_pv;
-	BOND_CF_ASSET	*&bond_pv;
-#endif
-#ifdef __CREATE_BOND_CF_ASSET_CLASS_
-	BOND_CF_ASSET	*company_asset_bond_bond_cf_bond_ym;
-	BOND_CF_ASSET	*&bond_ym;
-#endif
-#ifdef __CREATE_COMP_COMP_CLASS_
-	COMP_COMP	*company;
+#ifdef __CREATE_AA_COMP_COMP_CLASS_
+	AA_COMP_COMP	*company;
 #endif
 #ifdef __CREATE_EIO_ASSET_CLASS_
 	EIO_ASSET	*company_asset_eio;
@@ -331,10 +319,6 @@ public :
 	ANN_PBA_PBA	*company_liab_fia_fia_ann_pba;
 	ANN_PBA_PBA	*&fia_ann_pba;
 #endif
-#ifdef __CREATE_AUTOMATION_CLASS_
-	AUTOMATION	*company_liab_fia_fia_automation;
-	AUTOMATION	*&fia_automation;
-#endif
 #ifdef __CREATE_FIACARVM_LIAB_CLASS_
 	FIACARVM_LIAB	*company_liab_fia_carvm_stat;
 	FIACARVM_LIAB	*&fia_carvm_stat;
@@ -343,13 +327,13 @@ public :
 	FIACARVM_LIAB	*company_liab_fia_carvm_tax;
 	FIACARVM_LIAB	*&fia_carvm_tax;
 #endif
+#ifdef __CREATE_MRB_GAAP_CLASS_
+	MRB_GAAP	*company_liab_fia_fia_mrb;
+	MRB_GAAP	*&fia_mrb;
+#endif
 #ifdef __CREATE_RATES_ECONOMY_CLASS_
 	RATES_ECONOMY	*company_liab_fia_fia_rates;
 	RATES_ECONOMY	*&fia_rates;
-#endif
-#ifdef __CREATE_SFAS133_GAAP_CLASS_
-	SFAS133_GAAP	*company_liab_fia_fia_sfas133;
-	SFAS133_GAAP	*&fia_sfas133;
 #endif
 #ifdef __CREATE_SFAS97RD_GAAP_CLASS_
 	SFAS97RD_GAAP	*company_liab_fia_fia_sfas97rd;
@@ -358,10 +342,6 @@ public :
 #ifdef __CREATE_HDG_GRP_COMP_CLASS_
 	HDG_GRP_COMP	*company_seg_hedge_grp;
 	HDG_GRP_COMP	*&hedge_grp;
-#endif
-#ifdef __CREATE_INTEX_ASSET_CLASS_
-	INTEX_ASSET	*company_asset_intex;
-	INTEX_ASSET	*&intex;
 #endif
 #ifdef __CREATE_INVSTRAT_ASSET_CLASS_
 	INVSTRAT_ASSET	*company_inv_strategy;
@@ -380,16 +360,8 @@ public :
 	MTG_CF_ASSET	*&mtg_cf;
 #endif
 #ifdef __CREATE_MTG_CF_ASSET_CLASS_
-	MTG_CF_ASSET	*company_asset_mtg_mtg_cf_mtg_is;
-	MTG_CF_ASSET	*&mtg_is;
-#endif
-#ifdef __CREATE_MTG_CF_ASSET_CLASS_
-	MTG_CF_ASSET	*company_asset_mtg_mtg_cf_mtg_pv;
-	MTG_CF_ASSET	*&mtg_pv;
-#endif
-#ifdef __CREATE_MTG_CF_ASSET_CLASS_
-	MTG_CF_ASSET	*company_asset_mtg_mtg_cf_mtg_ym;
-	MTG_CF_ASSET	*&mtg_ym;
+	MTG_CF_ASSET	*company_asset_mtg_mtg_cf_var;
+	MTG_CF_ASSET	*&mtg_cf_var;
 #endif
 #ifdef __CREATE_RATES_ECONOMY_CLASS_
 	RATES_ECONOMY	*company_rates;
@@ -403,9 +375,6 @@ public :
 	SFAS97RD_GAAP	*company_seg_sfas97rd;
 	SFAS97RD_GAAP	*&sfas97rd;
 #endif
-#ifdef __CREATE_UTIL_RAFM_CLASS_
-	UTIL_RAFM	*util;
-#endif
  // Column Definition Begins
  	ColumnAccessor < mCFStaticData_0 > finalize;
  	ColumnAccessor < mCFStaticData_0 > initialize;
@@ -415,12 +384,6 @@ public :
  // Temporary Table...
 _1D_EPL_LIAB sm_epl;
 _1D_FIA_LIAB sm_fia;
-LIAB_LIAB *sm_bond_is;
-LIAB_LIAB *sm_bond_pv;
-LIAB_LIAB *sm_bond_ym;
-LIAB_LIAB *sm_mtg_is;
-LIAB_LIAB *sm_mtg_pv;
-LIAB_LIAB *sm_mtg_ym;
 int main_rebase_model; //1
 
 public :
@@ -439,9 +402,6 @@ public :
 #ifdef MICROSOFT
 #pragma warning(pop)
 #endif	MICROSOFT
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > independent_mp_defn;
-  inline xstring	Get_independent_mp_defn() {
-		return independent_mp_defn; }
 	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > proj_date;
   inline xstring	Get_proj_date() {
 		return proj_date; }
@@ -556,12 +516,6 @@ public :
 	ModelClass *Save_main;
 	_1D_EPL_LIAB &sm_epl; //
 	_1D_FIA_LIAB &sm_fia; //
-	LIAB_LIAB *&sm_bond_is; //
-	LIAB_LIAB *&sm_bond_pv; //
-	LIAB_LIAB *&sm_bond_ym; //
-	LIAB_LIAB *&sm_mtg_is; //
-	LIAB_LIAB *&sm_mtg_pv; //
-	LIAB_LIAB *&sm_mtg_ym; //
 
 	ProductFeatureList* pfl;
 

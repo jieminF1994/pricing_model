@@ -1,13 +1,12 @@
 ﻿
 //MODELCLASS BEGIN
+//MODELCLASS aa_comp_comp
 //MODELCLASS adco_asset
 //MODELCLASS ann_pba_pba
 //MODELCLASS asset_asset
-//MODELCLASS automation
 //MODELCLASS a_subport_asset
 //MODELCLASS bond_asset
 //MODELCLASS bond_cf_asset
-//MODELCLASS comp_comp
 //MODELCLASS eio_asset
 //MODELCLASS epa_asset
 //MODELCLASS epl_liab
@@ -15,16 +14,14 @@
 //MODELCLASS fiacarvm_liab
 //MODELCLASS fia_liab
 //MODELCLASS hdg_grp_comp
-//MODELCLASS intex_asset
 //MODELCLASS invstrat_asset
 //MODELCLASS liab_liab
+//MODELCLASS mrb_gaap
 //MODELCLASS mtg_asset
 //MODELCLASS mtg_cf_asset
 //MODELCLASS rates_economy
 //MODELCLASS seg_comp
-//MODELCLASS sfas133_gaap
 //MODELCLASS sfas97rd_gaap
-//MODELCLASS util_rafm
 //MODELCLASS END
 
 #if defined(MICROSOFT)
@@ -75,30 +72,27 @@ extern MemCount gMem;
 extern MY_DLL Parmfile *p;
 #include "column2.h"
 #include "ModelClass\epl_liab_udf.h"
+#include "ModelClass\aa_comp_comp.h"
 #include "ModelClass\adco_asset.h"
 #include "ModelClass\ann_pba_pba.h"
 #include "ModelClass\asset_asset.h"
-#include "ModelClass\automation.h"
 #include "ModelClass\a_subport_asset.h"
 #include "ModelClass\bond_asset.h"
 #include "ModelClass\bond_cf_asset.h"
-#include "ModelClass\comp_comp.h"
 #include "ModelClass\eio_asset.h"
 #include "ModelClass\epa_asset.h"
 #include "ModelClass\fiaafund_liab.h"
 #include "ModelClass\fiacarvm_liab.h"
 #include "ModelClass\fia_liab.h"
 #include "ModelClass\hdg_grp_comp.h"
-#include "ModelClass\intex_asset.h"
 #include "ModelClass\invstrat_asset.h"
 #include "ModelClass\liab_liab.h"
+#include "ModelClass\mrb_gaap.h"
 #include "ModelClass\mtg_asset.h"
 #include "ModelClass\mtg_cf_asset.h"
 #include "ModelClass\rates_economy.h"
 #include "ModelClass\seg_comp.h"
-#include "ModelClass\sfas133_gaap.h"
 #include "ModelClass\sfas97rd_gaap.h"
-#include "ModelClass\util_rafm.h"
 #pragma optimize( "gs", on )
 
 #include "generatedCppHeader.h"
@@ -109,7 +103,7 @@ extern MY_DLL Parmfile *p;
 //Redundant includes only for snip test:
 //iomanip included for "setprecision()"
 #include <iomanip>
-#include <strstream> //WTW - Gen2
+#include <strstream>
 typedef vector<vector<string>> sowfinput;
 typedef vector<string> sowfcols;
 typedef map <xstring, long, less <xstring> > sowfmap;
@@ -120,7 +114,9 @@ typedef vector<vector<string>> deptaskinput;
 typedef vector<string> deptaskcols;
 typedef map <xstring, long, less <xstring> > deptaskmap;
 typedef deptaskmap::iterator deptaskmapiter;
-//extern MY_DLL strstream log_screen; //WTW - Gen2 - MY_DLL is not supported
+const int pv = 0;
+const int is = 1;
+const int ym = 2;
 const int EFFECTIVE_RATE = 0;
 const int EFFECTIVE_ANNUAL = 1;
 const int NOMINAL_SEMIANNUAL = 2;
@@ -138,9 +134,8 @@ const double LEAST_ANNUAL_GROWTH_RATE = -0.9999;
 const double LEAST_BOND_EQUIVALENT_RATE = 0.0001;
 const double SPOT_SHIFT_FOR_EFFECTIVE_DURATION_CALCULATION = 0.0001;
 const double ONE_MILLION = 1000000.0;
-//WTW - Gen2 - Move Extern definitions to rates header
-//const double MINIMUM_MONTHLY_YIELD_RATIO = -0.9; // annual yield = (1.0-0.9)^12 = 1.0e-12
-//const double MAXIMUM_MONTHLY_YIELD_RATIO	 = 999999999.0; // annual yield = (1.0+999999999.0)^12 = 1.0e+120
+const double MINIMUM_MONTHLY_YIELD_RATIO = -0.9; // annual yield = (1.0-0.9)^12 = 1.0e-12
+const double MAXIMUM_MONTHLY_YIELD_RATIO	 = 999999999.0; // annual yield = (1.0+999999999.0)^12 = 1.0e+120
 const int DECIMALS_TO_ROUND = 6;
 const int ROUND_NEGATIVE_TOZERO = 0;
 const int ROUND_NEAR = 1;
@@ -154,11 +149,10 @@ const int SUM_OVER_NEGATIVE = -101;
 const int TIER = -98;
 const int ANY_GROUP = -99;
 const bool DO_NOT_ISSUE_WARNINGS = false;
-//WTW - Gen2 - Move Extern definitions to rates header
-//const int CALL_CODE = 1; 
-//const int PUT_CODE = 2; 
-//const int CONTINUOUS_PAYOUT_CODE = 3;
-//const int FUTURES_CODE = 4;
+const int CALL_CODE = 1;
+const int PUT_CODE = 2;
+const int CONTINUOUS_PAYOUT_CODE = 3;
+const int FUTURES_CODE = 4;
 // Model point type
 const int NEW_PURCH = 0;
 const int INIT_MP = 1;
@@ -208,11 +202,13 @@ const int HEDGE_CASH_FLOW = 0;
 const int HEDGE_MKT_VAL = 1;
 const int HEDGE_ARRAY_SIZE = 2;
 // global calculation flags
-//extern bool pricing_flag;//WTW - Gen2 - Move Extern definitions to rates header
+extern bool pricing_flag;
 extern bool factors_flag;
 extern bool nb_flag;
 extern bool alm_flag;
 extern bool tcm_flag;
+extern bool pba_disc_rate_flag;
+extern int pba_segment_size;
 extern bool avr_flag;
 extern bool imr_flag;
 extern bool gaap_flag;
@@ -220,17 +216,12 @@ extern bool tgt_cap_flag;
 extern bool stoch_flag;
 extern bool valn_flag;
 extern bool time_step_flag;
-extern bool sfas133_valn_flag;
+extern bool mrb_valn_flag;
 extern bool sop031_valn_flag;
 extern bool sfas97rd_valn_flag;
-extern bool sfas97lp_valn_flag;
-extern bool sfas97lp_gpr_valn_flag;
 extern bool sfas91_valn_flag;
-extern bool sfas60_valn_flag;
-extern bool sfas60_gpr_valn_flag;
+extern bool gaap_ldti_valn_flag;
 extern bool sfas120_nlp_valn_flag;
-extern bool sfas120_valn_flag;
-extern bool sfas120_gpr_valn_flag;
 extern bool loc_gpr_valn_flag;
 extern bool pba_valn_flag;
 extern bool pba_scen_amt_valn_flag;
@@ -239,6 +230,7 @@ extern bool res_scen_amt_valn_flag;
 extern bool res_det_res_valn_flag;
 extern bool res_ag38_8d_valn_flag;
 extern bool std_scen_valn_flag;
+extern bool std_scen_prescribed_assump_flag;
 extern bool rbc_std_scen_valn_flag;
 extern bool rbc_std_scen_step2_valn_flag;
 extern bool res_std_scen_valn_flag;
@@ -261,33 +253,32 @@ extern double aggregate_amount_threshold;
 extern double model_point_amount_threshold;
 extern double rate_ratio_threshold;
 extern vector<string> valn_periods;
+
 // utility functions - elaborated in rates/economy externs
-//WTW - Gen2 - Move Extern definitions to rates header
-/*extern double round_result(int rounding, int negative, double x, int n);
+extern double round_result(int rounding, int negative, double x, int n);
 extern double factorial(int n);
 extern int n_choose_k(int n, int k);
 extern xstring check_date_format(const xstring &date);
+extern int month_from_day_number(int nSerialDate);
+extern int year_from_day_number(int nSerialDate);
+extern int day_from_day_number(int nSerialDate);
+extern int month_number_from_date(int year, int month); 
+extern int day_number_from_date(int nYear, int nMonth, int nDay);
 extern int get_mth_from_date(const xstring &date);
 extern int get_yr_from_date(const xstring &date);
 extern int get_day_from_date(const xstring &date);
-extern int month_from_day_number(int nSerialDate);//WTW - Gen2 - add new formula to replace unsupported MonthFromDayNumber() function
-extern int year_from_day_number(int nSerialDate);//WTW - Gen2 - add new formula to replace unsupported YearFromDayNumber() function
-extern int day_from_day_number(int nSerialDate);//WTW - Gen2 - add new formula to replace unsupported DayFromDayNumber() function
-extern int month_number_from_date(int year, int month); //WTW - Gen2 - add new formula to replace unsupported MonthNumberFromDate() function
-extern int day_number_from_date(int nYear, int nMonth, int nDay); //WTW - Gen2 - add new formula to replace unsupported DayNumberFromDate() function
 extern int get_end_of_mth_day(int yr, int mth);
 extern xstring add_mths_to_date(const xstring &date, int mths);
 extern int get_mth_from_adj_date(const xstring &date, int mths);
 extern double convert_rate_basis(double orig_rate, double orig_rate_basis, double new_rate_basis);
 extern double convert_decrem_rate_basis(double orig_rate, double orig_rate_basis, double new_rate_basis);
-extern long int determine_tbl_size(int sNumberOfDims, ...);
 extern xstring get_file_name(const xstring &source_file);
 extern xstring get_file_path(const xstring &source_file);
-extern xstring get_base_group_name(const xstring &tag, bool seriatim_flag = false);
+extern xstring get_base_group_name(const xstring &tag, bool split_flag = false);
 extern xstring get_string_of_date(double date);
 extern xstring get_string_of_enum_val(StrEnum::EnumValue type);
 extern int date_diff(xstring first_date, xstring second_date);
-extern int number_of_decimals(double xxx, int digits);//WTW - Gen2 - replace preprocessor #define with formula
+extern int number_of_decimals(double xxx,int digits);
 extern xstring write_string(double value, int string_length, int significant_digits);
 extern xstring write_array_to_string(SmartArray <double> value_array, int low, int high);
 extern void read_from_string(xstring temp_string, SmartArray <double> &temp_array);
@@ -308,25 +299,8 @@ extern double bs_opt_val_continuous_highest_gain(int call_or_put, double current
 extern double bs_opt_val_highest_gain(int call_or_put, double current_price, double observed_max, double observed_min, double strike_price, double length_of_sampling_period, int sampling_freq, double yrs_to_expiry, double risk_free_rate, double init_div_yld, double index_vol, int scen_int_freq, int scen_index_freq);
 extern double bs_opt_val_mthly_sum_cap(int crediting_mths, int known_index_vals, double sum_capped_amts,  double mthly_cap_rate, double yrs_to_expiry, double risk_free_rate, double init_div_yld, double index_vol, int scen_int_freq, int scen_index_freq);
 extern double cumul_bivariate_normal_distribn(double x, double y, double rho);
-extern double cumul_normal_distribn(double x);*/
+extern double cumul_normal_distribn(double x);
 
-// RAFM SQLite
-#ifndef _RAFMSQLITE_H_
-#define _RAFMSQLITE_H_
-
-#include <string>
-#include <vector>
-
-using namespace std;
-
-// 20210614 STW: upgrade to RAFM 2.9
-/*
-extern void openDatabase(string dbPath);
-extern void closeDatabase();
-extern string readCsvFile(string csvPath);
-extern void executeQuery(string sql, vector<string>& columns, vector<vector<string>>& results);
-*/
-#endif
 #endif
 extern int trace_wanted;
 
@@ -334,6 +308,9 @@ extern int trace_wanted;
 extern MY_DLL double msPhase2Tolerance;
 extern MY_DLL int last_model_period;
 extern MY_DLL Message_handler *eh;
+
+vector<vector<string>> epl_sch_input;
+vector<string> epl_columns;
 
 extern MY_DLL long scenario_number;
 extern MY_DLL long layer;
@@ -346,7 +323,6 @@ extern const int& last_proj_task_loop;
 extern const int& proj_task_loop_num;
 extern const int& num_of_proj_task_loops;
 
-extern MY_DLL2 int use_overlay_code;
 extern MY_DLL int trace_level_wanted;
 extern MY_DLL int trace_level;
 extern MY_DLL bool bEmitTurboDebugger;
@@ -386,7 +362,6 @@ return get_epl_value("acq_exp", t)
 
 }
 
-
 //@@ END
 
 //@@ START - ag48_npr_net
@@ -411,7 +386,6 @@ return get_epl_value("ag48_npr_net", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -438,7 +412,6 @@ return get_epl_value("ag48_unearn_prem_res_npr_net", t)
 
 }
 
-
 //@@ END
 
 //@@ START - ann_benefits_bom
@@ -463,7 +436,6 @@ return get_epl_value("ann_benefits_bom", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -490,7 +462,6 @@ return get_epl_value("ann_benefits_eom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - ann_pba_reins_res
@@ -512,7 +483,6 @@ return get_epl_value("ann_pba_reins_res", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -536,7 +506,6 @@ return get_epl_value("ann_pba_working_res", t)
 
 }
 
-
 //@@ END
 
 //@@ START - annuitzn_consideration
@@ -559,7 +528,6 @@ return get_epl_value("annuitzn_consideration", t)
 
 }
 
-
 //@@ END
 
 //@@ START - annuitzn_val_released
@@ -581,7 +549,6 @@ return get_epl_value("annuitzn_val_released", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -608,7 +575,6 @@ return get_epl_value("cash_val", t)
 
 }
 
-
 //@@ END
 
 //@@ START - claim_paid
@@ -633,7 +599,6 @@ return get_epl_value("claim_paid", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -660,7 +625,6 @@ return get_epl_value("comm_bom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - comm_chargeback
@@ -685,7 +649,6 @@ return get_epl_value("comm_chargeback", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -712,7 +675,6 @@ return get_epl_value("comm_eom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - conversion_cost
@@ -737,7 +699,6 @@ return get_epl_value("conversion_cost", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -764,7 +725,6 @@ return get_epl_value("deferred_gross_prem", t)
 
 }
 
-
 //@@ END
 
 //@@ START - deferred_net_prem
@@ -789,7 +749,6 @@ return get_epl_value("deferred_net_prem", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -816,7 +775,6 @@ return get_epl_value("deferred_net_prem_net", t)
 
 }
 
-
 //@@ END
 
 //@@ START - deferred_net_prem_npr
@@ -841,7 +799,6 @@ return get_epl_value("deferred_net_prem_npr", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -868,7 +825,6 @@ return get_epl_value("deferred_net_prem_npr_net", t)
 
 }
 
-
 //@@ END
 
 //@@ START - div_applied
@@ -893,7 +849,6 @@ return get_epl_value("div_applied", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -920,7 +875,6 @@ return get_epl_value("div_liab", t)
 
 }
 
-
 //@@ END
 
 //@@ START - div_paid
@@ -945,7 +899,6 @@ return get_epl_value("div_paid", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -972,7 +925,6 @@ return get_epl_value("dth_ben_inf", t)
 
 }
 
-
 //@@ END
 
 //@@ START - dth_benefits
@@ -997,7 +949,6 @@ return get_epl_value("dth_benefits", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -1024,7 +975,6 @@ return get_epl_value("endow_benefits", t)
 
 }
 
-
 //@@ END
 
 //@@ START - fund_val_fixed
@@ -1049,7 +999,6 @@ return get_epl_value("fund_val_fixed", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -1076,7 +1025,6 @@ return get_epl_value("fund_val_sa", t)
 
 }
 
-
 //@@ END
 
 //@@ START - gross_prem_annualzd
@@ -1102,7 +1050,6 @@ return get_epl_value("gross_prem_annualzd", t)
 
 }
 
-
 //@@ END
 
 //@@ START - hedge_cash_flow
@@ -1124,7 +1071,6 @@ return get_epl_value("hedge_cash_flow", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -1148,7 +1094,6 @@ return get_epl_value("hedge_mkt_val", t)
 
 }
 
-
 //@@ END
 
 //@@ START - hedge_mkt_val_growth
@@ -1170,7 +1115,6 @@ return get_epl_value("hedge_mkt_val_growth", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -1194,7 +1138,6 @@ return get_epl_value("inv_fee_ref", t)
 
 }
 
-
 //@@ END
 
 //@@ START - life_pba_ag48_npr_net
@@ -1216,7 +1159,6 @@ return get_epl_value("life_pba_ag48_npr_net", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -1240,7 +1182,6 @@ return get_epl_value("life_pba_ag48_unearn_prem_res_npr_net", t)
 
 }
 
-
 //@@ END
 
 //@@ START - life_pba_asset_sa
@@ -1262,7 +1203,6 @@ return get_epl_value("life_pba_asset_sa", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -1286,7 +1226,6 @@ return get_epl_value("life_pba_direct_cash_flow_bom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - life_pba_direct_cash_flow_eom
@@ -1308,7 +1247,6 @@ return get_epl_value("life_pba_direct_cash_flow_eom", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -1332,7 +1270,6 @@ return get_epl_value("life_pba_gpr_ceded", t)
 
 }
 
-
 //@@ END
 
 //@@ START - life_pba_gpr_gross
@@ -1354,7 +1291,6 @@ return get_epl_value("life_pba_gpr_gross", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -1378,7 +1314,6 @@ return get_epl_value("life_pba_gpr_units_inf", t)
 
 }
 
-
 //@@ END
 
 //@@ START - life_pba_pol_loan
@@ -1400,7 +1335,6 @@ return get_epl_value("life_pba_pol_loan", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -1424,7 +1358,6 @@ return get_epl_value("life_pba_pol_loan_int", t)
 
 }
 
-
 //@@ END
 
 //@@ START - life_pba_reins_cash_flow_bom
@@ -1446,7 +1379,6 @@ return get_epl_value("life_pba_reins_cash_flow_bom", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -1470,7 +1402,6 @@ return get_epl_value("life_pba_reins_cash_flow_eom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - life_pba_reins_res
@@ -1492,7 +1423,6 @@ return get_epl_value("life_pba_reins_res", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -1519,7 +1449,6 @@ return get_epl_value("life_pba_reins_res_sa", t)
 
 }
 
-
 //@@ END
 
 //@@ START - life_pba_stat_res_mp
@@ -1541,7 +1470,6 @@ return get_epl_value("life_pba_stat_res_mp", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -1565,7 +1493,6 @@ return get_epl_value("life_pba_stat_res_net_mp", t)
 
 }
 
-
 //@@ END
 
 //@@ START - life_pba_stat_unearn_prem_res
@@ -1587,7 +1514,6 @@ return get_epl_value("life_pba_stat_unearn_prem_res", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -1611,7 +1537,6 @@ return get_epl_value("life_pba_stat_unearn_prem_res_net", t)
 
 }
 
-
 //@@ END
 
 //@@ START - life_pba_stat_unearn_prem_res_npr_net
@@ -1634,7 +1559,6 @@ return get_epl_value("life_pba_stat_unearn_prem_res_npr_net", t)
 
 }
 
-
 //@@ END
 
 //@@ START - life_pba_working_res
@@ -1653,7 +1577,7 @@ if (t < commencement_period || t > maturity_period)
 	return NO_AVG;
 
 #if defined(__LIFE_PBA_PBA_H_)
-if (seg->sm_life_pba[0]->res_cap_calc_defn == RESERVES)
+if (seg_element->sm_life_pba[0]->res_cap_calc_defn == RESERVES)
 	return 0.0;
 	
 return get_epl_value("life_pba_working_res", t)
@@ -1663,7 +1587,6 @@ return get_epl_value("life_pba_working_res", t)
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -1690,7 +1613,6 @@ return get_epl_value("maint_exp_bom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - maint_exp_eom
@@ -1715,7 +1637,6 @@ return get_epl_value("maint_exp_eom", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -1742,7 +1663,6 @@ return get_epl_value("maturity_benefits", t)
 
 }
 
-
 //@@ END
 
 //@@ START - pba_rollforward_base
@@ -1764,7 +1684,6 @@ return get_epl_value("pba_rollforward_base", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -1791,7 +1710,6 @@ return get_epl_value("pol_loan", t)
 
 }
 
-
 //@@ END
 
 //@@ START - pol_loan_exp
@@ -1816,7 +1734,6 @@ return get_epl_value("pol_loan_exp", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -1843,7 +1760,6 @@ return get_epl_value("pol_loan_int", t)
 
 }
 
-
 //@@ END
 
 //@@ START - pol_loan_proceeds
@@ -1869,7 +1785,6 @@ return get_epl_value("pol_loan_proceeds", t)
 
 }
 
-
 //@@ END
 
 //@@ START - policies_b
@@ -1891,7 +1806,6 @@ return get_epl_value("policies_b", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -1915,7 +1829,6 @@ return get_epl_value("policies_inf", t)
 
 }
 
-
 //@@ END
 
 //@@ START - policies_issued
@@ -1937,7 +1850,6 @@ return get_epl_value("policies_issued", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -1964,7 +1876,6 @@ return get_epl_value("prem_issued", t)
 
 }
 
-
 //@@ END
 
 //@@ START - prem_paid
@@ -1989,7 +1900,6 @@ return get_epl_value("prem_paid", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -2016,7 +1926,6 @@ return get_epl_value("prem_paid_net", t)
 
 }
 
-
 //@@ END
 
 //@@ START - prem_tax
@@ -2041,7 +1950,6 @@ return get_epl_value("prem_tax", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -2068,7 +1976,6 @@ return get_epl_value("prem_waiver_benefits", t)
 
 }
 
-
 //@@ END
 
 //@@ START - rbc_c1_unearn_prem_res_def
@@ -2093,7 +2000,6 @@ return get_epl_value("rbc_c1_unearn_prem_res_def", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -2120,7 +2026,6 @@ return get_epl_value("rbc_c2_claim", t)
 
 }
 
-
 //@@ END
 
 //@@ START - rbc_c2_claim_prev_yr
@@ -2145,7 +2050,6 @@ return get_epl_value("rbc_c2_claim_prev_yr", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -2172,7 +2076,6 @@ return get_epl_value("rbc_c2_prem", t)
 
 }
 
-
 //@@ END
 
 //@@ START - rbc_c2_prem_prev_yr
@@ -2197,7 +2100,6 @@ return get_epl_value("rbc_c2_prem_prev_yr", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -2224,7 +2126,6 @@ return get_epl_value("rbc_c3_base_ann_high_risk", t)
 
 }
 
-
 //@@ END
 
 //@@ START - rbc_c3_base_ann_low_risk
@@ -2249,7 +2150,6 @@ return get_epl_value("rbc_c3_base_ann_low_risk", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -2276,7 +2176,6 @@ return get_epl_value("rbc_c3_base_ann_medium_risk", t)
 
 }
 
-
 //@@ END
 
 //@@ START - rbc_c3_base_life
@@ -2301,7 +2200,6 @@ return get_epl_value("rbc_c3_base_life", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -2328,7 +2226,6 @@ return get_epl_value("rbc_c3_mp", t)
 
 }
 
-
 //@@ END
 
 //@@ START - rbc_c4
@@ -2353,7 +2250,6 @@ return get_epl_value("rbc_c4", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -2380,7 +2276,6 @@ return get_epl_value("reins_ann_benefits_bom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - reins_ann_benefits_eom
@@ -2405,7 +2300,6 @@ return get_epl_value("reins_ann_benefits_eom", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -2432,7 +2326,6 @@ return get_epl_value("reins_cash_val", t)
 
 }
 
-
 //@@ END
 
 //@@ START - reins_claim_paid
@@ -2457,7 +2350,6 @@ return get_epl_value("reins_claim_paid", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -2484,7 +2376,6 @@ return get_epl_value("reins_comm_chargeback_reimb", t)
 
 }
 
-
 //@@ END
 
 //@@ START - reins_comm_reimb_bom
@@ -2509,7 +2400,6 @@ return get_epl_value("reins_comm_reimb_bom", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -2536,7 +2426,6 @@ return get_epl_value("reins_comm_reimb_eom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - reins_deferred_gross_prem
@@ -2561,7 +2450,6 @@ return get_epl_value("reins_deferred_gross_prem", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -2588,7 +2476,6 @@ return get_epl_value("reins_deferred_net_prem", t)
 
 }
 
-
 //@@ END
 
 //@@ START - reins_div_applied
@@ -2613,7 +2500,6 @@ return get_epl_value("reins_div_applied", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -2640,7 +2526,6 @@ return get_epl_value("reins_div_liab", t)
 
 }
 
-
 //@@ END
 
 //@@ START - reins_div_paid
@@ -2665,7 +2550,6 @@ return get_epl_value("reins_div_paid", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -2692,7 +2576,6 @@ return get_epl_value("reins_dth_ben_inf", t)
 
 }
 
-
 //@@ END
 
 //@@ START - reins_dth_benefits
@@ -2717,7 +2600,6 @@ return get_epl_value("reins_dth_benefits", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -2744,7 +2626,6 @@ return get_epl_value("reins_ea", t)
 
 }
 
-
 //@@ END
 
 //@@ START - reins_ea_chargeback
@@ -2769,7 +2650,6 @@ return get_epl_value("reins_ea_chargeback", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -2796,7 +2676,6 @@ return get_epl_value("reins_endow_benefits", t)
 
 }
 
-
 //@@ END
 
 //@@ START - reins_exp
@@ -2821,7 +2700,6 @@ return get_epl_value("reins_exp", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -2848,7 +2726,6 @@ return get_epl_value("reins_exp_reimb_bom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - reins_exp_reimb_eom
@@ -2873,7 +2750,6 @@ return get_epl_value("reins_exp_reimb_eom", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -2900,7 +2776,6 @@ return get_epl_value("reins_inv_fee_ref", t)
 
 }
 
-
 //@@ END
 
 //@@ START - reins_maturity_benefits
@@ -2925,7 +2800,6 @@ return get_epl_value("reins_maturity_benefits", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -2952,7 +2826,6 @@ return get_epl_value("reins_modco_res_adj", t)
 
 }
 
-
 //@@ END
 
 //@@ START - reins_prem
@@ -2977,7 +2850,6 @@ return get_epl_value("reins_prem", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -3004,7 +2876,6 @@ return get_epl_value("reins_prem_tax", t)
 
 }
 
-
 //@@ END
 
 //@@ START - reins_prem_waiver_benefits
@@ -3029,7 +2900,6 @@ return get_epl_value("reins_prem_waiver_benefits", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -3056,7 +2926,6 @@ return get_epl_value("reins_ref", t)
 
 }
 
-
 //@@ END
 
 //@@ START - reins_stat_claim_res
@@ -3081,7 +2950,6 @@ return get_epl_value("reins_stat_claim_res", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -3108,7 +2976,6 @@ return get_epl_value("reins_stat_loading", t)
 
 }
 
-
 //@@ END
 
 //@@ START - reins_stat_prem_waiver_res
@@ -3129,7 +2996,6 @@ if (t < commencement_period || t > maturity_period)
 return get_epl_value("reins_stat_prem_waiver_res", t) * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -3156,7 +3022,6 @@ return get_epl_value("reins_stat_res_mp", t)
 
 }
 
-
 //@@ END
 
 //@@ START - reins_stat_res_npr
@@ -3181,7 +3046,6 @@ return get_epl_value("reins_stat_res_npr", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -3208,7 +3072,6 @@ return get_epl_value("reins_stat_unearn_prem_res", t)
 
 }
 
-
 //@@ END
 
 //@@ START - reins_surr_benefits
@@ -3233,7 +3096,6 @@ return get_epl_value("reins_surr_benefits", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -3260,7 +3122,6 @@ return get_epl_value("reins_tax_claim_res", t)
 
 }
 
-
 //@@ END
 
 //@@ START - reins_tax_deferred_net_prem
@@ -3285,7 +3146,6 @@ return get_epl_value("reins_tax_deferred_net_prem", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -3312,7 +3172,6 @@ return get_epl_value("reins_tax_loading", t)
 
 }
 
-
 //@@ END
 
 //@@ START - reins_tax_prem_waiver_res
@@ -3333,7 +3192,6 @@ if (t < commencement_period || t > maturity_period)
 return get_epl_value("reins_tax_prem_waiver_res", t) * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -3360,7 +3218,6 @@ return get_epl_value("reins_tax_res_mp", t)
 
 }
 
-
 //@@ END
 
 //@@ START - reins_tax_unearn_prem_res
@@ -3385,7 +3242,6 @@ return get_epl_value("reins_tax_unearn_prem_res", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -3412,7 +3268,6 @@ return get_epl_value("reins_terminal_div", t)
 
 }
 
-
 //@@ END
 
 //@@ START - reins_withdrl_benefits
@@ -3438,7 +3293,6 @@ return get_epl_value("reins_withdrl_benefits", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_ceded_acq_exp
@@ -3460,7 +3314,6 @@ return get_epl_value("sfas120_ceded_acq_exp", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -3484,7 +3337,6 @@ return get_epl_value("sfas120_ceded_benefits", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_ceded_capzd_acq_exp
@@ -3506,7 +3358,6 @@ return get_epl_value("sfas120_ceded_capzd_acq_exp", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -3530,7 +3381,6 @@ return get_epl_value("sfas120_ceded_capzd_comm_bom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_ceded_capzd_comm_chargeback
@@ -3552,7 +3402,6 @@ return get_epl_value("sfas120_ceded_capzd_comm_chargeback", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -3576,7 +3425,6 @@ return get_epl_value("sfas120_ceded_capzd_comm_eom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_ceded_cash_flow_bom
@@ -3598,7 +3446,6 @@ return get_epl_value("sfas120_ceded_cash_flow_bom", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -3622,7 +3469,6 @@ return get_epl_value("sfas120_ceded_comm_chargeback", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_ceded_comm_excess_bom
@@ -3644,7 +3490,6 @@ return get_epl_value("sfas120_ceded_comm_excess_bom", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -3668,7 +3513,6 @@ return get_epl_value("sfas120_ceded_comm_excess_eom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_ceded_comm_trail_bom
@@ -3690,7 +3534,6 @@ return get_epl_value("sfas120_ceded_comm_trail_bom", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -3714,7 +3557,6 @@ return get_epl_value("sfas120_ceded_comm_trail_bom_base_plan", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_ceded_comm_trail_bom_rider
@@ -3736,7 +3578,6 @@ return get_epl_value("sfas120_ceded_comm_trail_bom_rider", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -3760,7 +3601,6 @@ return get_epl_value("sfas120_ceded_comm_trail_eom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_ceded_conversion_cost
@@ -3783,7 +3623,6 @@ return get_epl_value("sfas120_ceded_conversion_cost", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_ceded_div_applied
@@ -3805,7 +3644,6 @@ return get_epl_value("sfas120_ceded_div_applied", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -3832,7 +3670,6 @@ return get_epl_value("sfas120_ceded_div_liab", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_ceded_div_opt_res
@@ -3858,7 +3695,6 @@ return get_epl_value("sfas120_ceded_div_opt_res", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_ceded_div_paid
@@ -3881,7 +3717,6 @@ return get_epl_value("sfas120_ceded_div_paid", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_ceded_dth_claim_cost
@@ -3903,7 +3738,6 @@ return get_epl_value("sfas120_ceded_dth_claim_cost", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -3930,7 +3764,6 @@ return get_epl_value("sfas120_ceded_egm_acq_exp", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_ceded_egm_comm
@@ -3955,7 +3788,6 @@ return get_epl_value("sfas120_ceded_egm_comm", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -3982,7 +3814,6 @@ return get_epl_value("sfas120_ceded_egm_div_applied", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_ceded_egm_div_paid
@@ -4007,7 +3838,6 @@ return get_epl_value("sfas120_ceded_egm_div_paid", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -4034,7 +3864,6 @@ return get_epl_value("sfas120_ceded_egm_dth_benefits", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_ceded_egm_endow_benefits
@@ -4059,7 +3888,6 @@ return get_epl_value("sfas120_ceded_egm_endow_benefits", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -4086,7 +3914,6 @@ return get_epl_value("sfas120_ceded_egm_maint_exp", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_ceded_egm_maturity_benefits
@@ -4111,7 +3938,6 @@ return get_epl_value("sfas120_ceded_egm_maturity_benefits", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -4138,7 +3964,6 @@ return get_epl_value("sfas120_ceded_egm_prem_paid", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_ceded_egm_prem_tax
@@ -4163,7 +3988,6 @@ return get_epl_value("sfas120_ceded_egm_prem_tax", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -4190,7 +4014,6 @@ return get_epl_value("sfas120_ceded_egm_surr_benefits", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_ceded_endow_claim_cost
@@ -4212,53 +4035,6 @@ return get_epl_value("sfas120_ceded_endow_claim_cost", t)
 	   * pct_to_use_mp;
 
 }
-
-
-//@@ END
-
-//@@ START - sfas120_ceded_gpr
-// SFAS120 Ceded Gross Premium Reserve                                                                                             
-// Column:SFAS120_CEDED_GPR
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas120_ceded_gpr(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas120_ceded_gpr.EPL_LIAB.for"
-if (!reins_flag || t < commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas120_ceded_gpr", t)
-	   * pct_to_use_mp;
-
-}
-
-
-//@@ END
-
-//@@ START - sfas120_ceded_gpr_units_inf
-// SFAS120 Ceded Gross Premium Reserve Units in Force                                                                                             
-// Column:SFAS120_CEDED_GPR_UNITS_INF
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas120_ceded_gpr_units_inf(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas120_ceded_gpr_units_inf.EPL_LIAB.for"
-if (!reins_flag || t < commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas120_ceded_gpr_units_inf", t)
-	   * pct_to_use_mp;
-
-}
-
 
 //@@ END
 
@@ -4282,7 +4058,6 @@ return get_epl_value("sfas120_ceded_gross_prem", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_ceded_loc_cost
@@ -4305,7 +4080,6 @@ return get_epl_value("sfas120_ceded_loc_cost", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_ceded_maint_exp_bom
@@ -4315,7 +4089,7 @@ return get_epl_value("sfas120_ceded_loc_cost", t)
 double EPL_LIAB_UDF::epl_liab_sfas120_ceded_maint_exp_bom(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(159,"sfas120_ceded_maint_exp_bom",t);
+	return rebase_value(157,"sfas120_ceded_maint_exp_bom",t);
 }
 
 
@@ -4330,7 +4104,6 @@ return get_epl_value("sfas120_ceded_maint_exp_bom", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -4354,7 +4127,6 @@ return get_epl_value("sfas120_ceded_maint_exp_eom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_ceded_maturity_claim_cost
@@ -4376,7 +4148,6 @@ return get_epl_value("sfas120_ceded_maturity_claim_cost", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -4400,7 +4171,6 @@ return get_epl_value("sfas120_ceded_modco_liab", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_ceded_modco_res_adj
@@ -4423,21 +4193,20 @@ return get_epl_value("sfas120_ceded_modco_res_adj", t)
 
 }
 
-
 //@@ END
 
-//@@ START - sfas120_ceded_nlp_res_net_prem2
+//@@ START - sfas120_ceded_nlp_res_net_prem
 // SFAS120 Ceded Net Level Premium Reserve Net Premium                                                                                             
-// Column:SFAS120_CEDED_NLP_RES_NET_PREM2
+// Column:SFAS120_CEDED_NLP_RES_NET_PREM
 //========================================================
-double EPL_LIAB_UDF::epl_liab_sfas120_ceded_nlp_res_net_prem2(int t) {
+double EPL_LIAB_UDF::epl_liab_sfas120_ceded_nlp_res_net_prem(int t) {
 //^^^
 
 
 
 //^^^
 
-#line 1 "sfas120_ceded_nlp_res_net_prem2.EPL_LIAB.for"
+#line 1 "sfas120_ceded_nlp_res_net_prem.EPL_LIAB.for"
 if (t <= commencement_period || t > maturity_period)
 	return NO_AVG;
 	
@@ -4445,7 +4214,6 @@ return get_epl_value("sfas120_ceded_nlp_res_net_prem", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -4469,7 +4237,6 @@ return get_epl_value("sfas120_ceded_nlp_res_prelim", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_ceded_prem_tax
@@ -4491,7 +4258,6 @@ return get_epl_value("sfas120_ceded_prem_tax", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -4515,7 +4281,6 @@ return get_epl_value("sfas120_ceded_refund", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_ceded_reins_ea_excess
@@ -4537,7 +4302,6 @@ return get_epl_value("sfas120_ceded_reins_ea_excess", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -4561,7 +4325,6 @@ return get_epl_value("sfas120_ceded_reins_ea_trail", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_ceded_surr_claim_cost
@@ -4583,7 +4346,6 @@ return get_epl_value("sfas120_ceded_surr_claim_cost", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -4607,7 +4369,6 @@ return get_epl_value("sfas120_ceded_terminal_div", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_gross_acq_exp
@@ -4629,7 +4390,6 @@ return get_epl_value("sfas120_gross_acq_exp", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -4653,7 +4413,6 @@ return get_epl_value("sfas120_gross_benefits", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_gross_capzd_acq_exp
@@ -4675,7 +4434,6 @@ return get_epl_value("sfas120_gross_capzd_acq_exp", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -4699,7 +4457,6 @@ return get_epl_value("sfas120_gross_capzd_comm_bom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_gross_capzd_comm_chargeback
@@ -4721,7 +4478,6 @@ return get_epl_value("sfas120_gross_capzd_comm_chargeback", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -4745,7 +4501,6 @@ return get_epl_value("sfas120_gross_capzd_comm_eom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_gross_capzd_reins_yrt_cost
@@ -4767,7 +4522,6 @@ return get_epl_value("sfas120_gross_capzd_reins_yrt_cost", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -4791,7 +4545,6 @@ return get_epl_value("sfas120_gross_cash_flow_bom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_gross_comm_chargeback
@@ -4813,7 +4566,6 @@ return get_epl_value("sfas120_gross_comm_chargeback", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -4837,7 +4589,6 @@ return get_epl_value("sfas120_gross_comm_excess_bom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_gross_comm_excess_eom
@@ -4859,7 +4610,6 @@ return get_epl_value("sfas120_gross_comm_excess_eom", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -4883,7 +4633,6 @@ return get_epl_value("sfas120_gross_comm_trail_bom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_gross_comm_trail_bom_base_plan
@@ -4905,7 +4654,6 @@ return get_epl_value("sfas120_gross_comm_trail_bom_base_plan", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -4929,7 +4677,6 @@ return get_epl_value("sfas120_gross_comm_trail_bom_rider", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_gross_comm_trail_eom
@@ -4951,7 +4698,6 @@ return get_epl_value("sfas120_gross_comm_trail_eom", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -4975,7 +4721,6 @@ return get_epl_value("sfas120_gross_conversion_cost", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_gross_div_applied
@@ -4998,7 +4743,6 @@ return get_epl_value("sfas120_gross_div_applied", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_gross_div_liab
@@ -5008,7 +4752,7 @@ return get_epl_value("sfas120_gross_div_applied", t)
 double EPL_LIAB_UDF::epl_liab_sfas120_gross_div_liab(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(189,"sfas120_gross_div_liab",t);
+	return rebase_value(187,"sfas120_gross_div_liab",t);
 }
 
 
@@ -5024,7 +4768,6 @@ return get_epl_value("sfas120_gross_div_liab", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_gross_div_opt_res
@@ -5034,7 +4777,7 @@ return get_epl_value("sfas120_gross_div_liab", t)
 double EPL_LIAB_UDF::epl_liab_sfas120_gross_div_opt_res(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(190,"sfas120_gross_div_opt_res",t);
+	return rebase_value(188,"sfas120_gross_div_opt_res",t);
 }
 
 
@@ -5049,7 +4792,6 @@ return get_epl_value("sfas120_gross_div_opt_res", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -5073,7 +4815,6 @@ return get_epl_value("sfas120_gross_div_paid", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_gross_dth_claim_cost
@@ -5096,7 +4837,6 @@ return get_epl_value("sfas120_gross_dth_claim_cost", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_gross_egm_acq_exp
@@ -5106,7 +4846,7 @@ return get_epl_value("sfas120_gross_dth_claim_cost", t)
 double EPL_LIAB_UDF::epl_liab_sfas120_gross_egm_acq_exp(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(193,"sfas120_gross_egm_acq_exp",t);
+	return rebase_value(191,"sfas120_gross_egm_acq_exp",t);
 }
 
 
@@ -5122,7 +4862,6 @@ return get_epl_value("sfas120_gross_egm_acq_exp", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_gross_egm_comm
@@ -5132,7 +4871,7 @@ return get_epl_value("sfas120_gross_egm_acq_exp", t)
 double EPL_LIAB_UDF::epl_liab_sfas120_gross_egm_comm(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(194,"sfas120_gross_egm_comm",t);
+	return rebase_value(192,"sfas120_gross_egm_comm",t);
 }
 
 
@@ -5148,7 +4887,6 @@ return get_epl_value("sfas120_gross_egm_comm", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_gross_egm_div_applied
@@ -5158,7 +4896,7 @@ return get_epl_value("sfas120_gross_egm_comm", t)
 double EPL_LIAB_UDF::epl_liab_sfas120_gross_egm_div_applied(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(195,"sfas120_gross_egm_div_applied",t);
+	return rebase_value(193,"sfas120_gross_egm_div_applied",t);
 }
 
 
@@ -5174,7 +4912,6 @@ return get_epl_value("sfas120_gross_egm_div_applied", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_gross_egm_div_paid
@@ -5184,7 +4921,7 @@ return get_epl_value("sfas120_gross_egm_div_applied", t)
 double EPL_LIAB_UDF::epl_liab_sfas120_gross_egm_div_paid(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(196,"sfas120_gross_egm_div_paid",t);
+	return rebase_value(194,"sfas120_gross_egm_div_paid",t);
 }
 
 
@@ -5200,7 +4937,6 @@ return get_epl_value("sfas120_gross_egm_div_paid", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_gross_egm_dth_benefits
@@ -5210,7 +4946,7 @@ return get_epl_value("sfas120_gross_egm_div_paid", t)
 double EPL_LIAB_UDF::epl_liab_sfas120_gross_egm_dth_benefits(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(197,"sfas120_gross_egm_dth_benefits",t);
+	return rebase_value(195,"sfas120_gross_egm_dth_benefits",t);
 }
 
 
@@ -5226,7 +4962,6 @@ return get_epl_value("sfas120_gross_egm_dth_benefits", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_gross_egm_endow_benefits
@@ -5236,7 +4971,7 @@ return get_epl_value("sfas120_gross_egm_dth_benefits", t)
 double EPL_LIAB_UDF::epl_liab_sfas120_gross_egm_endow_benefits(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(198,"sfas120_gross_egm_endow_benefits",t);
+	return rebase_value(196,"sfas120_gross_egm_endow_benefits",t);
 }
 
 
@@ -5252,7 +4987,6 @@ return get_epl_value("sfas120_gross_egm_endow_benefits", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_gross_egm_maint_exp
@@ -5262,7 +4996,7 @@ return get_epl_value("sfas120_gross_egm_endow_benefits", t)
 double EPL_LIAB_UDF::epl_liab_sfas120_gross_egm_maint_exp(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(199,"sfas120_gross_egm_maint_exp",t);
+	return rebase_value(197,"sfas120_gross_egm_maint_exp",t);
 }
 
 
@@ -5278,7 +5012,6 @@ return get_epl_value("sfas120_gross_egm_maint_exp", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_gross_egm_maturity_benefits
@@ -5288,7 +5021,7 @@ return get_epl_value("sfas120_gross_egm_maint_exp", t)
 double EPL_LIAB_UDF::epl_liab_sfas120_gross_egm_maturity_benefits(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(200,"sfas120_gross_egm_maturity_benefits",t);
+	return rebase_value(198,"sfas120_gross_egm_maturity_benefits",t);
 }
 
 
@@ -5304,7 +5037,6 @@ return get_epl_value("sfas120_gross_egm_maturity_benefits", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_gross_egm_prem_paid
@@ -5314,7 +5046,7 @@ return get_epl_value("sfas120_gross_egm_maturity_benefits", t)
 double EPL_LIAB_UDF::epl_liab_sfas120_gross_egm_prem_paid(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(201,"sfas120_gross_egm_prem_paid",t);
+	return rebase_value(199,"sfas120_gross_egm_prem_paid",t);
 }
 
 
@@ -5330,7 +5062,6 @@ return get_epl_value("sfas120_gross_egm_prem_paid", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_gross_egm_prem_tax
@@ -5340,7 +5071,7 @@ return get_epl_value("sfas120_gross_egm_prem_paid", t)
 double EPL_LIAB_UDF::epl_liab_sfas120_gross_egm_prem_tax(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(202,"sfas120_gross_egm_prem_tax",t);
+	return rebase_value(200,"sfas120_gross_egm_prem_tax",t);
 }
 
 
@@ -5356,7 +5087,6 @@ return get_epl_value("sfas120_gross_egm_prem_tax", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_gross_egm_reins_cost
@@ -5366,7 +5096,7 @@ return get_epl_value("sfas120_gross_egm_prem_tax", t)
 double EPL_LIAB_UDF::epl_liab_sfas120_gross_egm_reins_cost(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(203,"sfas120_gross_egm_reins_cost",t);
+	return rebase_value(201,"sfas120_gross_egm_reins_cost",t);
 }
 
 
@@ -5382,7 +5112,6 @@ return get_epl_value("sfas120_gross_egm_reins_cost", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_gross_egm_surr_benefits
@@ -5392,7 +5121,7 @@ return get_epl_value("sfas120_gross_egm_reins_cost", t)
 double EPL_LIAB_UDF::epl_liab_sfas120_gross_egm_surr_benefits(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(204,"sfas120_gross_egm_surr_benefits",t);
+	return rebase_value(202,"sfas120_gross_egm_surr_benefits",t);
 }
 
 
@@ -5407,7 +5136,6 @@ return get_epl_value("sfas120_gross_egm_surr_benefits", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -5431,53 +5159,6 @@ return get_epl_value("sfas120_gross_endow_claim_cost", t)
 
 }
 
-
-//@@ END
-
-//@@ START - sfas120_gross_gpr
-// SFAS120 Gross Gross Premium Reserve                                                                                             
-// Column:SFAS120_GROSS_GPR
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas120_gross_gpr(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas120_gross_gpr.EPL_LIAB.for"
-if (t < commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas120_gross_gpr", t)
-	   * pct_to_use_mp;
-
-}
-
-
-//@@ END
-
-//@@ START - sfas120_gross_gpr_units_inf
-// SFAS120 Gross Gross Premium Reserve Units in Force                                                                                             
-// Column:SFAS120_GROSS_GPR_UNITS_INF
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas120_gross_gpr_units_inf(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas120_gross_gpr_units_inf.EPL_LIAB.for"
-if (t < commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas120_gross_gpr_units_inf", t)
-	   * pct_to_use_mp;
-
-}
-
-
 //@@ END
 
 //@@ START - sfas120_gross_gross_prem
@@ -5499,7 +5180,6 @@ return get_epl_value("sfas120_gross_gross_prem", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -5523,7 +5203,6 @@ return get_epl_value("sfas120_gross_loc_cost", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_gross_maint_exp_bom
@@ -5533,7 +5212,7 @@ return get_epl_value("sfas120_gross_loc_cost", t)
 double EPL_LIAB_UDF::epl_liab_sfas120_gross_maint_exp_bom(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(210,"sfas120_gross_maint_exp_bom",t);
+	return rebase_value(206,"sfas120_gross_maint_exp_bom",t);
 }
 
 
@@ -5548,7 +5227,6 @@ return get_epl_value("sfas120_gross_maint_exp_bom", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -5572,7 +5250,6 @@ return get_epl_value("sfas120_gross_maint_exp_eom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_gross_maturity_claim_cost
@@ -5594,7 +5271,6 @@ return get_epl_value("sfas120_gross_maturity_claim_cost", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -5618,7 +5294,6 @@ return get_epl_value("sfas120_gross_nlp_res_net_prem", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_gross_nlp_res_prelim
@@ -5640,7 +5315,6 @@ return get_epl_value("sfas120_gross_nlp_res_prelim", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -5664,7 +5338,6 @@ return get_epl_value("sfas120_gross_pol_loan", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_gross_pol_loan_inc
@@ -5686,7 +5359,6 @@ return get_epl_value("sfas120_gross_pol_loan_inc", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -5710,7 +5382,6 @@ return get_epl_value("sfas120_gross_prem_tax", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_gross_reins_yrt_cost
@@ -5732,7 +5403,6 @@ return get_epl_value("sfas120_gross_reins_yrt_cost", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -5756,7 +5426,6 @@ return get_epl_value("sfas120_gross_stat_res_rider", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas120_gross_surr_claim_cost
@@ -5778,7 +5447,6 @@ return get_epl_value("sfas120_gross_surr_claim_cost", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -5802,7 +5470,6 @@ return get_epl_value("sfas120_gross_terminal_div", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas60_ceded_acq_exp
@@ -5824,53 +5491,6 @@ return get_epl_value("sfas60_ceded_acq_exp", t)
 	   * pct_to_use_mp;
 
 }
-
-
-//@@ END
-
-//@@ START - sfas60_ceded_ben_res_accrual_valn_basis
-// SFAS60 Ceded Benefit Reserve Accrual Valuation Basis                                                                                             
-// Column:SFAS60_CEDED_BEN_RES_ACCRUAL_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas60_ceded_ben_res_accrual_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas60_ceded_ben_res_accrual_valn_basis.EPL_LIAB.for"
-if (!reins_flag || t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas60_ceded_ben_res_accrual_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
-
-//@@ END
-
-//@@ START - sfas60_ceded_ben_res_int_valn_basis
-// SFAS60 Ceded Benefit Reserve Interest Valuation Basis                                                                                             
-// Column:SFAS60_CEDED_BEN_RES_INT_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas60_ceded_ben_res_int_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas60_ceded_ben_res_int_valn_basis.EPL_LIAB.for"
-if (!reins_flag || t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas60_ceded_ben_res_int_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
 
 //@@ END
 
@@ -5894,30 +5514,6 @@ return get_epl_value("sfas60_ceded_ben_res_prelim", t)
 
 }
 
-
-//@@ END
-
-//@@ START - sfas60_ceded_benefits_valn_basis
-// SFAS60 Ceded Benefits Valuation Basis                                                                                             
-// Column:SFAS60_CEDED_BENEFITS_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas60_ceded_benefits_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas60_ceded_benefits_valn_basis.EPL_LIAB.for"
-if (!reins_flag || t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas60_ceded_benefits_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
-
 //@@ END
 
 //@@ START - sfas60_ceded_capzd_acq_exp
@@ -5939,30 +5535,6 @@ return get_epl_value("sfas60_ceded_capzd_acq_exp", t)
 	   * pct_to_use_mp;
 
 }
-
-
-//@@ END
-
-//@@ START - sfas60_ceded_capzd_acq_exp_valn_basis
-// SFAS60 Ceded Capitalized Acquisition Expenses Valuation Basis                                                                                             
-// Column:SFAS60_CEDED_CAPZD_ACQ_EXP_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas60_ceded_capzd_acq_exp_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas60_ceded_capzd_acq_exp_valn_basis.EPL_LIAB.for"
-if (!reins_flag || t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas60_ceded_capzd_acq_exp_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
 
 //@@ END
 
@@ -5986,7 +5558,6 @@ return get_epl_value("sfas60_ceded_capzd_comm_bom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas60_ceded_capzd_comm_chargeback
@@ -6008,7 +5579,6 @@ return get_epl_value("sfas60_ceded_capzd_commission_chargeback", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -6032,30 +5602,6 @@ return get_epl_value("sfas60_ceded_capzd_comm_eom", t)
 
 }
 
-
-//@@ END
-
-//@@ START - sfas60_ceded_capzd_comm_valn_basis
-// SFAS60 Ceded Capitalized Commission Valuation Basis                                                                                             
-// Column:SFAS60_CEDED_CAPZD_COMM_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas60_ceded_capzd_comm_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas60_ceded_capzd_comm_valn_basis.EPL_LIAB.for"
-if (!reins_flag || t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas60_ceded_capzd_comm_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
-
 //@@ END
 
 //@@ START - sfas60_ceded_cash_flow_bom
@@ -6077,7 +5623,6 @@ return get_epl_value("sfas60_ceded_cash_flow_bom", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -6101,7 +5646,6 @@ return get_epl_value("sfas60_ceded_claim_res", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas60_ceded_comm_chargeback
@@ -6123,7 +5667,6 @@ return get_epl_value("sfas60_ceded_comm_chargeback", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -6147,7 +5690,6 @@ return get_epl_value("sfas60_ceded_comm_excess_bom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas60_ceded_comm_excess_eom
@@ -6169,7 +5711,6 @@ return get_epl_value("sfas60_ceded_comm_excess_eom", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -6193,7 +5734,6 @@ return get_epl_value("sfas60_ceded_comm_trail_bom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas60_ceded_comm_trail_bom_base_plan
@@ -6215,7 +5755,6 @@ return get_epl_value("sfas60_ceded_comm_trail_bom_base_plan", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -6239,7 +5778,6 @@ return get_epl_value("sfas60_ceded_comm_trail_bom_rider", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas60_ceded_comm_trail_eom
@@ -6261,7 +5799,6 @@ return get_epl_value("sfas60_ceded_comm_trail_eom", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -6285,53 +5822,6 @@ return get_epl_value("sfas60_ceded_conversion_cost", t)
 
 }
 
-
-//@@ END
-
-//@@ START - sfas60_ceded_dac_amortzn_valn_basis
-// SFAS60 Ceded DAC Amortization Valuation Basis                                                                                             
-// Column:SFAS60_CEDED_DAC_AMORTZN_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas60_ceded_dac_amortzn_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas60_ceded_dac_amortzn_valn_basis.EPL_LIAB.for"
-if (!reins_flag || t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas60_ceded_dac_amortzn_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
-
-//@@ END
-
-//@@ START - sfas60_ceded_dac_int_valn_basis
-// SFAS60 Ceded DAC Interest Valuation Basis                                                                                             
-// Column:SFAS60_CEDED_DAC_INT_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas60_ceded_dac_int_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas60_ceded_dac_int_valn_basis.EPL_LIAB.for"
-if (!reins_flag || t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas60_ceded_dac_int_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
-
 //@@ END
 
 //@@ START - sfas60_ceded_dac_prelim
@@ -6353,7 +5843,6 @@ return get_epl_value("sfas60_ceded_dac_prelim", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -6377,7 +5866,6 @@ return get_epl_value("sfas60_ceded_div_applied", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas60_ceded_div_paid
@@ -6399,30 +5887,6 @@ return get_epl_value("sfas60_ceded_div_paid", t)
 	   * pct_to_use_mp;
 
 }
-
-
-//@@ END
-
-//@@ START - sfas60_ceded_div_valn_basis
-// SFAS60 Ceded Annual Dividends Valuation Basis                                                                                             
-// Column:SFAS60_CEDED_DIV_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas60_ceded_div_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas60_ceded_div_valn_basis.EPL_LIAB.for"
-if (!reins_flag || t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas60_ceded_div_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
 
 //@@ END
 
@@ -6446,7 +5910,6 @@ return get_epl_value("sfas60_ceded_dth_claim_cost", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas60_ceded_endow_claim_cost
@@ -6468,79 +5931,6 @@ return get_epl_value("sfas60_ceded_endow_claim_cost", t)
 	   * pct_to_use_mp;
 
 }
-
-
-//@@ END
-
-//@@ START - sfas60_ceded_exp_valn_basis
-// SFAS60 Ceded Expenses Valuation Basis                                                                                             
-// Column:SFAS60_CEDED_EXP_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas60_ceded_exp_valn_basis(int t) {
-//^^^
-if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(251,"sfas60_ceded_exp_valn_basis",t);
-}
-
-
-
-//^^^
-
-#line 1 "sfas60_ceded_exp_valn_basis.EPL_LIAB.for"
-if (!reins_flag || t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas60_ceded_exp_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
-
-//@@ END
-
-//@@ START - sfas60_ceded_gpr
-// SFAS60 Ceded Gross Premium Reserve                                                                                             
-// Column:SFAS60_CEDED_GPR
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas60_ceded_gpr(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas60_ceded_gpr.EPL_LIAB.for"
-if (!reins_flag || t < commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas60_ceded_gpr", t)
-	   * pct_to_use_mp;
-
-}
-
-
-//@@ END
-
-//@@ START - sfas60_ceded_gpr_units_inf
-// SFAS60 Ceded Gross Premium Reserve Units in Force                                                                                             
-// Column:SFAS60_CEDED_GPR_UNITS_INF
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas60_ceded_gpr_units_inf(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas60_ceded_gpr_units_inf.EPL_LIAB.for"
-if (!reins_flag || t < commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas60_ceded_gpr_units_inf", t)
-	   * pct_to_use_mp;
-
-}
-
 
 //@@ END
 
@@ -6564,7 +5954,6 @@ return get_epl_value("sfas60_ceded_gross_prem", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas60_ceded_hlth_claim_cost
@@ -6586,7 +5975,6 @@ return get_epl_value("sfas60_ceded_hlth_claim_cost", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -6610,7 +5998,6 @@ return get_epl_value("sfas60_ceded_loc_cost", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas60_ceded_maint_exp_bom
@@ -6620,7 +6007,7 @@ return get_epl_value("sfas60_ceded_loc_cost", t)
 double EPL_LIAB_UDF::epl_liab_sfas60_ceded_maint_exp_bom(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(257,"sfas60_ceded_maint_exp_bom",t);
+	return rebase_value(242,"sfas60_ceded_maint_exp_bom",t);
 }
 
 
@@ -6635,7 +6022,6 @@ return get_epl_value("sfas60_ceded_maint_exp_bom", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -6659,76 +6045,6 @@ return get_epl_value("sfas60_ceded_maint_exp_eom", t)
 
 }
 
-
-//@@ END
-
-//@@ START - sfas60_ceded_maint_exp_res_accrual_valn_basis
-// SFAS60 Ceded Maintenance Expense Reserve Accrual Valuation Basis                                                                                             
-// Column:SFAS60_CEDED_MAINT_EXP_RES_ACCRUAL_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas60_ceded_maint_exp_res_accrual_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas60_ceded_maint_exp_res_accrual_valn_basis.EPL_LIAB.for"
-if (!reins_flag || t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas60_ceded_maint_exp_res_accrual_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
-
-//@@ END
-
-//@@ START - sfas60_ceded_maint_exp_res_int_valn_basis
-// SFAS60 Ceded Maintenance Expense Reserve Interest Valuation Basis                                                                                             
-// Column:SFAS60_CEDED_MAINT_EXP_RES_INT_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas60_ceded_maint_exp_res_int_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas60_ceded_maint_exp_res_int_valn_basis.EPL_LIAB.for"
-if (!reins_flag || t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas60_ceded_maint_exp_res_int_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
-
-//@@ END
-
-//@@ START - sfas60_ceded_maint_exp_res_prelim
-// SFAS60 Ceded Maintenance Expense Reserve Preliminary                                                                                             
-// Column:SFAS60_CEDED_MAINT_EXP_RES_PRELIM
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas60_ceded_maint_exp_res_prelim(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas60_ceded_maint_exp_res_prelim.EPL_LIAB.for"
-if (!reins_flag || t < commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas60_ceded_maint_exp_res_prelim", t)
-	   * pct_to_use_mp;
-
-}
-
-
 //@@ END
 
 //@@ START - sfas60_ceded_maturity_claim_cost
@@ -6750,7 +6066,6 @@ return get_epl_value("sfas60_ceded_maturity_claim_cost", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -6774,7 +6089,6 @@ return get_epl_value("sfas60_ceded_modco_liab", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas60_ceded_modco_res_adj
@@ -6796,7 +6110,6 @@ return get_epl_value("sfas60_ceded_modco_res_adj", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -6820,7 +6133,6 @@ return get_epl_value("sfas60_ceded_prem_tax", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas60_ceded_prem_waiver_res
@@ -6842,7 +6154,6 @@ return get_epl_value("sfas60_ceded_prem_waiver_res", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -6866,30 +6177,6 @@ return get_epl_value("sfas60_ceded_refund", t)
 
 }
 
-
-//@@ END
-
-//@@ START - sfas60_ceded_surr_ben_valn_basis
-// SFAS60 Ceded Surrender Benefits Valuation Basis                                                                                             
-// Column:SFAS60_CEDED_SURR_BEN_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas60_ceded_surr_ben_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas60_ceded_surr_ben_valn_basis.EPL_LIAB.for"
-if (!reins_flag || t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas60_ceded_surr_ben_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
-
 //@@ END
 
 //@@ START - sfas60_ceded_surr_claim_cost
@@ -6911,7 +6198,6 @@ return get_epl_value("sfas60_ceded_surr_claim_cost", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -6935,7 +6221,6 @@ return get_epl_value("sfas60_ceded_terminal_div", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas60_gross_acq_exp
@@ -6957,53 +6242,6 @@ return get_epl_value("sfas60_gross_acq_exp", t)
 	   * pct_to_use_mp;
 
 }
-
-
-//@@ END
-
-//@@ START - sfas60_gross_ben_res_accrual_valn_basis
-// SFAS60 Gross Benefit Reserve Accrual Valuation Basis                                                                                             
-// Column:SFAS60_GROSS_BEN_RES_ACCRUAL_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas60_gross_ben_res_accrual_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas60_gross_ben_res_accrual_valn_basis.EPL_LIAB.for"
-if (t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas60_gross_ben_res_accrual_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
-
-//@@ END
-
-//@@ START - sfas60_gross_ben_res_int_valn_basis
-// SFAS60 Gross Benefit Reserve Interest Valuation Basis                                                                                             
-// Column:SFAS60_GROSS_BEN_RES_INT_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas60_gross_ben_res_int_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas60_gross_ben_res_int_valn_basis.EPL_LIAB.for"
-if (t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas60_gross_ben_res_int_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
 
 //@@ END
 
@@ -7027,30 +6265,6 @@ return get_epl_value("sfas60_gross_ben_res_prelim", t)
 
 }
 
-
-//@@ END
-
-//@@ START - sfas60_gross_benefits_valn_basis
-// SFAS60 Gross Benefits Valuation Basis                                                                                             
-// Column:SFAS60_GROSS_BENEFITS_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas60_gross_benefits_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas60_gross_benefits_valn_basis.EPL_LIAB.for"
-if (t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas60_gross_benefits_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
-
 //@@ END
 
 //@@ START - sfas60_gross_capzd_acq_exp
@@ -7072,30 +6286,6 @@ return get_epl_value("sfas60_gross_capzd_acq_exp", t)
 	   * pct_to_use_mp;
 
 }
-
-
-//@@ END
-
-//@@ START - sfas60_gross_capzd_acq_exp_valn_basis
-// SFAS60 Gross Capitalized Acquisition Expenses Valuation Basis                                                                                             
-// Column:SFAS60_GROSS_CAPZD_ACQ_EXP_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas60_gross_capzd_acq_exp_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas60_gross_capzd_acq_exp_valn_basis.EPL_LIAB.for"
-if (t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas60_gross_capzd_acq_exp_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
 
 //@@ END
 
@@ -7119,7 +6309,6 @@ return get_epl_value("sfas60_gross_capzd_comm_bom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas60_gross_capzd_comm_chargeback
@@ -7141,7 +6330,6 @@ return get_epl_value("sfas60_gross_capzd_commission_chargeback", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -7165,30 +6353,6 @@ return get_epl_value("sfas60_gross_capzd_comm_eom", t)
 
 }
 
-
-//@@ END
-
-//@@ START - sfas60_gross_capzd_comm_valn_basis
-// SFAS60 Gross Capitalized Commission Valuation Basis                                                                                             
-// Column:SFAS60_GROSS_CAPZD_COMM_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas60_gross_capzd_comm_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas60_gross_capzd_comm_valn_basis.EPL_LIAB.for"
-if (t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas60_gross_capzd_comm_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
-
 //@@ END
 
 //@@ START - sfas60_gross_capzd_reins_yrt_cost
@@ -7210,7 +6374,6 @@ return get_epl_value("sfas60_gross_capzd_reins_yrt_cost", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -7234,7 +6397,6 @@ return get_epl_value("sfas60_gross_cash_flow_bom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas60_gross_claim_res
@@ -7256,7 +6418,6 @@ return get_epl_value("sfas60_gross_claim_res", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -7280,7 +6441,6 @@ return get_epl_value("sfas60_gross_comm_chargeback", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas60_gross_comm_excess_bom
@@ -7302,7 +6462,6 @@ return get_epl_value("sfas60_gross_comm_excess_bom", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -7326,7 +6485,6 @@ return get_epl_value("sfas60_gross_comm_excess_eom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas60_gross_comm_trail_bom
@@ -7348,7 +6506,6 @@ return get_epl_value("sfas60_gross_comm_trail_bom", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -7372,7 +6529,6 @@ return get_epl_value("sfas60_gross_comm_trail_bom_base_plan", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas60_gross_comm_trail_bom_rider
@@ -7394,7 +6550,6 @@ return get_epl_value("sfas60_gross_comm_trail_bom_rider", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -7418,7 +6573,6 @@ return get_epl_value("sfas60_gross_comm_trail_bom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas60_gross_conversion_cost
@@ -7440,53 +6594,6 @@ return get_epl_value("sfas60_gross_conversion_cost", t)
 	   * pct_to_use_mp;
 
 }
-
-
-//@@ END
-
-//@@ START - sfas60_gross_dac_amortzn_valn_basis
-// SFAS60 Gross DAC Amortization Valuation Basis                                                                                             
-// Column:SFAS60_GROSS_DAC_AMORTZN_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas60_gross_dac_amortzn_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas60_gross_dac_amortzn_valn_basis.EPL_LIAB.for"
-if (t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas60_gross_dac_amortzn_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
-
-//@@ END
-
-//@@ START - sfas60_gross_dac_int_valn_basis
-// SFAS60 Gross DAC Interest Valuation Basis                                                                                             
-// Column:SFAS60_GROSS_DAC_INT_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas60_gross_dac_int_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas60_gross_dac_int_valn_basis.EPL_LIAB.for"
-if (t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas60_gross_dac_int_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
 
 //@@ END
 
@@ -7510,53 +6617,6 @@ return get_epl_value("sfas60_gross_dac_prelim", t)
 
 }
 
-
-//@@ END
-
-//@@ START - sfas60_gross_dac_reins_yrt_asset_amortzn_valn_basis
-// SFAS60 Gross Reinsurance YRT Asset Amortization Valuation Basis                                                                                             
-// Column:SFAS60_GROSS_DAC_REINS_YRT_ASSET_AMORTZN_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas60_gross_dac_reins_yrt_asset_amortzn_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas60_gross_dac_reins_yrt_asset_amortzn_valn_basis.EPL_LIAB.for"
-if (t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas60_gross_reins_yrt_asset_amortzn_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
-
-//@@ END
-
-//@@ START - sfas60_gross_dac_reins_yrt_asset_int_valn_basis
-// SFAS60 Gross Reinsurance YRT Asset Interest Valuation Basis                                                                                             
-// Column:SFAS60_GROSS_DAC_REINS_YRT_ASSET_INT_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas60_gross_dac_reins_yrt_asset_int_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas60_gross_dac_reins_yrt_asset_int_valn_basis.EPL_LIAB.for"
-if (t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas60_gross_reins_yrt_asset_int_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
-
 //@@ END
 
 //@@ START - sfas60_gross_dac_reins_yrt_asset_prelim
@@ -7578,7 +6638,6 @@ return get_epl_value("sfas60_gross_dac_reins_yrt_asset_prelim", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -7602,7 +6661,6 @@ return get_epl_value("sfas60_gross_div_applied", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas60_gross_div_paid
@@ -7624,30 +6682,6 @@ return get_epl_value("sfas60_gross_div_paid", t)
 	   * pct_to_use_mp;
 
 }
-
-
-//@@ END
-
-//@@ START - sfas60_gross_div_valn_basis
-// SFAS60 Gross Annual Dividends Valuation Basis                                                                                             
-// Column:SFAS60_GROSS_DIV_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas60_gross_div_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas60_gross_div_valn_basis.EPL_LIAB.for"
-if (t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas60_gross_div_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
 
 //@@ END
 
@@ -7671,7 +6705,6 @@ return get_epl_value("sfas60_gross_dth_claim_cost", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas60_gross_endow_claim_cost
@@ -7693,79 +6726,6 @@ return get_epl_value("sfas60_gross_endow_claim_cost", t)
 	   * pct_to_use_mp;
 
 }
-
-
-//@@ END
-
-//@@ START - sfas60_gross_exp_valn_basis
-// SFAS60 Gross Expenses Valuation Basis                                                                                             
-// Column:SFAS60_GROSS_EXP_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas60_gross_exp_valn_basis(int t) {
-//^^^
-if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(304,"sfas60_gross_exp_valn_basis",t);
-}
-
-
-
-//^^^
-
-#line 1 "sfas60_gross_exp_valn_basis.EPL_LIAB.for"
-if (t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas60_gross_exp_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
-
-//@@ END
-
-//@@ START - sfas60_gross_gpr
-// SFAS60 Gross Gross Premium Reserve                                                                                             
-// Column:SFAS60_GROSS_GPR
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas60_gross_gpr(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas60_gross_gpr.EPL_LIAB.for"
-if (t < commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas60_gross_gpr", t)
-	   * pct_to_use_mp;
-
-}
-
-
-//@@ END
-
-//@@ START - sfas60_gross_gpr_units_inf
-// SFAS60 Gross Gross Premium Reserve Units in Force                                                                                             
-// Column:SFAS60_GROSS_GPR_UNITS_INF
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas60_gross_gpr_units_inf(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas60_gross_gpr_units_inf.EPL_LIAB.for"
-if (t < commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas60_gross_gpr_units_inf", t)
-	   * pct_to_use_mp;
-
-}
-
 
 //@@ END
 
@@ -7789,7 +6749,6 @@ return get_epl_value("sfas60_gross_gross_prem", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas60_gross_hlth_claim_cost
@@ -7811,7 +6770,6 @@ return get_epl_value("sfas60_gross_hlth_claim_cost", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -7835,7 +6793,6 @@ return get_epl_value("sfas60_gross_loc_cost", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas60_gross_maint_exp_bom
@@ -7845,7 +6802,7 @@ return get_epl_value("sfas60_gross_loc_cost", t)
 double EPL_LIAB_UDF::epl_liab_sfas60_gross_maint_exp_bom(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(310,"sfas60_gross_maint_exp_bom",t);
+	return rebase_value(278,"sfas60_gross_maint_exp_bom",t);
 }
 
 
@@ -7860,7 +6817,6 @@ return get_epl_value("sfas60_gross_maint_exp_bom", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -7884,76 +6840,6 @@ return get_epl_value("sfas60_gross_maint_exp_eom", t)
 
 }
 
-
-//@@ END
-
-//@@ START - sfas60_gross_maint_exp_res_accrual_valn_basis
-// SFAS60 Gross Maintenance Expense Reserve Accrual Valuation Basis                                                                                             
-// Column:SFAS60_GROSS_MAINT_EXP_RES_ACCRUAL_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas60_gross_maint_exp_res_accrual_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas60_gross_maint_exp_res_accrual_valn_basis.EPL_LIAB.for"
-if (t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas60_gross_maint_exp_res_accrual_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
-
-//@@ END
-
-//@@ START - sfas60_gross_maint_exp_res_int_valn_basis
-// SFAS60 Gross Maintenance Expense Reserve Interest Valuation Basis                                                                                             
-// Column:SFAS60_GROSS_MAINT_EXP_RES_INT_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas60_gross_maint_exp_res_int_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas60_gross_maint_exp_res_int_valn_basis.EPL_LIAB.for"
-if (t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas60_gross_maint_exp_res_int_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
-
-//@@ END
-
-//@@ START - sfas60_gross_maint_exp_res_prelim
-// SFAS60 Gross Maintenance Reserve Preliminary                                                                                             
-// Column:SFAS60_GROSS_MAINT_EXP_RES_PRELIM
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas60_gross_maint_exp_res_prelim(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas60_gross_maint_exp_res_prelim.EPL_LIAB.for"
-if (t < commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas60_gross_maint_exp_res_prelim", t)
-	   * pct_to_use_mp;
-
-}
-
-
 //@@ END
 
 //@@ START - sfas60_gross_maturity_claim_cost
@@ -7975,7 +6861,6 @@ return get_epl_value("sfas60_gross_maturity_claim_cost", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -7999,7 +6884,6 @@ return get_epl_value("sfas60_gross_pol_loan", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas60_gross_pol_loan_inc
@@ -8021,7 +6905,6 @@ return get_epl_value("sfas60_gross_pol_loan_inc", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -8045,7 +6928,6 @@ return get_epl_value("sfas60_gross_prem_tax", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas60_gross_prem_waiver_res
@@ -8067,7 +6949,6 @@ return get_epl_value("sfas60_gross_prem_waiver_res", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -8091,30 +6972,6 @@ return get_epl_value("sfas60_gross_reins_yrt_cost", t)
 
 }
 
-
-//@@ END
-
-//@@ START - sfas60_gross_reins_yrt_cost_valn_basis
-// SFAS60 Gross Reinsurance YRT Cost Valuation Basis                                                                                             
-// Column:SFAS60_GROSS_REINS_YRT_COST_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas60_gross_reins_yrt_cost_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas60_gross_reins_yrt_cost_valn_basis.EPL_LIAB.for"
-if (t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas60_gross_reins_yrt_cost_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
-
 //@@ END
 
 //@@ START - sfas60_gross_stat_res_rider
@@ -8136,30 +6993,6 @@ return get_epl_value("sfas60_gross_stat_res_rider", t)
 	   * pct_to_use_mp;
 
 }
-
-
-//@@ END
-
-//@@ START - sfas60_gross_surr_ben_valn_basis
-// SFAS60 Gross Surrender Benefits Valuation Basis                                                                                             
-// Column:SFAS60_GROSS_SURR_BEN_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas60_gross_surr_ben_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas60_gross_surr_ben_valn_basis.EPL_LIAB.for"
-if (t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas60_gross_surr_ben_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
 
 //@@ END
 
@@ -8183,7 +7016,6 @@ return get_epl_value("sfas60_gross_surr_claim_cost", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas60_gross_terminal_div
@@ -8205,7 +7037,6 @@ return get_epl_value("sfas60_gross_terminal_div", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -8229,7 +7060,6 @@ return get_epl_value("sfas91_ceded_acq_exp", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas91_ceded_ann_benefits_bom
@@ -8251,7 +7081,6 @@ return get_epl_value("sfas91_ceded_ann_benefits_bom", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -8275,7 +7104,6 @@ return get_epl_value("sfas91_ceded_ann_benefits_eom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas91_ceded_ben_maint_exp_res_cash_flow_bom
@@ -8297,7 +7125,6 @@ return get_epl_value("sfas91_ceded_ben_maint_exp_res_cash_flow_bom", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -8321,7 +7148,6 @@ return get_epl_value("sfas91_ceded_ben_maint_exp_res_cash_flow_eom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas91_ceded_ben_res_cash_flow_bom
@@ -8343,7 +7169,6 @@ return get_epl_value("sfas91_ceded_ben_res_cash_flow_bom", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -8367,7 +7192,6 @@ return get_epl_value("sfas91_ceded_ben_res_cash_flow_eom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas91_ceded_capzd_acq_exp
@@ -8389,7 +7213,6 @@ return get_epl_value("sfas91_ceded_capzd_acq_exp", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -8413,7 +7236,6 @@ return get_epl_value("sfas91_ceded_capzd_comm_bom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas91_ceded_cash_flow_bom
@@ -8435,7 +7257,6 @@ return get_epl_value("sfas91_ceded_cash_flow_bom", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -8459,7 +7280,6 @@ return get_epl_value("sfas91_ceded_comm_excess_bom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas91_ceded_deferred_maint_exp
@@ -8481,7 +7301,6 @@ return get_epl_value("sfas91_ceded_deferred_maint_exp", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -8505,7 +7324,6 @@ return get_epl_value("sfas91_ceded_dth_benefits", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas91_ceded_maint_exp_bom
@@ -8515,7 +7333,7 @@ return get_epl_value("sfas91_ceded_dth_benefits", t)
 double EPL_LIAB_UDF::epl_liab_sfas91_ceded_maint_exp_bom(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(339,"sfas91_ceded_maint_exp_bom",t);
+	return rebase_value(302,"sfas91_ceded_maint_exp_bom",t);
 }
 
 
@@ -8530,7 +7348,6 @@ return get_epl_value("sfas91_ceded_maint_exp_bom", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -8554,7 +7371,6 @@ return get_epl_value("sfas91_ceded_maint_exp_eom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas91_ceded_maint_exp_res_cash_flow_bom
@@ -8564,7 +7380,7 @@ return get_epl_value("sfas91_ceded_maint_exp_eom", t)
 double EPL_LIAB_UDF::epl_liab_sfas91_ceded_maint_exp_res_cash_flow_bom(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(341,"sfas91_ceded_maint_exp_res_cash_flow_bom",t);
+	return rebase_value(304,"sfas91_ceded_maint_exp_res_cash_flow_bom",t);
 }
 
 
@@ -8580,7 +7396,6 @@ return get_epl_value("sfas91_ceded_maint_exp_res_cash_flow_bom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas91_ceded_maint_exp_res_cash_flow_eom
@@ -8590,7 +7405,7 @@ return get_epl_value("sfas91_ceded_maint_exp_res_cash_flow_bom", t)
 double EPL_LIAB_UDF::epl_liab_sfas91_ceded_maint_exp_res_cash_flow_eom(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(342,"sfas91_ceded_maint_exp_res_cash_flow_eom",t);
+	return rebase_value(305,"sfas91_ceded_maint_exp_res_cash_flow_eom",t);
 }
 
 
@@ -8606,7 +7421,6 @@ return get_epl_value("sfas91_ceded_maint_exp_res_cash_flow_eom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas91_ceded_net_res_cash_flow_bom
@@ -8616,7 +7430,7 @@ return get_epl_value("sfas91_ceded_maint_exp_res_cash_flow_eom", t)
 double EPL_LIAB_UDF::epl_liab_sfas91_ceded_net_res_cash_flow_bom(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(343,"sfas91_ceded_net_res_cash_flow_bom",t);
+	return rebase_value(306,"sfas91_ceded_net_res_cash_flow_bom",t);
 }
 
 
@@ -8632,7 +7446,6 @@ return get_epl_value("sfas91_ceded_net_res_cash_flow_bom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas91_ceded_net_res_cash_flow_eom
@@ -8642,7 +7455,7 @@ return get_epl_value("sfas91_ceded_net_res_cash_flow_bom", t)
 double EPL_LIAB_UDF::epl_liab_sfas91_ceded_net_res_cash_flow_eom(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(344,"sfas91_ceded_net_res_cash_flow_eom",t);
+	return rebase_value(307,"sfas91_ceded_net_res_cash_flow_eom",t);
 }
 
 
@@ -8657,7 +7470,6 @@ return get_epl_value("sfas91_ceded_net_res_cash_flow_eom", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -8681,7 +7493,6 @@ return get_epl_value("sfas91_ceded_noncapzd_acq_exp", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas91_ceded_policies_b
@@ -8703,7 +7514,6 @@ return get_epl_value("sfas91_ceded_policies_b", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -8727,7 +7537,6 @@ return get_epl_value("sfas91_ceded_prem_paid", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas91_ceded_prem_tax
@@ -8749,7 +7558,6 @@ return get_epl_value("sfas91_ceded_prem_tax", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -8773,7 +7581,6 @@ return get_epl_value("sfas91_ceded_res_ann_benefits", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas91_ceded_res_dth_benefits
@@ -8795,7 +7602,6 @@ return get_epl_value("sfas91_ceded_res_dth_benefits", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -8819,7 +7625,6 @@ return get_epl_value("sfas91_gross_acq_exp", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas91_gross_ann_benefits_bom
@@ -8841,7 +7646,6 @@ return get_epl_value("sfas91_gross_ann_benefits_bom", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -8865,7 +7669,6 @@ return get_epl_value("sfas91_gross_ann_benefits_eom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas91_gross_ben_maint_exp_res_cash_flow_bom
@@ -8887,7 +7690,6 @@ return get_epl_value("sfas91_gross_ben_maint_exp_res_cash_flow_bom", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -8911,7 +7713,6 @@ return get_epl_value("sfas91_gross_ben_maint_exp_res_cash_flow_eom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas91_gross_ben_res_cash_flow_bom
@@ -8933,7 +7734,6 @@ return get_epl_value("sfas91_gross_ben_res_cash_flow_bom", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -8957,7 +7757,6 @@ return get_epl_value("sfas91_gross_ben_res_cash_flow_eom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas91_gross_capzd_acq_exp
@@ -8979,7 +7778,6 @@ return get_epl_value("sfas91_gross_capzd_acq_exp", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -9003,7 +7801,6 @@ return get_epl_value("sfas91_gross_capzd_comm_bom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas91_gross_cash_flow_bom
@@ -9025,7 +7822,6 @@ return get_epl_value("sfas91_gross_cash_flow_bom", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -9049,7 +7845,6 @@ return get_epl_value("sfas91_gross_comm_excess_bom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas91_gross_deferred_maint_exp
@@ -9071,7 +7866,6 @@ return get_epl_value("sfas91_gross_deferred_maint_exp", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -9095,7 +7889,6 @@ return get_epl_value("sfas91_gross_dth_benefits", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas91_gross_maint_exp_bom
@@ -9105,7 +7898,7 @@ return get_epl_value("sfas91_gross_dth_benefits", t)
 double EPL_LIAB_UDF::epl_liab_sfas91_gross_maint_exp_bom(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(364,"sfas91_gross_maint_exp_bom",t);
+	return rebase_value(327,"sfas91_gross_maint_exp_bom",t);
 }
 
 
@@ -9120,7 +7913,6 @@ return get_epl_value("sfas91_gross_maint_exp_bom", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -9144,7 +7936,6 @@ return get_epl_value("sfas91_gross_maint_exp_eom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas91_gross_maint_exp_res_cash_flow_bom
@@ -9154,7 +7945,7 @@ return get_epl_value("sfas91_gross_maint_exp_eom", t)
 double EPL_LIAB_UDF::epl_liab_sfas91_gross_maint_exp_res_cash_flow_bom(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(366,"sfas91_gross_maint_exp_res_cash_flow_bom",t);
+	return rebase_value(329,"sfas91_gross_maint_exp_res_cash_flow_bom",t);
 }
 
 
@@ -9170,7 +7961,6 @@ return get_epl_value("sfas91_gross_maint_exp_res_cash_flow_bom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas91_gross_maint_exp_res_cash_flow_eom
@@ -9180,7 +7970,7 @@ return get_epl_value("sfas91_gross_maint_exp_res_cash_flow_bom", t)
 double EPL_LIAB_UDF::epl_liab_sfas91_gross_maint_exp_res_cash_flow_eom(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(367,"sfas91_gross_maint_exp_res_cash_flow_eom",t);
+	return rebase_value(330,"sfas91_gross_maint_exp_res_cash_flow_eom",t);
 }
 
 
@@ -9196,7 +7986,6 @@ return get_epl_value("sfas91_gross_maint_exp_res_cash_flow_eom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas91_gross_net_res_cash_flow_bom
@@ -9206,7 +7995,7 @@ return get_epl_value("sfas91_gross_maint_exp_res_cash_flow_eom", t)
 double EPL_LIAB_UDF::epl_liab_sfas91_gross_net_res_cash_flow_bom(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(368,"sfas91_gross_net_res_cash_flow_bom",t);
+	return rebase_value(331,"sfas91_gross_net_res_cash_flow_bom",t);
 }
 
 
@@ -9222,7 +8011,6 @@ return get_epl_value("sfas91_gross_net_res_cash_flow_bom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas91_gross_net_res_cash_flow_eom
@@ -9232,7 +8020,7 @@ return get_epl_value("sfas91_gross_net_res_cash_flow_bom", t)
 double EPL_LIAB_UDF::epl_liab_sfas91_gross_net_res_cash_flow_eom(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(369,"sfas91_gross_net_res_cash_flow_eom",t);
+	return rebase_value(332,"sfas91_gross_net_res_cash_flow_eom",t);
 }
 
 
@@ -9247,7 +8035,6 @@ return get_epl_value("sfas91_gross_net_res_cash_flow_eom", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -9271,7 +8058,6 @@ return get_epl_value("sfas91_gross_noncapzd_acq_exp", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas91_gross_policies_b
@@ -9293,7 +8079,6 @@ return get_epl_value("sfas91_gross_policies_b", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -9317,7 +8102,6 @@ return get_epl_value("sfas91_gross_prem_paid", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas91_gross_prem_tax
@@ -9339,7 +8123,6 @@ return get_epl_value("sfas91_gross_prem_tax", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -9363,7 +8146,6 @@ return get_epl_value("sfas91_gross_res_ann_benefits", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas91_gross_res_dth_benefits
@@ -9385,7 +8167,6 @@ return get_epl_value("sfas91_gross_res_dth_benefits", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -9409,7 +8190,6 @@ return get_epl_value("sfas97lp_ceded_acq_exp", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97lp_ceded_ann_claim_cost
@@ -9431,53 +8211,6 @@ return get_epl_value("sfas97lp_ceded_ann_claim_cost", t)
 	   * pct_to_use_mp;
 
 }
-
-
-//@@ END
-
-//@@ START - sfas97lp_ceded_ben_res_accrual_valn_basis
-// SFAS97LP Ceded Benefit Reserve Accrual Valuation Basis                                                                                             
-// Column:SFAS97LP_CEDED_BEN_RES_ACCRUAL_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_ben_res_accrual_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas97lp_ceded_ben_res_accrual_valn_basis.EPL_LIAB.for"
-if (!reins_flag || t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas97lp_ceded_ben_res_accrual_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
-
-//@@ END
-
-//@@ START - sfas97lp_ceded_ben_res_int_valn_basis
-// SFAS97LP Ceded Benefit Reserve Interest Valuation Basis                                                                                             
-// Column:SFAS97LP_CEDED_BEN_RES_INT_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_ben_res_int_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas97lp_ceded_ben_res_int_valn_basis.EPL_LIAB.for"
-if (!reins_flag || t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas97lp_ceded_ben_res_int_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
 
 //@@ END
 
@@ -9501,30 +8234,6 @@ return get_epl_value("sfas97lp_ceded_ben_res_prelim", t)
 
 }
 
-
-//@@ END
-
-//@@ START - sfas97lp_ceded_benefits_valn_basis
-// SFAS97LP Ceded Benefits Valuation Basis                                                                                             
-// Column:SFAS97LP_CEDED_BENEFITS_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_benefits_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas97lp_ceded_benefits_valn_basis.EPL_LIAB.for"
-if (!reins_flag || t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas97lp_ceded_benefits_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
-
 //@@ END
 
 //@@ START - sfas97lp_ceded_capzd_acq_exp
@@ -9546,30 +8255,6 @@ return get_epl_value("sfas97lp_ceded_capzd_acq_exp", t)
 	   * pct_to_use_mp;
 
 }
-
-
-//@@ END
-
-//@@ START - sfas97lp_ceded_capzd_acq_exp_valn_basis
-// SFAS97 Limited Pay Ceded Capitalized Acquisition Expenses Valuation Basis                                                                                             
-// Column:SFAS97LP_CEDED_CAPZD_ACQ_EXP_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_capzd_acq_exp_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas97lp_ceded_capzd_acq_exp_valn_basis.EPL_LIAB.for"
-if (!reins_flag || t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas97lp_ceded_capzd_acq_exp_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
 
 //@@ END
 
@@ -9593,7 +8278,6 @@ return get_epl_value("sfas97lp_ceded_capzd_comm_bom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97lp_ceded_capzd_comm_chargeback
@@ -9615,7 +8299,6 @@ return get_epl_value("sfas97lp_ceded_capzd_comm_chargeback", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -9639,30 +8322,6 @@ return get_epl_value("sfas97lp_ceded_capzd_comm_eom", t)
 
 }
 
-
-//@@ END
-
-//@@ START - sfas97lp_ceded_capzd_comm_valn_basis
-// SFAS97LP Ceded Capitalized Commission Valuation Basis                                                                                             
-// Column:SFAS97LP_CEDED_CAPZD_COMM_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_capzd_comm_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas97lp_ceded_capzd_comm_valn_basis.EPL_LIAB.for"
-if (!reins_flag || t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas97lp_ceded_capzd_comm_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
-
 //@@ END
 
 //@@ START - sfas97lp_ceded_cash_flow_bom
@@ -9684,7 +8343,6 @@ return get_epl_value("sfas97lp_ceded_cash_flow_bom", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -9708,7 +8366,6 @@ return get_epl_value("sfas97lp_ceded_claim_res", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97lp_ceded_comm_chargeback
@@ -9730,7 +8387,6 @@ return get_epl_value("sfas97lp_ceded_comm_chargeback", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -9754,7 +8410,6 @@ return get_epl_value("sfas97lp_ceded_comm_excess_bom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97lp_ceded_comm_excess_eom
@@ -9776,7 +8431,6 @@ return get_epl_value("sfas97lp_ceded_comm_excess_eom", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -9800,7 +8454,6 @@ return get_epl_value("sfas97lp_ceded_comm_trail_bom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97lp_ceded_comm_trail_bom_base_plan
@@ -9822,7 +8475,6 @@ return get_epl_value("sfas97lp_ceded_comm_trail_bom_base_plan", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -9846,7 +8498,6 @@ return get_epl_value("sfas97lp_ceded_comm_trail_bom_rider", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97lp_ceded_comm_trail_eom
@@ -9868,7 +8519,6 @@ return get_epl_value("sfas97lp_ceded_comm_trail_eom", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -9892,53 +8542,6 @@ return get_epl_value("sfas97lp_ceded_conversion_cost", t)
 
 }
 
-
-//@@ END
-
-//@@ START - sfas97lp_ceded_dac_amortzn_valn_basis
-// SFAS97LP Ceded DAC Amortization Valuation Basis                                                                                             
-// Column:SFAS97LP_CEDED_DAC_AMORTZN_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_dac_amortzn_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas97lp_ceded_dac_amortzn_valn_basis.EPL_LIAB.for"
-if (!reins_flag || t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas97lp_ceded_dac_amortzn_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
-
-//@@ END
-
-//@@ START - sfas97lp_ceded_dac_int_valn_basis
-// SFAS97LP Ceded DAC Interest Valuation Basis                                                                                             
-// Column:SFAS97LP_CEDED_DAC_INT_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_dac_int_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas97lp_ceded_dac_int_valn_basis.EPL_LIAB.for"
-if (!reins_flag || t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas97lp_ceded_dac_int_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
-
 //@@ END
 
 //@@ START - sfas97lp_ceded_dac_prelim
@@ -9960,53 +8563,6 @@ return get_epl_value("sfas97lp_ceded_dac_prelim", t)
 	   * pct_to_use_mp;
 
 }
-
-
-//@@ END
-
-//@@ START - sfas97lp_ceded_deferred_prof_amortzn_valn_basis
-// SFAS97LP Ceded Deferred Profit Amortization Valuation Basis                                                                                             
-// Column:SFAS97LP_CEDED_DEFERRED_PROF_AMORTZN_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_deferred_prof_amortzn_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas97lp_ceded_deferred_prof_amortzn_valn_basis.EPL_LIAB.for"
-if (!reins_flag || t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas97lp_ceded_deferred_prof_int_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
-
-//@@ END
-
-//@@ START - sfas97lp_ceded_deferred_prof_int_valn_basis
-// SFAS97LP Ceded Deferred Profit Interest Valuation Basis                                                                                             
-// Column:SFAS97LP_CEDED_DEFERRED_PROF_INT_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_deferred_prof_int_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas97lp_ceded_deferred_prof_int_valn_basis.EPL_LIAB.for"
-if (!reins_flag || t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas97lp_ceded_deferred_prof_int_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
 
 //@@ END
 
@@ -10030,30 +8586,6 @@ return get_epl_value("sfas97lp_ceded_deferred_prof_liab_prelim", t)
 
 }
 
-
-//@@ END
-
-//@@ START - sfas97lp_ceded_deferred_prof_valn_basis
-// SFAS97LP Ceded Deferred Profit Valuation Basis                                                                                             
-// Column:SFAS97LP_CEDED_DEFERRED_PROF_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_deferred_prof_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas97lp_ceded_deferred_prof_valn_basis.EPL_LIAB.for"
-if (!reins_flag || t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas97lp_ceded_deferred_prof_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
-
 //@@ END
 
 //@@ START - sfas97lp_ceded_div_applied
@@ -10075,7 +8607,6 @@ return get_epl_value("sfas97lp_ceded_div_applied", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -10099,30 +8630,6 @@ return get_epl_value("sfas97lp_ceded_div_paid", t)
 
 }
 
-
-//@@ END
-
-//@@ START - sfas97lp_ceded_div_valn_basis
-// SFAS97LP Ceded Annual Dividends Valuation Basis                                                                                             
-// Column:SFAS97LP_CEDED_DIV_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_div_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas97lp_ceded_div_valn_basis.EPL_LIAB.for"
-if (!reins_flag || t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas97lp_ceded_div_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
-
 //@@ END
 
 //@@ START - sfas97lp_ceded_dth_claim_cost
@@ -10144,7 +8651,6 @@ return get_epl_value("sfas97lp_ceded_dth_claim_cost", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -10168,79 +8674,6 @@ return get_epl_value("sfas97lp_ceded_endow_claim_cost", t)
 
 }
 
-
-//@@ END
-
-//@@ START - sfas97lp_ceded_exp_valn_basis
-// SFAS97LP Ceded Expenses Valuation Basis                                                                                             
-// Column:SFAS97LP_CEDED_EXP_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_exp_valn_basis(int t) {
-//^^^
-if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(410,"sfas97lp_ceded_exp_valn_basis",t);
-}
-
-
-
-//^^^
-
-#line 1 "sfas97lp_ceded_exp_valn_basis.EPL_LIAB.for"
-if (!reins_flag || t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas97lp_ceded_exp_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
-
-//@@ END
-
-//@@ START - sfas97lp_ceded_gpr
-// SFAS97 Limited Pay Ceded Gross Premium Reserve                                                                                             
-// Column:SFAS97LP_CEDED_GPR
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_gpr(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas97lp_ceded_gpr.EPL_LIAB.for"
-if (!reins_flag || t < commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas97lp_ceded_gpr", t)
-	   * pct_to_use_mp;
-
-}
-
-
-//@@ END
-
-//@@ START - sfas97lp_ceded_gpr_units_inf
-// SFAS97 Limited Pay Ceded Gross Premium Reserve Units in Force                                                                                             
-// Column:SFAS97LP_CEDED_GPR_UNITS_INF
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_gpr_units_inf(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas97lp_ceded_gpr_units_inf.EPL_LIAB.for"
-if (!reins_flag || t < commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas97lp_ceded_gpr_units_inf", t)
-	   * pct_to_use_mp;
-
-}
-
-
 //@@ END
 
 //@@ START - sfas97lp_ceded_gross_prem
@@ -10262,7 +8695,6 @@ return get_epl_value("sfas97lp_ceded_gross_prem", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -10286,7 +8718,6 @@ return get_epl_value("sfas97lp_ceded_hlth_claim_cost", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97lp_ceded_loc_cost
@@ -10309,7 +8740,6 @@ return get_epl_value("sfas97lp_ceded_loc_cost", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97lp_ceded_maint_exp_bom
@@ -10319,7 +8749,7 @@ return get_epl_value("sfas97lp_ceded_loc_cost", t)
 double EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_maint_exp_bom(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(416,"sfas97lp_ceded_maint_exp_bom",t);
+	return rebase_value(365,"sfas97lp_ceded_maint_exp_bom",t);
 }
 
 
@@ -10334,7 +8764,6 @@ return get_epl_value("sfas97lp_ceded_maint_exp_bom", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -10358,76 +8787,6 @@ return get_epl_value("sfas97lp_ceded_maint_exp_eom", t)
 
 }
 
-
-//@@ END
-
-//@@ START - sfas97lp_ceded_maint_exp_res_accrual_valn_basis
-// SFAS97LP Ceded Maintenance Expense Reserve Accrual Valuation Basis                                                                                             
-// Column:SFAS97LP_CEDED_MAINT_EXP_RES_ACCRUAL_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_maint_exp_res_accrual_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas97lp_ceded_maint_exp_res_accrual_valn_basis.EPL_LIAB.for"
-if (!reins_flag || t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas97lp_ceded_maint_exp_res_accrual_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
-
-//@@ END
-
-//@@ START - sfas97lp_ceded_maint_exp_res_int_valn_basis
-// SFAS97LP Ceded Maintenance Expense Reserve Interest Valuation Basis                                                                                             
-// Column:SFAS97LP_CEDED_MAINT_EXP_RES_INT_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_maint_exp_res_int_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas97lp_ceded_maint_exp_res_int_valn_basis.EPL_LIAB.for"
-if (!reins_flag || t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas97lp_ceded_maint_exp_res_int_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
-
-//@@ END
-
-//@@ START - sfas97lp_ceded_maint_exp_res_prelim
-// SFAS97 Limited Pay Ceded Maintenance Expense Reserve Preliminary                                                                                             
-// Column:SFAS97LP_CEDED_MAINT_EXP_RES_PRELIM
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_maint_exp_res_prelim(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas97lp_ceded_maint_exp_res_prelim.EPL_LIAB.for"
-if (!reins_flag || t < commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas97lp_ceded_maint_exp_res_prelim", t)
-	   * pct_to_use_mp;
-
-}
-
-
 //@@ END
 
 //@@ START - sfas97lp_ceded_maturity_claim_cost
@@ -10449,7 +8808,6 @@ return get_epl_value("sfas97lp_ceded_maturity_claim_cost", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -10473,7 +8831,6 @@ return get_epl_value("sfas97lp_ceded_modco_liab", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97lp_ceded_modco_res_adj
@@ -10495,7 +8852,6 @@ return get_epl_value("sfas97lp_ceded_modco_res_adj", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -10519,7 +8875,6 @@ return get_epl_value("sfas97lp_ceded_prem_tax", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97lp_ceded_prem_waiver_res
@@ -10541,7 +8896,6 @@ return get_epl_value("sfas97lp_ceded_prem_waiver_res", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -10565,30 +8919,6 @@ return get_epl_value("sfas97lp_ceded_refund", t)
 
 }
 
-
-//@@ END
-
-//@@ START - sfas97lp_ceded_surr_ben_valn_basis
-// SFAS97LP Ceded Surrender Benefits Valuation Basis                                                                                             
-// Column:SFAS97LP_CEDED_SURR_BEN_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_surr_ben_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas97lp_ceded_surr_ben_valn_basis.EPL_LIAB.for"
-if (!reins_flag || t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas97lp_ceded_surr_ben_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
-
 //@@ END
 
 //@@ START - sfas97lp_ceded_surr_claim_cost
@@ -10610,7 +8940,6 @@ return get_epl_value("sfas97lp_ceded_surr_claim_cost", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -10634,7 +8963,6 @@ return get_epl_value("sfas97lp_ceded_terminal_div", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97lp_gross_acq_exp
@@ -10656,7 +8984,6 @@ return get_epl_value("sfas97lp_gross_acq_exp", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -10680,53 +9007,6 @@ return get_epl_value("sfas97lp_gross_ann_claim_cost", t)
 
 }
 
-
-//@@ END
-
-//@@ START - sfas97lp_gross_ben_res_accrual_valn_basis
-// SFAS97LP Gross Benefit Reserve Accrual Valuation Basis                                                                                             
-// Column:SFAS97LP_GROSS_BEN_RES_ACCRUAL_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas97lp_gross_ben_res_accrual_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas97lp_gross_ben_res_accrual_valn_basis.EPL_LIAB.for"
-if (t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas97lp_gross_ben_res_accrual_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
-
-//@@ END
-
-//@@ START - sfas97lp_gross_ben_res_int_valn_basis
-// SFAS97LP Gross Benefit Reserve Interest Valuation Basis                                                                                             
-// Column:SFAS97LP_GROSS_BEN_RES_INT_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas97lp_gross_ben_res_int_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas97lp_gross_ben_res_int_valn_basis.EPL_LIAB.for"
-if (t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas97lp_gross_ben_res_int_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
-
 //@@ END
 
 //@@ START - sfas97lp_gross_ben_res_prelim
@@ -10748,30 +9028,6 @@ return get_epl_value("sfas97lp_gross_ben_res_prelim", t)
 	   * pct_to_use_mp;
 
 }
-
-
-//@@ END
-
-//@@ START - sfas97lp_gross_benefits_valn_basis
-// SFAS97LP Gross Benefits Valuation Basis                                                                                             
-// Column:SFAS97LP_GROSS_BENEFITS_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas97lp_gross_benefits_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas97lp_gross_benefits_valn_basis.EPL_LIAB.for"
-if (t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas97lp_gross_benefits_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
 
 //@@ END
 
@@ -10795,30 +9051,6 @@ return get_epl_value("sfas97lp_gross_capzd_acq_exp", t)
 
 }
 
-
-//@@ END
-
-//@@ START - sfas97lp_gross_capzd_acq_exp_valn_basis
-// SFAS97LP Gross Capitalized Acquisition Expenses Valuation Basis                                                                                             
-// Column:SFAS97LP_GROSS_CAPZD_ACQ_EXP_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas97lp_gross_capzd_acq_exp_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas97lp_gross_capzd_acq_exp_valn_basis.EPL_LIAB.for"
-if (t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas97lp_gross_capzd_acq_exp_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
-
 //@@ END
 
 //@@ START - sfas97lp_gross_capzd_comm_bom
@@ -10840,7 +9072,6 @@ return get_epl_value("sfas97lp_gross_capzd_comm_bom", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -10864,7 +9095,6 @@ return get_epl_value("sfas97lp_gross_capzd_comm_chargeback", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97lp_gross_capzd_comm_eom
@@ -10886,30 +9116,6 @@ return get_epl_value("sfas97lp_gross_capzd_comm_eom", t)
 	   * pct_to_use_mp;
 
 }
-
-
-//@@ END
-
-//@@ START - sfas97lp_gross_capzd_comm_valn_basis
-// SFAS97LP Gross Capitalized Commission Valuation Basis                                                                                             
-// Column:SFAS97LP_GROSS_CAPZD_COMM_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas97lp_gross_capzd_comm_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas97lp_gross_capzd_comm_valn_basis.EPL_LIAB.for"
-if (t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas97lp_gross_capzd_comm_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
 
 //@@ END
 
@@ -10933,7 +9139,6 @@ return get_epl_value("sfas97lp_gross_capzd_reins_yrt_cost", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97lp_gross_cash_flow_bom
@@ -10955,7 +9160,6 @@ return get_epl_value("sfas97lp_gross_cash_flow_bom", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -10979,7 +9183,6 @@ return get_epl_value("sfas97lp_gross_claim_res", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97lp_gross_comm_chargeback
@@ -11001,7 +9204,6 @@ return get_epl_value("sfas97lp_gross_comm_chargeback", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -11025,7 +9227,6 @@ return get_epl_value("sfas97lp_gross_comm_excess_bom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97lp_gross_comm_excess_eom
@@ -11047,7 +9248,6 @@ return get_epl_value("sfas97lp_gross_comm_excess_eom", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -11071,7 +9271,6 @@ return get_epl_value("sfas97lp_gross_comm_trail_bom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97lp_gross_comm_trail_bom_base_plan
@@ -11093,7 +9292,6 @@ return get_epl_value("sfas97lp_gross_comm_trail_bom_base_plan", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -11117,7 +9315,6 @@ return get_epl_value("sfas97lp_gross_comm_trail_bom_rider", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97lp_gross_comm_trail_eom
@@ -11139,7 +9336,6 @@ return get_epl_value("sfas97lp_gross_comm_trail_eom", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -11163,53 +9359,6 @@ return get_epl_value("sfas97lp_gross_conversion_cost", t)
 
 }
 
-
-//@@ END
-
-//@@ START - sfas97lp_gross_dac_amortzn_valn_basis
-// SFAS97LP Gross DAC Amortization Valuation Basis                                                                                             
-// Column:SFAS97LP_GROSS_DAC_AMORTZN_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas97lp_gross_dac_amortzn_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas97lp_gross_dac_amortzn_valn_basis.EPL_LIAB.for"
-if (t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas60_gross_dac_amortzn_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
-
-//@@ END
-
-//@@ START - sfas97lp_gross_dac_int_valn_basis
-// SFAS97LP Gross DAC Interest Valuation Basis                                                                                             
-// Column:SFAS97LP_GROSS_DAC_INT_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas97lp_gross_dac_int_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas97lp_gross_dac_int_valn_basis.EPL_LIAB.for"
-if (t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas97lp_gross_dac_int_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
-
 //@@ END
 
 //@@ START - sfas97lp_gross_dac_prelim
@@ -11231,53 +9380,6 @@ return get_epl_value("sfas97lp_gross_dac_prelim", t)
 	   * pct_to_use_mp;
 
 }
-
-
-//@@ END
-
-//@@ START - sfas97lp_gross_dac_reins_yrt_asset_amortzn_valn_basis
-// SFAS97LP Gross Reinsurance YRT Asset Amortization Valuation Basis                                                                                             
-// Column:SFAS97LP_GROSS_DAC_REINS_YRT_ASSET_AMORTZN_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas97lp_gross_dac_reins_yrt_asset_amortzn_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas97lp_gross_dac_reins_yrt_asset_amortzn_valn_basis.EPL_LIAB.for"
-if (t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas97lp_gross_reins_yrt_asset_amortzn_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
-
-//@@ END
-
-//@@ START - sfas97lp_gross_dac_reins_yrt_asset_int_valn_basis
-// SFAS97LP Gross Reinsurance YRT Asset Interest Valuation Basis                                                                                             
-// Column:SFAS97LP_GROSS_DAC_REINS_YRT_ASSET_INT_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas97lp_gross_dac_reins_yrt_asset_int_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas97lp_gross_dac_reins_yrt_asset_int_valn_basis.EPL_LIAB.for"
-if (t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas97lp_gross_reins_yrt_asset_int_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
 
 //@@ END
 
@@ -11301,53 +9403,6 @@ return get_epl_value("sfas97lp_gross_dac_reins_yrt_asset_prelim", t)
 
 }
 
-
-//@@ END
-
-//@@ START - sfas97lp_gross_deferred_prof_amortzn_valn_basis
-// SFAS97LP Gross Deferred Profit Amortization Valuation Basis                                                                                             
-// Column:SFAS97LP_GROSS_DEFERRED_PROF_AMORTZN_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas97lp_gross_deferred_prof_amortzn_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas97lp_gross_deferred_prof_amortzn_valn_basis.EPL_LIAB.for"
-if (t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas97lp_gross_deferred_prof_int_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
-
-//@@ END
-
-//@@ START - sfas97lp_gross_deferred_prof_int_valn_basis
-// SFAS97LP Gross Deferred Profit Interest Valuation Basis                                                                                             
-// Column:SFAS97LP_GROSS_DEFERRED_PROF_INT_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas97lp_gross_deferred_prof_int_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas97lp_gross_deferred_prof_int_valn_basis.EPL_LIAB.for"
-if (t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas97lp_gross_deferred_prof_int_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
-
 //@@ END
 
 //@@ START - sfas97lp_gross_deferred_prof_liab_prelim
@@ -11369,30 +9424,6 @@ return get_epl_value("sfas97lp_gross_deferred_prof_liab_prelim", t)
 	   * pct_to_use_mp;
 
 }
-
-
-//@@ END
-
-//@@ START - sfas97lp_gross_deferred_prof_valn_basis
-// SFAS97LP Gross Deferred Profit Valuation Basis                                                                                             
-// Column:SFAS97LP_GROSS_DEFERRED_PROF_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas97lp_gross_deferred_prof_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas97lp_gross_deferred_prof_valn_basis.EPL_LIAB.for"
-if (t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas97lp_gross_deferred_prof_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
 
 //@@ END
 
@@ -11416,7 +9447,6 @@ return get_epl_value("sfas97lp_gross_div_applied", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97lp_gross_div_paid
@@ -11438,30 +9468,6 @@ return get_epl_value("sfas97lp_gross_div_paid", t)
 	   * pct_to_use_mp;
 
 }
-
-
-//@@ END
-
-//@@ START - sfas97lp_gross_div_valn_basis
-// SFAS97LP Gross Annual Dividends Valuation Basis                                                                                             
-// Column:SFAS97LP_GROSS_DIV_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas97lp_gross_div_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas97lp_gross_div_valn_basis.EPL_LIAB.for"
-if (t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas97lp_gross_div_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
 
 //@@ END
 
@@ -11485,7 +9491,6 @@ return get_epl_value("sfas97lp_gross_dth_claim_cost", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97lp_gross_endow_claim_cost
@@ -11507,79 +9512,6 @@ return get_epl_value("sfas97lp_gross_endow_claim_cost", t)
 	   * pct_to_use_mp;
 
 }
-
-
-//@@ END
-
-//@@ START - sfas97lp_gross_exp_valn_basis
-// SFAS97LP Gross Expenses Valuation Basis                                                                                             
-// Column:SFAS97LP_GROSS_EXP_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas97lp_gross_exp_valn_basis(int t) {
-//^^^
-if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(468,"sfas97lp_gross_exp_valn_basis",t);
-}
-
-
-
-//^^^
-
-#line 1 "sfas97lp_gross_exp_valn_basis.EPL_LIAB.for"
-if (t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas97lp_gross_exp_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
-
-//@@ END
-
-//@@ START - sfas97lp_gross_gpr
-// SFAS97 Limited Pay Gross Gross Premium Reserve                                                                                             
-// Column:SFAS97LP_GROSS_GPR
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas97lp_gross_gpr(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas97lp_gross_gpr.EPL_LIAB.for"
-if (t < commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas97lp_gross_gpr", t)
-	   * pct_to_use_mp;
-
-}
-
-
-//@@ END
-
-//@@ START - sfas97lp_gross_gpr_units_inf
-// SFAS97 Limited Pay Gross Gross Premium Reserve Units in Force                                                                                             
-// Column:SFAS97LP_GROSS_GPR_UNITS_INF
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas97lp_gross_gpr_units_inf(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas97lp_gross_gpr_units_inf.EPL_LIAB.for"
-if (t < commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas97lp_gross_gpr_units_inf", t)
-	   * pct_to_use_mp;
-
-}
-
 
 //@@ END
 
@@ -11603,7 +9535,6 @@ return get_epl_value("sfas97lp_gross_gross_prem", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97lp_gross_hlth_claim_cost
@@ -11625,7 +9556,6 @@ return get_epl_value("sfas97lp_gross_hlth_claim_cost", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -11649,7 +9579,6 @@ return get_epl_value("sfas97lp_gross_loc_cost", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97lp_gross_maint_exp_bom
@@ -11659,7 +9588,7 @@ return get_epl_value("sfas97lp_gross_loc_cost", t)
 double EPL_LIAB_UDF::epl_liab_sfas97lp_gross_maint_exp_bom(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(474,"sfas97lp_gross_maint_exp_bom",t);
+	return rebase_value(403,"sfas97lp_gross_maint_exp_bom",t);
 }
 
 
@@ -11674,7 +9603,6 @@ return get_epl_value("sfas97lp_gross_maint_exp_bom", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -11698,76 +9626,6 @@ return get_epl_value("sfas97lp_gross_maint_exp_eom", t)
 
 }
 
-
-//@@ END
-
-//@@ START - sfas97lp_gross_maint_exp_res_accrual_valn_basis
-// SFAS97LP Gross Maintenance Expense Reserve Accrual Valuation Basis                                                                                             
-// Column:SFAS97LP_GROSS_MAINT_EXP_RES_ACCRUAL_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas97lp_gross_maint_exp_res_accrual_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas97lp_gross_maint_exp_res_accrual_valn_basis.EPL_LIAB.for"
-if (t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas97lp_gross_maint_exp_res_accrual_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
-
-//@@ END
-
-//@@ START - sfas97lp_gross_maint_exp_res_int_valn_basis
-// SFAS97LP Gross Maintenance Expense Reserve Interest Valuation Basis                                                                                             
-// Column:SFAS97LP_GROSS_MAINT_EXP_RES_INT_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas97lp_gross_maint_exp_res_int_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas97lp_gross_maint_exp_res_int_valn_basis.EPL_LIAB.for"
-if (t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas97lp_gross_maint_exp_res_int_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
-
-//@@ END
-
-//@@ START - sfas97lp_gross_maint_exp_res_prelim
-// SFAS97 Limited Pay Gross Maintenance Expense Reserve Preliminary                                                                                             
-// Column:SFAS97LP_GROSS_MAINT_EXP_RES_PRELIM
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas97lp_gross_maint_exp_res_prelim(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas97lp_gross_maint_exp_res_prelim.EPL_LIAB.for"
-if (t < commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas97lp_gross_maint_exp_res_prelim", t)
-	   * pct_to_use_mp;
-
-}
-
-
 //@@ END
 
 //@@ START - sfas97lp_gross_maturity_claim_cost
@@ -11789,7 +9647,6 @@ return get_epl_value("sfas97lp_gross_maturity_claim_cost", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -11813,7 +9670,6 @@ return get_epl_value("sfas97lp_gross_pol_loan", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97lp_gross_pol_loan_inc
@@ -11835,7 +9691,6 @@ return get_epl_value("sfas97lp_gross_pol_loan_inc", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -11859,7 +9714,6 @@ return get_epl_value("sfas97lp_gross_prem_tax", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97lp_gross_prem_waiver_res
@@ -11881,7 +9735,6 @@ return get_epl_value("sfas97lp_gross_prem_waiver_res", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -11905,30 +9758,6 @@ return get_epl_value("sfas97lp_gross_reins_yrt_cost", t)
 
 }
 
-
-//@@ END
-
-//@@ START - sfas97lp_gross_reins_yrt_cost_valn_basis
-// SFAS97LP Gross Reinsurance YRT Cost Valuation Basis                                                                                             
-// Column:SFAS97LP_GROSS_REINS_YRT_COST_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas97lp_gross_reins_yrt_cost_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas97lp_gross_reins_yrt_cost_valn_basis.EPL_LIAB.for"
-if (t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas97lp_gross_reins_yrt_cost_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
-
 //@@ END
 
 //@@ START - sfas97lp_gross_stat_res_rider
@@ -11950,30 +9779,6 @@ return get_epl_value("sfas97lp_gross_stat_res_rider", t)
 	   * pct_to_use_mp;
 
 }
-
-
-//@@ END
-
-//@@ START - sfas97lp_gross_surr_ben_valn_basis
-// SFAS97LP Gross Surrender Benefits Valuation Basis                                                                                             
-// Column:SFAS97LP_GROSS_SURR_BEN_VALN_BASIS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas97lp_gross_surr_ben_valn_basis(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas97lp_gross_surr_ben_valn_basis.EPL_LIAB.for"
-if (t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas97lp_gross_surr_ben_valn_basis", t)
-	   * pct_to_use_mp;
-
-}
-
 
 //@@ END
 
@@ -11997,7 +9802,6 @@ return get_epl_value("sfas97lp_gross_surr_claim_cost", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97lp_gross_terminal_div
@@ -12020,7 +9824,6 @@ return get_epl_value("sfas97lp_gross_terminal_div", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_ceded_acq_exp
@@ -12030,7 +9833,7 @@ return get_epl_value("sfas97lp_gross_terminal_div", t)
 double EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_acq_exp(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(490,"sfas97rd_ceded_acq_exp",t);
+	return rebase_value(414,"sfas97rd_ceded_acq_exp",t);
 }
 
 
@@ -12045,7 +9848,6 @@ return get_epl_value("sfas97rd_ceded_acq_exp", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -12069,7 +9871,6 @@ return get_epl_value("sfas97rd_ceded_cap_gain_fund", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_ceded_capzd_acq_exp
@@ -12091,7 +9892,6 @@ return get_epl_value("sfas97rd_ceded_capzd_acq_exp", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -12115,7 +9915,6 @@ return get_epl_value("sfas97rd_ceded_capzd_comm_bom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_ceded_capzd_comm_chargeback
@@ -12137,7 +9936,6 @@ return get_epl_value("sfas97rd_ceded_capzd_comm_chargeback", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -12161,7 +9959,6 @@ return get_epl_value("sfas97rd_ceded_capzd_comm_eom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_ceded_capzd_prem_bonus
@@ -12183,7 +9980,6 @@ return get_epl_value("sfas97rd_ceded_capzd_prem_bonus", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -12207,7 +10003,6 @@ return get_epl_value("sfas97rd_ceded_cash_flow_bom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_ceded_charges
@@ -12230,7 +10025,6 @@ return get_epl_value("sfas97rd_ceded_charges", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_ceded_comm_chargeback
@@ -12240,7 +10034,7 @@ return get_epl_value("sfas97rd_ceded_charges", t)
 double EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_comm_chargeback(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(499,"sfas97rd_ceded_comm_chargeback",t);
+	return rebase_value(423,"sfas97rd_ceded_comm_chargeback",t);
 }
 
 
@@ -12255,7 +10049,6 @@ return get_epl_value("sfas97rd_ceded_comm_chargeback", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -12279,7 +10072,6 @@ return get_epl_value("sfas97rd_ceded_comm_excess_bom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_ceded_comm_trail_bom
@@ -12302,7 +10094,6 @@ return get_epl_value("sfas97rd_ceded_comm_trail_bom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_ceded_credited_int
@@ -12312,7 +10103,7 @@ return get_epl_value("sfas97rd_ceded_comm_trail_bom", t)
 double EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_credited_int(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(502,"sfas97rd_ceded_credited_int",t);
+	return rebase_value(426,"sfas97rd_ceded_credited_int",t);
 }
 
 
@@ -12327,7 +10118,6 @@ return get_epl_value("sfas97rd_ceded_credited_int", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -12351,7 +10141,6 @@ return get_epl_value("sfas97rd_ceded_deferred_loads", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_ceded_dth_claim_cost
@@ -12373,7 +10162,6 @@ return get_epl_value("sfas97rd_ceded_dth_claim_cost", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -12397,7 +10185,6 @@ return get_epl_value("sfas97rd_ceded_egp_gain_inv", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_ceded_egp_gain_mort
@@ -12419,7 +10206,6 @@ return get_epl_value("sfas97rd_ceded_egp_gain_mort", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -12443,7 +10229,6 @@ return get_epl_value("sfas97rd_ceded_egp_gain_surr", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_ceded_embed_deriv_cash_flow
@@ -12465,7 +10250,6 @@ return get_epl_value("sfas97rd_ceded_embed_deriv_cash_flow", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -12489,7 +10273,6 @@ return get_epl_value("sfas97rd_ceded_fund_val_aft_int", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_ceded_fund_val_bef_int
@@ -12512,7 +10295,6 @@ return get_epl_value("sfas97rd_ceded_fund_val_bef_int", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_ceded_fund_val_fixed
@@ -12522,7 +10304,7 @@ return get_epl_value("sfas97rd_ceded_fund_val_bef_int", t)
 double EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_fund_val_fixed(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(511,"sfas97rd_ceded_fund_val_fixed",t);
+	return rebase_value(435,"sfas97rd_ceded_fund_val_fixed",t);
 }
 
 
@@ -12538,7 +10320,6 @@ return get_epl_value("sfas97rd_ceded_fund_val_fixed", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_ceded_fund_val_sa
@@ -12548,7 +10329,7 @@ return get_epl_value("sfas97rd_ceded_fund_val_fixed", t)
 double EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_fund_val_sa(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(512,"sfas97rd_ceded_fund_val_sa",t);
+	return rebase_value(436,"sfas97rd_ceded_fund_val_sa",t);
 }
 
 
@@ -12563,7 +10344,6 @@ return get_epl_value("sfas97rd_ceded_fund_val_sa", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -12587,7 +10367,6 @@ return get_epl_value("sfas97rd_ceded_gmab_ben", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_ceded_gmdb_ben
@@ -12609,7 +10388,6 @@ return get_epl_value("sfas97rd_ceded_gmdb_ben", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -12633,7 +10411,6 @@ return get_epl_value("sfas97rd_ceded_gmib_ben", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_ceded_gmwb_ben
@@ -12655,7 +10432,6 @@ return get_epl_value("sfas97rd_ceded_gmwb_ben", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -12679,7 +10455,6 @@ return get_epl_value("sfas97rd_ceded_hedge_cash_flow", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_ceded_hedge_mkt_val
@@ -12701,7 +10476,6 @@ return get_epl_value("sfas97rd_ceded_hedge_mkt_val", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -12725,7 +10499,6 @@ return get_epl_value("sfas97rd_ceded_host_contract_cred_int", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_ceded_host_contract_val
@@ -12747,7 +10520,6 @@ return get_epl_value("sfas97rd_ceded_host_contract_val", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -12771,7 +10543,6 @@ return get_epl_value("sfas97rd_ceded_host_contract_val_bef", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_ceded_inv_inc_fund
@@ -12793,7 +10564,6 @@ return get_epl_value("sfas97rd_ceded_inv_inc_fund", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -12817,7 +10587,6 @@ return get_epl_value("sfas97rd_ceded_loads", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_ceded_loc_cost
@@ -12840,7 +10609,6 @@ return get_epl_value("sfas97rd_ceded_loc_cost", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_ceded_maint_exp_bom
@@ -12850,7 +10618,7 @@ return get_epl_value("sfas97rd_ceded_loc_cost", t)
 double EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_maint_exp_bom(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(525,"sfas97rd_ceded_maint_exp_bom",t);
+	return rebase_value(449,"sfas97rd_ceded_maint_exp_bom",t);
 }
 
 
@@ -12866,7 +10634,6 @@ return get_epl_value("sfas97rd_ceded_maint_exp_bom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_ceded_maint_exp_eom
@@ -12876,7 +10643,7 @@ return get_epl_value("sfas97rd_ceded_maint_exp_bom", t)
 double EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_maint_exp_eom(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(526,"sfas97rd_ceded_maint_exp_eom",t);
+	return rebase_value(450,"sfas97rd_ceded_maint_exp_eom",t);
 }
 
 
@@ -12892,7 +10659,6 @@ return get_epl_value("sfas97rd_ceded_maint_exp_eom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_ceded_modco_liab
@@ -12902,7 +10668,7 @@ return get_epl_value("sfas97rd_ceded_maint_exp_eom", t)
 double EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_modco_liab(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(527,"sfas97rd_ceded_modco_liab",t);
+	return rebase_value(451,"sfas97rd_ceded_modco_liab",t);
 }
 
 
@@ -12918,7 +10684,6 @@ return get_epl_value("sfas97rd_ceded_modco_liab", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_ceded_modco_res_adj
@@ -12928,7 +10693,7 @@ return get_epl_value("sfas97rd_ceded_modco_liab", t)
 double EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_modco_res_adj(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(528,"sfas97rd_ceded_modco_res_adj",t);
+	return rebase_value(452,"sfas97rd_ceded_modco_res_adj",t);
 }
 
 
@@ -12944,6 +10709,93 @@ return get_epl_value("sfas97rd_ceded_modco_res_adj", t)
 
 }
 
+//@@ END
+
+//@@ START - sfas97rd_ceded_mrb_gmab_liab
+// SFAS97RD Ceded MRB GMAB Liability                                                                                             
+// Column:SFAS97RD_CEDED_MRB_GMAB_LIAB
+//========================================================
+double EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_mrb_gmab_liab(int t) {
+//^^^
+
+
+
+//^^^
+
+#line 1 "sfas97rd_ceded_mrb_gmab_liab.EPL_LIAB.for"
+if (!reins_flag || t < commencement_period || t > maturity_period)
+	return NO_AVG;
+	
+return get_epl_value("sfas97rd_ceded_mrb_gmab_liab", t)
+	   * pct_to_use_mp;
+
+}
+
+//@@ END
+
+//@@ START - sfas97rd_ceded_mrb_gmdb_liab
+// SFAS97RD Ceded MRB GMDB Liability                                                                                             
+// Column:SFAS97RD_CEDED_MRB_GMDB_LIAB
+//========================================================
+double EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_mrb_gmdb_liab(int t) {
+//^^^
+
+
+
+//^^^
+
+#line 1 "sfas97rd_ceded_mrb_gmdb_liab.EPL_LIAB.for"
+if (!reins_flag || t < commencement_period || t > maturity_period)
+	return NO_AVG;
+	
+return get_epl_value("sfas97rd_ceded_mrb_gmab_liab", t)
+	   * pct_to_use_mp;
+
+}
+
+//@@ END
+
+//@@ START - sfas97rd_ceded_mrb_gmib_liab
+// SFAS97RD Ceded MRB GMIB Liability                                                                                             
+// Column:SFAS97RD_CEDED_MRB_GMIB_LIAB
+//========================================================
+double EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_mrb_gmib_liab(int t) {
+//^^^
+
+
+
+//^^^
+
+#line 1 "sfas97rd_ceded_mrb_gmib_liab.EPL_LIAB.for"
+if (!reins_flag || t < commencement_period || t > maturity_period)
+	return NO_AVG;
+	
+return get_epl_value("sfas97rd_ceded_mrb_gmib_liab", t)
+	   * pct_to_use_mp;
+
+}
+
+//@@ END
+
+//@@ START - sfas97rd_ceded_mrb_gmwb_liab
+// SFAS97RD Ceded MRB GMWB Liability                                                                                             
+// Column:SFAS97RD_CEDED_MRB_GMWB_LIAB
+//========================================================
+double EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_mrb_gmwb_liab(int t) {
+//^^^
+
+
+
+//^^^
+
+#line 1 "sfas97rd_ceded_mrb_gmwb_liab.EPL_LIAB.for"
+if (!reins_flag || t < commencement_period || t > maturity_period)
+	return NO_AVG;
+	
+return get_epl_value("sfas97rd_ceded_mrb_gmwb_liab", t)
+	   * pct_to_use_mp;
+
+}
 
 //@@ END
 
@@ -12967,32 +10819,30 @@ return get_epl_value("sfas97rd_ceded_persist_bon_ref", t)
 
 }
 
-
 //@@ END
 
-//@@ START - sfas97rd_ceded_policies_b
+//@@ START - sfas97rd_ceded_policies_inf
 // SFAS97RD Ceded Policies In Force Beginning of Month                                                                                             
-// Column:SFAS97RD_CEDED_POLICIES_B
+// Column:SFAS97RD_CEDED_POLICIES_INF
 //========================================================
-double EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_policies_b(int t) {
+double EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_policies_inf(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(530,"sfas97rd_ceded_policies_b",t);
+	return rebase_value(458,"sfas97rd_ceded_policies_inf",t);
 }
 
 
 
 //^^^
 
-#line 1 "sfas97rd_ceded_policies_b.EPL_LIAB.for"
+#line 1 "sfas97rd_ceded_policies_inf.EPL_LIAB.for"
 if (!reins_flag || t <= commencement_period || t > maturity_period)
 	return NO_AVG;
 	
-return get_epl_value("sfas97rd_ceded_policies_b", t)
+return get_epl_value("sfas97rd_ceded_policies_inf", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -13016,7 +10866,6 @@ return get_epl_value("sfas97rd_ceded_prem_bonus", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_ceded_prem_tax
@@ -13026,7 +10875,7 @@ return get_epl_value("sfas97rd_ceded_prem_bonus", t)
 double EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_prem_tax(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(532,"sfas97rd_ceded_prem_tax",t);
+	return rebase_value(460,"sfas97rd_ceded_prem_tax",t);
 }
 
 
@@ -13042,7 +10891,6 @@ return get_epl_value("sfas97rd_ceded_prem_tax", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_ceded_refund
@@ -13052,7 +10900,7 @@ return get_epl_value("sfas97rd_ceded_prem_tax", t)
 double EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_refund(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(533,"sfas97rd_ceded_refund",t);
+	return rebase_value(461,"sfas97rd_ceded_refund",t);
 }
 
 
@@ -13067,7 +10915,6 @@ return get_epl_value("sfas97rd_ceded_refund", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -13091,76 +10938,6 @@ return get_epl_value("sfas97rd_ceded_rider_charges", t)
 
 }
 
-
-//@@ END
-
-//@@ START - sfas97rd_ceded_sfas133_gmab_liab
-// SFAS97RD Ceded SFAS 133 GMAB Liability                                                                                             
-// Column:SFAS97RD_CEDED_SFAS133_GMAB_LIAB
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_sfas133_gmab_liab(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas97rd_ceded_sfas133_gmab_liab.EPL_LIAB.for"
-if (!reins_flag || t < commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas97rd_ceded_sfas133_gmab_liab", t)
-	   * pct_to_use_mp;
-
-}
-
-
-//@@ END
-
-//@@ START - sfas97rd_ceded_sfas133_gmib_liab
-// SFAS97RD Ceded SFAS 133 GMIB Liability                                                                                             
-// Column:SFAS97RD_CEDED_SFAS133_GMIB_LIAB
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_sfas133_gmib_liab(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas97rd_ceded_sfas133_gmib_liab.EPL_LIAB.for"
-if (!reins_flag || t < commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas97rd_ceded_sfas133_gmib_liab", t)
-	   * pct_to_use_mp;
-
-}
-
-
-//@@ END
-
-//@@ START - sfas97rd_ceded_sfas133_gmwb_liab
-// SFAS97RD Ceded SFAS 133 GMWB Liability                                                                                             
-// Column:SFAS97RD_CEDED_SFAS133_GMWB_LIAB
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_sfas133_gmwb_liab(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas97rd_ceded_sfas133_gmwb_liab.EPL_LIAB.for"
-if (!reins_flag || t < commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas97rd_ceded_sfas133_gmwb_liab", t)
-	   * pct_to_use_mp;
-
-}
-
-
 //@@ END
 
 //@@ START - sfas97rd_ceded_sop031_assess
@@ -13182,7 +10959,6 @@ return get_epl_value("sfas97rd_ceded_sop031_assess", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -13206,7 +10982,6 @@ return get_epl_value("sfas97rd_ceded_sop031_coi_assess", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_ceded_sop031_coi_ben
@@ -13228,7 +11003,6 @@ return get_epl_value("sfas97rd_ceded_sop031_coi_ben", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -13252,7 +11026,6 @@ return get_epl_value("sfas97rd_ceded_sop031_pbr", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_ceded_sop031_pbr_fund_val
@@ -13274,7 +11047,6 @@ return get_epl_value("sfas97rd_ceded_sop031_pbr_fund_val", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -13298,7 +11070,6 @@ return get_epl_value("sfas97rd_ceded_ulsg_ben", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_gross_acq_exp
@@ -13308,7 +11079,7 @@ return get_epl_value("sfas97rd_ceded_ulsg_ben", t)
 double EPL_LIAB_UDF::epl_liab_sfas97rd_gross_acq_exp(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(544,"sfas97rd_gross_acq_exp",t);
+	return rebase_value(469,"sfas97rd_gross_acq_exp",t);
 }
 
 
@@ -13323,7 +11094,6 @@ return get_epl_value("sfas97rd_gross_acq_exp", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -13347,7 +11117,6 @@ return get_epl_value("sfas97rd_gross_cap_gain_fund", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_gross_capzd_acq_exp
@@ -13369,7 +11138,6 @@ return get_epl_value("sfas97rd_gross_capzd_acq_exp", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -13393,7 +11161,6 @@ return get_epl_value("sfas97rd_gross_capzd_comm_bom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_gross_capzd_comm_chargeback
@@ -13415,7 +11182,6 @@ return get_epl_value("sfas97rd_gross_capzd_comm_chargeback", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -13439,7 +11205,6 @@ return get_epl_value("sfas97rd_gross_capzd_comm_eom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_gross_capzd_prem_bonus
@@ -13461,7 +11226,6 @@ return get_epl_value("sfas97rd_gross_capzd_prem_bonus", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -13485,7 +11249,6 @@ return get_epl_value("sfas97rd_gross_capzd_reins_yrt_cost", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_gross_cash_flow_bom
@@ -13507,7 +11270,6 @@ return get_epl_value("sfas97rd_gross_cash_flow_bom", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -13531,7 +11293,6 @@ return get_epl_value("sfas97rd_gross_charges", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_gross_comm_chargeback
@@ -13541,7 +11302,7 @@ return get_epl_value("sfas97rd_gross_charges", t)
 double EPL_LIAB_UDF::epl_liab_sfas97rd_gross_comm_chargeback(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(554,"sfas97rd_gross_comm_chargeback",t);
+	return rebase_value(479,"sfas97rd_gross_comm_chargeback",t);
 }
 
 
@@ -13556,7 +11317,6 @@ return get_epl_value("sfas97rd_gross_comm_chargeback", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -13580,7 +11340,6 @@ return get_epl_value("sfas97rd_gross_comm_excess_bom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_gross_comm_trail_bom
@@ -13603,7 +11362,6 @@ return get_epl_value("sfas97rd_gross_comm_trail_bom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_gross_credited_int
@@ -13613,7 +11371,7 @@ return get_epl_value("sfas97rd_gross_comm_trail_bom", t)
 double EPL_LIAB_UDF::epl_liab_sfas97rd_gross_credited_int(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(557,"sfas97rd_gross_credited_int",t);
+	return rebase_value(482,"sfas97rd_gross_credited_int",t);
 }
 
 
@@ -13628,7 +11386,6 @@ return get_epl_value("sfas97rd_gross_credited_int", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -13652,7 +11409,6 @@ return get_epl_value("sfas97rd_gross_deferred_loads", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_gross_dth_claim_cost
@@ -13674,7 +11430,6 @@ return get_epl_value("sfas97rd_gross_dth_claim_cost", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -13698,7 +11453,6 @@ return get_epl_value("sfas97rd_gross_egp_gain_inv", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_gross_egp_gain_mort
@@ -13720,7 +11474,6 @@ return get_epl_value("sfas97rd_gross_egp_gain_mort", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -13744,7 +11497,6 @@ return get_epl_value("sfas97rd_gross_egp_gain_surr", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_gross_embed_deriv_cash_flow
@@ -13766,7 +11518,6 @@ return get_epl_value("sfas97rd_gross_embed_deriv_cash_flow", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -13790,7 +11541,6 @@ return get_epl_value("sfas97rd_gross_fund_val_aft_int", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_gross_fund_val_bef_int
@@ -13813,7 +11563,6 @@ return get_epl_value("sfas97rd_gross_fund_val_bef_int", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_gross_fund_val_fixed
@@ -13823,7 +11572,7 @@ return get_epl_value("sfas97rd_gross_fund_val_bef_int", t)
 double EPL_LIAB_UDF::epl_liab_sfas97rd_gross_fund_val_fixed(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(566,"sfas97rd_gross_fund_val_fixed",t);
+	return rebase_value(491,"sfas97rd_gross_fund_val_fixed",t);
 }
 
 
@@ -13839,7 +11588,6 @@ return get_epl_value("sfas97rd_gross_fund_val_fixed", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_gross_fund_val_sa
@@ -13849,7 +11597,7 @@ return get_epl_value("sfas97rd_gross_fund_val_fixed", t)
 double EPL_LIAB_UDF::epl_liab_sfas97rd_gross_fund_val_sa(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(567,"sfas97rd_gross_fund_val_sa",t);
+	return rebase_value(492,"sfas97rd_gross_fund_val_sa",t);
 }
 
 
@@ -13864,7 +11612,6 @@ return get_epl_value("sfas97rd_gross_fund_val_sa", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -13888,7 +11635,6 @@ return get_epl_value("sfas97rd_gross_gmab_ben", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_gross_gmdb_ben
@@ -13910,7 +11656,6 @@ return get_epl_value("sfas97rd_gross_gmdb_ben", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -13934,7 +11679,6 @@ return get_epl_value("sfas97rd_gross_gmib_ben", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_gross_gmwb_ben
@@ -13956,7 +11700,6 @@ return get_epl_value("sfas97rd_gross_gmwb_ben", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -13980,7 +11723,6 @@ return get_epl_value("sfas97rd_gross_hedge_cash_flow", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_gross_hedge_mkt_val
@@ -14002,7 +11744,6 @@ return get_epl_value("sfas97rd_gross_hedge_mkt_val", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -14026,7 +11767,6 @@ return get_epl_value("sfas97rd_gross_host_contract_cred_int", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_gross_host_contract_val
@@ -14048,7 +11788,6 @@ return get_epl_value("sfas97rd_gross_host_contract_val", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -14072,7 +11811,6 @@ return get_epl_value("sfas97rd_gross_host_contract_val_bef", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_gross_inv_inc_fund
@@ -14094,7 +11832,6 @@ return get_epl_value("sfas97rd_gross_inv_inc_fund", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -14118,7 +11855,6 @@ return get_epl_value("sfas97rd_gross_loads", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_gross_loc_cost
@@ -14141,7 +11877,6 @@ return get_epl_value("sfas97rd_gross_loc_cost", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_gross_maint_exp_bom
@@ -14151,7 +11886,7 @@ return get_epl_value("sfas97rd_gross_loc_cost", t)
 double EPL_LIAB_UDF::epl_liab_sfas97rd_gross_maint_exp_bom(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(580,"sfas97rd_gross_maint_exp_bom",t);
+	return rebase_value(505,"sfas97rd_gross_maint_exp_bom",t);
 }
 
 
@@ -14167,7 +11902,6 @@ return get_epl_value("sfas97rd_gross_maint_exp_bom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_gross_maint_exp_eom
@@ -14177,7 +11911,7 @@ return get_epl_value("sfas97rd_gross_maint_exp_bom", t)
 double EPL_LIAB_UDF::epl_liab_sfas97rd_gross_maint_exp_eom(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(581,"sfas97rd_gross_maint_exp_eom",t);
+	return rebase_value(506,"sfas97rd_gross_maint_exp_eom",t);
 }
 
 
@@ -14193,6 +11927,93 @@ return get_epl_value("sfas97rd_gross_maint_exp_eom", t)
 
 }
 
+//@@ END
+
+//@@ START - sfas97rd_gross_mrb_gmab_liab
+// SFAS97RD Gross MRB GMAB Liability                                                                                             
+// Column:SFAS97RD_GROSS_MRB_GMAB_LIAB
+//========================================================
+double EPL_LIAB_UDF::epl_liab_sfas97rd_gross_mrb_gmab_liab(int t) {
+//^^^
+
+
+
+//^^^
+
+#line 1 "sfas97rd_gross_mrb_gmab_liab.EPL_LIAB.for"
+if (t < commencement_period || t > maturity_period)
+	return NO_AVG;
+	
+return get_epl_value("sfas97rd_gross_mrb_gmab_liab", t)
+	   * pct_to_use_mp;
+
+}
+
+//@@ END
+
+//@@ START - sfas97rd_gross_mrb_gmdb_liab
+// SFAS97RD Gross MRB GMDB Liability                                                                                             
+// Column:SFAS97RD_GROSS_MRB_GMDB_LIAB
+//========================================================
+double EPL_LIAB_UDF::epl_liab_sfas97rd_gross_mrb_gmdb_liab(int t) {
+//^^^
+
+
+
+//^^^
+
+#line 1 "sfas97rd_gross_mrb_gmdb_liab.EPL_LIAB.for"
+if (t < commencement_period || t > maturity_period)
+	return NO_AVG;
+	
+return get_epl_value("sfas97rd_gross_mrb_gmab_liab", t)
+	   * pct_to_use_mp;
+
+}
+
+//@@ END
+
+//@@ START - sfas97rd_gross_mrb_gmib_liab
+// SFAS97RD Gross MRB GMIB Liability                                                                                             
+// Column:SFAS97RD_GROSS_MRB_GMIB_LIAB
+//========================================================
+double EPL_LIAB_UDF::epl_liab_sfas97rd_gross_mrb_gmib_liab(int t) {
+//^^^
+
+
+
+//^^^
+
+#line 1 "sfas97rd_gross_mrb_gmib_liab.EPL_LIAB.for"
+if (t < commencement_period || t > maturity_period)
+	return NO_AVG;
+	
+return get_epl_value("sfas97rd_gross_mrb_gmib_liab", t)
+	   * pct_to_use_mp;
+
+}
+
+//@@ END
+
+//@@ START - sfas97rd_gross_mrb_gmwb_liab
+// SFAS97RD Gross MRB GMWB Liability                                                                                             
+// Column:SFAS97RD_GROSS_MRB_GMWB_LIAB
+//========================================================
+double EPL_LIAB_UDF::epl_liab_sfas97rd_gross_mrb_gmwb_liab(int t) {
+//^^^
+
+
+
+//^^^
+
+#line 1 "sfas97rd_gross_mrb_gmwb_liab.EPL_LIAB.for"
+if (t < commencement_period || t > maturity_period)
+	return NO_AVG;
+	
+return get_epl_value("sfas97rd_gross_mrb_gmwb_liab", t)
+	   * pct_to_use_mp;
+
+}
 
 //@@ END
 
@@ -14216,7 +12037,6 @@ return get_epl_value("sfas97rd_gross_persist_bon_ref", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_gross_pol_loan
@@ -14238,7 +12058,6 @@ return get_epl_value("sfas97rd_gross_pol_loan", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -14262,32 +12081,30 @@ return get_epl_value("sfas97rd_gross_pol_loan_inc", t)
 
 }
 
-
 //@@ END
 
-//@@ START - sfas97rd_gross_policies_b
+//@@ START - sfas97rd_gross_policies_inf
 // SFAS97RD Gross Policies In Force Beginning of Month                                                                                             
-// Column:SFAS97RD_GROSS_POLICIES_B
+// Column:SFAS97RD_GROSS_POLICIES_INF
 //========================================================
-double EPL_LIAB_UDF::epl_liab_sfas97rd_gross_policies_b(int t) {
+double EPL_LIAB_UDF::epl_liab_sfas97rd_gross_policies_inf(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(585,"sfas97rd_gross_policies_b",t);
+	return rebase_value(514,"sfas97rd_gross_policies_inf",t);
 }
 
 
 
 //^^^
 
-#line 1 "sfas97rd_gross_policies_b.EPL_LIAB.for"
+#line 1 "sfas97rd_gross_policies_inf.EPL_LIAB.for"
 if (t <= commencement_period || t > maturity_period)
 	return NO_AVG;
 	
-return get_epl_value("sfas97rd_gross_policies_b", t)
+return get_epl_value("sfas97rd_gross_policies_inf", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -14311,7 +12128,6 @@ return get_epl_value("sfas97rd_gross_prem_bonus", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_gross_prem_tax
@@ -14321,7 +12137,7 @@ return get_epl_value("sfas97rd_gross_prem_bonus", t)
 double EPL_LIAB_UDF::epl_liab_sfas97rd_gross_prem_tax(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(587,"sfas97rd_gross_prem_tax",t);
+	return rebase_value(516,"sfas97rd_gross_prem_tax",t);
 }
 
 
@@ -14336,7 +12152,6 @@ return get_epl_value("sfas97rd_gross_prem_tax", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -14360,7 +12175,6 @@ return get_epl_value("sfas97rd_gross_reins_yrt_cost", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_gross_rider_charges
@@ -14382,76 +12196,6 @@ return get_epl_value("sfas97rd_gross_rider_charges", t)
 	   * pct_to_use_mp;
 
 }
-
-
-//@@ END
-
-//@@ START - sfas97rd_gross_sfas133_gmab_liab
-// SFAS97RD Gross SFAS 133 GMAB Liability                                                                                             
-// Column:SFAS97RD_GROSS_SFAS133_GMAB_LIAB
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas97rd_gross_sfas133_gmab_liab(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas97rd_gross_sfas133_gmab_liab.EPL_LIAB.for"
-if (t < commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas97rd_gross_sfas133_gmab_liab", t)
-	   * pct_to_use_mp;
-
-}
-
-
-//@@ END
-
-//@@ START - sfas97rd_gross_sfas133_gmib_liab
-// SFAS97RD Gross SFAS 133 GMIB Liability                                                                                             
-// Column:SFAS97RD_GROSS_SFAS133_GMIB_LIAB
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas97rd_gross_sfas133_gmib_liab(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas97rd_gross_sfas133_gmib_liab.EPL_LIAB.for"
-if (t < commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas97rd_gross_sfas133_gmib_liab", t)
-	   * pct_to_use_mp;
-
-}
-
-
-//@@ END
-
-//@@ START - sfas97rd_gross_sfas133_gmwb_liab
-// SFAS97RD Gross SFAS 133 GMWB Liability                                                                                             
-// Column:SFAS97RD_GROSS_SFAS133_GMWB_LIAB
-//========================================================
-double EPL_LIAB_UDF::epl_liab_sfas97rd_gross_sfas133_gmwb_liab(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas97rd_gross_sfas133_gmwb_liab.EPL_LIAB.for"
-if (t < commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("sfas97rd_gross_sfas133_gmwb_liab", t)
-	   * pct_to_use_mp;
-
-}
-
 
 //@@ END
 
@@ -14475,7 +12219,6 @@ return get_epl_value("sfas97rd_gross_sop031_assess", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_gross_sop031_coi_assess
@@ -14497,7 +12240,6 @@ return get_epl_value("sfas97rd_gross_sop031_coi_assess", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -14521,7 +12263,6 @@ return get_epl_value("sfas97rd_gross_sop031_coi_ben", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_gross_sop031_pbr
@@ -14543,7 +12284,6 @@ return get_epl_value("sfas97rd_gross_sop031_pbr", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -14567,7 +12307,6 @@ return get_epl_value("sfas97rd_gross_sop031_pbr", t)
 
 }
 
-
 //@@ END
 
 //@@ START - sfas97rd_gross_stat_res_rider
@@ -14589,7 +12328,6 @@ return get_epl_value("sfas97rd_gross_stat_res_rider", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -14613,7 +12351,6 @@ return get_epl_value("sfas97rd_gross_ulsg_ben", t)
 
 }
 
-
 //@@ END
 
 //@@ START - startup
@@ -14628,10 +12365,22 @@ double EPL_LIAB_UDF::virtual_startup(int t) {
 //^^^
 
 #line 1 "startup.EPL_LIAB.for"
+#if 0 // START_HEADER
+#if defined(GEN2_ALM_RUN)
+	#define __EPL_LIAB_H_
+#endif
+#endif // END_HEADER
+
+#if 0 // START_EXTERNS
+vector<vector<string>> epl_sch_input;
+vector<string> epl_columns;
+#endif // END_EXTERNS
+
 #if 0 // START_CLASS
-Schedule * EPLData;
 int epl_last_cash_flow_period;
-map <xstring, long, less <xstring> > sched_byte_pos;
+SmartArray <SmartArray <double>> epl_values;
+
+SEG_COMP *seg_element;
 #endif // END_CLASS
 
 #if 0 // START_CONSTRUCTOR
@@ -14640,16 +12389,16 @@ epl_last_cash_flow_period = -1;
 
 if (use_mp == NO)
 	{
-	skipModelPoint();
-	return 1.0;
+	throw NonFatalError("Model Point Use Definition is set to No for EPL model point");
 	}
 
-if (!read_epl_file(replaceWildcards(epl_file)))
+bool epl_read = read_epl_file(replaceWildcards(epl_file));
+
+if (!epl_read)
 	{
 	if ((is_first_proj_task_loop || num_of_proj_task_loops == 0)
 		&& data_validation_defn == YES)
 		{
-		makeRunLogYellow();
 		log_screen << "Warning: Unable to process epl file " << epl_file << ". " 
 				   << "EPL values will not be included. Please check your data." << MSG_ERROR;
 		}
@@ -14657,14 +12406,12 @@ if (!read_epl_file(replaceWildcards(epl_file)))
 
 if (fabs(pct_to_use_mp) < rate_ratio_threshold)
 	{
-	skipModelPoint();
-	return 1.0;
+	throw NonFatalError("");
 	}
 
 return 1.0;
 
 }
-
 
 //@@ END
 
@@ -14675,7 +12422,7 @@ return 1.0;
 double EPL_LIAB_UDF::epl_liab_stat_claim_exp_res(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(601,"stat_claim_exp_res",t);
+	return rebase_value(527,"stat_claim_exp_res",t);
 }
 
 
@@ -14691,7 +12438,6 @@ return get_epl_value("stat_claim_exp_res", t)
 
 }
 
-
 //@@ END
 
 //@@ START - stat_claim_res
@@ -14701,7 +12447,7 @@ return get_epl_value("stat_claim_exp_res", t)
 double EPL_LIAB_UDF::epl_liab_stat_claim_res(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(602,"stat_claim_res",t);
+	return rebase_value(528,"stat_claim_res",t);
 }
 
 
@@ -14717,7 +12463,6 @@ return get_epl_value("stat_claim_res", t)
 
 }
 
-
 //@@ END
 
 //@@ START - stat_loading
@@ -14727,7 +12472,7 @@ return get_epl_value("stat_claim_res", t)
 double EPL_LIAB_UDF::epl_liab_stat_loading(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(603,"stat_loading",t);
+	return rebase_value(529,"stat_loading",t);
 }
 
 
@@ -14743,7 +12488,6 @@ return get_epl_value("stat_loading", t)
 
 }
 
-
 //@@ END
 
 //@@ START - stat_prem_waiver_exp_res
@@ -14753,7 +12497,7 @@ return get_epl_value("stat_loading", t)
 double EPL_LIAB_UDF::epl_liab_stat_prem_waiver_exp_res(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(604,"stat_prem_waiver_exp_res",t);
+	return rebase_value(530,"stat_prem_waiver_exp_res",t);
 }
 
 
@@ -14768,7 +12512,6 @@ return get_epl_value("stat_prem_waiver_exp_res", t) * pct_to_use_mp;
 
 }
 
-
 //@@ END
 
 //@@ START - stat_prem_waiver_res
@@ -14778,7 +12521,7 @@ return get_epl_value("stat_prem_waiver_exp_res", t) * pct_to_use_mp;
 double EPL_LIAB_UDF::epl_liab_stat_prem_waiver_res(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(605,"stat_prem_waiver_res",t);
+	return rebase_value(531,"stat_prem_waiver_res",t);
 }
 
 
@@ -14793,7 +12536,6 @@ return get_epl_value("stat_prem_waiver_res", t) * pct_to_use_mp;
 
 }
 
-
 //@@ END
 
 //@@ START - stat_res_mp
@@ -14803,7 +12545,7 @@ return get_epl_value("stat_prem_waiver_res", t) * pct_to_use_mp;
 double EPL_LIAB_UDF::epl_liab_stat_res_mp(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(606,"stat_res_mp",t);
+	return rebase_value(532,"stat_res_mp",t);
 }
 
 
@@ -14819,7 +12561,6 @@ return get_epl_value("stat_res_mp", t)
 
 }
 
-
 //@@ END
 
 //@@ START - stat_res_mp_unhedged
@@ -14829,7 +12570,7 @@ return get_epl_value("stat_res_mp", t)
 double EPL_LIAB_UDF::epl_liab_stat_res_mp_unhedged(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(607,"stat_res_mp_unhedged",t);
+	return rebase_value(533,"stat_res_mp_unhedged",t);
 }
 
 
@@ -14845,7 +12586,6 @@ return get_epl_value("stat_res_mp_unhedged", t)
 
 }
 
-
 //@@ END
 
 //@@ START - stat_res_net_mp
@@ -14855,7 +12595,7 @@ return get_epl_value("stat_res_mp_unhedged", t)
 double EPL_LIAB_UDF::epl_liab_stat_res_net_mp(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(608,"stat_res_net_mp",t);
+	return rebase_value(534,"stat_res_net_mp",t);
 }
 
 
@@ -14871,7 +12611,6 @@ return get_epl_value("stat_res_net_mp", t)
 
 }
 
-
 //@@ END
 
 //@@ START - stat_res_net_mp_unhedged
@@ -14881,7 +12620,7 @@ return get_epl_value("stat_res_net_mp", t)
 double EPL_LIAB_UDF::epl_liab_stat_res_net_mp_unhedged(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(609,"stat_res_net_mp_unhedged",t);
+	return rebase_value(535,"stat_res_net_mp_unhedged",t);
 }
 
 
@@ -14897,7 +12636,6 @@ return get_epl_value("stat_res_net_mp_unhedged", t)
 
 }
 
-
 //@@ END
 
 //@@ START - stat_res_net_npr
@@ -14907,7 +12645,7 @@ return get_epl_value("stat_res_net_mp_unhedged", t)
 double EPL_LIAB_UDF::epl_liab_stat_res_net_npr(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(610,"stat_res_net_npr",t);
+	return rebase_value(536,"stat_res_net_npr",t);
 }
 
 
@@ -14923,7 +12661,6 @@ return get_epl_value("stat_res_net_npr", t)
 
 }
 
-
 //@@ END
 
 //@@ START - stat_res_net_npr_unhedged
@@ -14933,7 +12670,7 @@ return get_epl_value("stat_res_net_npr", t)
 double EPL_LIAB_UDF::epl_liab_stat_res_net_npr_unhedged(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(611,"stat_res_net_npr_unhedged",t);
+	return rebase_value(537,"stat_res_net_npr_unhedged",t);
 }
 
 
@@ -14949,7 +12686,6 @@ return get_epl_value("stat_res_net_npr_unhedged", t)
 
 }
 
-
 //@@ END
 
 //@@ START - stat_res_net_sa
@@ -14959,7 +12695,7 @@ return get_epl_value("stat_res_net_npr_unhedged", t)
 double EPL_LIAB_UDF::epl_liab_stat_res_net_sa(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(612,"stat_res_net_sa",t);
+	return rebase_value(538,"stat_res_net_sa",t);
 }
 
 
@@ -14975,7 +12711,6 @@ return get_epl_value("stat_res_net_sa", t)
 
 }
 
-
 //@@ END
 
 //@@ START - stat_res_npr
@@ -14985,7 +12720,7 @@ return get_epl_value("stat_res_net_sa", t)
 double EPL_LIAB_UDF::epl_liab_stat_res_npr(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(613,"stat_res_npr",t);
+	return rebase_value(539,"stat_res_npr",t);
 }
 
 
@@ -15001,7 +12736,6 @@ return get_epl_value("stat_res_npr", t)
 
 }
 
-
 //@@ END
 
 //@@ START - stat_res_npr_unhedged
@@ -15011,7 +12745,7 @@ return get_epl_value("stat_res_npr", t)
 double EPL_LIAB_UDF::epl_liab_stat_res_npr_unhedged(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(614,"stat_res_npr_unhedged",t);
+	return rebase_value(540,"stat_res_npr_unhedged",t);
 }
 
 
@@ -15027,7 +12761,6 @@ return get_epl_value("stat_res_npr_unhedged", t)
 
 }
 
-
 //@@ END
 
 //@@ START - stat_res_sa
@@ -15037,7 +12770,7 @@ return get_epl_value("stat_res_npr_unhedged", t)
 double EPL_LIAB_UDF::epl_liab_stat_res_sa(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(615,"stat_res_sa",t);
+	return rebase_value(541,"stat_res_sa",t);
 }
 
 
@@ -15053,7 +12786,6 @@ return get_epl_value("stat_res_sa", t)
 
 }
 
-
 //@@ END
 
 //@@ START - stat_res_sa_exp_allow
@@ -15063,7 +12795,7 @@ return get_epl_value("stat_res_sa", t)
 double EPL_LIAB_UDF::epl_liab_stat_res_sa_exp_allow(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(616,"stat_res_sa_exp_allow",t);
+	return rebase_value(542,"stat_res_sa_exp_allow",t);
 }
 
 
@@ -15079,7 +12811,6 @@ return get_epl_value("stat_res_sa_exp_allow", t)
 
 }
 
-
 //@@ END
 
 //@@ START - stat_unearn_prem_res
@@ -15089,7 +12820,7 @@ return get_epl_value("stat_res_sa_exp_allow", t)
 double EPL_LIAB_UDF::epl_liab_stat_unearn_prem_res(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(617,"stat_unearn_prem_res",t);
+	return rebase_value(543,"stat_unearn_prem_res",t);
 }
 
 
@@ -15105,7 +12836,6 @@ return get_epl_value("stat_unearn_prem_res", t)
 
 }
 
-
 //@@ END
 
 //@@ START - stat_unearn_prem_res_net
@@ -15115,7 +12845,7 @@ return get_epl_value("stat_unearn_prem_res", t)
 double EPL_LIAB_UDF::epl_liab_stat_unearn_prem_res_net(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(618,"stat_unearn_prem_res_net",t);
+	return rebase_value(544,"stat_unearn_prem_res_net",t);
 }
 
 
@@ -15131,7 +12861,6 @@ return get_epl_value("stat_unearn_prem_res_net", t)
 
 }
 
-
 //@@ END
 
 //@@ START - stat_unearn_prem_res_npr
@@ -15141,7 +12870,7 @@ return get_epl_value("stat_unearn_prem_res_net", t)
 double EPL_LIAB_UDF::epl_liab_stat_unearn_prem_res_npr(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(619,"stat_unearn_prem_res_npr",t);
+	return rebase_value(545,"stat_unearn_prem_res_npr",t);
 }
 
 
@@ -15157,7 +12886,6 @@ return get_epl_value("stat_unearn_prem_res_npr", t)
 
 }
 
-
 //@@ END
 
 //@@ START - stat_unearn_prem_res_npr_net
@@ -15167,7 +12895,7 @@ return get_epl_value("stat_unearn_prem_res_npr", t)
 double EPL_LIAB_UDF::epl_liab_stat_unearn_prem_res_npr_net(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(620,"stat_unearn_prem_res_npr_net",t);
+	return rebase_value(546,"stat_unearn_prem_res_npr_net",t);
 }
 
 
@@ -15183,7 +12911,6 @@ return get_epl_value("stat_unearn_prem_res_npr_net", t)
 
 }
 
-
 //@@ END
 
 //@@ START - surr_benefits
@@ -15193,7 +12920,7 @@ return get_epl_value("stat_unearn_prem_res_npr_net", t)
 double EPL_LIAB_UDF::epl_liab_surr_benefits(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(621,"surr_benefits",t);
+	return rebase_value(547,"surr_benefits",t);
 }
 
 
@@ -15209,7 +12936,6 @@ return get_epl_value("surr_benefits", t)
 
 }
 
-
 //@@ END
 
 //@@ START - tax_capzd_prem
@@ -15219,7 +12945,7 @@ return get_epl_value("surr_benefits", t)
 double EPL_LIAB_UDF::epl_liab_tax_capzd_prem(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(622,"tax_capzd_prem",t);
+	return rebase_value(548,"tax_capzd_prem",t);
 }
 
 
@@ -15235,7 +12961,6 @@ return get_epl_value("tax_capzd_prem", t)
 
 }
 
-
 //@@ END
 
 //@@ START - tax_claim_exp_res
@@ -15245,7 +12970,7 @@ return get_epl_value("tax_capzd_prem", t)
 double EPL_LIAB_UDF::epl_liab_tax_claim_exp_res(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(623,"tax_claim_exp_res",t);
+	return rebase_value(549,"tax_claim_exp_res",t);
 }
 
 
@@ -15261,7 +12986,6 @@ return get_epl_value("tax_claim_exp_res", t)
 
 }
 
-
 //@@ END
 
 //@@ START - tax_claim_res
@@ -15271,7 +12995,7 @@ return get_epl_value("tax_claim_exp_res", t)
 double EPL_LIAB_UDF::epl_liab_tax_claim_res(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(624,"tax_claim_res",t);
+	return rebase_value(550,"tax_claim_res",t);
 }
 
 
@@ -15287,7 +13011,6 @@ return get_epl_value("tax_claim_res", t)
 
 }
 
-
 //@@ END
 
 //@@ START - tax_deferred_net_prem
@@ -15297,7 +13020,7 @@ return get_epl_value("tax_claim_res", t)
 double EPL_LIAB_UDF::epl_liab_tax_deferred_net_prem(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(625,"tax_deferred_net_prem",t);
+	return rebase_value(551,"tax_deferred_net_prem",t);
 }
 
 
@@ -15313,7 +13036,6 @@ return get_epl_value("tax_deferred_net_prem", t)
 
 }
 
-
 //@@ END
 
 //@@ START - tax_loading
@@ -15323,7 +13045,7 @@ return get_epl_value("tax_deferred_net_prem", t)
 double EPL_LIAB_UDF::epl_liab_tax_loading(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(626,"tax_loading",t);
+	return rebase_value(552,"tax_loading",t);
 }
 
 
@@ -15339,7 +13061,6 @@ return get_epl_value("tax_loading", t)
 
 }
 
-
 //@@ END
 
 //@@ START - tax_prem_waiver_exp_res
@@ -15349,7 +13070,7 @@ return get_epl_value("tax_loading", t)
 double EPL_LIAB_UDF::epl_liab_tax_prem_waiver_exp_res(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(627,"tax_prem_waiver_exp_res",t);
+	return rebase_value(553,"tax_prem_waiver_exp_res",t);
 }
 
 
@@ -15364,7 +13085,6 @@ return get_epl_value("tax_prem_waiver_exp_res", t) * pct_to_use_mp;
 
 }
 
-
 //@@ END
 
 //@@ START - tax_prem_waiver_res
@@ -15374,7 +13094,7 @@ return get_epl_value("tax_prem_waiver_exp_res", t) * pct_to_use_mp;
 double EPL_LIAB_UDF::epl_liab_tax_prem_waiver_res(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(628,"tax_prem_waiver_res",t);
+	return rebase_value(554,"tax_prem_waiver_res",t);
 }
 
 
@@ -15389,7 +13109,6 @@ return get_epl_value("tax_prem_waiver_res", t) * pct_to_use_mp;
 
 }
 
-
 //@@ END
 
 //@@ START - tax_res_mp
@@ -15399,7 +13118,7 @@ return get_epl_value("tax_prem_waiver_res", t) * pct_to_use_mp;
 double EPL_LIAB_UDF::epl_liab_tax_res_mp(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(629,"tax_res_mp",t);
+	return rebase_value(555,"tax_res_mp",t);
 }
 
 
@@ -15415,7 +13134,6 @@ return get_epl_value("tax_res_mp", t)
 
 }
 
-
 //@@ END
 
 //@@ START - tax_transfer_to_sa_net
@@ -15425,7 +13143,7 @@ return get_epl_value("tax_res_mp", t)
 double EPL_LIAB_UDF::epl_liab_tax_transfer_to_sa_net(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(630,"tax_transfer_to_sa_net",t);
+	return rebase_value(556,"tax_transfer_to_sa_net",t);
 }
 
 
@@ -15441,7 +13159,6 @@ return get_epl_value("tax_transfer_to_sa_net", t)
 
 }
 
-
 //@@ END
 
 //@@ START - tax_unearn_prem_res
@@ -15451,7 +13168,7 @@ return get_epl_value("tax_transfer_to_sa_net", t)
 double EPL_LIAB_UDF::epl_liab_tax_unearn_prem_res(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(631,"tax_unearn_prem_res",t);
+	return rebase_value(557,"tax_unearn_prem_res",t);
 }
 
 
@@ -15466,7 +13183,6 @@ return get_epl_value("tax_unearn_prem_res", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -15490,7 +13206,6 @@ return get_epl_value("terminal_div", t)
 
 }
 
-
 //@@ END
 
 //@@ START - transfer_cash_flow_sa_bom
@@ -15500,7 +13215,7 @@ return get_epl_value("terminal_div", t)
 double EPL_LIAB_UDF::epl_liab_transfer_cash_flow_sa_bom(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(633,"transfer_cash_flow_sa_bom",t);
+	return rebase_value(559,"transfer_cash_flow_sa_bom",t);
 }
 
 
@@ -15516,7 +13231,6 @@ return get_epl_value("transfer_cash_flow_sa_bom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - transfer_cash_flow_sa_eom
@@ -15526,7 +13240,7 @@ return get_epl_value("transfer_cash_flow_sa_bom", t)
 double EPL_LIAB_UDF::epl_liab_transfer_cash_flow_sa_eom(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(634,"transfer_cash_flow_sa_eom",t);
+	return rebase_value(560,"transfer_cash_flow_sa_eom",t);
 }
 
 
@@ -15542,7 +13256,6 @@ return get_epl_value("transfer_cash_flow_sa_eom", t)
 
 }
 
-
 //@@ END
 
 //@@ START - transfer_to_sa_net
@@ -15552,7 +13265,7 @@ return get_epl_value("transfer_cash_flow_sa_eom", t)
 double EPL_LIAB_UDF::epl_liab_transfer_to_sa_net(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(635,"transfer_to_sa_net",t);
+	return rebase_value(561,"transfer_to_sa_net",t);
 }
 
 
@@ -15568,7 +13281,6 @@ return get_epl_value("transfer_to_sa_net", t)
 
 }
 
-
 //@@ END
 
 //@@ START - va_pba_asset_sa
@@ -15578,7 +13290,7 @@ return get_epl_value("transfer_to_sa_net", t)
 double EPL_LIAB_UDF::epl_liab_va_pba_asset_sa(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(636,"va_pba_asset_sa",t);
+	return rebase_value(562,"va_pba_asset_sa",t);
 }
 
 
@@ -15594,190 +13306,27 @@ return get_epl_value("va_pba_asset_sa", t)
 
 }
 
-
 //@@ END
 
-//@@ START - va_pba_ceded_cap_std_scen_ben_costs
-// VA PBA Standard Scenario Benefit Costs - Ceded Capital                                                                                             
-// Column:VA_PBA_CEDED_CAP_STD_SCEN_BEN_COSTS
+//@@ START - va_pba_cash_val
+// VA PBA Cash Value                                                                                             
+// Column:VA_PBA_CASH_VAL
 //========================================================
-double EPL_LIAB_UDF::epl_liab_va_pba_ceded_cap_std_scen_ben_costs(int t) {
+double EPL_LIAB_UDF::epl_liab_va_pba_cash_val(int t) {
 //^^^
 
 
 
 //^^^
 
-#line 1 "va_pba_ceded_cap_std_scen_ben_costs.EPL_LIAB.for"
-if (t <= commencement_period || t > maturity_period)
+#line 1 "va_pba_cash_val.EPL_LIAB.for"
+if (t < commencement_period || t > maturity_period)
 	return NO_AVG;
-	
-return get_epl_value("va_pba_std_scen_ben_costs", t)
+
+return get_epl_value("va_pba_cash_val", t)
 	   * pct_to_use_mp;
 
 }
-
-
-//@@ END
-
-//@@ START - va_pba_ceded_cap_std_scen_margin
-// VA PBA Standard Scenario Margin - Ceded Capital                                                                                             
-// Column:VA_PBA_CEDED_CAP_STD_SCEN_MARGIN
-//========================================================
-double EPL_LIAB_UDF::epl_liab_va_pba_ceded_cap_std_scen_margin(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "va_pba_ceded_cap_std_scen_margin.EPL_LIAB.for"
-if (t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("va_pba_gross_res_std_scen_margin", t)
-	   * pct_to_use_mp;
-
-}
-
-
-//@@ END
-
-//@@ START - va_pba_ceded_res_std_scen_ben_costs
-// VA PBA Standard Scenario Benefit Costs - Ceded Reserve                                                                                             
-// Column:VA_PBA_CEDED_RES_STD_SCEN_BEN_COSTS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_va_pba_ceded_res_std_scen_ben_costs(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "va_pba_ceded_res_std_scen_ben_costs.EPL_LIAB.for"
-if (t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("va_pba_std_scen_ben_costs", t)
-	   * pct_to_use_mp;
-
-}
-
-
-//@@ END
-
-//@@ START - va_pba_ceded_res_std_scen_margin
-// VA PBA Standard Scenario Margin - Ceded Reserve                                                                                             
-// Column:VA_PBA_CEDED_RES_STD_SCEN_MARGIN
-//========================================================
-double EPL_LIAB_UDF::epl_liab_va_pba_ceded_res_std_scen_margin(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "va_pba_ceded_res_std_scen_margin.EPL_LIAB.for"
-if (t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("va_pba_gross_res_std_scen_margin", t)
-	   * pct_to_use_mp;
-
-}
-
-
-//@@ END
-
-//@@ START - va_pba_gross_cap_std_scen_ben_costs
-// VA PBA Standard Scenario Benefit Costs - Gross Capital                                                                                             
-// Column:VA_PBA_GROSS_CAP_STD_SCEN_BEN_COSTS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_va_pba_gross_cap_std_scen_ben_costs(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "va_pba_gross_cap_std_scen_ben_costs.EPL_LIAB.for"
-if (t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("va_pba_std_scen_ben_costs", t)
-	   * pct_to_use_mp;
-
-}
-
-
-//@@ END
-
-//@@ START - va_pba_gross_cap_std_scen_margin
-// VA PBA Standard Scenario Margin - Gross Capital                                                                                             
-// Column:VA_PBA_GROSS_CAP_STD_SCEN_MARGIN
-//========================================================
-double EPL_LIAB_UDF::epl_liab_va_pba_gross_cap_std_scen_margin(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "va_pba_gross_cap_std_scen_margin.EPL_LIAB.for"
-if (t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("va_pba_gross_cap_std_scen_margin", t)
-	   * pct_to_use_mp;
-
-}
-
-
-//@@ END
-
-//@@ START - va_pba_gross_res_std_scen_ben_costs
-// VA PBA Standard Scenario Benefit Costs - Gross Reserve                                                                                             
-// Column:VA_PBA_GROSS_RES_STD_SCEN_BEN_COSTS
-//========================================================
-double EPL_LIAB_UDF::epl_liab_va_pba_gross_res_std_scen_ben_costs(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "va_pba_gross_res_std_scen_ben_costs.EPL_LIAB.for"
-if (t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("va_pba_std_scen_ben_costs", t)
-	   * pct_to_use_mp;
-
-}
-
-
-//@@ END
-
-//@@ START - va_pba_gross_res_std_scen_margin
-// VA PBA Standard Scenario Margin - Gross Reserve                                                                                             
-// Column:VA_PBA_GROSS_RES_STD_SCEN_MARGIN
-//========================================================
-double EPL_LIAB_UDF::epl_liab_va_pba_gross_res_std_scen_margin(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "va_pba_gross_res_std_scen_margin.EPL_LIAB.for"
-if (t <= commencement_period || t > maturity_period)
-	return NO_AVG;
-	
-return get_epl_value("va_pba_gross_res_std_scen_margin", t)
-	   * pct_to_use_mp;
-
-}
-
 
 //@@ END
 
@@ -15801,7 +13350,6 @@ return get_epl_value("va_pba_working_res", t)
 
 }
 
-
 //@@ END
 
 //@@ START - withdrl_benefits
@@ -15811,7 +13359,7 @@ return get_epl_value("va_pba_working_res", t)
 double EPL_LIAB_UDF::epl_liab_withdrl_benefits(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(646,"withdrl_benefits",t);
+	return rebase_value(565,"withdrl_benefits",t);
 }
 
 
@@ -15826,7 +13374,6 @@ return get_epl_value("withdrl_benefits", t)
 	   * pct_to_use_mp;
 
 }
-
 
 //@@ END
 
@@ -15843,7 +13390,6 @@ return 0;
 
 }
 
-
 //@@ END
 
 //@@ START - maturity_period
@@ -15855,10 +13401,9 @@ int EPL_LIAB_UDF::epl_liab_maturity_period() {
 
 
 #line 1 "maturity_period.EPL_LIAB.for"
-return epl_last_cash_flow_period;
+return epl_last_cash_flow_period - proj_date_offset;
 
 }
-
 
 //@@ END
 
@@ -15879,7 +13424,6 @@ return valn_period;
 
 }
 
-
 //@@ END
 
 //@@ START - reins_flag
@@ -15898,14 +13442,19 @@ return 1;
 
 }
 
-
 //@@ END
 
 
 #line 1 "get_epl_value.EPL_LIAB.for"                                                                                   
 double EPL_LIAB::get_epl_value(const xstring &col_name, int t)
 {
-return EPLData->getvalue(t + proj_date_offset, col_name, 1);
+if (find(epl_columns.begin(), epl_columns.end(), col_name) != epl_columns.end())
+	{
+	int index = find(epl_columns.begin(), epl_columns.end(), col_name) - epl_columns.begin();
+	return epl_values[t + proj_date_offset][index];
+	}
+
+return 0.0; //element not found
 }
 
 
@@ -15923,80 +13472,45 @@ else
 
 if (is_first_proj_task_loop || num_of_proj_task_loops == 0)
 	{
-	EPLData = new Schedule;
-	set_sched_byte_markers(epl_file);
+	epl_sch_input.clear();
+	epl_columns.clear();
+
+	split_string_usl(epl_column_headers.c_str(), epl_columns, "|");
+
+	OutputFileReader ofr;
+	epl_sch_input = ofr.readFile(epl_file.getStdStr(), epl_columns);
+
+	if (!epl_sch_input.size())
+		throw FatalError("Could not read EPL Cash Flow File: " 
+			              + epl_file + " "
+			              + "Please check your data.");
+	
+	if (epl_values.size() < valn_period + last_proj_period + 1)
+		epl_values.resize(valn_period + last_proj_period + 1);
 	}
 
-if (!EPLData->is_open())
-	EPLData->open(epl_file, ',', true);
+int num_periods = 0;
+int time = 0;
 
-int byte_pos = sched_byte_pos[sched_val];
-EPLData->read(sched_val, byte_pos, 1);		
-
-if (LOOKUP_FAILED > 0 && LOOKUP_FAILED < 6)
-	return false; 
-
-epl_last_cash_flow_period = EPLData->numrows - 1;
-
-return true;
-}
-
-
-
-#line 1 "set_sched_byte_markers.EPL_LIAB.for"                                                                                   
-void EPL_LIAB::set_sched_byte_markers(const xstring &sched_file)
-{
-using namespace std;
-
-int comma_pos = 0;
-xstring sched_val_prior = "0";
-long byte_pos = 0;
-bool found_diff = false;
-int diff = 0;
-string buffer;
-xstring sched_val;
-ifstream schedfile;
-
-sched_byte_pos.clear();
-
-//NOTE: using text mode here in order to count bytes consistent 
-//      with other read routine.
-schedfile.open(sched_file);
-
-if (schedfile.eof())
-	throw FatalError("Could not open Schedule file " + sched_file);
-
-while (!schedfile.eof() && getline(schedfile, buffer))
+for (int row = 0; row < epl_sch_input.size(); row++)
 	{
-	// Find the first comma
-	comma_pos = buffer.find_first_of(",");
-
-	if (comma_pos !=std::string::npos)
+	if (eq(epl_sch_input[row][0], sched_val))
 		{
-		// not a continuation line
-		sched_val = buffer.substr(0, comma_pos);
-		
-	    if (sched_val != sched_val_prior)
-			{
-	    	sched_byte_pos[sched_val] = byte_pos;		
-		    sched_val_prior = sched_val;
-			}
+		time = atoi(epl_sch_input[row][1].c_str());
+		if (time > valn_period + last_proj_period)
+			continue;
+			
+		num_periods++;
+		epl_values[time].resize(0);
 
-		// optimized tellg() process for grid processing
-		if (!found_diff)
-			{
-			int size = schedfile.tellg();
-			diff = size - buffer.size();
-			found_diff = true;
-			}
-
-		byte_pos += buffer.size() + diff;
+		for (int col = 0; col < epl_sch_input[row].size(); col++)
+			epl_values[time].push_back(atof(epl_sch_input[row][col].c_str()));
 		}
 	}
+	
+epl_last_cash_flow_period = num_periods - 1;
 
-schedfile.close();
-
-return;
+return true;
 }
 
 
@@ -16331,997 +13845,835 @@ const CashFlowCommonData EPL_LIAB::mCFStaticData_0[] =
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_ceded_egm_surr_benefits, 'E','Y', '3', 'C', (size_t)&modelOffset->sfas120_ceded_egm_surr_benefits),
 	CashFlowCommonData(154, "sfas120_ceded_endow_claim_cost", "epl_liab_sfas120_ceded_endow_claim_cost",  "sfas120_ceded_endow_claim_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_ceded_endow_claim_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas120_ceded_endow_claim_cost),
-	CashFlowCommonData(155, "sfas120_ceded_gpr", "epl_liab_sfas120_ceded_gpr",  "sfas120_ceded_gpr",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_ceded_gpr, 'E','N', '3', 'P', (size_t)&modelOffset->sfas120_ceded_gpr),
-	CashFlowCommonData(156, "sfas120_ceded_gpr_units_inf", "epl_liab_sfas120_ceded_gpr_units_inf",  "sfas120_ceded_gpr_units_inf",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_ceded_gpr_units_inf, 'E','N', '3', 'P', (size_t)&modelOffset->sfas120_ceded_gpr_units_inf),
-	CashFlowCommonData(157, "sfas120_ceded_gross_prem", "epl_liab_sfas120_ceded_gross_prem",  "sfas120_ceded_gross_prem",  CashFlowCommonData::SUM,
+	CashFlowCommonData(155, "sfas120_ceded_gross_prem", "epl_liab_sfas120_ceded_gross_prem",  "sfas120_ceded_gross_prem",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_ceded_gross_prem, 'E','N', '3', 'P', (size_t)&modelOffset->sfas120_ceded_gross_prem),
-	CashFlowCommonData(158, "sfas120_ceded_loc_cost", "epl_liab_sfas120_ceded_loc_cost",  "sfas120_ceded_loc_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(156, "sfas120_ceded_loc_cost", "epl_liab_sfas120_ceded_loc_cost",  "sfas120_ceded_loc_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_ceded_loc_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas120_ceded_loc_cost),
-	CashFlowCommonData(159, "sfas120_ceded_maint_exp_bom", "epl_liab_sfas120_ceded_maint_exp_bom",  "sfas120_ceded_maint_exp_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(157, "sfas120_ceded_maint_exp_bom", "epl_liab_sfas120_ceded_maint_exp_bom",  "sfas120_ceded_maint_exp_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_ceded_maint_exp_bom, 'B','Y', '3', 'C', (size_t)&modelOffset->sfas120_ceded_maint_exp_bom),
-	CashFlowCommonData(160, "sfas120_ceded_maint_exp_eom", "epl_liab_sfas120_ceded_maint_exp_eom",  "sfas120_ceded_maint_exp_eom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(158, "sfas120_ceded_maint_exp_eom", "epl_liab_sfas120_ceded_maint_exp_eom",  "sfas120_ceded_maint_exp_eom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_ceded_maint_exp_eom, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas120_ceded_maint_exp_eom),
-	CashFlowCommonData(161, "sfas120_ceded_maturity_claim_cost", "epl_liab_sfas120_ceded_maturity_claim_cost",  "sfas120_ceded_maturity_claim_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(159, "sfas120_ceded_maturity_claim_cost", "epl_liab_sfas120_ceded_maturity_claim_cost",  "sfas120_ceded_maturity_claim_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_ceded_maturity_claim_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas120_ceded_maturity_claim_cost),
-	CashFlowCommonData(162, "sfas120_ceded_modco_liab", "epl_liab_sfas120_ceded_modco_liab",  "sfas120_ceded_modco_liab",  CashFlowCommonData::SUM,
+	CashFlowCommonData(160, "sfas120_ceded_modco_liab", "epl_liab_sfas120_ceded_modco_liab",  "sfas120_ceded_modco_liab",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_ceded_modco_liab, 'E','N', '3', 'P', (size_t)&modelOffset->sfas120_ceded_modco_liab),
-	CashFlowCommonData(163, "sfas120_ceded_modco_res_adj", "epl_liab_sfas120_ceded_modco_res_adj",  "sfas120_ceded_modco_res_adj",  CashFlowCommonData::SUM,
+	CashFlowCommonData(161, "sfas120_ceded_modco_res_adj", "epl_liab_sfas120_ceded_modco_res_adj",  "sfas120_ceded_modco_res_adj",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_ceded_modco_res_adj, 'E','N', '3', 'P', (size_t)&modelOffset->sfas120_ceded_modco_res_adj),
-	CashFlowCommonData(164, "sfas120_ceded_nlp_res_net_prem2", "epl_liab_sfas120_ceded_nlp_res_net_prem2",  "sfas120_ceded_nlp_res_net_prem2",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_ceded_nlp_res_net_prem2, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas120_ceded_nlp_res_net_prem2),
-	CashFlowCommonData(165, "sfas120_ceded_nlp_res_prelim", "epl_liab_sfas120_ceded_nlp_res_prelim",  "sfas120_ceded_nlp_res_prelim",  CashFlowCommonData::SUM,
+	CashFlowCommonData(162, "sfas120_ceded_nlp_res_net_prem", "epl_liab_sfas120_ceded_nlp_res_net_prem",  "sfas120_ceded_nlp_res_net_prem",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_ceded_nlp_res_net_prem, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas120_ceded_nlp_res_net_prem),
+	CashFlowCommonData(163, "sfas120_ceded_nlp_res_prelim", "epl_liab_sfas120_ceded_nlp_res_prelim",  "sfas120_ceded_nlp_res_prelim",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_ceded_nlp_res_prelim, 'E','N', '3', 'P', (size_t)&modelOffset->sfas120_ceded_nlp_res_prelim),
-	CashFlowCommonData(166, "sfas120_ceded_prem_tax", "epl_liab_sfas120_ceded_prem_tax",  "sfas120_ceded_prem_tax",  CashFlowCommonData::SUM,
+	CashFlowCommonData(164, "sfas120_ceded_prem_tax", "epl_liab_sfas120_ceded_prem_tax",  "sfas120_ceded_prem_tax",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_ceded_prem_tax, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas120_ceded_prem_tax),
-	CashFlowCommonData(167, "sfas120_ceded_refund", "epl_liab_sfas120_ceded_refund",  "sfas120_ceded_refund",  CashFlowCommonData::SUM,
+	CashFlowCommonData(165, "sfas120_ceded_refund", "epl_liab_sfas120_ceded_refund",  "sfas120_ceded_refund",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_ceded_refund, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas120_ceded_refund),
-	CashFlowCommonData(168, "sfas120_ceded_reins_ea_excess", "epl_liab_sfas120_ceded_reins_ea_excess",  "sfas120_ceded_reins_ea_excess",  CashFlowCommonData::SUM,
+	CashFlowCommonData(166, "sfas120_ceded_reins_ea_excess", "epl_liab_sfas120_ceded_reins_ea_excess",  "sfas120_ceded_reins_ea_excess",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_ceded_reins_ea_excess, 'B','N', '3', 'P', (size_t)&modelOffset->sfas120_ceded_reins_ea_excess),
-	CashFlowCommonData(169, "sfas120_ceded_reins_ea_trail", "epl_liab_sfas120_ceded_reins_ea_trail",  "sfas120_ceded_reins_ea_trail",  CashFlowCommonData::SUM,
+	CashFlowCommonData(167, "sfas120_ceded_reins_ea_trail", "epl_liab_sfas120_ceded_reins_ea_trail",  "sfas120_ceded_reins_ea_trail",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_ceded_reins_ea_trail, 'B','N', '3', 'P', (size_t)&modelOffset->sfas120_ceded_reins_ea_trail),
-	CashFlowCommonData(170, "sfas120_ceded_surr_claim_cost", "epl_liab_sfas120_ceded_surr_claim_cost",  "sfas120_ceded_surr_claim_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(168, "sfas120_ceded_surr_claim_cost", "epl_liab_sfas120_ceded_surr_claim_cost",  "sfas120_ceded_surr_claim_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_ceded_surr_claim_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas120_ceded_surr_claim_cost),
-	CashFlowCommonData(171, "sfas120_ceded_terminal_div", "epl_liab_sfas120_ceded_terminal_div",  "sfas120_ceded_terminal_div",  CashFlowCommonData::SUM,
+	CashFlowCommonData(169, "sfas120_ceded_terminal_div", "epl_liab_sfas120_ceded_terminal_div",  "sfas120_ceded_terminal_div",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_ceded_terminal_div, 'E','N', '3', 'P', (size_t)&modelOffset->sfas120_ceded_terminal_div),
-	CashFlowCommonData(172, "sfas120_gross_acq_exp", "epl_liab_sfas120_gross_acq_exp",  "sfas120_gross_acq_exp",  CashFlowCommonData::SUM,
+	CashFlowCommonData(170, "sfas120_gross_acq_exp", "epl_liab_sfas120_gross_acq_exp",  "sfas120_gross_acq_exp",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_gross_acq_exp, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas120_gross_acq_exp),
-	CashFlowCommonData(173, "sfas120_gross_benefits", "epl_liab_sfas120_gross_benefits",  "sfas120_gross_benefits",  CashFlowCommonData::SUM,
+	CashFlowCommonData(171, "sfas120_gross_benefits", "epl_liab_sfas120_gross_benefits",  "sfas120_gross_benefits",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_gross_benefits, 'E','N', '3', 'P', (size_t)&modelOffset->sfas120_gross_benefits),
-	CashFlowCommonData(174, "sfas120_gross_capzd_acq_exp", "epl_liab_sfas120_gross_capzd_acq_exp",  "sfas120_gross_capzd_acq_exp",  CashFlowCommonData::SUM,
+	CashFlowCommonData(172, "sfas120_gross_capzd_acq_exp", "epl_liab_sfas120_gross_capzd_acq_exp",  "sfas120_gross_capzd_acq_exp",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_gross_capzd_acq_exp, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas120_gross_capzd_acq_exp),
-	CashFlowCommonData(175, "sfas120_gross_capzd_comm_bom", "epl_liab_sfas120_gross_capzd_comm_bom",  "sfas120_gross_capzd_comm_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(173, "sfas120_gross_capzd_comm_bom", "epl_liab_sfas120_gross_capzd_comm_bom",  "sfas120_gross_capzd_comm_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_gross_capzd_comm_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas120_gross_capzd_comm_bom),
-	CashFlowCommonData(176, "sfas120_gross_capzd_comm_chargeback", "epl_liab_sfas120_gross_capzd_comm_chargeback",  "sfas120_gross_capzd_comm_chargeback",  CashFlowCommonData::SUM,
+	CashFlowCommonData(174, "sfas120_gross_capzd_comm_chargeback", "epl_liab_sfas120_gross_capzd_comm_chargeback",  "sfas120_gross_capzd_comm_chargeback",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_gross_capzd_comm_chargeback, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas120_gross_capzd_comm_chargeback),
-	CashFlowCommonData(177, "sfas120_gross_capzd_comm_eom", "epl_liab_sfas120_gross_capzd_comm_eom",  "sfas120_gross_capzd_comm_eom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(175, "sfas120_gross_capzd_comm_eom", "epl_liab_sfas120_gross_capzd_comm_eom",  "sfas120_gross_capzd_comm_eom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_gross_capzd_comm_eom, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas120_gross_capzd_comm_eom),
-	CashFlowCommonData(178, "sfas120_gross_capzd_reins_yrt_cost", "epl_liab_sfas120_gross_capzd_reins_yrt_cost",  "sfas120_gross_capzd_reins_yrt_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(176, "sfas120_gross_capzd_reins_yrt_cost", "epl_liab_sfas120_gross_capzd_reins_yrt_cost",  "sfas120_gross_capzd_reins_yrt_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_gross_capzd_reins_yrt_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas120_gross_capzd_reins_yrt_cost),
-	CashFlowCommonData(179, "sfas120_gross_cash_flow_bom", "epl_liab_sfas120_gross_cash_flow_bom",  "sfas120_gross_cash_flow_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(177, "sfas120_gross_cash_flow_bom", "epl_liab_sfas120_gross_cash_flow_bom",  "sfas120_gross_cash_flow_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_gross_cash_flow_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas120_gross_cash_flow_bom),
-	CashFlowCommonData(180, "sfas120_gross_comm_chargeback", "epl_liab_sfas120_gross_comm_chargeback",  "sfas120_gross_comm_chargeback",  CashFlowCommonData::SUM,
+	CashFlowCommonData(178, "sfas120_gross_comm_chargeback", "epl_liab_sfas120_gross_comm_chargeback",  "sfas120_gross_comm_chargeback",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_gross_comm_chargeback, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas120_gross_comm_chargeback),
-	CashFlowCommonData(181, "sfas120_gross_comm_excess_bom", "epl_liab_sfas120_gross_comm_excess_bom",  "sfas120_gross_comm_excess_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(179, "sfas120_gross_comm_excess_bom", "epl_liab_sfas120_gross_comm_excess_bom",  "sfas120_gross_comm_excess_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_gross_comm_excess_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas120_gross_comm_excess_bom),
-	CashFlowCommonData(182, "sfas120_gross_comm_excess_eom", "epl_liab_sfas120_gross_comm_excess_eom",  "sfas120_gross_comm_excess_eom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(180, "sfas120_gross_comm_excess_eom", "epl_liab_sfas120_gross_comm_excess_eom",  "sfas120_gross_comm_excess_eom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_gross_comm_excess_eom, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas120_gross_comm_excess_eom),
-	CashFlowCommonData(183, "sfas120_gross_comm_trail_bom", "epl_liab_sfas120_gross_comm_trail_bom",  "sfas120_gross_comm_trail_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(181, "sfas120_gross_comm_trail_bom", "epl_liab_sfas120_gross_comm_trail_bom",  "sfas120_gross_comm_trail_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_gross_comm_trail_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas120_gross_comm_trail_bom),
-	CashFlowCommonData(184, "sfas120_gross_comm_trail_bom_base_plan", "epl_liab_sfas120_gross_comm_trail_bom_base_plan",  "sfas120_gross_comm_trail_bom_base_plan",  CashFlowCommonData::SUM,
+	CashFlowCommonData(182, "sfas120_gross_comm_trail_bom_base_plan", "epl_liab_sfas120_gross_comm_trail_bom_base_plan",  "sfas120_gross_comm_trail_bom_base_plan",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_gross_comm_trail_bom_base_plan, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas120_gross_comm_trail_bom_base_plan),
-	CashFlowCommonData(185, "sfas120_gross_comm_trail_bom_rider", "epl_liab_sfas120_gross_comm_trail_bom_rider",  "sfas120_gross_comm_trail_bom_rider",  CashFlowCommonData::SUM,
+	CashFlowCommonData(183, "sfas120_gross_comm_trail_bom_rider", "epl_liab_sfas120_gross_comm_trail_bom_rider",  "sfas120_gross_comm_trail_bom_rider",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_gross_comm_trail_bom_rider, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas120_gross_comm_trail_bom_rider),
-	CashFlowCommonData(186, "sfas120_gross_comm_trail_eom", "epl_liab_sfas120_gross_comm_trail_eom",  "sfas120_gross_comm_trail_eom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(184, "sfas120_gross_comm_trail_eom", "epl_liab_sfas120_gross_comm_trail_eom",  "sfas120_gross_comm_trail_eom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_gross_comm_trail_eom, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas120_gross_comm_trail_eom),
-	CashFlowCommonData(187, "sfas120_gross_conversion_cost", "epl_liab_sfas120_gross_conversion_cost",  "sfas120_gross_conversion_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(185, "sfas120_gross_conversion_cost", "epl_liab_sfas120_gross_conversion_cost",  "sfas120_gross_conversion_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_gross_conversion_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas120_gross_conversion_cost),
-	CashFlowCommonData(188, "sfas120_gross_div_applied", "epl_liab_sfas120_gross_div_applied",  "sfas120_gross_div_applied",  CashFlowCommonData::SUM,
+	CashFlowCommonData(186, "sfas120_gross_div_applied", "epl_liab_sfas120_gross_div_applied",  "sfas120_gross_div_applied",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_gross_div_applied, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas120_gross_div_applied),
-	CashFlowCommonData(189, "sfas120_gross_div_liab", "epl_liab_sfas120_gross_div_liab",  "sfas120_gross_div_liab",  CashFlowCommonData::SUM,
+	CashFlowCommonData(187, "sfas120_gross_div_liab", "epl_liab_sfas120_gross_div_liab",  "sfas120_gross_div_liab",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_gross_div_liab, 'E','N', '3', 'C', (size_t)&modelOffset->sfas120_gross_div_liab),
-	CashFlowCommonData(190, "sfas120_gross_div_opt_res", "epl_liab_sfas120_gross_div_opt_res",  "sfas120_gross_div_opt_res",  CashFlowCommonData::SUM,
+	CashFlowCommonData(188, "sfas120_gross_div_opt_res", "epl_liab_sfas120_gross_div_opt_res",  "sfas120_gross_div_opt_res",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_gross_div_opt_res, 'E','N', '3', 'C', (size_t)&modelOffset->sfas120_gross_div_opt_res),
-	CashFlowCommonData(191, "sfas120_gross_div_paid", "epl_liab_sfas120_gross_div_paid",  "sfas120_gross_div_paid",  CashFlowCommonData::SUM,
+	CashFlowCommonData(189, "sfas120_gross_div_paid", "epl_liab_sfas120_gross_div_paid",  "sfas120_gross_div_paid",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_gross_div_paid, 'E','N', '3', 'P', (size_t)&modelOffset->sfas120_gross_div_paid),
-	CashFlowCommonData(192, "sfas120_gross_dth_claim_cost", "epl_liab_sfas120_gross_dth_claim_cost",  "sfas120_gross_dth_claim_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(190, "sfas120_gross_dth_claim_cost", "epl_liab_sfas120_gross_dth_claim_cost",  "sfas120_gross_dth_claim_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_gross_dth_claim_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas120_gross_dth_claim_cost),
-	CashFlowCommonData(193, "sfas120_gross_egm_acq_exp", "epl_liab_sfas120_gross_egm_acq_exp",  "sfas120_gross_egm_acq_exp",  CashFlowCommonData::SUM,
+	CashFlowCommonData(191, "sfas120_gross_egm_acq_exp", "epl_liab_sfas120_gross_egm_acq_exp",  "sfas120_gross_egm_acq_exp",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_gross_egm_acq_exp, 'E','Y', '3', 'C', (size_t)&modelOffset->sfas120_gross_egm_acq_exp),
-	CashFlowCommonData(194, "sfas120_gross_egm_comm", "epl_liab_sfas120_gross_egm_comm",  "sfas120_gross_egm_comm",  CashFlowCommonData::SUM,
+	CashFlowCommonData(192, "sfas120_gross_egm_comm", "epl_liab_sfas120_gross_egm_comm",  "sfas120_gross_egm_comm",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_gross_egm_comm, 'E','Y', '3', 'C', (size_t)&modelOffset->sfas120_gross_egm_comm),
-	CashFlowCommonData(195, "sfas120_gross_egm_div_applied", "epl_liab_sfas120_gross_egm_div_applied",  "sfas120_gross_egm_div_applied",  CashFlowCommonData::SUM,
+	CashFlowCommonData(193, "sfas120_gross_egm_div_applied", "epl_liab_sfas120_gross_egm_div_applied",  "sfas120_gross_egm_div_applied",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_gross_egm_div_applied, 'E','Y', '3', 'C', (size_t)&modelOffset->sfas120_gross_egm_div_applied),
-	CashFlowCommonData(196, "sfas120_gross_egm_div_paid", "epl_liab_sfas120_gross_egm_div_paid",  "sfas120_gross_egm_div_paid",  CashFlowCommonData::SUM,
+	CashFlowCommonData(194, "sfas120_gross_egm_div_paid", "epl_liab_sfas120_gross_egm_div_paid",  "sfas120_gross_egm_div_paid",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_gross_egm_div_paid, 'E','Y', '3', 'C', (size_t)&modelOffset->sfas120_gross_egm_div_paid),
-	CashFlowCommonData(197, "sfas120_gross_egm_dth_benefits", "epl_liab_sfas120_gross_egm_dth_benefits",  "sfas120_gross_egm_dth_benefits",  CashFlowCommonData::SUM,
+	CashFlowCommonData(195, "sfas120_gross_egm_dth_benefits", "epl_liab_sfas120_gross_egm_dth_benefits",  "sfas120_gross_egm_dth_benefits",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_gross_egm_dth_benefits, 'E','Y', '3', 'C', (size_t)&modelOffset->sfas120_gross_egm_dth_benefits),
-	CashFlowCommonData(198, "sfas120_gross_egm_endow_benefits", "epl_liab_sfas120_gross_egm_endow_benefits",  "sfas120_gross_egm_endow_benefits",  CashFlowCommonData::SUM,
+	CashFlowCommonData(196, "sfas120_gross_egm_endow_benefits", "epl_liab_sfas120_gross_egm_endow_benefits",  "sfas120_gross_egm_endow_benefits",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_gross_egm_endow_benefits, 'E','Y', '3', 'C', (size_t)&modelOffset->sfas120_gross_egm_endow_benefits),
-	CashFlowCommonData(199, "sfas120_gross_egm_maint_exp", "epl_liab_sfas120_gross_egm_maint_exp",  "sfas120_gross_egm_maint_exp",  CashFlowCommonData::SUM,
+	CashFlowCommonData(197, "sfas120_gross_egm_maint_exp", "epl_liab_sfas120_gross_egm_maint_exp",  "sfas120_gross_egm_maint_exp",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_gross_egm_maint_exp, 'E','Y', '3', 'C', (size_t)&modelOffset->sfas120_gross_egm_maint_exp),
-	CashFlowCommonData(200, "sfas120_gross_egm_maturity_benefits", "epl_liab_sfas120_gross_egm_maturity_benefits",  "sfas120_gross_egm_maturity_benefits",  CashFlowCommonData::SUM,
+	CashFlowCommonData(198, "sfas120_gross_egm_maturity_benefits", "epl_liab_sfas120_gross_egm_maturity_benefits",  "sfas120_gross_egm_maturity_benefits",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_gross_egm_maturity_benefits, 'E','Y', '3', 'C', (size_t)&modelOffset->sfas120_gross_egm_maturity_benefits),
-	CashFlowCommonData(201, "sfas120_gross_egm_prem_paid", "epl_liab_sfas120_gross_egm_prem_paid",  "sfas120_gross_egm_prem_paid",  CashFlowCommonData::SUM,
+	CashFlowCommonData(199, "sfas120_gross_egm_prem_paid", "epl_liab_sfas120_gross_egm_prem_paid",  "sfas120_gross_egm_prem_paid",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_gross_egm_prem_paid, 'E','Y', '3', 'C', (size_t)&modelOffset->sfas120_gross_egm_prem_paid),
-	CashFlowCommonData(202, "sfas120_gross_egm_prem_tax", "epl_liab_sfas120_gross_egm_prem_tax",  "sfas120_gross_egm_prem_tax",  CashFlowCommonData::SUM,
+	CashFlowCommonData(200, "sfas120_gross_egm_prem_tax", "epl_liab_sfas120_gross_egm_prem_tax",  "sfas120_gross_egm_prem_tax",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_gross_egm_prem_tax, 'E','Y', '3', 'C', (size_t)&modelOffset->sfas120_gross_egm_prem_tax),
-	CashFlowCommonData(203, "sfas120_gross_egm_reins_cost", "epl_liab_sfas120_gross_egm_reins_cost",  "sfas120_gross_egm_reins_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(201, "sfas120_gross_egm_reins_cost", "epl_liab_sfas120_gross_egm_reins_cost",  "sfas120_gross_egm_reins_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_gross_egm_reins_cost, 'E','Y', '3', 'C', (size_t)&modelOffset->sfas120_gross_egm_reins_cost),
-	CashFlowCommonData(204, "sfas120_gross_egm_surr_benefits", "epl_liab_sfas120_gross_egm_surr_benefits",  "sfas120_gross_egm_surr_benefits",  CashFlowCommonData::SUM,
+	CashFlowCommonData(202, "sfas120_gross_egm_surr_benefits", "epl_liab_sfas120_gross_egm_surr_benefits",  "sfas120_gross_egm_surr_benefits",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_gross_egm_surr_benefits, 'E','Y', '3', 'C', (size_t)&modelOffset->sfas120_gross_egm_surr_benefits),
-	CashFlowCommonData(205, "sfas120_gross_endow_claim_cost", "epl_liab_sfas120_gross_endow_claim_cost",  "sfas120_gross_endow_claim_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(203, "sfas120_gross_endow_claim_cost", "epl_liab_sfas120_gross_endow_claim_cost",  "sfas120_gross_endow_claim_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_gross_endow_claim_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas120_gross_endow_claim_cost),
-	CashFlowCommonData(206, "sfas120_gross_gpr", "epl_liab_sfas120_gross_gpr",  "sfas120_gross_gpr",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_gross_gpr, 'E','N', '3', 'P', (size_t)&modelOffset->sfas120_gross_gpr),
-	CashFlowCommonData(207, "sfas120_gross_gpr_units_inf", "epl_liab_sfas120_gross_gpr_units_inf",  "sfas120_gross_gpr_units_inf",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_gross_gpr_units_inf, 'E','N', '3', 'P', (size_t)&modelOffset->sfas120_gross_gpr_units_inf),
-	CashFlowCommonData(208, "sfas120_gross_gross_prem", "epl_liab_sfas120_gross_gross_prem",  "sfas120_gross_gross_prem",  CashFlowCommonData::SUM,
+	CashFlowCommonData(204, "sfas120_gross_gross_prem", "epl_liab_sfas120_gross_gross_prem",  "sfas120_gross_gross_prem",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_gross_gross_prem, 'E','N', '3', 'P', (size_t)&modelOffset->sfas120_gross_gross_prem),
-	CashFlowCommonData(209, "sfas120_gross_loc_cost", "epl_liab_sfas120_gross_loc_cost",  "sfas120_gross_loc_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(205, "sfas120_gross_loc_cost", "epl_liab_sfas120_gross_loc_cost",  "sfas120_gross_loc_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_gross_loc_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas120_gross_loc_cost),
-	CashFlowCommonData(210, "sfas120_gross_maint_exp_bom", "epl_liab_sfas120_gross_maint_exp_bom",  "sfas120_gross_maint_exp_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(206, "sfas120_gross_maint_exp_bom", "epl_liab_sfas120_gross_maint_exp_bom",  "sfas120_gross_maint_exp_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_gross_maint_exp_bom, 'B','Y', '3', 'C', (size_t)&modelOffset->sfas120_gross_maint_exp_bom),
-	CashFlowCommonData(211, "sfas120_gross_maint_exp_eom", "epl_liab_sfas120_gross_maint_exp_eom",  "sfas120_gross_maint_exp_eom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(207, "sfas120_gross_maint_exp_eom", "epl_liab_sfas120_gross_maint_exp_eom",  "sfas120_gross_maint_exp_eom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_gross_maint_exp_eom, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas120_gross_maint_exp_eom),
-	CashFlowCommonData(212, "sfas120_gross_maturity_claim_cost", "epl_liab_sfas120_gross_maturity_claim_cost",  "sfas120_gross_maturity_claim_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(208, "sfas120_gross_maturity_claim_cost", "epl_liab_sfas120_gross_maturity_claim_cost",  "sfas120_gross_maturity_claim_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_gross_maturity_claim_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas120_gross_maturity_claim_cost),
-	CashFlowCommonData(213, "sfas120_gross_nlp_res_net_prem", "epl_liab_sfas120_gross_nlp_res_net_prem",  "sfas120_gross_nlp_res_net_prem",  CashFlowCommonData::SUM,
+	CashFlowCommonData(209, "sfas120_gross_nlp_res_net_prem", "epl_liab_sfas120_gross_nlp_res_net_prem",  "sfas120_gross_nlp_res_net_prem",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_gross_nlp_res_net_prem, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas120_gross_nlp_res_net_prem),
-	CashFlowCommonData(214, "sfas120_gross_nlp_res_prelim", "epl_liab_sfas120_gross_nlp_res_prelim",  "sfas120_gross_nlp_res_prelim",  CashFlowCommonData::SUM,
+	CashFlowCommonData(210, "sfas120_gross_nlp_res_prelim", "epl_liab_sfas120_gross_nlp_res_prelim",  "sfas120_gross_nlp_res_prelim",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_gross_nlp_res_prelim, 'E','N', '3', 'P', (size_t)&modelOffset->sfas120_gross_nlp_res_prelim),
-	CashFlowCommonData(215, "sfas120_gross_pol_loan", "epl_liab_sfas120_gross_pol_loan",  "sfas120_gross_pol_loan",  CashFlowCommonData::SUM,
+	CashFlowCommonData(211, "sfas120_gross_pol_loan", "epl_liab_sfas120_gross_pol_loan",  "sfas120_gross_pol_loan",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_gross_pol_loan, 'E','N', '3', 'P', (size_t)&modelOffset->sfas120_gross_pol_loan),
-	CashFlowCommonData(216, "sfas120_gross_pol_loan_inc", "epl_liab_sfas120_gross_pol_loan_inc",  "sfas120_gross_pol_loan_inc",  CashFlowCommonData::SUM,
+	CashFlowCommonData(212, "sfas120_gross_pol_loan_inc", "epl_liab_sfas120_gross_pol_loan_inc",  "sfas120_gross_pol_loan_inc",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_gross_pol_loan_inc, 'E','N', '3', 'P', (size_t)&modelOffset->sfas120_gross_pol_loan_inc),
-	CashFlowCommonData(217, "sfas120_gross_prem_tax", "epl_liab_sfas120_gross_prem_tax",  "sfas120_gross_prem_tax",  CashFlowCommonData::SUM,
+	CashFlowCommonData(213, "sfas120_gross_prem_tax", "epl_liab_sfas120_gross_prem_tax",  "sfas120_gross_prem_tax",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_gross_prem_tax, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas120_gross_prem_tax),
-	CashFlowCommonData(218, "sfas120_gross_reins_yrt_cost", "epl_liab_sfas120_gross_reins_yrt_cost",  "sfas120_gross_reins_yrt_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(214, "sfas120_gross_reins_yrt_cost", "epl_liab_sfas120_gross_reins_yrt_cost",  "sfas120_gross_reins_yrt_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_gross_reins_yrt_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas120_gross_reins_yrt_cost),
-	CashFlowCommonData(219, "sfas120_gross_stat_res_rider", "epl_liab_sfas120_gross_stat_res_rider",  "sfas120_gross_stat_res_rider",  CashFlowCommonData::SUM,
+	CashFlowCommonData(215, "sfas120_gross_stat_res_rider", "epl_liab_sfas120_gross_stat_res_rider",  "sfas120_gross_stat_res_rider",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_gross_stat_res_rider, 'E','N', '3', 'P', (size_t)&modelOffset->sfas120_gross_stat_res_rider),
-	CashFlowCommonData(220, "sfas120_gross_surr_claim_cost", "epl_liab_sfas120_gross_surr_claim_cost",  "sfas120_gross_surr_claim_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(216, "sfas120_gross_surr_claim_cost", "epl_liab_sfas120_gross_surr_claim_cost",  "sfas120_gross_surr_claim_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_gross_surr_claim_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas120_gross_surr_claim_cost),
-	CashFlowCommonData(221, "sfas120_gross_terminal_div", "epl_liab_sfas120_gross_terminal_div",  "sfas120_gross_terminal_div",  CashFlowCommonData::SUM,
+	CashFlowCommonData(217, "sfas120_gross_terminal_div", "epl_liab_sfas120_gross_terminal_div",  "sfas120_gross_terminal_div",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas120_gross_terminal_div, 'E','N', '3', 'P', (size_t)&modelOffset->sfas120_gross_terminal_div),
-	CashFlowCommonData(222, "sfas60_ceded_acq_exp", "epl_liab_sfas60_ceded_acq_exp",  "sfas60_ceded_acq_exp",  CashFlowCommonData::SUM,
+	CashFlowCommonData(218, "sfas60_ceded_acq_exp", "epl_liab_sfas60_ceded_acq_exp",  "sfas60_ceded_acq_exp",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_acq_exp, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas60_ceded_acq_exp),
-	CashFlowCommonData(223, "sfas60_ceded_ben_res_accrual_valn_basis", "epl_liab_sfas60_ceded_ben_res_accrual_valn_basis",  "sfas60_ceded_ben_res_accrual_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_ben_res_accrual_valn_basis, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_ceded_ben_res_accrual_valn_basis),
-	CashFlowCommonData(224, "sfas60_ceded_ben_res_int_valn_basis", "epl_liab_sfas60_ceded_ben_res_int_valn_basis",  "sfas60_ceded_ben_res_int_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_ben_res_int_valn_basis, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_ceded_ben_res_int_valn_basis),
-	CashFlowCommonData(225, "sfas60_ceded_ben_res_prelim", "epl_liab_sfas60_ceded_ben_res_prelim",  "sfas60_ceded_ben_res_prelim",  CashFlowCommonData::SUM,
+	CashFlowCommonData(219, "sfas60_ceded_ben_res_prelim", "epl_liab_sfas60_ceded_ben_res_prelim",  "sfas60_ceded_ben_res_prelim",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_ben_res_prelim, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_ceded_ben_res_prelim),
-	CashFlowCommonData(226, "sfas60_ceded_benefits_valn_basis", "epl_liab_sfas60_ceded_benefits_valn_basis",  "sfas60_ceded_benefits_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_benefits_valn_basis, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_ceded_benefits_valn_basis),
-	CashFlowCommonData(227, "sfas60_ceded_capzd_acq_exp", "epl_liab_sfas60_ceded_capzd_acq_exp",  "sfas60_ceded_capzd_acq_exp",  CashFlowCommonData::SUM,
+	CashFlowCommonData(220, "sfas60_ceded_capzd_acq_exp", "epl_liab_sfas60_ceded_capzd_acq_exp",  "sfas60_ceded_capzd_acq_exp",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_capzd_acq_exp, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas60_ceded_capzd_acq_exp),
-	CashFlowCommonData(228, "sfas60_ceded_capzd_acq_exp_valn_basis", "epl_liab_sfas60_ceded_capzd_acq_exp_valn_basis",  "sfas60_ceded_capzd_acq_exp_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_capzd_acq_exp_valn_basis, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas60_ceded_capzd_acq_exp_valn_basis),
-	CashFlowCommonData(229, "sfas60_ceded_capzd_comm_bom", "epl_liab_sfas60_ceded_capzd_comm_bom",  "sfas60_ceded_capzd_comm_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(221, "sfas60_ceded_capzd_comm_bom", "epl_liab_sfas60_ceded_capzd_comm_bom",  "sfas60_ceded_capzd_comm_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_capzd_comm_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas60_ceded_capzd_comm_bom),
-	CashFlowCommonData(230, "sfas60_ceded_capzd_comm_chargeback", "epl_liab_sfas60_ceded_capzd_comm_chargeback",  "sfas60_ceded_capzd_comm_chargeback",  CashFlowCommonData::SUM,
+	CashFlowCommonData(222, "sfas60_ceded_capzd_comm_chargeback", "epl_liab_sfas60_ceded_capzd_comm_chargeback",  "sfas60_ceded_capzd_comm_chargeback",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_capzd_comm_chargeback, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas60_ceded_capzd_comm_chargeback),
-	CashFlowCommonData(231, "sfas60_ceded_capzd_comm_eom", "epl_liab_sfas60_ceded_capzd_comm_eom",  "sfas60_ceded_capzd_comm_eom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(223, "sfas60_ceded_capzd_comm_eom", "epl_liab_sfas60_ceded_capzd_comm_eom",  "sfas60_ceded_capzd_comm_eom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_capzd_comm_eom, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas60_ceded_capzd_comm_eom),
-	CashFlowCommonData(232, "sfas60_ceded_capzd_comm_valn_basis", "epl_liab_sfas60_ceded_capzd_comm_valn_basis",  "sfas60_ceded_capzd_comm_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_capzd_comm_valn_basis, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas60_ceded_capzd_comm_valn_basis),
-	CashFlowCommonData(233, "sfas60_ceded_cash_flow_bom", "epl_liab_sfas60_ceded_cash_flow_bom",  "sfas60_ceded_cash_flow_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(224, "sfas60_ceded_cash_flow_bom", "epl_liab_sfas60_ceded_cash_flow_bom",  "sfas60_ceded_cash_flow_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_cash_flow_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas60_ceded_cash_flow_bom),
-	CashFlowCommonData(234, "sfas60_ceded_claim_res", "epl_liab_sfas60_ceded_claim_res",  "sfas60_ceded_claim_res",  CashFlowCommonData::SUM,
+	CashFlowCommonData(225, "sfas60_ceded_claim_res", "epl_liab_sfas60_ceded_claim_res",  "sfas60_ceded_claim_res",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_claim_res, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_ceded_claim_res),
-	CashFlowCommonData(235, "sfas60_ceded_comm_chargeback", "epl_liab_sfas60_ceded_comm_chargeback",  "sfas60_ceded_comm_chargeback",  CashFlowCommonData::SUM,
+	CashFlowCommonData(226, "sfas60_ceded_comm_chargeback", "epl_liab_sfas60_ceded_comm_chargeback",  "sfas60_ceded_comm_chargeback",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_comm_chargeback, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas60_ceded_comm_chargeback),
-	CashFlowCommonData(236, "sfas60_ceded_comm_excess_bom", "epl_liab_sfas60_ceded_comm_excess_bom",  "sfas60_ceded_comm_excess_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(227, "sfas60_ceded_comm_excess_bom", "epl_liab_sfas60_ceded_comm_excess_bom",  "sfas60_ceded_comm_excess_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_comm_excess_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas60_ceded_comm_excess_bom),
-	CashFlowCommonData(237, "sfas60_ceded_comm_excess_eom", "epl_liab_sfas60_ceded_comm_excess_eom",  "sfas60_ceded_comm_excess_eom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(228, "sfas60_ceded_comm_excess_eom", "epl_liab_sfas60_ceded_comm_excess_eom",  "sfas60_ceded_comm_excess_eom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_comm_excess_eom, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas60_ceded_comm_excess_eom),
-	CashFlowCommonData(238, "sfas60_ceded_comm_trail_bom", "epl_liab_sfas60_ceded_comm_trail_bom",  "sfas60_ceded_comm_trail_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(229, "sfas60_ceded_comm_trail_bom", "epl_liab_sfas60_ceded_comm_trail_bom",  "sfas60_ceded_comm_trail_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_comm_trail_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas60_ceded_comm_trail_bom),
-	CashFlowCommonData(239, "sfas60_ceded_comm_trail_bom_base_plan", "epl_liab_sfas60_ceded_comm_trail_bom_base_plan",  "sfas60_ceded_comm_trail_bom_base_plan",  CashFlowCommonData::SUM,
+	CashFlowCommonData(230, "sfas60_ceded_comm_trail_bom_base_plan", "epl_liab_sfas60_ceded_comm_trail_bom_base_plan",  "sfas60_ceded_comm_trail_bom_base_plan",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_comm_trail_bom_base_plan, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas60_ceded_comm_trail_bom_base_plan),
-	CashFlowCommonData(240, "sfas60_ceded_comm_trail_bom_rider", "epl_liab_sfas60_ceded_comm_trail_bom_rider",  "sfas60_ceded_comm_trail_bom_rider",  CashFlowCommonData::SUM,
+	CashFlowCommonData(231, "sfas60_ceded_comm_trail_bom_rider", "epl_liab_sfas60_ceded_comm_trail_bom_rider",  "sfas60_ceded_comm_trail_bom_rider",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_comm_trail_bom_rider, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas60_ceded_comm_trail_bom_rider),
-	CashFlowCommonData(241, "sfas60_ceded_comm_trail_eom", "epl_liab_sfas60_ceded_comm_trail_eom",  "sfas60_ceded_comm_trail_eom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(232, "sfas60_ceded_comm_trail_eom", "epl_liab_sfas60_ceded_comm_trail_eom",  "sfas60_ceded_comm_trail_eom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_comm_trail_eom, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas60_ceded_comm_trail_eom),
-	CashFlowCommonData(242, "sfas60_ceded_conversion_cost", "epl_liab_sfas60_ceded_conversion_cost",  "sfas60_ceded_conversion_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(233, "sfas60_ceded_conversion_cost", "epl_liab_sfas60_ceded_conversion_cost",  "sfas60_ceded_conversion_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_conversion_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_ceded_conversion_cost),
-	CashFlowCommonData(243, "sfas60_ceded_dac_amortzn_valn_basis", "epl_liab_sfas60_ceded_dac_amortzn_valn_basis",  "sfas60_ceded_dac_amortzn_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_dac_amortzn_valn_basis, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_ceded_dac_amortzn_valn_basis),
-	CashFlowCommonData(244, "sfas60_ceded_dac_int_valn_basis", "epl_liab_sfas60_ceded_dac_int_valn_basis",  "sfas60_ceded_dac_int_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_dac_int_valn_basis, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_ceded_dac_int_valn_basis),
-	CashFlowCommonData(245, "sfas60_ceded_dac_prelim", "epl_liab_sfas60_ceded_dac_prelim",  "sfas60_ceded_dac_prelim",  CashFlowCommonData::SUM,
+	CashFlowCommonData(234, "sfas60_ceded_dac_prelim", "epl_liab_sfas60_ceded_dac_prelim",  "sfas60_ceded_dac_prelim",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_dac_prelim, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_ceded_dac_prelim),
-	CashFlowCommonData(246, "sfas60_ceded_div_applied", "epl_liab_sfas60_ceded_div_applied",  "sfas60_ceded_div_applied",  CashFlowCommonData::SUM,
+	CashFlowCommonData(235, "sfas60_ceded_div_applied", "epl_liab_sfas60_ceded_div_applied",  "sfas60_ceded_div_applied",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_div_applied, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas60_ceded_div_applied),
-	CashFlowCommonData(247, "sfas60_ceded_div_paid", "epl_liab_sfas60_ceded_div_paid",  "sfas60_ceded_div_paid",  CashFlowCommonData::SUM,
+	CashFlowCommonData(236, "sfas60_ceded_div_paid", "epl_liab_sfas60_ceded_div_paid",  "sfas60_ceded_div_paid",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_div_paid, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_ceded_div_paid),
-	CashFlowCommonData(248, "sfas60_ceded_div_valn_basis", "epl_liab_sfas60_ceded_div_valn_basis",  "sfas60_ceded_div_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_div_valn_basis, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_ceded_div_valn_basis),
-	CashFlowCommonData(249, "sfas60_ceded_dth_claim_cost", "epl_liab_sfas60_ceded_dth_claim_cost",  "sfas60_ceded_dth_claim_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(237, "sfas60_ceded_dth_claim_cost", "epl_liab_sfas60_ceded_dth_claim_cost",  "sfas60_ceded_dth_claim_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_dth_claim_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_ceded_dth_claim_cost),
-	CashFlowCommonData(250, "sfas60_ceded_endow_claim_cost", "epl_liab_sfas60_ceded_endow_claim_cost",  "sfas60_ceded_endow_claim_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(238, "sfas60_ceded_endow_claim_cost", "epl_liab_sfas60_ceded_endow_claim_cost",  "sfas60_ceded_endow_claim_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_endow_claim_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_ceded_endow_claim_cost),
-	CashFlowCommonData(251, "sfas60_ceded_exp_valn_basis", "epl_liab_sfas60_ceded_exp_valn_basis",  "sfas60_ceded_exp_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_exp_valn_basis, 'B','Y', '3', 'C', (size_t)&modelOffset->sfas60_ceded_exp_valn_basis),
-	CashFlowCommonData(252, "sfas60_ceded_gpr", "epl_liab_sfas60_ceded_gpr",  "sfas60_ceded_gpr",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_gpr, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_ceded_gpr),
-	CashFlowCommonData(253, "sfas60_ceded_gpr_units_inf", "epl_liab_sfas60_ceded_gpr_units_inf",  "sfas60_ceded_gpr_units_inf",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_gpr_units_inf, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_ceded_gpr_units_inf),
-	CashFlowCommonData(254, "sfas60_ceded_gross_prem", "epl_liab_sfas60_ceded_gross_prem",  "sfas60_ceded_gross_prem",  CashFlowCommonData::SUM,
+	CashFlowCommonData(239, "sfas60_ceded_gross_prem", "epl_liab_sfas60_ceded_gross_prem",  "sfas60_ceded_gross_prem",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_gross_prem, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_ceded_gross_prem),
-	CashFlowCommonData(255, "sfas60_ceded_hlth_claim_cost", "epl_liab_sfas60_ceded_hlth_claim_cost",  "sfas60_ceded_hlth_claim_cost",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_hlth_claim_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_ceded_hlth_claim_cost)
+	CashFlowCommonData(240, "sfas60_ceded_hlth_claim_cost", "epl_liab_sfas60_ceded_hlth_claim_cost",  "sfas60_ceded_hlth_claim_cost",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_hlth_claim_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_ceded_hlth_claim_cost),
+	CashFlowCommonData(241, "sfas60_ceded_loc_cost", "epl_liab_sfas60_ceded_loc_cost",  "sfas60_ceded_loc_cost",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_loc_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_ceded_loc_cost),
+	CashFlowCommonData(242, "sfas60_ceded_maint_exp_bom", "epl_liab_sfas60_ceded_maint_exp_bom",  "sfas60_ceded_maint_exp_bom",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_maint_exp_bom, 'B','Y', '3', 'C', (size_t)&modelOffset->sfas60_ceded_maint_exp_bom),
+	CashFlowCommonData(243, "sfas60_ceded_maint_exp_eom", "epl_liab_sfas60_ceded_maint_exp_eom",  "sfas60_ceded_maint_exp_eom",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_maint_exp_eom, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas60_ceded_maint_exp_eom),
+	CashFlowCommonData(244, "sfas60_ceded_maturity_claim_cost", "epl_liab_sfas60_ceded_maturity_claim_cost",  "sfas60_ceded_maturity_claim_cost",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_maturity_claim_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_ceded_maturity_claim_cost),
+	CashFlowCommonData(245, "sfas60_ceded_modco_liab", "epl_liab_sfas60_ceded_modco_liab",  "sfas60_ceded_modco_liab",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_modco_liab, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_ceded_modco_liab),
+	CashFlowCommonData(246, "sfas60_ceded_modco_res_adj", "epl_liab_sfas60_ceded_modco_res_adj",  "sfas60_ceded_modco_res_adj",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_modco_res_adj, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_ceded_modco_res_adj),
+	CashFlowCommonData(247, "sfas60_ceded_prem_tax", "epl_liab_sfas60_ceded_prem_tax",  "sfas60_ceded_prem_tax",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_prem_tax, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas60_ceded_prem_tax),
+	CashFlowCommonData(248, "sfas60_ceded_prem_waiver_res", "epl_liab_sfas60_ceded_prem_waiver_res",  "sfas60_ceded_prem_waiver_res",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_prem_waiver_res, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_ceded_prem_waiver_res),
+	CashFlowCommonData(249, "sfas60_ceded_refund", "epl_liab_sfas60_ceded_refund",  "sfas60_ceded_refund",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_refund, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas60_ceded_refund),
+	CashFlowCommonData(250, "sfas60_ceded_surr_claim_cost", "epl_liab_sfas60_ceded_surr_claim_cost",  "sfas60_ceded_surr_claim_cost",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_surr_claim_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_ceded_surr_claim_cost),
+	CashFlowCommonData(251, "sfas60_ceded_terminal_div", "epl_liab_sfas60_ceded_terminal_div",  "sfas60_ceded_terminal_div",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_terminal_div, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_ceded_terminal_div),
+	CashFlowCommonData(252, "sfas60_gross_acq_exp", "epl_liab_sfas60_gross_acq_exp",  "sfas60_gross_acq_exp",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_acq_exp, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas60_gross_acq_exp),
+	CashFlowCommonData(253, "sfas60_gross_ben_res_prelim", "epl_liab_sfas60_gross_ben_res_prelim",  "sfas60_gross_ben_res_prelim",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_ben_res_prelim, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_gross_ben_res_prelim),
+	CashFlowCommonData(254, "sfas60_gross_capzd_acq_exp", "epl_liab_sfas60_gross_capzd_acq_exp",  "sfas60_gross_capzd_acq_exp",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_capzd_acq_exp, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas60_gross_capzd_acq_exp),
+	CashFlowCommonData(255, "sfas60_gross_capzd_comm_bom", "epl_liab_sfas60_gross_capzd_comm_bom",  "sfas60_gross_capzd_comm_bom",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_capzd_comm_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas60_gross_capzd_comm_bom)
 };
 
 const CashFlowCommonData EPL_LIAB::mCFStaticData_256[] = 
 {
-	CashFlowCommonData(256, "sfas60_ceded_loc_cost", "epl_liab_sfas60_ceded_loc_cost",  "sfas60_ceded_loc_cost",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_loc_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_ceded_loc_cost),
-	CashFlowCommonData(257, "sfas60_ceded_maint_exp_bom", "epl_liab_sfas60_ceded_maint_exp_bom",  "sfas60_ceded_maint_exp_bom",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_maint_exp_bom, 'B','Y', '3', 'C', (size_t)&modelOffset->sfas60_ceded_maint_exp_bom),
-	CashFlowCommonData(258, "sfas60_ceded_maint_exp_eom", "epl_liab_sfas60_ceded_maint_exp_eom",  "sfas60_ceded_maint_exp_eom",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_maint_exp_eom, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas60_ceded_maint_exp_eom),
-	CashFlowCommonData(259, "sfas60_ceded_maint_exp_res_accrual_valn_basis", "epl_liab_sfas60_ceded_maint_exp_res_accrual_valn_basis",  "sfas60_ceded_maint_exp_res_accrual_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_maint_exp_res_accrual_valn_basis, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_ceded_maint_exp_res_accrual_valn_basis),
-	CashFlowCommonData(260, "sfas60_ceded_maint_exp_res_int_valn_basis", "epl_liab_sfas60_ceded_maint_exp_res_int_valn_basis",  "sfas60_ceded_maint_exp_res_int_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_maint_exp_res_int_valn_basis, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_ceded_maint_exp_res_int_valn_basis),
-	CashFlowCommonData(261, "sfas60_ceded_maint_exp_res_prelim", "epl_liab_sfas60_ceded_maint_exp_res_prelim",  "sfas60_ceded_maint_exp_res_prelim",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_maint_exp_res_prelim, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_ceded_maint_exp_res_prelim),
-	CashFlowCommonData(262, "sfas60_ceded_maturity_claim_cost", "epl_liab_sfas60_ceded_maturity_claim_cost",  "sfas60_ceded_maturity_claim_cost",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_maturity_claim_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_ceded_maturity_claim_cost),
-	CashFlowCommonData(263, "sfas60_ceded_modco_liab", "epl_liab_sfas60_ceded_modco_liab",  "sfas60_ceded_modco_liab",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_modco_liab, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_ceded_modco_liab),
-	CashFlowCommonData(264, "sfas60_ceded_modco_res_adj", "epl_liab_sfas60_ceded_modco_res_adj",  "sfas60_ceded_modco_res_adj",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_modco_res_adj, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_ceded_modco_res_adj),
-	CashFlowCommonData(265, "sfas60_ceded_prem_tax", "epl_liab_sfas60_ceded_prem_tax",  "sfas60_ceded_prem_tax",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_prem_tax, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas60_ceded_prem_tax),
-	CashFlowCommonData(266, "sfas60_ceded_prem_waiver_res", "epl_liab_sfas60_ceded_prem_waiver_res",  "sfas60_ceded_prem_waiver_res",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_prem_waiver_res, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_ceded_prem_waiver_res),
-	CashFlowCommonData(267, "sfas60_ceded_refund", "epl_liab_sfas60_ceded_refund",  "sfas60_ceded_refund",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_refund, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas60_ceded_refund),
-	CashFlowCommonData(268, "sfas60_ceded_surr_ben_valn_basis", "epl_liab_sfas60_ceded_surr_ben_valn_basis",  "sfas60_ceded_surr_ben_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_surr_ben_valn_basis, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_ceded_surr_ben_valn_basis),
-	CashFlowCommonData(269, "sfas60_ceded_surr_claim_cost", "epl_liab_sfas60_ceded_surr_claim_cost",  "sfas60_ceded_surr_claim_cost",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_surr_claim_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_ceded_surr_claim_cost),
-	CashFlowCommonData(270, "sfas60_ceded_terminal_div", "epl_liab_sfas60_ceded_terminal_div",  "sfas60_ceded_terminal_div",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_ceded_terminal_div, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_ceded_terminal_div),
-	CashFlowCommonData(271, "sfas60_gross_acq_exp", "epl_liab_sfas60_gross_acq_exp",  "sfas60_gross_acq_exp",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_acq_exp, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas60_gross_acq_exp),
-	CashFlowCommonData(272, "sfas60_gross_ben_res_accrual_valn_basis", "epl_liab_sfas60_gross_ben_res_accrual_valn_basis",  "sfas60_gross_ben_res_accrual_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_ben_res_accrual_valn_basis, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_gross_ben_res_accrual_valn_basis),
-	CashFlowCommonData(273, "sfas60_gross_ben_res_int_valn_basis", "epl_liab_sfas60_gross_ben_res_int_valn_basis",  "sfas60_gross_ben_res_int_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_ben_res_int_valn_basis, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_gross_ben_res_int_valn_basis),
-	CashFlowCommonData(274, "sfas60_gross_ben_res_prelim", "epl_liab_sfas60_gross_ben_res_prelim",  "sfas60_gross_ben_res_prelim",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_ben_res_prelim, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_gross_ben_res_prelim),
-	CashFlowCommonData(275, "sfas60_gross_benefits_valn_basis", "epl_liab_sfas60_gross_benefits_valn_basis",  "sfas60_gross_benefits_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_benefits_valn_basis, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_gross_benefits_valn_basis),
-	CashFlowCommonData(276, "sfas60_gross_capzd_acq_exp", "epl_liab_sfas60_gross_capzd_acq_exp",  "sfas60_gross_capzd_acq_exp",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_capzd_acq_exp, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas60_gross_capzd_acq_exp),
-	CashFlowCommonData(277, "sfas60_gross_capzd_acq_exp_valn_basis", "epl_liab_sfas60_gross_capzd_acq_exp_valn_basis",  "sfas60_gross_capzd_acq_exp_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_capzd_acq_exp_valn_basis, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas60_gross_capzd_acq_exp_valn_basis),
-	CashFlowCommonData(278, "sfas60_gross_capzd_comm_bom", "epl_liab_sfas60_gross_capzd_comm_bom",  "sfas60_gross_capzd_comm_bom",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_capzd_comm_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas60_gross_capzd_comm_bom),
-	CashFlowCommonData(279, "sfas60_gross_capzd_comm_chargeback", "epl_liab_sfas60_gross_capzd_comm_chargeback",  "sfas60_gross_capzd_comm_chargeback",  CashFlowCommonData::SUM,
+	CashFlowCommonData(256, "sfas60_gross_capzd_comm_chargeback", "epl_liab_sfas60_gross_capzd_comm_chargeback",  "sfas60_gross_capzd_comm_chargeback",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_capzd_comm_chargeback, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas60_gross_capzd_comm_chargeback),
-	CashFlowCommonData(280, "sfas60_gross_capzd_comm_eom", "epl_liab_sfas60_gross_capzd_comm_eom",  "sfas60_gross_capzd_comm_eom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(257, "sfas60_gross_capzd_comm_eom", "epl_liab_sfas60_gross_capzd_comm_eom",  "sfas60_gross_capzd_comm_eom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_capzd_comm_eom, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas60_gross_capzd_comm_eom),
-	CashFlowCommonData(281, "sfas60_gross_capzd_comm_valn_basis", "epl_liab_sfas60_gross_capzd_comm_valn_basis",  "sfas60_gross_capzd_comm_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_capzd_comm_valn_basis, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas60_gross_capzd_comm_valn_basis),
-	CashFlowCommonData(282, "sfas60_gross_capzd_reins_yrt_cost", "epl_liab_sfas60_gross_capzd_reins_yrt_cost",  "sfas60_gross_capzd_reins_yrt_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(258, "sfas60_gross_capzd_reins_yrt_cost", "epl_liab_sfas60_gross_capzd_reins_yrt_cost",  "sfas60_gross_capzd_reins_yrt_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_capzd_reins_yrt_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_gross_capzd_reins_yrt_cost),
-	CashFlowCommonData(283, "sfas60_gross_cash_flow_bom", "epl_liab_sfas60_gross_cash_flow_bom",  "sfas60_gross_cash_flow_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(259, "sfas60_gross_cash_flow_bom", "epl_liab_sfas60_gross_cash_flow_bom",  "sfas60_gross_cash_flow_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_cash_flow_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas60_gross_cash_flow_bom),
-	CashFlowCommonData(284, "sfas60_gross_claim_res", "epl_liab_sfas60_gross_claim_res",  "sfas60_gross_claim_res",  CashFlowCommonData::SUM,
+	CashFlowCommonData(260, "sfas60_gross_claim_res", "epl_liab_sfas60_gross_claim_res",  "sfas60_gross_claim_res",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_claim_res, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_gross_claim_res),
-	CashFlowCommonData(285, "sfas60_gross_comm_chargeback", "epl_liab_sfas60_gross_comm_chargeback",  "sfas60_gross_comm_chargeback",  CashFlowCommonData::SUM,
+	CashFlowCommonData(261, "sfas60_gross_comm_chargeback", "epl_liab_sfas60_gross_comm_chargeback",  "sfas60_gross_comm_chargeback",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_comm_chargeback, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas60_gross_comm_chargeback),
-	CashFlowCommonData(286, "sfas60_gross_comm_excess_bom", "epl_liab_sfas60_gross_comm_excess_bom",  "sfas60_gross_comm_excess_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(262, "sfas60_gross_comm_excess_bom", "epl_liab_sfas60_gross_comm_excess_bom",  "sfas60_gross_comm_excess_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_comm_excess_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas60_gross_comm_excess_bom),
-	CashFlowCommonData(287, "sfas60_gross_comm_excess_eom", "epl_liab_sfas60_gross_comm_excess_eom",  "sfas60_gross_comm_excess_eom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(263, "sfas60_gross_comm_excess_eom", "epl_liab_sfas60_gross_comm_excess_eom",  "sfas60_gross_comm_excess_eom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_comm_excess_eom, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas60_gross_comm_excess_eom),
-	CashFlowCommonData(288, "sfas60_gross_comm_trail_bom", "epl_liab_sfas60_gross_comm_trail_bom",  "sfas60_gross_comm_trail_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(264, "sfas60_gross_comm_trail_bom", "epl_liab_sfas60_gross_comm_trail_bom",  "sfas60_gross_comm_trail_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_comm_trail_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas60_gross_comm_trail_bom),
-	CashFlowCommonData(289, "sfas60_gross_comm_trail_bom_base_plan", "epl_liab_sfas60_gross_comm_trail_bom_base_plan",  "sfas60_gross_comm_trail_bom_base_plan",  CashFlowCommonData::SUM,
+	CashFlowCommonData(265, "sfas60_gross_comm_trail_bom_base_plan", "epl_liab_sfas60_gross_comm_trail_bom_base_plan",  "sfas60_gross_comm_trail_bom_base_plan",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_comm_trail_bom_base_plan, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas60_gross_comm_trail_bom_base_plan),
-	CashFlowCommonData(290, "sfas60_gross_comm_trail_bom_rider", "epl_liab_sfas60_gross_comm_trail_bom_rider",  "sfas60_gross_comm_trail_bom_rider",  CashFlowCommonData::SUM,
+	CashFlowCommonData(266, "sfas60_gross_comm_trail_bom_rider", "epl_liab_sfas60_gross_comm_trail_bom_rider",  "sfas60_gross_comm_trail_bom_rider",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_comm_trail_bom_rider, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas60_gross_comm_trail_bom_rider),
-	CashFlowCommonData(291, "sfas60_gross_comm_trail_eom", "epl_liab_sfas60_gross_comm_trail_eom",  "sfas60_gross_comm_trail_eom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(267, "sfas60_gross_comm_trail_eom", "epl_liab_sfas60_gross_comm_trail_eom",  "sfas60_gross_comm_trail_eom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_comm_trail_eom, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas60_gross_comm_trail_eom),
-	CashFlowCommonData(292, "sfas60_gross_conversion_cost", "epl_liab_sfas60_gross_conversion_cost",  "sfas60_gross_conversion_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(268, "sfas60_gross_conversion_cost", "epl_liab_sfas60_gross_conversion_cost",  "sfas60_gross_conversion_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_conversion_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_gross_conversion_cost),
-	CashFlowCommonData(293, "sfas60_gross_dac_amortzn_valn_basis", "epl_liab_sfas60_gross_dac_amortzn_valn_basis",  "sfas60_gross_dac_amortzn_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_dac_amortzn_valn_basis, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_gross_dac_amortzn_valn_basis),
-	CashFlowCommonData(294, "sfas60_gross_dac_int_valn_basis", "epl_liab_sfas60_gross_dac_int_valn_basis",  "sfas60_gross_dac_int_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_dac_int_valn_basis, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_gross_dac_int_valn_basis),
-	CashFlowCommonData(295, "sfas60_gross_dac_prelim", "epl_liab_sfas60_gross_dac_prelim",  "sfas60_gross_dac_prelim",  CashFlowCommonData::SUM,
+	CashFlowCommonData(269, "sfas60_gross_dac_prelim", "epl_liab_sfas60_gross_dac_prelim",  "sfas60_gross_dac_prelim",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_dac_prelim, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_gross_dac_prelim),
-	CashFlowCommonData(296, "sfas60_gross_dac_reins_yrt_asset_amortzn_valn_basis", "epl_liab_sfas60_gross_dac_reins_yrt_asset_amortzn_valn_basis",  "sfas60_gross_dac_reins_yrt_asset_amortzn_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_dac_reins_yrt_asset_amortzn_valn_basis, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_gross_dac_reins_yrt_asset_amortzn_valn_basis),
-	CashFlowCommonData(297, "sfas60_gross_dac_reins_yrt_asset_int_valn_basis", "epl_liab_sfas60_gross_dac_reins_yrt_asset_int_valn_basis",  "sfas60_gross_dac_reins_yrt_asset_int_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_dac_reins_yrt_asset_int_valn_basis, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_gross_dac_reins_yrt_asset_int_valn_basis),
-	CashFlowCommonData(298, "sfas60_gross_dac_reins_yrt_asset_prelim", "epl_liab_sfas60_gross_dac_reins_yrt_asset_prelim",  "sfas60_gross_dac_reins_yrt_asset_prelim",  CashFlowCommonData::SUM,
+	CashFlowCommonData(270, "sfas60_gross_dac_reins_yrt_asset_prelim", "epl_liab_sfas60_gross_dac_reins_yrt_asset_prelim",  "sfas60_gross_dac_reins_yrt_asset_prelim",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_dac_reins_yrt_asset_prelim, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_gross_dac_reins_yrt_asset_prelim),
-	CashFlowCommonData(299, "sfas60_gross_div_applied", "epl_liab_sfas60_gross_div_applied",  "sfas60_gross_div_applied",  CashFlowCommonData::SUM,
+	CashFlowCommonData(271, "sfas60_gross_div_applied", "epl_liab_sfas60_gross_div_applied",  "sfas60_gross_div_applied",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_div_applied, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas60_gross_div_applied),
-	CashFlowCommonData(300, "sfas60_gross_div_paid", "epl_liab_sfas60_gross_div_paid",  "sfas60_gross_div_paid",  CashFlowCommonData::SUM,
+	CashFlowCommonData(272, "sfas60_gross_div_paid", "epl_liab_sfas60_gross_div_paid",  "sfas60_gross_div_paid",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_div_paid, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_gross_div_paid),
-	CashFlowCommonData(301, "sfas60_gross_div_valn_basis", "epl_liab_sfas60_gross_div_valn_basis",  "sfas60_gross_div_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_div_valn_basis, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_gross_div_valn_basis),
-	CashFlowCommonData(302, "sfas60_gross_dth_claim_cost", "epl_liab_sfas60_gross_dth_claim_cost",  "sfas60_gross_dth_claim_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(273, "sfas60_gross_dth_claim_cost", "epl_liab_sfas60_gross_dth_claim_cost",  "sfas60_gross_dth_claim_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_dth_claim_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_gross_dth_claim_cost),
-	CashFlowCommonData(303, "sfas60_gross_endow_claim_cost", "epl_liab_sfas60_gross_endow_claim_cost",  "sfas60_gross_endow_claim_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(274, "sfas60_gross_endow_claim_cost", "epl_liab_sfas60_gross_endow_claim_cost",  "sfas60_gross_endow_claim_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_endow_claim_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_gross_endow_claim_cost),
-	CashFlowCommonData(304, "sfas60_gross_exp_valn_basis", "epl_liab_sfas60_gross_exp_valn_basis",  "sfas60_gross_exp_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_exp_valn_basis, 'B','Y', '3', 'C', (size_t)&modelOffset->sfas60_gross_exp_valn_basis),
-	CashFlowCommonData(305, "sfas60_gross_gpr", "epl_liab_sfas60_gross_gpr",  "sfas60_gross_gpr",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_gpr, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_gross_gpr),
-	CashFlowCommonData(306, "sfas60_gross_gpr_units_inf", "epl_liab_sfas60_gross_gpr_units_inf",  "sfas60_gross_gpr_units_inf",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_gpr_units_inf, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_gross_gpr_units_inf),
-	CashFlowCommonData(307, "sfas60_gross_gross_prem", "epl_liab_sfas60_gross_gross_prem",  "sfas60_gross_gross_prem",  CashFlowCommonData::SUM,
+	CashFlowCommonData(275, "sfas60_gross_gross_prem", "epl_liab_sfas60_gross_gross_prem",  "sfas60_gross_gross_prem",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_gross_prem, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_gross_gross_prem),
-	CashFlowCommonData(308, "sfas60_gross_hlth_claim_cost", "epl_liab_sfas60_gross_hlth_claim_cost",  "sfas60_gross_hlth_claim_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(276, "sfas60_gross_hlth_claim_cost", "epl_liab_sfas60_gross_hlth_claim_cost",  "sfas60_gross_hlth_claim_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_hlth_claim_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_gross_hlth_claim_cost),
-	CashFlowCommonData(309, "sfas60_gross_loc_cost", "epl_liab_sfas60_gross_loc_cost",  "sfas60_gross_loc_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(277, "sfas60_gross_loc_cost", "epl_liab_sfas60_gross_loc_cost",  "sfas60_gross_loc_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_loc_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_gross_loc_cost),
-	CashFlowCommonData(310, "sfas60_gross_maint_exp_bom", "epl_liab_sfas60_gross_maint_exp_bom",  "sfas60_gross_maint_exp_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(278, "sfas60_gross_maint_exp_bom", "epl_liab_sfas60_gross_maint_exp_bom",  "sfas60_gross_maint_exp_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_maint_exp_bom, 'B','Y', '3', 'C', (size_t)&modelOffset->sfas60_gross_maint_exp_bom),
-	CashFlowCommonData(311, "sfas60_gross_maint_exp_eom", "epl_liab_sfas60_gross_maint_exp_eom",  "sfas60_gross_maint_exp_eom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(279, "sfas60_gross_maint_exp_eom", "epl_liab_sfas60_gross_maint_exp_eom",  "sfas60_gross_maint_exp_eom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_maint_exp_eom, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas60_gross_maint_exp_eom),
-	CashFlowCommonData(312, "sfas60_gross_maint_exp_res_accrual_valn_basis", "epl_liab_sfas60_gross_maint_exp_res_accrual_valn_basis",  "sfas60_gross_maint_exp_res_accrual_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_maint_exp_res_accrual_valn_basis, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_gross_maint_exp_res_accrual_valn_basis),
-	CashFlowCommonData(313, "sfas60_gross_maint_exp_res_int_valn_basis", "epl_liab_sfas60_gross_maint_exp_res_int_valn_basis",  "sfas60_gross_maint_exp_res_int_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_maint_exp_res_int_valn_basis, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_gross_maint_exp_res_int_valn_basis),
-	CashFlowCommonData(314, "sfas60_gross_maint_exp_res_prelim", "epl_liab_sfas60_gross_maint_exp_res_prelim",  "sfas60_gross_maint_exp_res_prelim",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_maint_exp_res_prelim, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_gross_maint_exp_res_prelim),
-	CashFlowCommonData(315, "sfas60_gross_maturity_claim_cost", "epl_liab_sfas60_gross_maturity_claim_cost",  "sfas60_gross_maturity_claim_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(280, "sfas60_gross_maturity_claim_cost", "epl_liab_sfas60_gross_maturity_claim_cost",  "sfas60_gross_maturity_claim_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_maturity_claim_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_gross_maturity_claim_cost),
-	CashFlowCommonData(316, "sfas60_gross_pol_loan", "epl_liab_sfas60_gross_pol_loan",  "sfas60_gross_pol_loan",  CashFlowCommonData::SUM,
+	CashFlowCommonData(281, "sfas60_gross_pol_loan", "epl_liab_sfas60_gross_pol_loan",  "sfas60_gross_pol_loan",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_pol_loan, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_gross_pol_loan),
-	CashFlowCommonData(317, "sfas60_gross_pol_loan_inc", "epl_liab_sfas60_gross_pol_loan_inc",  "sfas60_gross_pol_loan_inc",  CashFlowCommonData::SUM,
+	CashFlowCommonData(282, "sfas60_gross_pol_loan_inc", "epl_liab_sfas60_gross_pol_loan_inc",  "sfas60_gross_pol_loan_inc",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_pol_loan_inc, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_gross_pol_loan_inc),
-	CashFlowCommonData(318, "sfas60_gross_prem_tax", "epl_liab_sfas60_gross_prem_tax",  "sfas60_gross_prem_tax",  CashFlowCommonData::SUM,
+	CashFlowCommonData(283, "sfas60_gross_prem_tax", "epl_liab_sfas60_gross_prem_tax",  "sfas60_gross_prem_tax",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_prem_tax, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas60_gross_prem_tax),
-	CashFlowCommonData(319, "sfas60_gross_prem_waiver_res", "epl_liab_sfas60_gross_prem_waiver_res",  "sfas60_gross_prem_waiver_res",  CashFlowCommonData::SUM,
+	CashFlowCommonData(284, "sfas60_gross_prem_waiver_res", "epl_liab_sfas60_gross_prem_waiver_res",  "sfas60_gross_prem_waiver_res",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_prem_waiver_res, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_gross_prem_waiver_res),
-	CashFlowCommonData(320, "sfas60_gross_reins_yrt_cost", "epl_liab_sfas60_gross_reins_yrt_cost",  "sfas60_gross_reins_yrt_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(285, "sfas60_gross_reins_yrt_cost", "epl_liab_sfas60_gross_reins_yrt_cost",  "sfas60_gross_reins_yrt_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_reins_yrt_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_gross_reins_yrt_cost),
-	CashFlowCommonData(321, "sfas60_gross_reins_yrt_cost_valn_basis", "epl_liab_sfas60_gross_reins_yrt_cost_valn_basis",  "sfas60_gross_reins_yrt_cost_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_reins_yrt_cost_valn_basis, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_gross_reins_yrt_cost_valn_basis),
-	CashFlowCommonData(322, "sfas60_gross_stat_res_rider", "epl_liab_sfas60_gross_stat_res_rider",  "sfas60_gross_stat_res_rider",  CashFlowCommonData::SUM,
+	CashFlowCommonData(286, "sfas60_gross_stat_res_rider", "epl_liab_sfas60_gross_stat_res_rider",  "sfas60_gross_stat_res_rider",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_stat_res_rider, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_gross_stat_res_rider),
-	CashFlowCommonData(323, "sfas60_gross_surr_ben_valn_basis", "epl_liab_sfas60_gross_surr_ben_valn_basis",  "sfas60_gross_surr_ben_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_surr_ben_valn_basis, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_gross_surr_ben_valn_basis),
-	CashFlowCommonData(324, "sfas60_gross_surr_claim_cost", "epl_liab_sfas60_gross_surr_claim_cost",  "sfas60_gross_surr_claim_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(287, "sfas60_gross_surr_claim_cost", "epl_liab_sfas60_gross_surr_claim_cost",  "sfas60_gross_surr_claim_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_surr_claim_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_gross_surr_claim_cost),
-	CashFlowCommonData(325, "sfas60_gross_terminal_div", "epl_liab_sfas60_gross_terminal_div",  "sfas60_gross_terminal_div",  CashFlowCommonData::SUM,
+	CashFlowCommonData(288, "sfas60_gross_terminal_div", "epl_liab_sfas60_gross_terminal_div",  "sfas60_gross_terminal_div",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas60_gross_terminal_div, 'E','N', '3', 'P', (size_t)&modelOffset->sfas60_gross_terminal_div),
-	CashFlowCommonData(326, "sfas91_ceded_acq_exp", "epl_liab_sfas91_ceded_acq_exp",  "sfas91_ceded_acq_exp",  CashFlowCommonData::SUM,
+	CashFlowCommonData(289, "sfas91_ceded_acq_exp", "epl_liab_sfas91_ceded_acq_exp",  "sfas91_ceded_acq_exp",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas91_ceded_acq_exp, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas91_ceded_acq_exp),
-	CashFlowCommonData(327, "sfas91_ceded_ann_benefits_bom", "epl_liab_sfas91_ceded_ann_benefits_bom",  "sfas91_ceded_ann_benefits_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(290, "sfas91_ceded_ann_benefits_bom", "epl_liab_sfas91_ceded_ann_benefits_bom",  "sfas91_ceded_ann_benefits_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas91_ceded_ann_benefits_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas91_ceded_ann_benefits_bom),
-	CashFlowCommonData(328, "sfas91_ceded_ann_benefits_eom", "epl_liab_sfas91_ceded_ann_benefits_eom",  "sfas91_ceded_ann_benefits_eom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(291, "sfas91_ceded_ann_benefits_eom", "epl_liab_sfas91_ceded_ann_benefits_eom",  "sfas91_ceded_ann_benefits_eom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas91_ceded_ann_benefits_eom, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas91_ceded_ann_benefits_eom),
-	CashFlowCommonData(329, "sfas91_ceded_ben_maint_exp_res_cash_flow_bom", "epl_liab_sfas91_ceded_ben_maint_exp_res_cash_flow_bom",  "sfas91_ceded_ben_maint_exp_res_cash_flow_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(292, "sfas91_ceded_ben_maint_exp_res_cash_flow_bom", "epl_liab_sfas91_ceded_ben_maint_exp_res_cash_flow_bom",  "sfas91_ceded_ben_maint_exp_res_cash_flow_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas91_ceded_ben_maint_exp_res_cash_flow_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas91_ceded_ben_maint_exp_res_cash_flow_bom),
-	CashFlowCommonData(330, "sfas91_ceded_ben_maint_exp_res_cash_flow_eom", "epl_liab_sfas91_ceded_ben_maint_exp_res_cash_flow_eom",  "sfas91_ceded_ben_maint_exp_res_cash_flow_eom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(293, "sfas91_ceded_ben_maint_exp_res_cash_flow_eom", "epl_liab_sfas91_ceded_ben_maint_exp_res_cash_flow_eom",  "sfas91_ceded_ben_maint_exp_res_cash_flow_eom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas91_ceded_ben_maint_exp_res_cash_flow_eom, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas91_ceded_ben_maint_exp_res_cash_flow_eom),
-	CashFlowCommonData(331, "sfas91_ceded_ben_res_cash_flow_bom", "epl_liab_sfas91_ceded_ben_res_cash_flow_bom",  "sfas91_ceded_ben_res_cash_flow_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(294, "sfas91_ceded_ben_res_cash_flow_bom", "epl_liab_sfas91_ceded_ben_res_cash_flow_bom",  "sfas91_ceded_ben_res_cash_flow_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas91_ceded_ben_res_cash_flow_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas91_ceded_ben_res_cash_flow_bom),
-	CashFlowCommonData(332, "sfas91_ceded_ben_res_cash_flow_eom", "epl_liab_sfas91_ceded_ben_res_cash_flow_eom",  "sfas91_ceded_ben_res_cash_flow_eom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(295, "sfas91_ceded_ben_res_cash_flow_eom", "epl_liab_sfas91_ceded_ben_res_cash_flow_eom",  "sfas91_ceded_ben_res_cash_flow_eom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas91_ceded_ben_res_cash_flow_eom, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas91_ceded_ben_res_cash_flow_eom),
-	CashFlowCommonData(333, "sfas91_ceded_capzd_acq_exp", "epl_liab_sfas91_ceded_capzd_acq_exp",  "sfas91_ceded_capzd_acq_exp",  CashFlowCommonData::SUM,
+	CashFlowCommonData(296, "sfas91_ceded_capzd_acq_exp", "epl_liab_sfas91_ceded_capzd_acq_exp",  "sfas91_ceded_capzd_acq_exp",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas91_ceded_capzd_acq_exp, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas91_ceded_capzd_acq_exp),
-	CashFlowCommonData(334, "sfas91_ceded_capzd_comm_bom", "epl_liab_sfas91_ceded_capzd_comm_bom",  "sfas91_ceded_capzd_comm_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(297, "sfas91_ceded_capzd_comm_bom", "epl_liab_sfas91_ceded_capzd_comm_bom",  "sfas91_ceded_capzd_comm_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas91_ceded_capzd_comm_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas91_ceded_capzd_comm_bom),
-	CashFlowCommonData(335, "sfas91_ceded_cash_flow_bom", "epl_liab_sfas91_ceded_cash_flow_bom",  "sfas91_ceded_cash_flow_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(298, "sfas91_ceded_cash_flow_bom", "epl_liab_sfas91_ceded_cash_flow_bom",  "sfas91_ceded_cash_flow_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas91_ceded_cash_flow_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas91_ceded_cash_flow_bom),
-	CashFlowCommonData(336, "sfas91_ceded_comm_excess_bom", "epl_liab_sfas91_ceded_comm_excess_bom",  "sfas91_ceded_comm_excess_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(299, "sfas91_ceded_comm_excess_bom", "epl_liab_sfas91_ceded_comm_excess_bom",  "sfas91_ceded_comm_excess_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas91_ceded_comm_excess_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas91_ceded_comm_excess_bom),
-	CashFlowCommonData(337, "sfas91_ceded_deferred_maint_exp", "epl_liab_sfas91_ceded_deferred_maint_exp",  "sfas91_ceded_deferred_maint_exp",  CashFlowCommonData::SUM,
+	CashFlowCommonData(300, "sfas91_ceded_deferred_maint_exp", "epl_liab_sfas91_ceded_deferred_maint_exp",  "sfas91_ceded_deferred_maint_exp",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas91_ceded_deferred_maint_exp, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas91_ceded_deferred_maint_exp),
-	CashFlowCommonData(338, "sfas91_ceded_dth_benefits", "epl_liab_sfas91_ceded_dth_benefits",  "sfas91_ceded_dth_benefits",  CashFlowCommonData::SUM,
+	CashFlowCommonData(301, "sfas91_ceded_dth_benefits", "epl_liab_sfas91_ceded_dth_benefits",  "sfas91_ceded_dth_benefits",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas91_ceded_dth_benefits, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas91_ceded_dth_benefits),
-	CashFlowCommonData(339, "sfas91_ceded_maint_exp_bom", "epl_liab_sfas91_ceded_maint_exp_bom",  "sfas91_ceded_maint_exp_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(302, "sfas91_ceded_maint_exp_bom", "epl_liab_sfas91_ceded_maint_exp_bom",  "sfas91_ceded_maint_exp_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas91_ceded_maint_exp_bom, 'B','Y', '3', 'C', (size_t)&modelOffset->sfas91_ceded_maint_exp_bom),
-	CashFlowCommonData(340, "sfas91_ceded_maint_exp_eom", "epl_liab_sfas91_ceded_maint_exp_eom",  "sfas91_ceded_maint_exp_eom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(303, "sfas91_ceded_maint_exp_eom", "epl_liab_sfas91_ceded_maint_exp_eom",  "sfas91_ceded_maint_exp_eom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas91_ceded_maint_exp_eom, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas91_ceded_maint_exp_eom),
-	CashFlowCommonData(341, "sfas91_ceded_maint_exp_res_cash_flow_bom", "epl_liab_sfas91_ceded_maint_exp_res_cash_flow_bom",  "sfas91_ceded_maint_exp_res_cash_flow_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(304, "sfas91_ceded_maint_exp_res_cash_flow_bom", "epl_liab_sfas91_ceded_maint_exp_res_cash_flow_bom",  "sfas91_ceded_maint_exp_res_cash_flow_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas91_ceded_maint_exp_res_cash_flow_bom, 'B','Y', '3', 'C', (size_t)&modelOffset->sfas91_ceded_maint_exp_res_cash_flow_bom),
-	CashFlowCommonData(342, "sfas91_ceded_maint_exp_res_cash_flow_eom", "epl_liab_sfas91_ceded_maint_exp_res_cash_flow_eom",  "sfas91_ceded_maint_exp_res_cash_flow_eom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(305, "sfas91_ceded_maint_exp_res_cash_flow_eom", "epl_liab_sfas91_ceded_maint_exp_res_cash_flow_eom",  "sfas91_ceded_maint_exp_res_cash_flow_eom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas91_ceded_maint_exp_res_cash_flow_eom, 'E','Y', '3', 'C', (size_t)&modelOffset->sfas91_ceded_maint_exp_res_cash_flow_eom),
-	CashFlowCommonData(343, "sfas91_ceded_net_res_cash_flow_bom", "epl_liab_sfas91_ceded_net_res_cash_flow_bom",  "sfas91_ceded_net_res_cash_flow_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(306, "sfas91_ceded_net_res_cash_flow_bom", "epl_liab_sfas91_ceded_net_res_cash_flow_bom",  "sfas91_ceded_net_res_cash_flow_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas91_ceded_net_res_cash_flow_bom, 'B','Y', '3', 'C', (size_t)&modelOffset->sfas91_ceded_net_res_cash_flow_bom),
-	CashFlowCommonData(344, "sfas91_ceded_net_res_cash_flow_eom", "epl_liab_sfas91_ceded_net_res_cash_flow_eom",  "sfas91_ceded_net_res_cash_flow_eom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(307, "sfas91_ceded_net_res_cash_flow_eom", "epl_liab_sfas91_ceded_net_res_cash_flow_eom",  "sfas91_ceded_net_res_cash_flow_eom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas91_ceded_net_res_cash_flow_eom, 'E','Y', '3', 'C', (size_t)&modelOffset->sfas91_ceded_net_res_cash_flow_eom),
-	CashFlowCommonData(345, "sfas91_ceded_noncapzd_acq_exp", "epl_liab_sfas91_ceded_noncapzd_acq_exp",  "sfas91_ceded_noncapzd_acq_exp",  CashFlowCommonData::SUM,
+	CashFlowCommonData(308, "sfas91_ceded_noncapzd_acq_exp", "epl_liab_sfas91_ceded_noncapzd_acq_exp",  "sfas91_ceded_noncapzd_acq_exp",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas91_ceded_noncapzd_acq_exp, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas91_ceded_noncapzd_acq_exp),
-	CashFlowCommonData(346, "sfas91_ceded_policies_b", "epl_liab_sfas91_ceded_policies_b",  "sfas91_ceded_policies_b",  CashFlowCommonData::SUM,
+	CashFlowCommonData(309, "sfas91_ceded_policies_b", "epl_liab_sfas91_ceded_policies_b",  "sfas91_ceded_policies_b",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas91_ceded_policies_b, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas91_ceded_policies_b),
-	CashFlowCommonData(347, "sfas91_ceded_prem_paid", "epl_liab_sfas91_ceded_prem_paid",  "sfas91_ceded_prem_paid",  CashFlowCommonData::SUM,
+	CashFlowCommonData(310, "sfas91_ceded_prem_paid", "epl_liab_sfas91_ceded_prem_paid",  "sfas91_ceded_prem_paid",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas91_ceded_prem_paid, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas91_ceded_prem_paid),
-	CashFlowCommonData(348, "sfas91_ceded_prem_tax", "epl_liab_sfas91_ceded_prem_tax",  "sfas91_ceded_prem_tax",  CashFlowCommonData::SUM,
+	CashFlowCommonData(311, "sfas91_ceded_prem_tax", "epl_liab_sfas91_ceded_prem_tax",  "sfas91_ceded_prem_tax",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas91_ceded_prem_tax, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas91_ceded_prem_tax),
-	CashFlowCommonData(349, "sfas91_ceded_res_ann_benefits", "epl_liab_sfas91_ceded_res_ann_benefits",  "sfas91_ceded_res_ann_benefits",  CashFlowCommonData::SUM,
+	CashFlowCommonData(312, "sfas91_ceded_res_ann_benefits", "epl_liab_sfas91_ceded_res_ann_benefits",  "sfas91_ceded_res_ann_benefits",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas91_ceded_res_ann_benefits, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas91_ceded_res_ann_benefits),
-	CashFlowCommonData(350, "sfas91_ceded_res_dth_benefits", "epl_liab_sfas91_ceded_res_dth_benefits",  "sfas91_ceded_res_dth_benefits",  CashFlowCommonData::SUM,
+	CashFlowCommonData(313, "sfas91_ceded_res_dth_benefits", "epl_liab_sfas91_ceded_res_dth_benefits",  "sfas91_ceded_res_dth_benefits",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas91_ceded_res_dth_benefits, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas91_ceded_res_dth_benefits),
-	CashFlowCommonData(351, "sfas91_gross_acq_exp", "epl_liab_sfas91_gross_acq_exp",  "sfas91_gross_acq_exp",  CashFlowCommonData::SUM,
+	CashFlowCommonData(314, "sfas91_gross_acq_exp", "epl_liab_sfas91_gross_acq_exp",  "sfas91_gross_acq_exp",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas91_gross_acq_exp, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas91_gross_acq_exp),
-	CashFlowCommonData(352, "sfas91_gross_ann_benefits_bom", "epl_liab_sfas91_gross_ann_benefits_bom",  "sfas91_gross_ann_benefits_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(315, "sfas91_gross_ann_benefits_bom", "epl_liab_sfas91_gross_ann_benefits_bom",  "sfas91_gross_ann_benefits_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas91_gross_ann_benefits_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas91_gross_ann_benefits_bom),
-	CashFlowCommonData(353, "sfas91_gross_ann_benefits_eom", "epl_liab_sfas91_gross_ann_benefits_eom",  "sfas91_gross_ann_benefits_eom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(316, "sfas91_gross_ann_benefits_eom", "epl_liab_sfas91_gross_ann_benefits_eom",  "sfas91_gross_ann_benefits_eom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas91_gross_ann_benefits_eom, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas91_gross_ann_benefits_eom),
-	CashFlowCommonData(354, "sfas91_gross_ben_maint_exp_res_cash_flow_bom", "epl_liab_sfas91_gross_ben_maint_exp_res_cash_flow_bom",  "sfas91_gross_ben_maint_exp_res_cash_flow_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(317, "sfas91_gross_ben_maint_exp_res_cash_flow_bom", "epl_liab_sfas91_gross_ben_maint_exp_res_cash_flow_bom",  "sfas91_gross_ben_maint_exp_res_cash_flow_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas91_gross_ben_maint_exp_res_cash_flow_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas91_gross_ben_maint_exp_res_cash_flow_bom),
-	CashFlowCommonData(355, "sfas91_gross_ben_maint_exp_res_cash_flow_eom", "epl_liab_sfas91_gross_ben_maint_exp_res_cash_flow_eom",  "sfas91_gross_ben_maint_exp_res_cash_flow_eom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(318, "sfas91_gross_ben_maint_exp_res_cash_flow_eom", "epl_liab_sfas91_gross_ben_maint_exp_res_cash_flow_eom",  "sfas91_gross_ben_maint_exp_res_cash_flow_eom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas91_gross_ben_maint_exp_res_cash_flow_eom, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas91_gross_ben_maint_exp_res_cash_flow_eom),
-	CashFlowCommonData(356, "sfas91_gross_ben_res_cash_flow_bom", "epl_liab_sfas91_gross_ben_res_cash_flow_bom",  "sfas91_gross_ben_res_cash_flow_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(319, "sfas91_gross_ben_res_cash_flow_bom", "epl_liab_sfas91_gross_ben_res_cash_flow_bom",  "sfas91_gross_ben_res_cash_flow_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas91_gross_ben_res_cash_flow_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas91_gross_ben_res_cash_flow_bom),
-	CashFlowCommonData(357, "sfas91_gross_ben_res_cash_flow_eom", "epl_liab_sfas91_gross_ben_res_cash_flow_eom",  "sfas91_gross_ben_res_cash_flow_eom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(320, "sfas91_gross_ben_res_cash_flow_eom", "epl_liab_sfas91_gross_ben_res_cash_flow_eom",  "sfas91_gross_ben_res_cash_flow_eom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas91_gross_ben_res_cash_flow_eom, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas91_gross_ben_res_cash_flow_eom),
-	CashFlowCommonData(358, "sfas91_gross_capzd_acq_exp", "epl_liab_sfas91_gross_capzd_acq_exp",  "sfas91_gross_capzd_acq_exp",  CashFlowCommonData::SUM,
+	CashFlowCommonData(321, "sfas91_gross_capzd_acq_exp", "epl_liab_sfas91_gross_capzd_acq_exp",  "sfas91_gross_capzd_acq_exp",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas91_gross_capzd_acq_exp, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas91_gross_capzd_acq_exp),
-	CashFlowCommonData(359, "sfas91_gross_capzd_comm_bom", "epl_liab_sfas91_gross_capzd_comm_bom",  "sfas91_gross_capzd_comm_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(322, "sfas91_gross_capzd_comm_bom", "epl_liab_sfas91_gross_capzd_comm_bom",  "sfas91_gross_capzd_comm_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas91_gross_capzd_comm_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas91_gross_capzd_comm_bom),
-	CashFlowCommonData(360, "sfas91_gross_cash_flow_bom", "epl_liab_sfas91_gross_cash_flow_bom",  "sfas91_gross_cash_flow_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(323, "sfas91_gross_cash_flow_bom", "epl_liab_sfas91_gross_cash_flow_bom",  "sfas91_gross_cash_flow_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas91_gross_cash_flow_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas91_gross_cash_flow_bom),
-	CashFlowCommonData(361, "sfas91_gross_comm_excess_bom", "epl_liab_sfas91_gross_comm_excess_bom",  "sfas91_gross_comm_excess_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(324, "sfas91_gross_comm_excess_bom", "epl_liab_sfas91_gross_comm_excess_bom",  "sfas91_gross_comm_excess_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas91_gross_comm_excess_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas91_gross_comm_excess_bom),
-	CashFlowCommonData(362, "sfas91_gross_deferred_maint_exp", "epl_liab_sfas91_gross_deferred_maint_exp",  "sfas91_gross_deferred_maint_exp",  CashFlowCommonData::SUM,
+	CashFlowCommonData(325, "sfas91_gross_deferred_maint_exp", "epl_liab_sfas91_gross_deferred_maint_exp",  "sfas91_gross_deferred_maint_exp",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas91_gross_deferred_maint_exp, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas91_gross_deferred_maint_exp),
-	CashFlowCommonData(363, "sfas91_gross_dth_benefits", "epl_liab_sfas91_gross_dth_benefits",  "sfas91_gross_dth_benefits",  CashFlowCommonData::SUM,
+	CashFlowCommonData(326, "sfas91_gross_dth_benefits", "epl_liab_sfas91_gross_dth_benefits",  "sfas91_gross_dth_benefits",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas91_gross_dth_benefits, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas91_gross_dth_benefits),
-	CashFlowCommonData(364, "sfas91_gross_maint_exp_bom", "epl_liab_sfas91_gross_maint_exp_bom",  "sfas91_gross_maint_exp_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(327, "sfas91_gross_maint_exp_bom", "epl_liab_sfas91_gross_maint_exp_bom",  "sfas91_gross_maint_exp_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas91_gross_maint_exp_bom, 'B','Y', '3', 'C', (size_t)&modelOffset->sfas91_gross_maint_exp_bom),
-	CashFlowCommonData(365, "sfas91_gross_maint_exp_eom", "epl_liab_sfas91_gross_maint_exp_eom",  "sfas91_gross_maint_exp_eom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(328, "sfas91_gross_maint_exp_eom", "epl_liab_sfas91_gross_maint_exp_eom",  "sfas91_gross_maint_exp_eom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas91_gross_maint_exp_eom, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas91_gross_maint_exp_eom),
-	CashFlowCommonData(366, "sfas91_gross_maint_exp_res_cash_flow_bom", "epl_liab_sfas91_gross_maint_exp_res_cash_flow_bom",  "sfas91_gross_maint_exp_res_cash_flow_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(329, "sfas91_gross_maint_exp_res_cash_flow_bom", "epl_liab_sfas91_gross_maint_exp_res_cash_flow_bom",  "sfas91_gross_maint_exp_res_cash_flow_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas91_gross_maint_exp_res_cash_flow_bom, 'B','Y', '3', 'C', (size_t)&modelOffset->sfas91_gross_maint_exp_res_cash_flow_bom),
-	CashFlowCommonData(367, "sfas91_gross_maint_exp_res_cash_flow_eom", "epl_liab_sfas91_gross_maint_exp_res_cash_flow_eom",  "sfas91_gross_maint_exp_res_cash_flow_eom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(330, "sfas91_gross_maint_exp_res_cash_flow_eom", "epl_liab_sfas91_gross_maint_exp_res_cash_flow_eom",  "sfas91_gross_maint_exp_res_cash_flow_eom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas91_gross_maint_exp_res_cash_flow_eom, 'E','Y', '3', 'C', (size_t)&modelOffset->sfas91_gross_maint_exp_res_cash_flow_eom),
-	CashFlowCommonData(368, "sfas91_gross_net_res_cash_flow_bom", "epl_liab_sfas91_gross_net_res_cash_flow_bom",  "sfas91_gross_net_res_cash_flow_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(331, "sfas91_gross_net_res_cash_flow_bom", "epl_liab_sfas91_gross_net_res_cash_flow_bom",  "sfas91_gross_net_res_cash_flow_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas91_gross_net_res_cash_flow_bom, 'B','Y', '3', 'C', (size_t)&modelOffset->sfas91_gross_net_res_cash_flow_bom),
-	CashFlowCommonData(369, "sfas91_gross_net_res_cash_flow_eom", "epl_liab_sfas91_gross_net_res_cash_flow_eom",  "sfas91_gross_net_res_cash_flow_eom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(332, "sfas91_gross_net_res_cash_flow_eom", "epl_liab_sfas91_gross_net_res_cash_flow_eom",  "sfas91_gross_net_res_cash_flow_eom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas91_gross_net_res_cash_flow_eom, 'E','Y', '3', 'C', (size_t)&modelOffset->sfas91_gross_net_res_cash_flow_eom),
-	CashFlowCommonData(370, "sfas91_gross_noncapzd_acq_exp", "epl_liab_sfas91_gross_noncapzd_acq_exp",  "sfas91_gross_noncapzd_acq_exp",  CashFlowCommonData::SUM,
+	CashFlowCommonData(333, "sfas91_gross_noncapzd_acq_exp", "epl_liab_sfas91_gross_noncapzd_acq_exp",  "sfas91_gross_noncapzd_acq_exp",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas91_gross_noncapzd_acq_exp, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas91_gross_noncapzd_acq_exp),
-	CashFlowCommonData(371, "sfas91_gross_policies_b", "epl_liab_sfas91_gross_policies_b",  "sfas91_gross_policies_b",  CashFlowCommonData::SUM,
+	CashFlowCommonData(334, "sfas91_gross_policies_b", "epl_liab_sfas91_gross_policies_b",  "sfas91_gross_policies_b",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas91_gross_policies_b, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas91_gross_policies_b),
-	CashFlowCommonData(372, "sfas91_gross_prem_paid", "epl_liab_sfas91_gross_prem_paid",  "sfas91_gross_prem_paid",  CashFlowCommonData::SUM,
+	CashFlowCommonData(335, "sfas91_gross_prem_paid", "epl_liab_sfas91_gross_prem_paid",  "sfas91_gross_prem_paid",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas91_gross_prem_paid, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas91_gross_prem_paid),
-	CashFlowCommonData(373, "sfas91_gross_prem_tax", "epl_liab_sfas91_gross_prem_tax",  "sfas91_gross_prem_tax",  CashFlowCommonData::SUM,
+	CashFlowCommonData(336, "sfas91_gross_prem_tax", "epl_liab_sfas91_gross_prem_tax",  "sfas91_gross_prem_tax",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas91_gross_prem_tax, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas91_gross_prem_tax),
-	CashFlowCommonData(374, "sfas91_gross_res_ann_benefits", "epl_liab_sfas91_gross_res_ann_benefits",  "sfas91_gross_res_ann_benefits",  CashFlowCommonData::SUM,
+	CashFlowCommonData(337, "sfas91_gross_res_ann_benefits", "epl_liab_sfas91_gross_res_ann_benefits",  "sfas91_gross_res_ann_benefits",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas91_gross_res_ann_benefits, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas91_gross_res_ann_benefits),
-	CashFlowCommonData(375, "sfas91_gross_res_dth_benefits", "epl_liab_sfas91_gross_res_dth_benefits",  "sfas91_gross_res_dth_benefits",  CashFlowCommonData::SUM,
+	CashFlowCommonData(338, "sfas91_gross_res_dth_benefits", "epl_liab_sfas91_gross_res_dth_benefits",  "sfas91_gross_res_dth_benefits",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas91_gross_res_dth_benefits, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas91_gross_res_dth_benefits),
-	CashFlowCommonData(376, "sfas97lp_ceded_acq_exp", "epl_liab_sfas97lp_ceded_acq_exp",  "sfas97lp_ceded_acq_exp",  CashFlowCommonData::SUM,
+	CashFlowCommonData(339, "sfas97lp_ceded_acq_exp", "epl_liab_sfas97lp_ceded_acq_exp",  "sfas97lp_ceded_acq_exp",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_acq_exp, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_acq_exp),
-	CashFlowCommonData(377, "sfas97lp_ceded_ann_claim_cost", "epl_liab_sfas97lp_ceded_ann_claim_cost",  "sfas97lp_ceded_ann_claim_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(340, "sfas97lp_ceded_ann_claim_cost", "epl_liab_sfas97lp_ceded_ann_claim_cost",  "sfas97lp_ceded_ann_claim_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_ann_claim_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_ann_claim_cost),
-	CashFlowCommonData(378, "sfas97lp_ceded_ben_res_accrual_valn_basis", "epl_liab_sfas97lp_ceded_ben_res_accrual_valn_basis",  "sfas97lp_ceded_ben_res_accrual_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_ben_res_accrual_valn_basis, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_ben_res_accrual_valn_basis),
-	CashFlowCommonData(379, "sfas97lp_ceded_ben_res_int_valn_basis", "epl_liab_sfas97lp_ceded_ben_res_int_valn_basis",  "sfas97lp_ceded_ben_res_int_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_ben_res_int_valn_basis, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_ben_res_int_valn_basis),
-	CashFlowCommonData(380, "sfas97lp_ceded_ben_res_prelim", "epl_liab_sfas97lp_ceded_ben_res_prelim",  "sfas97lp_ceded_ben_res_prelim",  CashFlowCommonData::SUM,
+	CashFlowCommonData(341, "sfas97lp_ceded_ben_res_prelim", "epl_liab_sfas97lp_ceded_ben_res_prelim",  "sfas97lp_ceded_ben_res_prelim",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_ben_res_prelim, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_ben_res_prelim),
-	CashFlowCommonData(381, "sfas97lp_ceded_benefits_valn_basis", "epl_liab_sfas97lp_ceded_benefits_valn_basis",  "sfas97lp_ceded_benefits_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_benefits_valn_basis, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_benefits_valn_basis),
-	CashFlowCommonData(382, "sfas97lp_ceded_capzd_acq_exp", "epl_liab_sfas97lp_ceded_capzd_acq_exp",  "sfas97lp_ceded_capzd_acq_exp",  CashFlowCommonData::SUM,
+	CashFlowCommonData(342, "sfas97lp_ceded_capzd_acq_exp", "epl_liab_sfas97lp_ceded_capzd_acq_exp",  "sfas97lp_ceded_capzd_acq_exp",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_capzd_acq_exp, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_capzd_acq_exp),
-	CashFlowCommonData(383, "sfas97lp_ceded_capzd_acq_exp_valn_basis", "epl_liab_sfas97lp_ceded_capzd_acq_exp_valn_basis",  "sfas97lp_ceded_capzd_acq_exp_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_capzd_acq_exp_valn_basis, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_capzd_acq_exp_valn_basis),
-	CashFlowCommonData(384, "sfas97lp_ceded_capzd_comm_bom", "epl_liab_sfas97lp_ceded_capzd_comm_bom",  "sfas97lp_ceded_capzd_comm_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(343, "sfas97lp_ceded_capzd_comm_bom", "epl_liab_sfas97lp_ceded_capzd_comm_bom",  "sfas97lp_ceded_capzd_comm_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_capzd_comm_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_capzd_comm_bom),
-	CashFlowCommonData(385, "sfas97lp_ceded_capzd_comm_chargeback", "epl_liab_sfas97lp_ceded_capzd_comm_chargeback",  "sfas97lp_ceded_capzd_comm_chargeback",  CashFlowCommonData::SUM,
+	CashFlowCommonData(344, "sfas97lp_ceded_capzd_comm_chargeback", "epl_liab_sfas97lp_ceded_capzd_comm_chargeback",  "sfas97lp_ceded_capzd_comm_chargeback",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_capzd_comm_chargeback, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_capzd_comm_chargeback),
-	CashFlowCommonData(386, "sfas97lp_ceded_capzd_comm_eom", "epl_liab_sfas97lp_ceded_capzd_comm_eom",  "sfas97lp_ceded_capzd_comm_eom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(345, "sfas97lp_ceded_capzd_comm_eom", "epl_liab_sfas97lp_ceded_capzd_comm_eom",  "sfas97lp_ceded_capzd_comm_eom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_capzd_comm_eom, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_capzd_comm_eom),
-	CashFlowCommonData(387, "sfas97lp_ceded_capzd_comm_valn_basis", "epl_liab_sfas97lp_ceded_capzd_comm_valn_basis",  "sfas97lp_ceded_capzd_comm_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_capzd_comm_valn_basis, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_capzd_comm_valn_basis),
-	CashFlowCommonData(388, "sfas97lp_ceded_cash_flow_bom", "epl_liab_sfas97lp_ceded_cash_flow_bom",  "sfas97lp_ceded_cash_flow_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(346, "sfas97lp_ceded_cash_flow_bom", "epl_liab_sfas97lp_ceded_cash_flow_bom",  "sfas97lp_ceded_cash_flow_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_cash_flow_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_cash_flow_bom),
-	CashFlowCommonData(389, "sfas97lp_ceded_claim_res", "epl_liab_sfas97lp_ceded_claim_res",  "sfas97lp_ceded_claim_res",  CashFlowCommonData::SUM,
+	CashFlowCommonData(347, "sfas97lp_ceded_claim_res", "epl_liab_sfas97lp_ceded_claim_res",  "sfas97lp_ceded_claim_res",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_claim_res, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_claim_res),
-	CashFlowCommonData(390, "sfas97lp_ceded_comm_chargeback", "epl_liab_sfas97lp_ceded_comm_chargeback",  "sfas97lp_ceded_comm_chargeback",  CashFlowCommonData::SUM,
+	CashFlowCommonData(348, "sfas97lp_ceded_comm_chargeback", "epl_liab_sfas97lp_ceded_comm_chargeback",  "sfas97lp_ceded_comm_chargeback",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_comm_chargeback, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_comm_chargeback),
-	CashFlowCommonData(391, "sfas97lp_ceded_comm_excess_bom", "epl_liab_sfas97lp_ceded_comm_excess_bom",  "sfas97lp_ceded_comm_excess_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(349, "sfas97lp_ceded_comm_excess_bom", "epl_liab_sfas97lp_ceded_comm_excess_bom",  "sfas97lp_ceded_comm_excess_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_comm_excess_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_comm_excess_bom),
-	CashFlowCommonData(392, "sfas97lp_ceded_comm_excess_eom", "epl_liab_sfas97lp_ceded_comm_excess_eom",  "sfas97lp_ceded_comm_excess_eom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(350, "sfas97lp_ceded_comm_excess_eom", "epl_liab_sfas97lp_ceded_comm_excess_eom",  "sfas97lp_ceded_comm_excess_eom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_comm_excess_eom, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_comm_excess_eom),
-	CashFlowCommonData(393, "sfas97lp_ceded_comm_trail_bom", "epl_liab_sfas97lp_ceded_comm_trail_bom",  "sfas97lp_ceded_comm_trail_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(351, "sfas97lp_ceded_comm_trail_bom", "epl_liab_sfas97lp_ceded_comm_trail_bom",  "sfas97lp_ceded_comm_trail_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_comm_trail_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_comm_trail_bom),
-	CashFlowCommonData(394, "sfas97lp_ceded_comm_trail_bom_base_plan", "epl_liab_sfas97lp_ceded_comm_trail_bom_base_plan",  "sfas97lp_ceded_comm_trail_bom_base_plan",  CashFlowCommonData::SUM,
+	CashFlowCommonData(352, "sfas97lp_ceded_comm_trail_bom_base_plan", "epl_liab_sfas97lp_ceded_comm_trail_bom_base_plan",  "sfas97lp_ceded_comm_trail_bom_base_plan",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_comm_trail_bom_base_plan, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_comm_trail_bom_base_plan),
-	CashFlowCommonData(395, "sfas97lp_ceded_comm_trail_bom_rider", "epl_liab_sfas97lp_ceded_comm_trail_bom_rider",  "sfas97lp_ceded_comm_trail_bom_rider",  CashFlowCommonData::SUM,
+	CashFlowCommonData(353, "sfas97lp_ceded_comm_trail_bom_rider", "epl_liab_sfas97lp_ceded_comm_trail_bom_rider",  "sfas97lp_ceded_comm_trail_bom_rider",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_comm_trail_bom_rider, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_comm_trail_bom_rider),
-	CashFlowCommonData(396, "sfas97lp_ceded_comm_trail_eom", "epl_liab_sfas97lp_ceded_comm_trail_eom",  "sfas97lp_ceded_comm_trail_eom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(354, "sfas97lp_ceded_comm_trail_eom", "epl_liab_sfas97lp_ceded_comm_trail_eom",  "sfas97lp_ceded_comm_trail_eom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_comm_trail_eom, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_comm_trail_eom),
-	CashFlowCommonData(397, "sfas97lp_ceded_conversion_cost", "epl_liab_sfas97lp_ceded_conversion_cost",  "sfas97lp_ceded_conversion_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(355, "sfas97lp_ceded_conversion_cost", "epl_liab_sfas97lp_ceded_conversion_cost",  "sfas97lp_ceded_conversion_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_conversion_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_conversion_cost),
-	CashFlowCommonData(398, "sfas97lp_ceded_dac_amortzn_valn_basis", "epl_liab_sfas97lp_ceded_dac_amortzn_valn_basis",  "sfas97lp_ceded_dac_amortzn_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_dac_amortzn_valn_basis, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_dac_amortzn_valn_basis),
-	CashFlowCommonData(399, "sfas97lp_ceded_dac_int_valn_basis", "epl_liab_sfas97lp_ceded_dac_int_valn_basis",  "sfas97lp_ceded_dac_int_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_dac_int_valn_basis, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_dac_int_valn_basis),
-	CashFlowCommonData(400, "sfas97lp_ceded_dac_prelim", "epl_liab_sfas97lp_ceded_dac_prelim",  "sfas97lp_ceded_dac_prelim",  CashFlowCommonData::SUM,
+	CashFlowCommonData(356, "sfas97lp_ceded_dac_prelim", "epl_liab_sfas97lp_ceded_dac_prelim",  "sfas97lp_ceded_dac_prelim",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_dac_prelim, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_dac_prelim),
-	CashFlowCommonData(401, "sfas97lp_ceded_deferred_prof_amortzn_valn_basis", "epl_liab_sfas97lp_ceded_deferred_prof_amortzn_valn_basis",  "sfas97lp_ceded_deferred_prof_amortzn_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_deferred_prof_amortzn_valn_basis, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_deferred_prof_amortzn_valn_basis),
-	CashFlowCommonData(402, "sfas97lp_ceded_deferred_prof_int_valn_basis", "epl_liab_sfas97lp_ceded_deferred_prof_int_valn_basis",  "sfas97lp_ceded_deferred_prof_int_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_deferred_prof_int_valn_basis, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_deferred_prof_int_valn_basis),
-	CashFlowCommonData(403, "sfas97lp_ceded_deferred_prof_liab_prelim", "epl_liab_sfas97lp_ceded_deferred_prof_liab_prelim",  "sfas97lp_ceded_deferred_prof_liab_prelim",  CashFlowCommonData::SUM,
+	CashFlowCommonData(357, "sfas97lp_ceded_deferred_prof_liab_prelim", "epl_liab_sfas97lp_ceded_deferred_prof_liab_prelim",  "sfas97lp_ceded_deferred_prof_liab_prelim",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_deferred_prof_liab_prelim, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_deferred_prof_liab_prelim),
-	CashFlowCommonData(404, "sfas97lp_ceded_deferred_prof_valn_basis", "epl_liab_sfas97lp_ceded_deferred_prof_valn_basis",  "sfas97lp_ceded_deferred_prof_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_deferred_prof_valn_basis, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_deferred_prof_valn_basis),
-	CashFlowCommonData(405, "sfas97lp_ceded_div_applied", "epl_liab_sfas97lp_ceded_div_applied",  "sfas97lp_ceded_div_applied",  CashFlowCommonData::SUM,
+	CashFlowCommonData(358, "sfas97lp_ceded_div_applied", "epl_liab_sfas97lp_ceded_div_applied",  "sfas97lp_ceded_div_applied",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_div_applied, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_div_applied),
-	CashFlowCommonData(406, "sfas97lp_ceded_div_paid", "epl_liab_sfas97lp_ceded_div_paid",  "sfas97lp_ceded_div_paid",  CashFlowCommonData::SUM,
+	CashFlowCommonData(359, "sfas97lp_ceded_div_paid", "epl_liab_sfas97lp_ceded_div_paid",  "sfas97lp_ceded_div_paid",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_div_paid, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_div_paid),
-	CashFlowCommonData(407, "sfas97lp_ceded_div_valn_basis", "epl_liab_sfas97lp_ceded_div_valn_basis",  "sfas97lp_ceded_div_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_div_valn_basis, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_div_valn_basis),
-	CashFlowCommonData(408, "sfas97lp_ceded_dth_claim_cost", "epl_liab_sfas97lp_ceded_dth_claim_cost",  "sfas97lp_ceded_dth_claim_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(360, "sfas97lp_ceded_dth_claim_cost", "epl_liab_sfas97lp_ceded_dth_claim_cost",  "sfas97lp_ceded_dth_claim_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_dth_claim_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_dth_claim_cost),
-	CashFlowCommonData(409, "sfas97lp_ceded_endow_claim_cost", "epl_liab_sfas97lp_ceded_endow_claim_cost",  "sfas97lp_ceded_endow_claim_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(361, "sfas97lp_ceded_endow_claim_cost", "epl_liab_sfas97lp_ceded_endow_claim_cost",  "sfas97lp_ceded_endow_claim_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_endow_claim_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_endow_claim_cost),
-	CashFlowCommonData(410, "sfas97lp_ceded_exp_valn_basis", "epl_liab_sfas97lp_ceded_exp_valn_basis",  "sfas97lp_ceded_exp_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_exp_valn_basis, 'B','Y', '3', 'C', (size_t)&modelOffset->sfas97lp_ceded_exp_valn_basis),
-	CashFlowCommonData(411, "sfas97lp_ceded_gpr", "epl_liab_sfas97lp_ceded_gpr",  "sfas97lp_ceded_gpr",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_gpr, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_gpr),
-	CashFlowCommonData(412, "sfas97lp_ceded_gpr_units_inf", "epl_liab_sfas97lp_ceded_gpr_units_inf",  "sfas97lp_ceded_gpr_units_inf",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_gpr_units_inf, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_gpr_units_inf),
-	CashFlowCommonData(413, "sfas97lp_ceded_gross_prem", "epl_liab_sfas97lp_ceded_gross_prem",  "sfas97lp_ceded_gross_prem",  CashFlowCommonData::SUM,
+	CashFlowCommonData(362, "sfas97lp_ceded_gross_prem", "epl_liab_sfas97lp_ceded_gross_prem",  "sfas97lp_ceded_gross_prem",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_gross_prem, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_gross_prem),
-	CashFlowCommonData(414, "sfas97lp_ceded_hlth_claim_cost", "epl_liab_sfas97lp_ceded_hlth_claim_cost",  "sfas97lp_ceded_hlth_claim_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(363, "sfas97lp_ceded_hlth_claim_cost", "epl_liab_sfas97lp_ceded_hlth_claim_cost",  "sfas97lp_ceded_hlth_claim_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_hlth_claim_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_hlth_claim_cost),
-	CashFlowCommonData(415, "sfas97lp_ceded_loc_cost", "epl_liab_sfas97lp_ceded_loc_cost",  "sfas97lp_ceded_loc_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(364, "sfas97lp_ceded_loc_cost", "epl_liab_sfas97lp_ceded_loc_cost",  "sfas97lp_ceded_loc_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_loc_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_loc_cost),
-	CashFlowCommonData(416, "sfas97lp_ceded_maint_exp_bom", "epl_liab_sfas97lp_ceded_maint_exp_bom",  "sfas97lp_ceded_maint_exp_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(365, "sfas97lp_ceded_maint_exp_bom", "epl_liab_sfas97lp_ceded_maint_exp_bom",  "sfas97lp_ceded_maint_exp_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_maint_exp_bom, 'B','Y', '3', 'C', (size_t)&modelOffset->sfas97lp_ceded_maint_exp_bom),
-	CashFlowCommonData(417, "sfas97lp_ceded_maint_exp_eom", "epl_liab_sfas97lp_ceded_maint_exp_eom",  "sfas97lp_ceded_maint_exp_eom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(366, "sfas97lp_ceded_maint_exp_eom", "epl_liab_sfas97lp_ceded_maint_exp_eom",  "sfas97lp_ceded_maint_exp_eom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_maint_exp_eom, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_maint_exp_eom),
-	CashFlowCommonData(418, "sfas97lp_ceded_maint_exp_res_accrual_valn_basis", "epl_liab_sfas97lp_ceded_maint_exp_res_accrual_valn_basis",  "sfas97lp_ceded_maint_exp_res_accrual_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_maint_exp_res_accrual_valn_basis, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_maint_exp_res_accrual_valn_basis),
-	CashFlowCommonData(419, "sfas97lp_ceded_maint_exp_res_int_valn_basis", "epl_liab_sfas97lp_ceded_maint_exp_res_int_valn_basis",  "sfas97lp_ceded_maint_exp_res_int_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_maint_exp_res_int_valn_basis, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_maint_exp_res_int_valn_basis),
-	CashFlowCommonData(420, "sfas97lp_ceded_maint_exp_res_prelim", "epl_liab_sfas97lp_ceded_maint_exp_res_prelim",  "sfas97lp_ceded_maint_exp_res_prelim",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_maint_exp_res_prelim, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_maint_exp_res_prelim),
-	CashFlowCommonData(421, "sfas97lp_ceded_maturity_claim_cost", "epl_liab_sfas97lp_ceded_maturity_claim_cost",  "sfas97lp_ceded_maturity_claim_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(367, "sfas97lp_ceded_maturity_claim_cost", "epl_liab_sfas97lp_ceded_maturity_claim_cost",  "sfas97lp_ceded_maturity_claim_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_maturity_claim_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_maturity_claim_cost),
-	CashFlowCommonData(422, "sfas97lp_ceded_modco_liab", "epl_liab_sfas97lp_ceded_modco_liab",  "sfas97lp_ceded_modco_liab",  CashFlowCommonData::SUM,
+	CashFlowCommonData(368, "sfas97lp_ceded_modco_liab", "epl_liab_sfas97lp_ceded_modco_liab",  "sfas97lp_ceded_modco_liab",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_modco_liab, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_modco_liab),
-	CashFlowCommonData(423, "sfas97lp_ceded_modco_res_adj", "epl_liab_sfas97lp_ceded_modco_res_adj",  "sfas97lp_ceded_modco_res_adj",  CashFlowCommonData::SUM,
+	CashFlowCommonData(369, "sfas97lp_ceded_modco_res_adj", "epl_liab_sfas97lp_ceded_modco_res_adj",  "sfas97lp_ceded_modco_res_adj",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_modco_res_adj, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_modco_res_adj),
-	CashFlowCommonData(424, "sfas97lp_ceded_prem_tax", "epl_liab_sfas97lp_ceded_prem_tax",  "sfas97lp_ceded_prem_tax",  CashFlowCommonData::SUM,
+	CashFlowCommonData(370, "sfas97lp_ceded_prem_tax", "epl_liab_sfas97lp_ceded_prem_tax",  "sfas97lp_ceded_prem_tax",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_prem_tax, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_prem_tax),
-	CashFlowCommonData(425, "sfas97lp_ceded_prem_waiver_res", "epl_liab_sfas97lp_ceded_prem_waiver_res",  "sfas97lp_ceded_prem_waiver_res",  CashFlowCommonData::SUM,
+	CashFlowCommonData(371, "sfas97lp_ceded_prem_waiver_res", "epl_liab_sfas97lp_ceded_prem_waiver_res",  "sfas97lp_ceded_prem_waiver_res",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_prem_waiver_res, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_prem_waiver_res),
-	CashFlowCommonData(426, "sfas97lp_ceded_refund", "epl_liab_sfas97lp_ceded_refund",  "sfas97lp_ceded_refund",  CashFlowCommonData::SUM,
+	CashFlowCommonData(372, "sfas97lp_ceded_refund", "epl_liab_sfas97lp_ceded_refund",  "sfas97lp_ceded_refund",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_refund, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_refund),
-	CashFlowCommonData(427, "sfas97lp_ceded_surr_ben_valn_basis", "epl_liab_sfas97lp_ceded_surr_ben_valn_basis",  "sfas97lp_ceded_surr_ben_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_surr_ben_valn_basis, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_surr_ben_valn_basis),
-	CashFlowCommonData(428, "sfas97lp_ceded_surr_claim_cost", "epl_liab_sfas97lp_ceded_surr_claim_cost",  "sfas97lp_ceded_surr_claim_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(373, "sfas97lp_ceded_surr_claim_cost", "epl_liab_sfas97lp_ceded_surr_claim_cost",  "sfas97lp_ceded_surr_claim_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_surr_claim_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_surr_claim_cost),
-	CashFlowCommonData(429, "sfas97lp_ceded_terminal_div", "epl_liab_sfas97lp_ceded_terminal_div",  "sfas97lp_ceded_terminal_div",  CashFlowCommonData::SUM,
+	CashFlowCommonData(374, "sfas97lp_ceded_terminal_div", "epl_liab_sfas97lp_ceded_terminal_div",  "sfas97lp_ceded_terminal_div",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_ceded_terminal_div, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_ceded_terminal_div),
-	CashFlowCommonData(430, "sfas97lp_gross_acq_exp", "epl_liab_sfas97lp_gross_acq_exp",  "sfas97lp_gross_acq_exp",  CashFlowCommonData::SUM,
+	CashFlowCommonData(375, "sfas97lp_gross_acq_exp", "epl_liab_sfas97lp_gross_acq_exp",  "sfas97lp_gross_acq_exp",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_acq_exp, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_acq_exp),
-	CashFlowCommonData(431, "sfas97lp_gross_ann_claim_cost", "epl_liab_sfas97lp_gross_ann_claim_cost",  "sfas97lp_gross_ann_claim_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(376, "sfas97lp_gross_ann_claim_cost", "epl_liab_sfas97lp_gross_ann_claim_cost",  "sfas97lp_gross_ann_claim_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_ann_claim_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_ann_claim_cost),
-	CashFlowCommonData(432, "sfas97lp_gross_ben_res_accrual_valn_basis", "epl_liab_sfas97lp_gross_ben_res_accrual_valn_basis",  "sfas97lp_gross_ben_res_accrual_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_ben_res_accrual_valn_basis, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_ben_res_accrual_valn_basis),
-	CashFlowCommonData(433, "sfas97lp_gross_ben_res_int_valn_basis", "epl_liab_sfas97lp_gross_ben_res_int_valn_basis",  "sfas97lp_gross_ben_res_int_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_ben_res_int_valn_basis, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_ben_res_int_valn_basis),
-	CashFlowCommonData(434, "sfas97lp_gross_ben_res_prelim", "epl_liab_sfas97lp_gross_ben_res_prelim",  "sfas97lp_gross_ben_res_prelim",  CashFlowCommonData::SUM,
+	CashFlowCommonData(377, "sfas97lp_gross_ben_res_prelim", "epl_liab_sfas97lp_gross_ben_res_prelim",  "sfas97lp_gross_ben_res_prelim",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_ben_res_prelim, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_ben_res_prelim),
-	CashFlowCommonData(435, "sfas97lp_gross_benefits_valn_basis", "epl_liab_sfas97lp_gross_benefits_valn_basis",  "sfas97lp_gross_benefits_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_benefits_valn_basis, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_benefits_valn_basis),
-	CashFlowCommonData(436, "sfas97lp_gross_capzd_acq_exp", "epl_liab_sfas97lp_gross_capzd_acq_exp",  "sfas97lp_gross_capzd_acq_exp",  CashFlowCommonData::SUM,
+	CashFlowCommonData(378, "sfas97lp_gross_capzd_acq_exp", "epl_liab_sfas97lp_gross_capzd_acq_exp",  "sfas97lp_gross_capzd_acq_exp",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_capzd_acq_exp, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_capzd_acq_exp),
-	CashFlowCommonData(437, "sfas97lp_gross_capzd_acq_exp_valn_basis", "epl_liab_sfas97lp_gross_capzd_acq_exp_valn_basis",  "sfas97lp_gross_capzd_acq_exp_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_capzd_acq_exp_valn_basis, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_capzd_acq_exp_valn_basis),
-	CashFlowCommonData(438, "sfas97lp_gross_capzd_comm_bom", "epl_liab_sfas97lp_gross_capzd_comm_bom",  "sfas97lp_gross_capzd_comm_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(379, "sfas97lp_gross_capzd_comm_bom", "epl_liab_sfas97lp_gross_capzd_comm_bom",  "sfas97lp_gross_capzd_comm_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_capzd_comm_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_capzd_comm_bom),
-	CashFlowCommonData(439, "sfas97lp_gross_capzd_comm_chargeback", "epl_liab_sfas97lp_gross_capzd_comm_chargeback",  "sfas97lp_gross_capzd_comm_chargeback",  CashFlowCommonData::SUM,
+	CashFlowCommonData(380, "sfas97lp_gross_capzd_comm_chargeback", "epl_liab_sfas97lp_gross_capzd_comm_chargeback",  "sfas97lp_gross_capzd_comm_chargeback",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_capzd_comm_chargeback, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_capzd_comm_chargeback),
-	CashFlowCommonData(440, "sfas97lp_gross_capzd_comm_eom", "epl_liab_sfas97lp_gross_capzd_comm_eom",  "sfas97lp_gross_capzd_comm_eom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(381, "sfas97lp_gross_capzd_comm_eom", "epl_liab_sfas97lp_gross_capzd_comm_eom",  "sfas97lp_gross_capzd_comm_eom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_capzd_comm_eom, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_capzd_comm_eom),
-	CashFlowCommonData(441, "sfas97lp_gross_capzd_comm_valn_basis", "epl_liab_sfas97lp_gross_capzd_comm_valn_basis",  "sfas97lp_gross_capzd_comm_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_capzd_comm_valn_basis, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_capzd_comm_valn_basis),
-	CashFlowCommonData(442, "sfas97lp_gross_capzd_reins_yrt_cost", "epl_liab_sfas97lp_gross_capzd_reins_yrt_cost",  "sfas97lp_gross_capzd_reins_yrt_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(382, "sfas97lp_gross_capzd_reins_yrt_cost", "epl_liab_sfas97lp_gross_capzd_reins_yrt_cost",  "sfas97lp_gross_capzd_reins_yrt_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_capzd_reins_yrt_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_capzd_reins_yrt_cost),
-	CashFlowCommonData(443, "sfas97lp_gross_cash_flow_bom", "epl_liab_sfas97lp_gross_cash_flow_bom",  "sfas97lp_gross_cash_flow_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(383, "sfas97lp_gross_cash_flow_bom", "epl_liab_sfas97lp_gross_cash_flow_bom",  "sfas97lp_gross_cash_flow_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_cash_flow_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_cash_flow_bom),
-	CashFlowCommonData(444, "sfas97lp_gross_claim_res", "epl_liab_sfas97lp_gross_claim_res",  "sfas97lp_gross_claim_res",  CashFlowCommonData::SUM,
+	CashFlowCommonData(384, "sfas97lp_gross_claim_res", "epl_liab_sfas97lp_gross_claim_res",  "sfas97lp_gross_claim_res",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_claim_res, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_claim_res),
-	CashFlowCommonData(445, "sfas97lp_gross_comm_chargeback", "epl_liab_sfas97lp_gross_comm_chargeback",  "sfas97lp_gross_comm_chargeback",  CashFlowCommonData::SUM,
+	CashFlowCommonData(385, "sfas97lp_gross_comm_chargeback", "epl_liab_sfas97lp_gross_comm_chargeback",  "sfas97lp_gross_comm_chargeback",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_comm_chargeback, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_comm_chargeback),
-	CashFlowCommonData(446, "sfas97lp_gross_comm_excess_bom", "epl_liab_sfas97lp_gross_comm_excess_bom",  "sfas97lp_gross_comm_excess_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(386, "sfas97lp_gross_comm_excess_bom", "epl_liab_sfas97lp_gross_comm_excess_bom",  "sfas97lp_gross_comm_excess_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_comm_excess_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_comm_excess_bom),
-	CashFlowCommonData(447, "sfas97lp_gross_comm_excess_eom", "epl_liab_sfas97lp_gross_comm_excess_eom",  "sfas97lp_gross_comm_excess_eom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(387, "sfas97lp_gross_comm_excess_eom", "epl_liab_sfas97lp_gross_comm_excess_eom",  "sfas97lp_gross_comm_excess_eom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_comm_excess_eom, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_comm_excess_eom),
-	CashFlowCommonData(448, "sfas97lp_gross_comm_trail_bom", "epl_liab_sfas97lp_gross_comm_trail_bom",  "sfas97lp_gross_comm_trail_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(388, "sfas97lp_gross_comm_trail_bom", "epl_liab_sfas97lp_gross_comm_trail_bom",  "sfas97lp_gross_comm_trail_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_comm_trail_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_comm_trail_bom),
-	CashFlowCommonData(449, "sfas97lp_gross_comm_trail_bom_base_plan", "epl_liab_sfas97lp_gross_comm_trail_bom_base_plan",  "sfas97lp_gross_comm_trail_bom_base_plan",  CashFlowCommonData::SUM,
+	CashFlowCommonData(389, "sfas97lp_gross_comm_trail_bom_base_plan", "epl_liab_sfas97lp_gross_comm_trail_bom_base_plan",  "sfas97lp_gross_comm_trail_bom_base_plan",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_comm_trail_bom_base_plan, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_comm_trail_bom_base_plan),
-	CashFlowCommonData(450, "sfas97lp_gross_comm_trail_bom_rider", "epl_liab_sfas97lp_gross_comm_trail_bom_rider",  "sfas97lp_gross_comm_trail_bom_rider",  CashFlowCommonData::SUM,
+	CashFlowCommonData(390, "sfas97lp_gross_comm_trail_bom_rider", "epl_liab_sfas97lp_gross_comm_trail_bom_rider",  "sfas97lp_gross_comm_trail_bom_rider",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_comm_trail_bom_rider, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_comm_trail_bom_rider),
-	CashFlowCommonData(451, "sfas97lp_gross_comm_trail_eom", "epl_liab_sfas97lp_gross_comm_trail_eom",  "sfas97lp_gross_comm_trail_eom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(391, "sfas97lp_gross_comm_trail_eom", "epl_liab_sfas97lp_gross_comm_trail_eom",  "sfas97lp_gross_comm_trail_eom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_comm_trail_eom, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_comm_trail_eom),
-	CashFlowCommonData(452, "sfas97lp_gross_conversion_cost", "epl_liab_sfas97lp_gross_conversion_cost",  "sfas97lp_gross_conversion_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(392, "sfas97lp_gross_conversion_cost", "epl_liab_sfas97lp_gross_conversion_cost",  "sfas97lp_gross_conversion_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_conversion_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_conversion_cost),
-	CashFlowCommonData(453, "sfas97lp_gross_dac_amortzn_valn_basis", "epl_liab_sfas97lp_gross_dac_amortzn_valn_basis",  "sfas97lp_gross_dac_amortzn_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_dac_amortzn_valn_basis, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_dac_amortzn_valn_basis),
-	CashFlowCommonData(454, "sfas97lp_gross_dac_int_valn_basis", "epl_liab_sfas97lp_gross_dac_int_valn_basis",  "sfas97lp_gross_dac_int_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_dac_int_valn_basis, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_dac_int_valn_basis),
-	CashFlowCommonData(455, "sfas97lp_gross_dac_prelim", "epl_liab_sfas97lp_gross_dac_prelim",  "sfas97lp_gross_dac_prelim",  CashFlowCommonData::SUM,
+	CashFlowCommonData(393, "sfas97lp_gross_dac_prelim", "epl_liab_sfas97lp_gross_dac_prelim",  "sfas97lp_gross_dac_prelim",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_dac_prelim, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_dac_prelim),
-	CashFlowCommonData(456, "sfas97lp_gross_dac_reins_yrt_asset_amortzn_valn_basis", "epl_liab_sfas97lp_gross_dac_reins_yrt_asset_amortzn_valn_basis",  "sfas97lp_gross_dac_reins_yrt_asset_amortzn_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_dac_reins_yrt_asset_amortzn_valn_basis, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_dac_reins_yrt_asset_amortzn_valn_basis),
-	CashFlowCommonData(457, "sfas97lp_gross_dac_reins_yrt_asset_int_valn_basis", "epl_liab_sfas97lp_gross_dac_reins_yrt_asset_int_valn_basis",  "sfas97lp_gross_dac_reins_yrt_asset_int_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_dac_reins_yrt_asset_int_valn_basis, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_dac_reins_yrt_asset_int_valn_basis),
-	CashFlowCommonData(458, "sfas97lp_gross_dac_reins_yrt_asset_prelim", "epl_liab_sfas97lp_gross_dac_reins_yrt_asset_prelim",  "sfas97lp_gross_dac_reins_yrt_asset_prelim",  CashFlowCommonData::SUM,
+	CashFlowCommonData(394, "sfas97lp_gross_dac_reins_yrt_asset_prelim", "epl_liab_sfas97lp_gross_dac_reins_yrt_asset_prelim",  "sfas97lp_gross_dac_reins_yrt_asset_prelim",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_dac_reins_yrt_asset_prelim, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_dac_reins_yrt_asset_prelim),
-	CashFlowCommonData(459, "sfas97lp_gross_deferred_prof_amortzn_valn_basis", "epl_liab_sfas97lp_gross_deferred_prof_amortzn_valn_basis",  "sfas97lp_gross_deferred_prof_amortzn_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_deferred_prof_amortzn_valn_basis, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_deferred_prof_amortzn_valn_basis),
-	CashFlowCommonData(460, "sfas97lp_gross_deferred_prof_int_valn_basis", "epl_liab_sfas97lp_gross_deferred_prof_int_valn_basis",  "sfas97lp_gross_deferred_prof_int_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_deferred_prof_int_valn_basis, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_deferred_prof_int_valn_basis),
-	CashFlowCommonData(461, "sfas97lp_gross_deferred_prof_liab_prelim", "epl_liab_sfas97lp_gross_deferred_prof_liab_prelim",  "sfas97lp_gross_deferred_prof_liab_prelim",  CashFlowCommonData::SUM,
+	CashFlowCommonData(395, "sfas97lp_gross_deferred_prof_liab_prelim", "epl_liab_sfas97lp_gross_deferred_prof_liab_prelim",  "sfas97lp_gross_deferred_prof_liab_prelim",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_deferred_prof_liab_prelim, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_deferred_prof_liab_prelim),
-	CashFlowCommonData(462, "sfas97lp_gross_deferred_prof_valn_basis", "epl_liab_sfas97lp_gross_deferred_prof_valn_basis",  "sfas97lp_gross_deferred_prof_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_deferred_prof_valn_basis, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_deferred_prof_valn_basis),
-	CashFlowCommonData(463, "sfas97lp_gross_div_applied", "epl_liab_sfas97lp_gross_div_applied",  "sfas97lp_gross_div_applied",  CashFlowCommonData::SUM,
+	CashFlowCommonData(396, "sfas97lp_gross_div_applied", "epl_liab_sfas97lp_gross_div_applied",  "sfas97lp_gross_div_applied",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_div_applied, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_div_applied),
-	CashFlowCommonData(464, "sfas97lp_gross_div_paid", "epl_liab_sfas97lp_gross_div_paid",  "sfas97lp_gross_div_paid",  CashFlowCommonData::SUM,
+	CashFlowCommonData(397, "sfas97lp_gross_div_paid", "epl_liab_sfas97lp_gross_div_paid",  "sfas97lp_gross_div_paid",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_div_paid, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_div_paid),
-	CashFlowCommonData(465, "sfas97lp_gross_div_valn_basis", "epl_liab_sfas97lp_gross_div_valn_basis",  "sfas97lp_gross_div_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_div_valn_basis, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_div_valn_basis),
-	CashFlowCommonData(466, "sfas97lp_gross_dth_claim_cost", "epl_liab_sfas97lp_gross_dth_claim_cost",  "sfas97lp_gross_dth_claim_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(398, "sfas97lp_gross_dth_claim_cost", "epl_liab_sfas97lp_gross_dth_claim_cost",  "sfas97lp_gross_dth_claim_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_dth_claim_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_dth_claim_cost),
-	CashFlowCommonData(467, "sfas97lp_gross_endow_claim_cost", "epl_liab_sfas97lp_gross_endow_claim_cost",  "sfas97lp_gross_endow_claim_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(399, "sfas97lp_gross_endow_claim_cost", "epl_liab_sfas97lp_gross_endow_claim_cost",  "sfas97lp_gross_endow_claim_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_endow_claim_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_endow_claim_cost),
-	CashFlowCommonData(468, "sfas97lp_gross_exp_valn_basis", "epl_liab_sfas97lp_gross_exp_valn_basis",  "sfas97lp_gross_exp_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_exp_valn_basis, 'B','Y', '3', 'C', (size_t)&modelOffset->sfas97lp_gross_exp_valn_basis),
-	CashFlowCommonData(469, "sfas97lp_gross_gpr", "epl_liab_sfas97lp_gross_gpr",  "sfas97lp_gross_gpr",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_gpr, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_gpr),
-	CashFlowCommonData(470, "sfas97lp_gross_gpr_units_inf", "epl_liab_sfas97lp_gross_gpr_units_inf",  "sfas97lp_gross_gpr_units_inf",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_gpr_units_inf, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_gpr_units_inf),
-	CashFlowCommonData(471, "sfas97lp_gross_gross_prem", "epl_liab_sfas97lp_gross_gross_prem",  "sfas97lp_gross_gross_prem",  CashFlowCommonData::SUM,
+	CashFlowCommonData(400, "sfas97lp_gross_gross_prem", "epl_liab_sfas97lp_gross_gross_prem",  "sfas97lp_gross_gross_prem",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_gross_prem, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_gross_prem),
-	CashFlowCommonData(472, "sfas97lp_gross_hlth_claim_cost", "epl_liab_sfas97lp_gross_hlth_claim_cost",  "sfas97lp_gross_hlth_claim_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(401, "sfas97lp_gross_hlth_claim_cost", "epl_liab_sfas97lp_gross_hlth_claim_cost",  "sfas97lp_gross_hlth_claim_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_hlth_claim_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_hlth_claim_cost),
-	CashFlowCommonData(473, "sfas97lp_gross_loc_cost", "epl_liab_sfas97lp_gross_loc_cost",  "sfas97lp_gross_loc_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(402, "sfas97lp_gross_loc_cost", "epl_liab_sfas97lp_gross_loc_cost",  "sfas97lp_gross_loc_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_loc_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_loc_cost),
-	CashFlowCommonData(474, "sfas97lp_gross_maint_exp_bom", "epl_liab_sfas97lp_gross_maint_exp_bom",  "sfas97lp_gross_maint_exp_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(403, "sfas97lp_gross_maint_exp_bom", "epl_liab_sfas97lp_gross_maint_exp_bom",  "sfas97lp_gross_maint_exp_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_maint_exp_bom, 'B','Y', '3', 'C', (size_t)&modelOffset->sfas97lp_gross_maint_exp_bom),
-	CashFlowCommonData(475, "sfas97lp_gross_maint_exp_eom", "epl_liab_sfas97lp_gross_maint_exp_eom",  "sfas97lp_gross_maint_exp_eom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(404, "sfas97lp_gross_maint_exp_eom", "epl_liab_sfas97lp_gross_maint_exp_eom",  "sfas97lp_gross_maint_exp_eom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_maint_exp_eom, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_maint_exp_eom),
-	CashFlowCommonData(476, "sfas97lp_gross_maint_exp_res_accrual_valn_basis", "epl_liab_sfas97lp_gross_maint_exp_res_accrual_valn_basis",  "sfas97lp_gross_maint_exp_res_accrual_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_maint_exp_res_accrual_valn_basis, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_maint_exp_res_accrual_valn_basis),
-	CashFlowCommonData(477, "sfas97lp_gross_maint_exp_res_int_valn_basis", "epl_liab_sfas97lp_gross_maint_exp_res_int_valn_basis",  "sfas97lp_gross_maint_exp_res_int_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_maint_exp_res_int_valn_basis, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_maint_exp_res_int_valn_basis),
-	CashFlowCommonData(478, "sfas97lp_gross_maint_exp_res_prelim", "epl_liab_sfas97lp_gross_maint_exp_res_prelim",  "sfas97lp_gross_maint_exp_res_prelim",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_maint_exp_res_prelim, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_maint_exp_res_prelim),
-	CashFlowCommonData(479, "sfas97lp_gross_maturity_claim_cost", "epl_liab_sfas97lp_gross_maturity_claim_cost",  "sfas97lp_gross_maturity_claim_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(405, "sfas97lp_gross_maturity_claim_cost", "epl_liab_sfas97lp_gross_maturity_claim_cost",  "sfas97lp_gross_maturity_claim_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_maturity_claim_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_maturity_claim_cost),
-	CashFlowCommonData(480, "sfas97lp_gross_pol_loan", "epl_liab_sfas97lp_gross_pol_loan",  "sfas97lp_gross_pol_loan",  CashFlowCommonData::SUM,
+	CashFlowCommonData(406, "sfas97lp_gross_pol_loan", "epl_liab_sfas97lp_gross_pol_loan",  "sfas97lp_gross_pol_loan",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_pol_loan, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_pol_loan),
-	CashFlowCommonData(481, "sfas97lp_gross_pol_loan_inc", "epl_liab_sfas97lp_gross_pol_loan_inc",  "sfas97lp_gross_pol_loan_inc",  CashFlowCommonData::SUM,
+	CashFlowCommonData(407, "sfas97lp_gross_pol_loan_inc", "epl_liab_sfas97lp_gross_pol_loan_inc",  "sfas97lp_gross_pol_loan_inc",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_pol_loan_inc, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_pol_loan_inc),
-	CashFlowCommonData(482, "sfas97lp_gross_prem_tax", "epl_liab_sfas97lp_gross_prem_tax",  "sfas97lp_gross_prem_tax",  CashFlowCommonData::SUM,
+	CashFlowCommonData(408, "sfas97lp_gross_prem_tax", "epl_liab_sfas97lp_gross_prem_tax",  "sfas97lp_gross_prem_tax",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_prem_tax, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_prem_tax),
-	CashFlowCommonData(483, "sfas97lp_gross_prem_waiver_res", "epl_liab_sfas97lp_gross_prem_waiver_res",  "sfas97lp_gross_prem_waiver_res",  CashFlowCommonData::SUM,
+	CashFlowCommonData(409, "sfas97lp_gross_prem_waiver_res", "epl_liab_sfas97lp_gross_prem_waiver_res",  "sfas97lp_gross_prem_waiver_res",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_prem_waiver_res, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_prem_waiver_res),
-	CashFlowCommonData(484, "sfas97lp_gross_reins_yrt_cost", "epl_liab_sfas97lp_gross_reins_yrt_cost",  "sfas97lp_gross_reins_yrt_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(410, "sfas97lp_gross_reins_yrt_cost", "epl_liab_sfas97lp_gross_reins_yrt_cost",  "sfas97lp_gross_reins_yrt_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_reins_yrt_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_reins_yrt_cost),
-	CashFlowCommonData(485, "sfas97lp_gross_reins_yrt_cost_valn_basis", "epl_liab_sfas97lp_gross_reins_yrt_cost_valn_basis",  "sfas97lp_gross_reins_yrt_cost_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_reins_yrt_cost_valn_basis, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_reins_yrt_cost_valn_basis),
-	CashFlowCommonData(486, "sfas97lp_gross_stat_res_rider", "epl_liab_sfas97lp_gross_stat_res_rider",  "sfas97lp_gross_stat_res_rider",  CashFlowCommonData::SUM,
+	CashFlowCommonData(411, "sfas97lp_gross_stat_res_rider", "epl_liab_sfas97lp_gross_stat_res_rider",  "sfas97lp_gross_stat_res_rider",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_stat_res_rider, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_stat_res_rider),
-	CashFlowCommonData(487, "sfas97lp_gross_surr_ben_valn_basis", "epl_liab_sfas97lp_gross_surr_ben_valn_basis",  "sfas97lp_gross_surr_ben_valn_basis",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_surr_ben_valn_basis, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_surr_ben_valn_basis),
-	CashFlowCommonData(488, "sfas97lp_gross_surr_claim_cost", "epl_liab_sfas97lp_gross_surr_claim_cost",  "sfas97lp_gross_surr_claim_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(412, "sfas97lp_gross_surr_claim_cost", "epl_liab_sfas97lp_gross_surr_claim_cost",  "sfas97lp_gross_surr_claim_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_surr_claim_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_surr_claim_cost),
-	CashFlowCommonData(489, "sfas97lp_gross_terminal_div", "epl_liab_sfas97lp_gross_terminal_div",  "sfas97lp_gross_terminal_div",  CashFlowCommonData::SUM,
+	CashFlowCommonData(413, "sfas97lp_gross_terminal_div", "epl_liab_sfas97lp_gross_terminal_div",  "sfas97lp_gross_terminal_div",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97lp_gross_terminal_div, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97lp_gross_terminal_div),
-	CashFlowCommonData(490, "sfas97rd_ceded_acq_exp", "epl_liab_sfas97rd_ceded_acq_exp",  "sfas97rd_ceded_acq_exp",  CashFlowCommonData::SUM,
+	CashFlowCommonData(414, "sfas97rd_ceded_acq_exp", "epl_liab_sfas97rd_ceded_acq_exp",  "sfas97rd_ceded_acq_exp",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_acq_exp, 'B','Y', '3', 'C', (size_t)&modelOffset->sfas97rd_ceded_acq_exp),
-	CashFlowCommonData(491, "sfas97rd_ceded_cap_gain_fund", "epl_liab_sfas97rd_ceded_cap_gain_fund",  "sfas97rd_ceded_cap_gain_fund",  CashFlowCommonData::SUM,
+	CashFlowCommonData(415, "sfas97rd_ceded_cap_gain_fund", "epl_liab_sfas97rd_ceded_cap_gain_fund",  "sfas97rd_ceded_cap_gain_fund",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_cap_gain_fund, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_cap_gain_fund),
-	CashFlowCommonData(492, "sfas97rd_ceded_capzd_acq_exp", "epl_liab_sfas97rd_ceded_capzd_acq_exp",  "sfas97rd_ceded_capzd_acq_exp",  CashFlowCommonData::SUM,
+	CashFlowCommonData(416, "sfas97rd_ceded_capzd_acq_exp", "epl_liab_sfas97rd_ceded_capzd_acq_exp",  "sfas97rd_ceded_capzd_acq_exp",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_capzd_acq_exp, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_capzd_acq_exp),
-	CashFlowCommonData(493, "sfas97rd_ceded_capzd_comm_bom", "epl_liab_sfas97rd_ceded_capzd_comm_bom",  "sfas97rd_ceded_capzd_comm_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(417, "sfas97rd_ceded_capzd_comm_bom", "epl_liab_sfas97rd_ceded_capzd_comm_bom",  "sfas97rd_ceded_capzd_comm_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_capzd_comm_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_capzd_comm_bom),
-	CashFlowCommonData(494, "sfas97rd_ceded_capzd_comm_chargeback", "epl_liab_sfas97rd_ceded_capzd_comm_chargeback",  "sfas97rd_ceded_capzd_comm_chargeback",  CashFlowCommonData::SUM,
+	CashFlowCommonData(418, "sfas97rd_ceded_capzd_comm_chargeback", "epl_liab_sfas97rd_ceded_capzd_comm_chargeback",  "sfas97rd_ceded_capzd_comm_chargeback",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_capzd_comm_chargeback, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_capzd_comm_chargeback),
-	CashFlowCommonData(495, "sfas97rd_ceded_capzd_comm_eom", "epl_liab_sfas97rd_ceded_capzd_comm_eom",  "sfas97rd_ceded_capzd_comm_eom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(419, "sfas97rd_ceded_capzd_comm_eom", "epl_liab_sfas97rd_ceded_capzd_comm_eom",  "sfas97rd_ceded_capzd_comm_eom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_capzd_comm_eom, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_capzd_comm_eom),
-	CashFlowCommonData(496, "sfas97rd_ceded_capzd_prem_bonus", "epl_liab_sfas97rd_ceded_capzd_prem_bonus",  "sfas97rd_ceded_capzd_prem_bonus",  CashFlowCommonData::SUM,
+	CashFlowCommonData(420, "sfas97rd_ceded_capzd_prem_bonus", "epl_liab_sfas97rd_ceded_capzd_prem_bonus",  "sfas97rd_ceded_capzd_prem_bonus",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_capzd_prem_bonus, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_capzd_prem_bonus),
-	CashFlowCommonData(497, "sfas97rd_ceded_cash_flow_bom", "epl_liab_sfas97rd_ceded_cash_flow_bom",  "sfas97rd_ceded_cash_flow_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(421, "sfas97rd_ceded_cash_flow_bom", "epl_liab_sfas97rd_ceded_cash_flow_bom",  "sfas97rd_ceded_cash_flow_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_cash_flow_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_cash_flow_bom),
-	CashFlowCommonData(498, "sfas97rd_ceded_charges", "epl_liab_sfas97rd_ceded_charges",  "sfas97rd_ceded_charges",  CashFlowCommonData::SUM,
+	CashFlowCommonData(422, "sfas97rd_ceded_charges", "epl_liab_sfas97rd_ceded_charges",  "sfas97rd_ceded_charges",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_charges, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_charges),
-	CashFlowCommonData(499, "sfas97rd_ceded_comm_chargeback", "epl_liab_sfas97rd_ceded_comm_chargeback",  "sfas97rd_ceded_comm_chargeback",  CashFlowCommonData::SUM,
+	CashFlowCommonData(423, "sfas97rd_ceded_comm_chargeback", "epl_liab_sfas97rd_ceded_comm_chargeback",  "sfas97rd_ceded_comm_chargeback",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_comm_chargeback, 'E','Y', '3', 'C', (size_t)&modelOffset->sfas97rd_ceded_comm_chargeback),
-	CashFlowCommonData(500, "sfas97rd_ceded_comm_excess_bom", "epl_liab_sfas97rd_ceded_comm_excess_bom",  "sfas97rd_ceded_comm_excess_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(424, "sfas97rd_ceded_comm_excess_bom", "epl_liab_sfas97rd_ceded_comm_excess_bom",  "sfas97rd_ceded_comm_excess_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_comm_excess_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_comm_excess_bom),
-	CashFlowCommonData(501, "sfas97rd_ceded_comm_trail_bom", "epl_liab_sfas97rd_ceded_comm_trail_bom",  "sfas97rd_ceded_comm_trail_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(425, "sfas97rd_ceded_comm_trail_bom", "epl_liab_sfas97rd_ceded_comm_trail_bom",  "sfas97rd_ceded_comm_trail_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_comm_trail_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_comm_trail_bom),
-	CashFlowCommonData(502, "sfas97rd_ceded_credited_int", "epl_liab_sfas97rd_ceded_credited_int",  "sfas97rd_ceded_credited_int",  CashFlowCommonData::SUM,
+	CashFlowCommonData(426, "sfas97rd_ceded_credited_int", "epl_liab_sfas97rd_ceded_credited_int",  "sfas97rd_ceded_credited_int",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_credited_int, 'E','Y', '3', 'C', (size_t)&modelOffset->sfas97rd_ceded_credited_int),
-	CashFlowCommonData(503, "sfas97rd_ceded_deferred_loads", "epl_liab_sfas97rd_ceded_deferred_loads",  "sfas97rd_ceded_deferred_loads",  CashFlowCommonData::SUM,
+	CashFlowCommonData(427, "sfas97rd_ceded_deferred_loads", "epl_liab_sfas97rd_ceded_deferred_loads",  "sfas97rd_ceded_deferred_loads",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_deferred_loads, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_deferred_loads),
-	CashFlowCommonData(504, "sfas97rd_ceded_dth_claim_cost", "epl_liab_sfas97rd_ceded_dth_claim_cost",  "sfas97rd_ceded_dth_claim_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(428, "sfas97rd_ceded_dth_claim_cost", "epl_liab_sfas97rd_ceded_dth_claim_cost",  "sfas97rd_ceded_dth_claim_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_dth_claim_cost, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_dth_claim_cost),
-	CashFlowCommonData(505, "sfas97rd_ceded_egp_gain_inv", "epl_liab_sfas97rd_ceded_egp_gain_inv",  "sfas97rd_ceded_egp_gain_inv",  CashFlowCommonData::SUM,
+	CashFlowCommonData(429, "sfas97rd_ceded_egp_gain_inv", "epl_liab_sfas97rd_ceded_egp_gain_inv",  "sfas97rd_ceded_egp_gain_inv",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_egp_gain_inv, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_egp_gain_inv),
-	CashFlowCommonData(506, "sfas97rd_ceded_egp_gain_mort", "epl_liab_sfas97rd_ceded_egp_gain_mort",  "sfas97rd_ceded_egp_gain_mort",  CashFlowCommonData::SUM,
+	CashFlowCommonData(430, "sfas97rd_ceded_egp_gain_mort", "epl_liab_sfas97rd_ceded_egp_gain_mort",  "sfas97rd_ceded_egp_gain_mort",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_egp_gain_mort, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_egp_gain_mort),
-	CashFlowCommonData(507, "sfas97rd_ceded_egp_gain_surr", "epl_liab_sfas97rd_ceded_egp_gain_surr",  "sfas97rd_ceded_egp_gain_surr",  CashFlowCommonData::SUM,
+	CashFlowCommonData(431, "sfas97rd_ceded_egp_gain_surr", "epl_liab_sfas97rd_ceded_egp_gain_surr",  "sfas97rd_ceded_egp_gain_surr",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_egp_gain_surr, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_egp_gain_surr),
-	CashFlowCommonData(508, "sfas97rd_ceded_embed_deriv_cash_flow", "epl_liab_sfas97rd_ceded_embed_deriv_cash_flow",  "sfas97rd_ceded_embed_deriv_cash_flow",  CashFlowCommonData::SUM,
+	CashFlowCommonData(432, "sfas97rd_ceded_embed_deriv_cash_flow", "epl_liab_sfas97rd_ceded_embed_deriv_cash_flow",  "sfas97rd_ceded_embed_deriv_cash_flow",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_embed_deriv_cash_flow, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_embed_deriv_cash_flow),
-	CashFlowCommonData(509, "sfas97rd_ceded_fund_val_aft_int", "epl_liab_sfas97rd_ceded_fund_val_aft_int",  "sfas97rd_ceded_fund_val_aft_int",  CashFlowCommonData::SUM,
+	CashFlowCommonData(433, "sfas97rd_ceded_fund_val_aft_int", "epl_liab_sfas97rd_ceded_fund_val_aft_int",  "sfas97rd_ceded_fund_val_aft_int",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_fund_val_aft_int, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_fund_val_aft_int),
-	CashFlowCommonData(510, "sfas97rd_ceded_fund_val_bef_int", "epl_liab_sfas97rd_ceded_fund_val_bef_int",  "sfas97rd_ceded_fund_val_bef_int",  CashFlowCommonData::SUM,
+	CashFlowCommonData(434, "sfas97rd_ceded_fund_val_bef_int", "epl_liab_sfas97rd_ceded_fund_val_bef_int",  "sfas97rd_ceded_fund_val_bef_int",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_fund_val_bef_int, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_fund_val_bef_int),
-	CashFlowCommonData(511, "sfas97rd_ceded_fund_val_fixed", "epl_liab_sfas97rd_ceded_fund_val_fixed",  "sfas97rd_ceded_fund_val_fixed",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_fund_val_fixed, 'E','N', '3', 'C', (size_t)&modelOffset->sfas97rd_ceded_fund_val_fixed)
+	CashFlowCommonData(435, "sfas97rd_ceded_fund_val_fixed", "epl_liab_sfas97rd_ceded_fund_val_fixed",  "sfas97rd_ceded_fund_val_fixed",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_fund_val_fixed, 'E','N', '3', 'C', (size_t)&modelOffset->sfas97rd_ceded_fund_val_fixed),
+	CashFlowCommonData(436, "sfas97rd_ceded_fund_val_sa", "epl_liab_sfas97rd_ceded_fund_val_sa",  "sfas97rd_ceded_fund_val_sa",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_fund_val_sa, 'E','N', '3', 'C', (size_t)&modelOffset->sfas97rd_ceded_fund_val_sa),
+	CashFlowCommonData(437, "sfas97rd_ceded_gmab_ben", "epl_liab_sfas97rd_ceded_gmab_ben",  "sfas97rd_ceded_gmab_ben",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_gmab_ben, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_gmab_ben),
+	CashFlowCommonData(438, "sfas97rd_ceded_gmdb_ben", "epl_liab_sfas97rd_ceded_gmdb_ben",  "sfas97rd_ceded_gmdb_ben",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_gmdb_ben, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_gmdb_ben),
+	CashFlowCommonData(439, "sfas97rd_ceded_gmib_ben", "epl_liab_sfas97rd_ceded_gmib_ben",  "sfas97rd_ceded_gmib_ben",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_gmib_ben, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_gmib_ben),
+	CashFlowCommonData(440, "sfas97rd_ceded_gmwb_ben", "epl_liab_sfas97rd_ceded_gmwb_ben",  "sfas97rd_ceded_gmwb_ben",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_gmwb_ben, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_gmwb_ben),
+	CashFlowCommonData(441, "sfas97rd_ceded_hedge_cash_flow", "epl_liab_sfas97rd_ceded_hedge_cash_flow",  "sfas97rd_ceded_hedge_cash_flow",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_hedge_cash_flow, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_hedge_cash_flow),
+	CashFlowCommonData(442, "sfas97rd_ceded_hedge_mkt_val", "epl_liab_sfas97rd_ceded_hedge_mkt_val",  "sfas97rd_ceded_hedge_mkt_val",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_hedge_mkt_val, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_hedge_mkt_val),
+	CashFlowCommonData(443, "sfas97rd_ceded_host_contract_cred_int", "epl_liab_sfas97rd_ceded_host_contract_cred_int",  "sfas97rd_ceded_host_contract_cred_int",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_host_contract_cred_int, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_host_contract_cred_int),
+	CashFlowCommonData(444, "sfas97rd_ceded_host_contract_val", "epl_liab_sfas97rd_ceded_host_contract_val",  "sfas97rd_ceded_host_contract_val",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_host_contract_val, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_host_contract_val),
+	CashFlowCommonData(445, "sfas97rd_ceded_host_contract_val_bef", "epl_liab_sfas97rd_ceded_host_contract_val_bef",  "sfas97rd_ceded_host_contract_val_bef",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_host_contract_val_bef, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_host_contract_val_bef),
+	CashFlowCommonData(446, "sfas97rd_ceded_inv_inc_fund", "epl_liab_sfas97rd_ceded_inv_inc_fund",  "sfas97rd_ceded_inv_inc_fund",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_inv_inc_fund, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_inv_inc_fund),
+	CashFlowCommonData(447, "sfas97rd_ceded_loads", "epl_liab_sfas97rd_ceded_loads",  "sfas97rd_ceded_loads",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_loads, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_loads),
+	CashFlowCommonData(448, "sfas97rd_ceded_loc_cost", "epl_liab_sfas97rd_ceded_loc_cost",  "sfas97rd_ceded_loc_cost",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_loc_cost, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_loc_cost),
+	CashFlowCommonData(449, "sfas97rd_ceded_maint_exp_bom", "epl_liab_sfas97rd_ceded_maint_exp_bom",  "sfas97rd_ceded_maint_exp_bom",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_maint_exp_bom, 'B','Y', '3', 'C', (size_t)&modelOffset->sfas97rd_ceded_maint_exp_bom),
+	CashFlowCommonData(450, "sfas97rd_ceded_maint_exp_eom", "epl_liab_sfas97rd_ceded_maint_exp_eom",  "sfas97rd_ceded_maint_exp_eom",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_maint_exp_eom, 'B','Y', '3', 'C', (size_t)&modelOffset->sfas97rd_ceded_maint_exp_eom),
+	CashFlowCommonData(451, "sfas97rd_ceded_modco_liab", "epl_liab_sfas97rd_ceded_modco_liab",  "sfas97rd_ceded_modco_liab",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_modco_liab, 'E','N', '3', 'C', (size_t)&modelOffset->sfas97rd_ceded_modco_liab),
+	CashFlowCommonData(452, "sfas97rd_ceded_modco_res_adj", "epl_liab_sfas97rd_ceded_modco_res_adj",  "sfas97rd_ceded_modco_res_adj",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_modco_res_adj, 'E','Y', '3', 'C', (size_t)&modelOffset->sfas97rd_ceded_modco_res_adj),
+	CashFlowCommonData(453, "sfas97rd_ceded_mrb_gmab_liab", "epl_liab_sfas97rd_ceded_mrb_gmab_liab",  "sfas97rd_ceded_mrb_gmab_liab",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_mrb_gmab_liab, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_mrb_gmab_liab),
+	CashFlowCommonData(454, "sfas97rd_ceded_mrb_gmdb_liab", "epl_liab_sfas97rd_ceded_mrb_gmdb_liab",  "sfas97rd_ceded_mrb_gmdb_liab",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_mrb_gmdb_liab, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_mrb_gmdb_liab),
+	CashFlowCommonData(455, "sfas97rd_ceded_mrb_gmib_liab", "epl_liab_sfas97rd_ceded_mrb_gmib_liab",  "sfas97rd_ceded_mrb_gmib_liab",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_mrb_gmib_liab, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_mrb_gmib_liab),
+	CashFlowCommonData(456, "sfas97rd_ceded_mrb_gmwb_liab", "epl_liab_sfas97rd_ceded_mrb_gmwb_liab",  "sfas97rd_ceded_mrb_gmwb_liab",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_mrb_gmwb_liab, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_mrb_gmwb_liab),
+	CashFlowCommonData(457, "sfas97rd_ceded_persist_bon_ref", "epl_liab_sfas97rd_ceded_persist_bon_ref",  "sfas97rd_ceded_persist_bon_ref",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_persist_bon_ref, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_persist_bon_ref),
+	CashFlowCommonData(458, "sfas97rd_ceded_policies_inf", "epl_liab_sfas97rd_ceded_policies_inf",  "sfas97rd_ceded_policies_inf",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_policies_inf, 'B','N', '3', 'C', (size_t)&modelOffset->sfas97rd_ceded_policies_inf),
+	CashFlowCommonData(459, "sfas97rd_ceded_prem_bonus", "epl_liab_sfas97rd_ceded_prem_bonus",  "sfas97rd_ceded_prem_bonus",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_prem_bonus, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_prem_bonus),
+	CashFlowCommonData(460, "sfas97rd_ceded_prem_tax", "epl_liab_sfas97rd_ceded_prem_tax",  "sfas97rd_ceded_prem_tax",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_prem_tax, 'B','Y', '3', 'C', (size_t)&modelOffset->sfas97rd_ceded_prem_tax),
+	CashFlowCommonData(461, "sfas97rd_ceded_refund", "epl_liab_sfas97rd_ceded_refund",  "sfas97rd_ceded_refund",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_refund, 'E','Y', '3', 'C', (size_t)&modelOffset->sfas97rd_ceded_refund),
+	CashFlowCommonData(462, "sfas97rd_ceded_rider_charges", "epl_liab_sfas97rd_ceded_rider_charges",  "sfas97rd_ceded_rider_charges",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_rider_charges, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_rider_charges),
+	CashFlowCommonData(463, "sfas97rd_ceded_sop031_assess", "epl_liab_sfas97rd_ceded_sop031_assess",  "sfas97rd_ceded_sop031_assess",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_sop031_assess, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_sop031_assess),
+	CashFlowCommonData(464, "sfas97rd_ceded_sop031_coi_assess", "epl_liab_sfas97rd_ceded_sop031_coi_assess",  "sfas97rd_ceded_sop031_coi_assess",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_sop031_coi_assess, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_sop031_coi_assess),
+	CashFlowCommonData(465, "sfas97rd_ceded_sop031_coi_ben", "epl_liab_sfas97rd_ceded_sop031_coi_ben",  "sfas97rd_ceded_sop031_coi_ben",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_sop031_coi_ben, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_sop031_coi_ben),
+	CashFlowCommonData(466, "sfas97rd_ceded_sop031_pbr", "epl_liab_sfas97rd_ceded_sop031_pbr",  "sfas97rd_ceded_sop031_pbr",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_sop031_pbr, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_sop031_pbr),
+	CashFlowCommonData(467, "sfas97rd_ceded_sop031_pbr_fund_val", "epl_liab_sfas97rd_ceded_sop031_pbr_fund_val",  "sfas97rd_ceded_sop031_pbr_fund_val",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_sop031_pbr_fund_val, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_sop031_pbr_fund_val),
+	CashFlowCommonData(468, "sfas97rd_ceded_ulsg_ben", "epl_liab_sfas97rd_ceded_ulsg_ben",  "sfas97rd_ceded_ulsg_ben",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_ulsg_ben, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_ulsg_ben),
+	CashFlowCommonData(469, "sfas97rd_gross_acq_exp", "epl_liab_sfas97rd_gross_acq_exp",  "sfas97rd_gross_acq_exp",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_acq_exp, 'B','Y', '3', 'C', (size_t)&modelOffset->sfas97rd_gross_acq_exp),
+	CashFlowCommonData(470, "sfas97rd_gross_cap_gain_fund", "epl_liab_sfas97rd_gross_cap_gain_fund",  "sfas97rd_gross_cap_gain_fund",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_cap_gain_fund, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_cap_gain_fund),
+	CashFlowCommonData(471, "sfas97rd_gross_capzd_acq_exp", "epl_liab_sfas97rd_gross_capzd_acq_exp",  "sfas97rd_gross_capzd_acq_exp",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_capzd_acq_exp, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_capzd_acq_exp),
+	CashFlowCommonData(472, "sfas97rd_gross_capzd_comm_bom", "epl_liab_sfas97rd_gross_capzd_comm_bom",  "sfas97rd_gross_capzd_comm_bom",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_capzd_comm_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_capzd_comm_bom),
+	CashFlowCommonData(473, "sfas97rd_gross_capzd_comm_chargeback", "epl_liab_sfas97rd_gross_capzd_comm_chargeback",  "sfas97rd_gross_capzd_comm_chargeback",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_capzd_comm_chargeback, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_capzd_comm_chargeback),
+	CashFlowCommonData(474, "sfas97rd_gross_capzd_comm_eom", "epl_liab_sfas97rd_gross_capzd_comm_eom",  "sfas97rd_gross_capzd_comm_eom",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_capzd_comm_eom, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_capzd_comm_eom),
+	CashFlowCommonData(475, "sfas97rd_gross_capzd_prem_bonus", "epl_liab_sfas97rd_gross_capzd_prem_bonus",  "sfas97rd_gross_capzd_prem_bonus",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_capzd_prem_bonus, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_capzd_prem_bonus),
+	CashFlowCommonData(476, "sfas97rd_gross_capzd_reins_yrt_cost", "epl_liab_sfas97rd_gross_capzd_reins_yrt_cost",  "sfas97rd_gross_capzd_reins_yrt_cost",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_capzd_reins_yrt_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_capzd_reins_yrt_cost),
+	CashFlowCommonData(477, "sfas97rd_gross_cash_flow_bom", "epl_liab_sfas97rd_gross_cash_flow_bom",  "sfas97rd_gross_cash_flow_bom",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_cash_flow_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_cash_flow_bom),
+	CashFlowCommonData(478, "sfas97rd_gross_charges", "epl_liab_sfas97rd_gross_charges",  "sfas97rd_gross_charges",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_charges, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_charges),
+	CashFlowCommonData(479, "sfas97rd_gross_comm_chargeback", "epl_liab_sfas97rd_gross_comm_chargeback",  "sfas97rd_gross_comm_chargeback",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_comm_chargeback, 'E','Y', '3', 'C', (size_t)&modelOffset->sfas97rd_gross_comm_chargeback),
+	CashFlowCommonData(480, "sfas97rd_gross_comm_excess_bom", "epl_liab_sfas97rd_gross_comm_excess_bom",  "sfas97rd_gross_comm_excess_bom",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_comm_excess_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_comm_excess_bom),
+	CashFlowCommonData(481, "sfas97rd_gross_comm_trail_bom", "epl_liab_sfas97rd_gross_comm_trail_bom",  "sfas97rd_gross_comm_trail_bom",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_comm_trail_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_comm_trail_bom),
+	CashFlowCommonData(482, "sfas97rd_gross_credited_int", "epl_liab_sfas97rd_gross_credited_int",  "sfas97rd_gross_credited_int",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_credited_int, 'E','Y', '3', 'C', (size_t)&modelOffset->sfas97rd_gross_credited_int),
+	CashFlowCommonData(483, "sfas97rd_gross_deferred_loads", "epl_liab_sfas97rd_gross_deferred_loads",  "sfas97rd_gross_deferred_loads",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_deferred_loads, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_deferred_loads),
+	CashFlowCommonData(484, "sfas97rd_gross_dth_claim_cost", "epl_liab_sfas97rd_gross_dth_claim_cost",  "sfas97rd_gross_dth_claim_cost",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_dth_claim_cost, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_dth_claim_cost),
+	CashFlowCommonData(485, "sfas97rd_gross_egp_gain_inv", "epl_liab_sfas97rd_gross_egp_gain_inv",  "sfas97rd_gross_egp_gain_inv",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_egp_gain_inv, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_egp_gain_inv),
+	CashFlowCommonData(486, "sfas97rd_gross_egp_gain_mort", "epl_liab_sfas97rd_gross_egp_gain_mort",  "sfas97rd_gross_egp_gain_mort",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_egp_gain_mort, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_egp_gain_mort),
+	CashFlowCommonData(487, "sfas97rd_gross_egp_gain_surr", "epl_liab_sfas97rd_gross_egp_gain_surr",  "sfas97rd_gross_egp_gain_surr",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_egp_gain_surr, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_egp_gain_surr),
+	CashFlowCommonData(488, "sfas97rd_gross_embed_deriv_cash_flow", "epl_liab_sfas97rd_gross_embed_deriv_cash_flow",  "sfas97rd_gross_embed_deriv_cash_flow",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_embed_deriv_cash_flow, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_embed_deriv_cash_flow),
+	CashFlowCommonData(489, "sfas97rd_gross_fund_val_aft_int", "epl_liab_sfas97rd_gross_fund_val_aft_int",  "sfas97rd_gross_fund_val_aft_int",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_fund_val_aft_int, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_fund_val_aft_int),
+	CashFlowCommonData(490, "sfas97rd_gross_fund_val_bef_int", "epl_liab_sfas97rd_gross_fund_val_bef_int",  "sfas97rd_gross_fund_val_bef_int",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_fund_val_bef_int, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_fund_val_bef_int),
+	CashFlowCommonData(491, "sfas97rd_gross_fund_val_fixed", "epl_liab_sfas97rd_gross_fund_val_fixed",  "sfas97rd_gross_fund_val_fixed",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_fund_val_fixed, 'E','N', '3', 'C', (size_t)&modelOffset->sfas97rd_gross_fund_val_fixed),
+	CashFlowCommonData(492, "sfas97rd_gross_fund_val_sa", "epl_liab_sfas97rd_gross_fund_val_sa",  "sfas97rd_gross_fund_val_sa",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_fund_val_sa, 'E','N', '3', 'C', (size_t)&modelOffset->sfas97rd_gross_fund_val_sa),
+	CashFlowCommonData(493, "sfas97rd_gross_gmab_ben", "epl_liab_sfas97rd_gross_gmab_ben",  "sfas97rd_gross_gmab_ben",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_gmab_ben, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_gmab_ben),
+	CashFlowCommonData(494, "sfas97rd_gross_gmdb_ben", "epl_liab_sfas97rd_gross_gmdb_ben",  "sfas97rd_gross_gmdb_ben",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_gmdb_ben, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_gmdb_ben),
+	CashFlowCommonData(495, "sfas97rd_gross_gmib_ben", "epl_liab_sfas97rd_gross_gmib_ben",  "sfas97rd_gross_gmib_ben",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_gmib_ben, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_gmib_ben),
+	CashFlowCommonData(496, "sfas97rd_gross_gmwb_ben", "epl_liab_sfas97rd_gross_gmwb_ben",  "sfas97rd_gross_gmwb_ben",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_gmwb_ben, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_gmwb_ben),
+	CashFlowCommonData(497, "sfas97rd_gross_hedge_cash_flow", "epl_liab_sfas97rd_gross_hedge_cash_flow",  "sfas97rd_gross_hedge_cash_flow",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_hedge_cash_flow, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_hedge_cash_flow),
+	CashFlowCommonData(498, "sfas97rd_gross_hedge_mkt_val", "epl_liab_sfas97rd_gross_hedge_mkt_val",  "sfas97rd_gross_hedge_mkt_val",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_hedge_mkt_val, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_hedge_mkt_val),
+	CashFlowCommonData(499, "sfas97rd_gross_host_contract_cred_int", "epl_liab_sfas97rd_gross_host_contract_cred_int",  "sfas97rd_gross_host_contract_cred_int",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_host_contract_cred_int, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_host_contract_cred_int),
+	CashFlowCommonData(500, "sfas97rd_gross_host_contract_val", "epl_liab_sfas97rd_gross_host_contract_val",  "sfas97rd_gross_host_contract_val",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_host_contract_val, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_host_contract_val),
+	CashFlowCommonData(501, "sfas97rd_gross_host_contract_val_bef", "epl_liab_sfas97rd_gross_host_contract_val_bef",  "sfas97rd_gross_host_contract_val_bef",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_host_contract_val_bef, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_host_contract_val_bef),
+	CashFlowCommonData(502, "sfas97rd_gross_inv_inc_fund", "epl_liab_sfas97rd_gross_inv_inc_fund",  "sfas97rd_gross_inv_inc_fund",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_inv_inc_fund, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_inv_inc_fund),
+	CashFlowCommonData(503, "sfas97rd_gross_loads", "epl_liab_sfas97rd_gross_loads",  "sfas97rd_gross_loads",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_loads, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_loads),
+	CashFlowCommonData(504, "sfas97rd_gross_loc_cost", "epl_liab_sfas97rd_gross_loc_cost",  "sfas97rd_gross_loc_cost",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_loc_cost, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_loc_cost),
+	CashFlowCommonData(505, "sfas97rd_gross_maint_exp_bom", "epl_liab_sfas97rd_gross_maint_exp_bom",  "sfas97rd_gross_maint_exp_bom",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_maint_exp_bom, 'B','Y', '3', 'C', (size_t)&modelOffset->sfas97rd_gross_maint_exp_bom),
+	CashFlowCommonData(506, "sfas97rd_gross_maint_exp_eom", "epl_liab_sfas97rd_gross_maint_exp_eom",  "sfas97rd_gross_maint_exp_eom",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_maint_exp_eom, 'B','Y', '3', 'C', (size_t)&modelOffset->sfas97rd_gross_maint_exp_eom),
+	CashFlowCommonData(507, "sfas97rd_gross_mrb_gmab_liab", "epl_liab_sfas97rd_gross_mrb_gmab_liab",  "sfas97rd_gross_mrb_gmab_liab",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_mrb_gmab_liab, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_mrb_gmab_liab),
+	CashFlowCommonData(508, "sfas97rd_gross_mrb_gmdb_liab", "epl_liab_sfas97rd_gross_mrb_gmdb_liab",  "sfas97rd_gross_mrb_gmdb_liab",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_mrb_gmdb_liab, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_mrb_gmdb_liab),
+	CashFlowCommonData(509, "sfas97rd_gross_mrb_gmib_liab", "epl_liab_sfas97rd_gross_mrb_gmib_liab",  "sfas97rd_gross_mrb_gmib_liab",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_mrb_gmib_liab, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_mrb_gmib_liab),
+	CashFlowCommonData(510, "sfas97rd_gross_mrb_gmwb_liab", "epl_liab_sfas97rd_gross_mrb_gmwb_liab",  "sfas97rd_gross_mrb_gmwb_liab",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_mrb_gmwb_liab, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_mrb_gmwb_liab),
+	CashFlowCommonData(511, "sfas97rd_gross_persist_bon_ref", "epl_liab_sfas97rd_gross_persist_bon_ref",  "sfas97rd_gross_persist_bon_ref",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_persist_bon_ref, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_persist_bon_ref)
 };
 
 const CashFlowCommonData EPL_LIAB::mCFStaticData_512[] = 
 {
-	CashFlowCommonData(512, "sfas97rd_ceded_fund_val_sa", "epl_liab_sfas97rd_ceded_fund_val_sa",  "sfas97rd_ceded_fund_val_sa",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_fund_val_sa, 'E','N', '3', 'C', (size_t)&modelOffset->sfas97rd_ceded_fund_val_sa),
-	CashFlowCommonData(513, "sfas97rd_ceded_gmab_ben", "epl_liab_sfas97rd_ceded_gmab_ben",  "sfas97rd_ceded_gmab_ben",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_gmab_ben, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_gmab_ben),
-	CashFlowCommonData(514, "sfas97rd_ceded_gmdb_ben", "epl_liab_sfas97rd_ceded_gmdb_ben",  "sfas97rd_ceded_gmdb_ben",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_gmdb_ben, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_gmdb_ben),
-	CashFlowCommonData(515, "sfas97rd_ceded_gmib_ben", "epl_liab_sfas97rd_ceded_gmib_ben",  "sfas97rd_ceded_gmib_ben",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_gmib_ben, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_gmib_ben),
-	CashFlowCommonData(516, "sfas97rd_ceded_gmwb_ben", "epl_liab_sfas97rd_ceded_gmwb_ben",  "sfas97rd_ceded_gmwb_ben",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_gmwb_ben, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_gmwb_ben),
-	CashFlowCommonData(517, "sfas97rd_ceded_hedge_cash_flow", "epl_liab_sfas97rd_ceded_hedge_cash_flow",  "sfas97rd_ceded_hedge_cash_flow",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_hedge_cash_flow, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_hedge_cash_flow),
-	CashFlowCommonData(518, "sfas97rd_ceded_hedge_mkt_val", "epl_liab_sfas97rd_ceded_hedge_mkt_val",  "sfas97rd_ceded_hedge_mkt_val",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_hedge_mkt_val, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_hedge_mkt_val),
-	CashFlowCommonData(519, "sfas97rd_ceded_host_contract_cred_int", "epl_liab_sfas97rd_ceded_host_contract_cred_int",  "sfas97rd_ceded_host_contract_cred_int",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_host_contract_cred_int, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_host_contract_cred_int),
-	CashFlowCommonData(520, "sfas97rd_ceded_host_contract_val", "epl_liab_sfas97rd_ceded_host_contract_val",  "sfas97rd_ceded_host_contract_val",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_host_contract_val, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_host_contract_val),
-	CashFlowCommonData(521, "sfas97rd_ceded_host_contract_val_bef", "epl_liab_sfas97rd_ceded_host_contract_val_bef",  "sfas97rd_ceded_host_contract_val_bef",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_host_contract_val_bef, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_host_contract_val_bef),
-	CashFlowCommonData(522, "sfas97rd_ceded_inv_inc_fund", "epl_liab_sfas97rd_ceded_inv_inc_fund",  "sfas97rd_ceded_inv_inc_fund",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_inv_inc_fund, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_inv_inc_fund),
-	CashFlowCommonData(523, "sfas97rd_ceded_loads", "epl_liab_sfas97rd_ceded_loads",  "sfas97rd_ceded_loads",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_loads, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_loads),
-	CashFlowCommonData(524, "sfas97rd_ceded_loc_cost", "epl_liab_sfas97rd_ceded_loc_cost",  "sfas97rd_ceded_loc_cost",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_loc_cost, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_loc_cost),
-	CashFlowCommonData(525, "sfas97rd_ceded_maint_exp_bom", "epl_liab_sfas97rd_ceded_maint_exp_bom",  "sfas97rd_ceded_maint_exp_bom",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_maint_exp_bom, 'B','Y', '3', 'C', (size_t)&modelOffset->sfas97rd_ceded_maint_exp_bom),
-	CashFlowCommonData(526, "sfas97rd_ceded_maint_exp_eom", "epl_liab_sfas97rd_ceded_maint_exp_eom",  "sfas97rd_ceded_maint_exp_eom",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_maint_exp_eom, 'B','Y', '3', 'C', (size_t)&modelOffset->sfas97rd_ceded_maint_exp_eom),
-	CashFlowCommonData(527, "sfas97rd_ceded_modco_liab", "epl_liab_sfas97rd_ceded_modco_liab",  "sfas97rd_ceded_modco_liab",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_modco_liab, 'E','N', '3', 'C', (size_t)&modelOffset->sfas97rd_ceded_modco_liab),
-	CashFlowCommonData(528, "sfas97rd_ceded_modco_res_adj", "epl_liab_sfas97rd_ceded_modco_res_adj",  "sfas97rd_ceded_modco_res_adj",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_modco_res_adj, 'E','Y', '3', 'C', (size_t)&modelOffset->sfas97rd_ceded_modco_res_adj),
-	CashFlowCommonData(529, "sfas97rd_ceded_persist_bon_ref", "epl_liab_sfas97rd_ceded_persist_bon_ref",  "sfas97rd_ceded_persist_bon_ref",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_persist_bon_ref, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_persist_bon_ref),
-	CashFlowCommonData(530, "sfas97rd_ceded_policies_b", "epl_liab_sfas97rd_ceded_policies_b",  "sfas97rd_ceded_policies_b",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_policies_b, 'B','N', '3', 'C', (size_t)&modelOffset->sfas97rd_ceded_policies_b),
-	CashFlowCommonData(531, "sfas97rd_ceded_prem_bonus", "epl_liab_sfas97rd_ceded_prem_bonus",  "sfas97rd_ceded_prem_bonus",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_prem_bonus, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_prem_bonus),
-	CashFlowCommonData(532, "sfas97rd_ceded_prem_tax", "epl_liab_sfas97rd_ceded_prem_tax",  "sfas97rd_ceded_prem_tax",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_prem_tax, 'B','Y', '3', 'C', (size_t)&modelOffset->sfas97rd_ceded_prem_tax),
-	CashFlowCommonData(533, "sfas97rd_ceded_refund", "epl_liab_sfas97rd_ceded_refund",  "sfas97rd_ceded_refund",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_refund, 'E','Y', '3', 'C', (size_t)&modelOffset->sfas97rd_ceded_refund),
-	CashFlowCommonData(534, "sfas97rd_ceded_rider_charges", "epl_liab_sfas97rd_ceded_rider_charges",  "sfas97rd_ceded_rider_charges",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_rider_charges, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_rider_charges),
-	CashFlowCommonData(535, "sfas97rd_ceded_sfas133_gmab_liab", "epl_liab_sfas97rd_ceded_sfas133_gmab_liab",  "sfas97rd_ceded_sfas133_gmab_liab",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_sfas133_gmab_liab, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_sfas133_gmab_liab),
-	CashFlowCommonData(536, "sfas97rd_ceded_sfas133_gmib_liab", "epl_liab_sfas97rd_ceded_sfas133_gmib_liab",  "sfas97rd_ceded_sfas133_gmib_liab",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_sfas133_gmib_liab, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_sfas133_gmib_liab),
-	CashFlowCommonData(537, "sfas97rd_ceded_sfas133_gmwb_liab", "epl_liab_sfas97rd_ceded_sfas133_gmwb_liab",  "sfas97rd_ceded_sfas133_gmwb_liab",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_sfas133_gmwb_liab, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_sfas133_gmwb_liab),
-	CashFlowCommonData(538, "sfas97rd_ceded_sop031_assess", "epl_liab_sfas97rd_ceded_sop031_assess",  "sfas97rd_ceded_sop031_assess",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_sop031_assess, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_sop031_assess),
-	CashFlowCommonData(539, "sfas97rd_ceded_sop031_coi_assess", "epl_liab_sfas97rd_ceded_sop031_coi_assess",  "sfas97rd_ceded_sop031_coi_assess",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_sop031_coi_assess, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_sop031_coi_assess),
-	CashFlowCommonData(540, "sfas97rd_ceded_sop031_coi_ben", "epl_liab_sfas97rd_ceded_sop031_coi_ben",  "sfas97rd_ceded_sop031_coi_ben",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_sop031_coi_ben, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_sop031_coi_ben),
-	CashFlowCommonData(541, "sfas97rd_ceded_sop031_pbr", "epl_liab_sfas97rd_ceded_sop031_pbr",  "sfas97rd_ceded_sop031_pbr",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_sop031_pbr, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_sop031_pbr),
-	CashFlowCommonData(542, "sfas97rd_ceded_sop031_pbr_fund_val", "epl_liab_sfas97rd_ceded_sop031_pbr_fund_val",  "sfas97rd_ceded_sop031_pbr_fund_val",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_sop031_pbr_fund_val, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_sop031_pbr_fund_val),
-	CashFlowCommonData(543, "sfas97rd_ceded_ulsg_ben", "epl_liab_sfas97rd_ceded_ulsg_ben",  "sfas97rd_ceded_ulsg_ben",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_ceded_ulsg_ben, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_ceded_ulsg_ben),
-	CashFlowCommonData(544, "sfas97rd_gross_acq_exp", "epl_liab_sfas97rd_gross_acq_exp",  "sfas97rd_gross_acq_exp",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_acq_exp, 'B','Y', '3', 'C', (size_t)&modelOffset->sfas97rd_gross_acq_exp),
-	CashFlowCommonData(545, "sfas97rd_gross_cap_gain_fund", "epl_liab_sfas97rd_gross_cap_gain_fund",  "sfas97rd_gross_cap_gain_fund",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_cap_gain_fund, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_cap_gain_fund),
-	CashFlowCommonData(546, "sfas97rd_gross_capzd_acq_exp", "epl_liab_sfas97rd_gross_capzd_acq_exp",  "sfas97rd_gross_capzd_acq_exp",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_capzd_acq_exp, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_capzd_acq_exp),
-	CashFlowCommonData(547, "sfas97rd_gross_capzd_comm_bom", "epl_liab_sfas97rd_gross_capzd_comm_bom",  "sfas97rd_gross_capzd_comm_bom",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_capzd_comm_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_capzd_comm_bom),
-	CashFlowCommonData(548, "sfas97rd_gross_capzd_comm_chargeback", "epl_liab_sfas97rd_gross_capzd_comm_chargeback",  "sfas97rd_gross_capzd_comm_chargeback",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_capzd_comm_chargeback, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_capzd_comm_chargeback),
-	CashFlowCommonData(549, "sfas97rd_gross_capzd_comm_eom", "epl_liab_sfas97rd_gross_capzd_comm_eom",  "sfas97rd_gross_capzd_comm_eom",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_capzd_comm_eom, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_capzd_comm_eom),
-	CashFlowCommonData(550, "sfas97rd_gross_capzd_prem_bonus", "epl_liab_sfas97rd_gross_capzd_prem_bonus",  "sfas97rd_gross_capzd_prem_bonus",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_capzd_prem_bonus, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_capzd_prem_bonus),
-	CashFlowCommonData(551, "sfas97rd_gross_capzd_reins_yrt_cost", "epl_liab_sfas97rd_gross_capzd_reins_yrt_cost",  "sfas97rd_gross_capzd_reins_yrt_cost",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_capzd_reins_yrt_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_capzd_reins_yrt_cost),
-	CashFlowCommonData(552, "sfas97rd_gross_cash_flow_bom", "epl_liab_sfas97rd_gross_cash_flow_bom",  "sfas97rd_gross_cash_flow_bom",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_cash_flow_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_cash_flow_bom),
-	CashFlowCommonData(553, "sfas97rd_gross_charges", "epl_liab_sfas97rd_gross_charges",  "sfas97rd_gross_charges",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_charges, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_charges),
-	CashFlowCommonData(554, "sfas97rd_gross_comm_chargeback", "epl_liab_sfas97rd_gross_comm_chargeback",  "sfas97rd_gross_comm_chargeback",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_comm_chargeback, 'E','Y', '3', 'C', (size_t)&modelOffset->sfas97rd_gross_comm_chargeback),
-	CashFlowCommonData(555, "sfas97rd_gross_comm_excess_bom", "epl_liab_sfas97rd_gross_comm_excess_bom",  "sfas97rd_gross_comm_excess_bom",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_comm_excess_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_comm_excess_bom),
-	CashFlowCommonData(556, "sfas97rd_gross_comm_trail_bom", "epl_liab_sfas97rd_gross_comm_trail_bom",  "sfas97rd_gross_comm_trail_bom",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_comm_trail_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_comm_trail_bom),
-	CashFlowCommonData(557, "sfas97rd_gross_credited_int", "epl_liab_sfas97rd_gross_credited_int",  "sfas97rd_gross_credited_int",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_credited_int, 'E','Y', '3', 'C', (size_t)&modelOffset->sfas97rd_gross_credited_int),
-	CashFlowCommonData(558, "sfas97rd_gross_deferred_loads", "epl_liab_sfas97rd_gross_deferred_loads",  "sfas97rd_gross_deferred_loads",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_deferred_loads, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_deferred_loads),
-	CashFlowCommonData(559, "sfas97rd_gross_dth_claim_cost", "epl_liab_sfas97rd_gross_dth_claim_cost",  "sfas97rd_gross_dth_claim_cost",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_dth_claim_cost, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_dth_claim_cost),
-	CashFlowCommonData(560, "sfas97rd_gross_egp_gain_inv", "epl_liab_sfas97rd_gross_egp_gain_inv",  "sfas97rd_gross_egp_gain_inv",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_egp_gain_inv, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_egp_gain_inv),
-	CashFlowCommonData(561, "sfas97rd_gross_egp_gain_mort", "epl_liab_sfas97rd_gross_egp_gain_mort",  "sfas97rd_gross_egp_gain_mort",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_egp_gain_mort, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_egp_gain_mort),
-	CashFlowCommonData(562, "sfas97rd_gross_egp_gain_surr", "epl_liab_sfas97rd_gross_egp_gain_surr",  "sfas97rd_gross_egp_gain_surr",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_egp_gain_surr, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_egp_gain_surr),
-	CashFlowCommonData(563, "sfas97rd_gross_embed_deriv_cash_flow", "epl_liab_sfas97rd_gross_embed_deriv_cash_flow",  "sfas97rd_gross_embed_deriv_cash_flow",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_embed_deriv_cash_flow, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_embed_deriv_cash_flow),
-	CashFlowCommonData(564, "sfas97rd_gross_fund_val_aft_int", "epl_liab_sfas97rd_gross_fund_val_aft_int",  "sfas97rd_gross_fund_val_aft_int",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_fund_val_aft_int, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_fund_val_aft_int),
-	CashFlowCommonData(565, "sfas97rd_gross_fund_val_bef_int", "epl_liab_sfas97rd_gross_fund_val_bef_int",  "sfas97rd_gross_fund_val_bef_int",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_fund_val_bef_int, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_fund_val_bef_int),
-	CashFlowCommonData(566, "sfas97rd_gross_fund_val_fixed", "epl_liab_sfas97rd_gross_fund_val_fixed",  "sfas97rd_gross_fund_val_fixed",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_fund_val_fixed, 'E','N', '3', 'C', (size_t)&modelOffset->sfas97rd_gross_fund_val_fixed),
-	CashFlowCommonData(567, "sfas97rd_gross_fund_val_sa", "epl_liab_sfas97rd_gross_fund_val_sa",  "sfas97rd_gross_fund_val_sa",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_fund_val_sa, 'E','N', '3', 'C', (size_t)&modelOffset->sfas97rd_gross_fund_val_sa),
-	CashFlowCommonData(568, "sfas97rd_gross_gmab_ben", "epl_liab_sfas97rd_gross_gmab_ben",  "sfas97rd_gross_gmab_ben",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_gmab_ben, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_gmab_ben),
-	CashFlowCommonData(569, "sfas97rd_gross_gmdb_ben", "epl_liab_sfas97rd_gross_gmdb_ben",  "sfas97rd_gross_gmdb_ben",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_gmdb_ben, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_gmdb_ben),
-	CashFlowCommonData(570, "sfas97rd_gross_gmib_ben", "epl_liab_sfas97rd_gross_gmib_ben",  "sfas97rd_gross_gmib_ben",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_gmib_ben, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_gmib_ben),
-	CashFlowCommonData(571, "sfas97rd_gross_gmwb_ben", "epl_liab_sfas97rd_gross_gmwb_ben",  "sfas97rd_gross_gmwb_ben",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_gmwb_ben, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_gmwb_ben),
-	CashFlowCommonData(572, "sfas97rd_gross_hedge_cash_flow", "epl_liab_sfas97rd_gross_hedge_cash_flow",  "sfas97rd_gross_hedge_cash_flow",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_hedge_cash_flow, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_hedge_cash_flow),
-	CashFlowCommonData(573, "sfas97rd_gross_hedge_mkt_val", "epl_liab_sfas97rd_gross_hedge_mkt_val",  "sfas97rd_gross_hedge_mkt_val",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_hedge_mkt_val, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_hedge_mkt_val),
-	CashFlowCommonData(574, "sfas97rd_gross_host_contract_cred_int", "epl_liab_sfas97rd_gross_host_contract_cred_int",  "sfas97rd_gross_host_contract_cred_int",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_host_contract_cred_int, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_host_contract_cred_int),
-	CashFlowCommonData(575, "sfas97rd_gross_host_contract_val", "epl_liab_sfas97rd_gross_host_contract_val",  "sfas97rd_gross_host_contract_val",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_host_contract_val, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_host_contract_val),
-	CashFlowCommonData(576, "sfas97rd_gross_host_contract_val_bef", "epl_liab_sfas97rd_gross_host_contract_val_bef",  "sfas97rd_gross_host_contract_val_bef",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_host_contract_val_bef, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_host_contract_val_bef),
-	CashFlowCommonData(577, "sfas97rd_gross_inv_inc_fund", "epl_liab_sfas97rd_gross_inv_inc_fund",  "sfas97rd_gross_inv_inc_fund",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_inv_inc_fund, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_inv_inc_fund),
-	CashFlowCommonData(578, "sfas97rd_gross_loads", "epl_liab_sfas97rd_gross_loads",  "sfas97rd_gross_loads",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_loads, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_loads),
-	CashFlowCommonData(579, "sfas97rd_gross_loc_cost", "epl_liab_sfas97rd_gross_loc_cost",  "sfas97rd_gross_loc_cost",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_loc_cost, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_loc_cost),
-	CashFlowCommonData(580, "sfas97rd_gross_maint_exp_bom", "epl_liab_sfas97rd_gross_maint_exp_bom",  "sfas97rd_gross_maint_exp_bom",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_maint_exp_bom, 'B','Y', '3', 'C', (size_t)&modelOffset->sfas97rd_gross_maint_exp_bom),
-	CashFlowCommonData(581, "sfas97rd_gross_maint_exp_eom", "epl_liab_sfas97rd_gross_maint_exp_eom",  "sfas97rd_gross_maint_exp_eom",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_maint_exp_eom, 'B','Y', '3', 'C', (size_t)&modelOffset->sfas97rd_gross_maint_exp_eom),
-	CashFlowCommonData(582, "sfas97rd_gross_persist_bon_ref", "epl_liab_sfas97rd_gross_persist_bon_ref",  "sfas97rd_gross_persist_bon_ref",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_persist_bon_ref, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_persist_bon_ref),
-	CashFlowCommonData(583, "sfas97rd_gross_pol_loan", "epl_liab_sfas97rd_gross_pol_loan",  "sfas97rd_gross_pol_loan",  CashFlowCommonData::SUM,
+	CashFlowCommonData(512, "sfas97rd_gross_pol_loan", "epl_liab_sfas97rd_gross_pol_loan",  "sfas97rd_gross_pol_loan",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_pol_loan, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_pol_loan),
-	CashFlowCommonData(584, "sfas97rd_gross_pol_loan_inc", "epl_liab_sfas97rd_gross_pol_loan_inc",  "sfas97rd_gross_pol_loan_inc",  CashFlowCommonData::SUM,
+	CashFlowCommonData(513, "sfas97rd_gross_pol_loan_inc", "epl_liab_sfas97rd_gross_pol_loan_inc",  "sfas97rd_gross_pol_loan_inc",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_pol_loan_inc, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_pol_loan_inc),
-	CashFlowCommonData(585, "sfas97rd_gross_policies_b", "epl_liab_sfas97rd_gross_policies_b",  "sfas97rd_gross_policies_b",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_policies_b, 'B','N', '3', 'C', (size_t)&modelOffset->sfas97rd_gross_policies_b),
-	CashFlowCommonData(586, "sfas97rd_gross_prem_bonus", "epl_liab_sfas97rd_gross_prem_bonus",  "sfas97rd_gross_prem_bonus",  CashFlowCommonData::SUM,
+	CashFlowCommonData(514, "sfas97rd_gross_policies_inf", "epl_liab_sfas97rd_gross_policies_inf",  "sfas97rd_gross_policies_inf",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_policies_inf, 'B','N', '3', 'C', (size_t)&modelOffset->sfas97rd_gross_policies_inf),
+	CashFlowCommonData(515, "sfas97rd_gross_prem_bonus", "epl_liab_sfas97rd_gross_prem_bonus",  "sfas97rd_gross_prem_bonus",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_prem_bonus, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_prem_bonus),
-	CashFlowCommonData(587, "sfas97rd_gross_prem_tax", "epl_liab_sfas97rd_gross_prem_tax",  "sfas97rd_gross_prem_tax",  CashFlowCommonData::SUM,
+	CashFlowCommonData(516, "sfas97rd_gross_prem_tax", "epl_liab_sfas97rd_gross_prem_tax",  "sfas97rd_gross_prem_tax",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_prem_tax, 'B','Y', '3', 'C', (size_t)&modelOffset->sfas97rd_gross_prem_tax),
-	CashFlowCommonData(588, "sfas97rd_gross_reins_yrt_cost", "epl_liab_sfas97rd_gross_reins_yrt_cost",  "sfas97rd_gross_reins_yrt_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(517, "sfas97rd_gross_reins_yrt_cost", "epl_liab_sfas97rd_gross_reins_yrt_cost",  "sfas97rd_gross_reins_yrt_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_reins_yrt_cost, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_reins_yrt_cost),
-	CashFlowCommonData(589, "sfas97rd_gross_rider_charges", "epl_liab_sfas97rd_gross_rider_charges",  "sfas97rd_gross_rider_charges",  CashFlowCommonData::SUM,
+	CashFlowCommonData(518, "sfas97rd_gross_rider_charges", "epl_liab_sfas97rd_gross_rider_charges",  "sfas97rd_gross_rider_charges",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_rider_charges, 'B','Y', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_rider_charges),
-	CashFlowCommonData(590, "sfas97rd_gross_sfas133_gmab_liab", "epl_liab_sfas97rd_gross_sfas133_gmab_liab",  "sfas97rd_gross_sfas133_gmab_liab",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_sfas133_gmab_liab, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_sfas133_gmab_liab),
-	CashFlowCommonData(591, "sfas97rd_gross_sfas133_gmib_liab", "epl_liab_sfas97rd_gross_sfas133_gmib_liab",  "sfas97rd_gross_sfas133_gmib_liab",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_sfas133_gmib_liab, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_sfas133_gmib_liab),
-	CashFlowCommonData(592, "sfas97rd_gross_sfas133_gmwb_liab", "epl_liab_sfas97rd_gross_sfas133_gmwb_liab",  "sfas97rd_gross_sfas133_gmwb_liab",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_sfas133_gmwb_liab, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_sfas133_gmwb_liab),
-	CashFlowCommonData(593, "sfas97rd_gross_sop031_assess", "epl_liab_sfas97rd_gross_sop031_assess",  "sfas97rd_gross_sop031_assess",  CashFlowCommonData::SUM,
+	CashFlowCommonData(519, "sfas97rd_gross_sop031_assess", "epl_liab_sfas97rd_gross_sop031_assess",  "sfas97rd_gross_sop031_assess",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_sop031_assess, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_sop031_assess),
-	CashFlowCommonData(594, "sfas97rd_gross_sop031_coi_assess", "epl_liab_sfas97rd_gross_sop031_coi_assess",  "sfas97rd_gross_sop031_coi_assess",  CashFlowCommonData::SUM,
+	CashFlowCommonData(520, "sfas97rd_gross_sop031_coi_assess", "epl_liab_sfas97rd_gross_sop031_coi_assess",  "sfas97rd_gross_sop031_coi_assess",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_sop031_coi_assess, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_sop031_coi_assess),
-	CashFlowCommonData(595, "sfas97rd_gross_sop031_coi_ben", "epl_liab_sfas97rd_gross_sop031_coi_ben",  "sfas97rd_gross_sop031_coi_ben",  CashFlowCommonData::SUM,
+	CashFlowCommonData(521, "sfas97rd_gross_sop031_coi_ben", "epl_liab_sfas97rd_gross_sop031_coi_ben",  "sfas97rd_gross_sop031_coi_ben",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_sop031_coi_ben, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_sop031_coi_ben),
-	CashFlowCommonData(596, "sfas97rd_gross_sop031_pbr", "epl_liab_sfas97rd_gross_sop031_pbr",  "sfas97rd_gross_sop031_pbr",  CashFlowCommonData::SUM,
+	CashFlowCommonData(522, "sfas97rd_gross_sop031_pbr", "epl_liab_sfas97rd_gross_sop031_pbr",  "sfas97rd_gross_sop031_pbr",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_sop031_pbr, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_sop031_pbr),
-	CashFlowCommonData(597, "sfas97rd_gross_sop031_pbr_fund_val", "epl_liab_sfas97rd_gross_sop031_pbr_fund_val",  "sfas97rd_gross_sop031_pbr_fund_val",  CashFlowCommonData::SUM,
+	CashFlowCommonData(523, "sfas97rd_gross_sop031_pbr_fund_val", "epl_liab_sfas97rd_gross_sop031_pbr_fund_val",  "sfas97rd_gross_sop031_pbr_fund_val",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_sop031_pbr_fund_val, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_sop031_pbr_fund_val),
-	CashFlowCommonData(598, "sfas97rd_gross_stat_res_rider", "epl_liab_sfas97rd_gross_stat_res_rider",  "sfas97rd_gross_stat_res_rider",  CashFlowCommonData::SUM,
+	CashFlowCommonData(524, "sfas97rd_gross_stat_res_rider", "epl_liab_sfas97rd_gross_stat_res_rider",  "sfas97rd_gross_stat_res_rider",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_stat_res_rider, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_stat_res_rider),
-	CashFlowCommonData(599, "sfas97rd_gross_ulsg_ben", "epl_liab_sfas97rd_gross_ulsg_ben",  "sfas97rd_gross_ulsg_ben",  CashFlowCommonData::SUM,
+	CashFlowCommonData(525, "sfas97rd_gross_ulsg_ben", "epl_liab_sfas97rd_gross_ulsg_ben",  "sfas97rd_gross_ulsg_ben",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_sfas97rd_gross_ulsg_ben, 'E','N', '3', 'P', (size_t)&modelOffset->sfas97rd_gross_ulsg_ben),
-	CashFlowCommonData(600, "startup", "epl_liab_startup",  "startup",  CashFlowCommonData::SUM,
+	CashFlowCommonData(526, "startup", "epl_liab_startup",  "startup",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::virtual_startup, 'E','N', '3', 'N', (size_t)&modelOffset->startup),
-	CashFlowCommonData(601, "stat_claim_exp_res", "epl_liab_stat_claim_exp_res",  "stat_claim_exp_res",  CashFlowCommonData::SUM,
+	CashFlowCommonData(527, "stat_claim_exp_res", "epl_liab_stat_claim_exp_res",  "stat_claim_exp_res",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_stat_claim_exp_res, 'E','N', '3', 'C', (size_t)&modelOffset->stat_claim_exp_res),
-	CashFlowCommonData(602, "stat_claim_res", "epl_liab_stat_claim_res",  "stat_claim_res",  CashFlowCommonData::SUM,
+	CashFlowCommonData(528, "stat_claim_res", "epl_liab_stat_claim_res",  "stat_claim_res",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_stat_claim_res, 'E','N', '3', 'C', (size_t)&modelOffset->stat_claim_res),
-	CashFlowCommonData(603, "stat_loading", "epl_liab_stat_loading",  "stat_loading",  CashFlowCommonData::SUM,
+	CashFlowCommonData(529, "stat_loading", "epl_liab_stat_loading",  "stat_loading",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_stat_loading, 'E','N', '3', 'C', (size_t)&modelOffset->stat_loading),
-	CashFlowCommonData(604, "stat_prem_waiver_exp_res", "epl_liab_stat_prem_waiver_exp_res",  "stat_prem_waiver_exp_res",  CashFlowCommonData::SUM,
+	CashFlowCommonData(530, "stat_prem_waiver_exp_res", "epl_liab_stat_prem_waiver_exp_res",  "stat_prem_waiver_exp_res",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_stat_prem_waiver_exp_res, 'E','N', '3', 'C', (size_t)&modelOffset->stat_prem_waiver_exp_res),
-	CashFlowCommonData(605, "stat_prem_waiver_res", "epl_liab_stat_prem_waiver_res",  "stat_prem_waiver_res",  CashFlowCommonData::SUM,
+	CashFlowCommonData(531, "stat_prem_waiver_res", "epl_liab_stat_prem_waiver_res",  "stat_prem_waiver_res",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_stat_prem_waiver_res, 'E','N', '3', 'C', (size_t)&modelOffset->stat_prem_waiver_res),
-	CashFlowCommonData(606, "stat_res_mp", "epl_liab_stat_res_mp",  "stat_res_mp",  CashFlowCommonData::SUM,
+	CashFlowCommonData(532, "stat_res_mp", "epl_liab_stat_res_mp",  "stat_res_mp",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_stat_res_mp, 'E','N', '3', 'C', (size_t)&modelOffset->stat_res_mp),
-	CashFlowCommonData(607, "stat_res_mp_unhedged", "epl_liab_stat_res_mp_unhedged",  "stat_res_mp_unhedged",  CashFlowCommonData::SUM,
+	CashFlowCommonData(533, "stat_res_mp_unhedged", "epl_liab_stat_res_mp_unhedged",  "stat_res_mp_unhedged",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_stat_res_mp_unhedged, 'E','N', '3', 'C', (size_t)&modelOffset->stat_res_mp_unhedged),
-	CashFlowCommonData(608, "stat_res_net_mp", "epl_liab_stat_res_net_mp",  "stat_res_net_mp",  CashFlowCommonData::SUM,
+	CashFlowCommonData(534, "stat_res_net_mp", "epl_liab_stat_res_net_mp",  "stat_res_net_mp",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_stat_res_net_mp, 'E','N', '3', 'C', (size_t)&modelOffset->stat_res_net_mp),
-	CashFlowCommonData(609, "stat_res_net_mp_unhedged", "epl_liab_stat_res_net_mp_unhedged",  "stat_res_net_mp_unhedged",  CashFlowCommonData::SUM,
+	CashFlowCommonData(535, "stat_res_net_mp_unhedged", "epl_liab_stat_res_net_mp_unhedged",  "stat_res_net_mp_unhedged",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_stat_res_net_mp_unhedged, 'E','N', '3', 'C', (size_t)&modelOffset->stat_res_net_mp_unhedged),
-	CashFlowCommonData(610, "stat_res_net_npr", "epl_liab_stat_res_net_npr",  "stat_res_net_npr",  CashFlowCommonData::SUM,
+	CashFlowCommonData(536, "stat_res_net_npr", "epl_liab_stat_res_net_npr",  "stat_res_net_npr",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_stat_res_net_npr, 'E','N', '3', 'C', (size_t)&modelOffset->stat_res_net_npr),
-	CashFlowCommonData(611, "stat_res_net_npr_unhedged", "epl_liab_stat_res_net_npr_unhedged",  "stat_res_net_npr_unhedged",  CashFlowCommonData::SUM,
+	CashFlowCommonData(537, "stat_res_net_npr_unhedged", "epl_liab_stat_res_net_npr_unhedged",  "stat_res_net_npr_unhedged",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_stat_res_net_npr_unhedged, 'E','N', '3', 'C', (size_t)&modelOffset->stat_res_net_npr_unhedged),
-	CashFlowCommonData(612, "stat_res_net_sa", "epl_liab_stat_res_net_sa",  "stat_res_net_sa",  CashFlowCommonData::SUM,
+	CashFlowCommonData(538, "stat_res_net_sa", "epl_liab_stat_res_net_sa",  "stat_res_net_sa",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_stat_res_net_sa, 'E','N', '3', 'C', (size_t)&modelOffset->stat_res_net_sa),
-	CashFlowCommonData(613, "stat_res_npr", "epl_liab_stat_res_npr",  "stat_res_npr",  CashFlowCommonData::SUM,
+	CashFlowCommonData(539, "stat_res_npr", "epl_liab_stat_res_npr",  "stat_res_npr",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_stat_res_npr, 'E','N', '3', 'C', (size_t)&modelOffset->stat_res_npr),
-	CashFlowCommonData(614, "stat_res_npr_unhedged", "epl_liab_stat_res_npr_unhedged",  "stat_res_npr_unhedged",  CashFlowCommonData::SUM,
+	CashFlowCommonData(540, "stat_res_npr_unhedged", "epl_liab_stat_res_npr_unhedged",  "stat_res_npr_unhedged",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_stat_res_npr_unhedged, 'E','N', '3', 'C', (size_t)&modelOffset->stat_res_npr_unhedged),
-	CashFlowCommonData(615, "stat_res_sa", "epl_liab_stat_res_sa",  "stat_res_sa",  CashFlowCommonData::SUM,
+	CashFlowCommonData(541, "stat_res_sa", "epl_liab_stat_res_sa",  "stat_res_sa",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_stat_res_sa, 'E','N', '3', 'C', (size_t)&modelOffset->stat_res_sa),
-	CashFlowCommonData(616, "stat_res_sa_exp_allow", "epl_liab_stat_res_sa_exp_allow",  "stat_res_sa_exp_allow",  CashFlowCommonData::SUM,
+	CashFlowCommonData(542, "stat_res_sa_exp_allow", "epl_liab_stat_res_sa_exp_allow",  "stat_res_sa_exp_allow",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_stat_res_sa_exp_allow, 'E','N', '3', 'C', (size_t)&modelOffset->stat_res_sa_exp_allow),
-	CashFlowCommonData(617, "stat_unearn_prem_res", "epl_liab_stat_unearn_prem_res",  "stat_unearn_prem_res",  CashFlowCommonData::SUM,
+	CashFlowCommonData(543, "stat_unearn_prem_res", "epl_liab_stat_unearn_prem_res",  "stat_unearn_prem_res",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_stat_unearn_prem_res, 'E','N', '3', 'C', (size_t)&modelOffset->stat_unearn_prem_res),
-	CashFlowCommonData(618, "stat_unearn_prem_res_net", "epl_liab_stat_unearn_prem_res_net",  "stat_unearn_prem_res_net",  CashFlowCommonData::SUM,
+	CashFlowCommonData(544, "stat_unearn_prem_res_net", "epl_liab_stat_unearn_prem_res_net",  "stat_unearn_prem_res_net",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_stat_unearn_prem_res_net, 'E','N', '3', 'C', (size_t)&modelOffset->stat_unearn_prem_res_net),
-	CashFlowCommonData(619, "stat_unearn_prem_res_npr", "epl_liab_stat_unearn_prem_res_npr",  "stat_unearn_prem_res_npr",  CashFlowCommonData::SUM,
+	CashFlowCommonData(545, "stat_unearn_prem_res_npr", "epl_liab_stat_unearn_prem_res_npr",  "stat_unearn_prem_res_npr",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_stat_unearn_prem_res_npr, 'E','N', '3', 'C', (size_t)&modelOffset->stat_unearn_prem_res_npr),
-	CashFlowCommonData(620, "stat_unearn_prem_res_npr_net", "epl_liab_stat_unearn_prem_res_npr_net",  "stat_unearn_prem_res_npr_net",  CashFlowCommonData::SUM,
+	CashFlowCommonData(546, "stat_unearn_prem_res_npr_net", "epl_liab_stat_unearn_prem_res_npr_net",  "stat_unearn_prem_res_npr_net",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_stat_unearn_prem_res_npr_net, 'E','N', '3', 'C', (size_t)&modelOffset->stat_unearn_prem_res_npr_net),
-	CashFlowCommonData(621, "surr_benefits", "epl_liab_surr_benefits",  "surr_benefits",  CashFlowCommonData::SUM,
+	CashFlowCommonData(547, "surr_benefits", "epl_liab_surr_benefits",  "surr_benefits",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_surr_benefits, 'E','Y', '3', 'C', (size_t)&modelOffset->surr_benefits),
-	CashFlowCommonData(622, "tax_capzd_prem", "epl_liab_tax_capzd_prem",  "tax_capzd_prem",  CashFlowCommonData::SUM,
+	CashFlowCommonData(548, "tax_capzd_prem", "epl_liab_tax_capzd_prem",  "tax_capzd_prem",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_tax_capzd_prem, 'E','Y', '3', 'C', (size_t)&modelOffset->tax_capzd_prem),
-	CashFlowCommonData(623, "tax_claim_exp_res", "epl_liab_tax_claim_exp_res",  "tax_claim_exp_res",  CashFlowCommonData::SUM,
+	CashFlowCommonData(549, "tax_claim_exp_res", "epl_liab_tax_claim_exp_res",  "tax_claim_exp_res",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_tax_claim_exp_res, 'E','N', '3', 'C', (size_t)&modelOffset->tax_claim_exp_res),
-	CashFlowCommonData(624, "tax_claim_res", "epl_liab_tax_claim_res",  "tax_claim_res",  CashFlowCommonData::SUM,
+	CashFlowCommonData(550, "tax_claim_res", "epl_liab_tax_claim_res",  "tax_claim_res",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_tax_claim_res, 'E','N', '3', 'C', (size_t)&modelOffset->tax_claim_res),
-	CashFlowCommonData(625, "tax_deferred_net_prem", "epl_liab_tax_deferred_net_prem",  "tax_deferred_net_prem",  CashFlowCommonData::SUM,
+	CashFlowCommonData(551, "tax_deferred_net_prem", "epl_liab_tax_deferred_net_prem",  "tax_deferred_net_prem",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_tax_deferred_net_prem, 'E','N', '3', 'C', (size_t)&modelOffset->tax_deferred_net_prem),
-	CashFlowCommonData(626, "tax_loading", "epl_liab_tax_loading",  "tax_loading",  CashFlowCommonData::SUM,
+	CashFlowCommonData(552, "tax_loading", "epl_liab_tax_loading",  "tax_loading",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_tax_loading, 'E','N', '3', 'C', (size_t)&modelOffset->tax_loading),
-	CashFlowCommonData(627, "tax_prem_waiver_exp_res", "epl_liab_tax_prem_waiver_exp_res",  "tax_prem_waiver_exp_res",  CashFlowCommonData::SUM,
+	CashFlowCommonData(553, "tax_prem_waiver_exp_res", "epl_liab_tax_prem_waiver_exp_res",  "tax_prem_waiver_exp_res",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_tax_prem_waiver_exp_res, 'E','N', '3', 'C', (size_t)&modelOffset->tax_prem_waiver_exp_res),
-	CashFlowCommonData(628, "tax_prem_waiver_res", "epl_liab_tax_prem_waiver_res",  "tax_prem_waiver_res",  CashFlowCommonData::SUM,
+	CashFlowCommonData(554, "tax_prem_waiver_res", "epl_liab_tax_prem_waiver_res",  "tax_prem_waiver_res",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_tax_prem_waiver_res, 'E','N', '3', 'C', (size_t)&modelOffset->tax_prem_waiver_res),
-	CashFlowCommonData(629, "tax_res_mp", "epl_liab_tax_res_mp",  "tax_res_mp",  CashFlowCommonData::SUM,
+	CashFlowCommonData(555, "tax_res_mp", "epl_liab_tax_res_mp",  "tax_res_mp",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_tax_res_mp, 'E','N', '3', 'C', (size_t)&modelOffset->tax_res_mp),
-	CashFlowCommonData(630, "tax_transfer_to_sa_net", "epl_liab_tax_transfer_to_sa_net",  "tax_transfer_to_sa_net",  CashFlowCommonData::SUM,
+	CashFlowCommonData(556, "tax_transfer_to_sa_net", "epl_liab_tax_transfer_to_sa_net",  "tax_transfer_to_sa_net",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_tax_transfer_to_sa_net, 'E','Y', '3', 'C', (size_t)&modelOffset->tax_transfer_to_sa_net),
-	CashFlowCommonData(631, "tax_unearn_prem_res", "epl_liab_tax_unearn_prem_res",  "tax_unearn_prem_res",  CashFlowCommonData::SUM,
+	CashFlowCommonData(557, "tax_unearn_prem_res", "epl_liab_tax_unearn_prem_res",  "tax_unearn_prem_res",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_tax_unearn_prem_res, 'E','N', '3', 'C', (size_t)&modelOffset->tax_unearn_prem_res),
-	CashFlowCommonData(632, "terminal_div", "epl_liab_terminal_div",  "terminal_div",  CashFlowCommonData::SUM,
+	CashFlowCommonData(558, "terminal_div", "epl_liab_terminal_div",  "terminal_div",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_terminal_div, 'E','N', '3', 'P', (size_t)&modelOffset->terminal_div),
-	CashFlowCommonData(633, "transfer_cash_flow_sa_bom", "epl_liab_transfer_cash_flow_sa_bom",  "transfer_cash_flow_sa_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(559, "transfer_cash_flow_sa_bom", "epl_liab_transfer_cash_flow_sa_bom",  "transfer_cash_flow_sa_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_transfer_cash_flow_sa_bom, 'B','Y', '3', 'C', (size_t)&modelOffset->transfer_cash_flow_sa_bom),
-	CashFlowCommonData(634, "transfer_cash_flow_sa_eom", "epl_liab_transfer_cash_flow_sa_eom",  "transfer_cash_flow_sa_eom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(560, "transfer_cash_flow_sa_eom", "epl_liab_transfer_cash_flow_sa_eom",  "transfer_cash_flow_sa_eom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_transfer_cash_flow_sa_eom, 'E','Y', '3', 'C', (size_t)&modelOffset->transfer_cash_flow_sa_eom),
-	CashFlowCommonData(635, "transfer_to_sa_net", "epl_liab_transfer_to_sa_net",  "transfer_to_sa_net",  CashFlowCommonData::SUM,
+	CashFlowCommonData(561, "transfer_to_sa_net", "epl_liab_transfer_to_sa_net",  "transfer_to_sa_net",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_transfer_to_sa_net, 'E','Y', '3', 'C', (size_t)&modelOffset->transfer_to_sa_net),
-	CashFlowCommonData(636, "va_pba_asset_sa", "epl_liab_va_pba_asset_sa",  "va_pba_asset_sa",  CashFlowCommonData::SUM,
+	CashFlowCommonData(562, "va_pba_asset_sa", "epl_liab_va_pba_asset_sa",  "va_pba_asset_sa",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_va_pba_asset_sa, 'E','N', '3', 'C', (size_t)&modelOffset->va_pba_asset_sa),
-	CashFlowCommonData(637, "va_pba_ceded_cap_std_scen_ben_costs", "epl_liab_va_pba_ceded_cap_std_scen_ben_costs",  "va_pba_ceded_cap_std_scen_ben_costs",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_va_pba_ceded_cap_std_scen_ben_costs, 'E','N', '3', 'P', (size_t)&modelOffset->va_pba_ceded_cap_std_scen_ben_costs),
-	CashFlowCommonData(638, "va_pba_ceded_cap_std_scen_margin", "epl_liab_va_pba_ceded_cap_std_scen_margin",  "va_pba_ceded_cap_std_scen_margin",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_va_pba_ceded_cap_std_scen_margin, 'E','Y', '3', 'P', (size_t)&modelOffset->va_pba_ceded_cap_std_scen_margin),
-	CashFlowCommonData(639, "va_pba_ceded_res_std_scen_ben_costs", "epl_liab_va_pba_ceded_res_std_scen_ben_costs",  "va_pba_ceded_res_std_scen_ben_costs",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_va_pba_ceded_res_std_scen_ben_costs, 'E','N', '3', 'P', (size_t)&modelOffset->va_pba_ceded_res_std_scen_ben_costs),
-	CashFlowCommonData(640, "va_pba_ceded_res_std_scen_margin", "epl_liab_va_pba_ceded_res_std_scen_margin",  "va_pba_ceded_res_std_scen_margin",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_va_pba_ceded_res_std_scen_margin, 'E','Y', '3', 'P', (size_t)&modelOffset->va_pba_ceded_res_std_scen_margin),
-	CashFlowCommonData(641, "va_pba_gross_cap_std_scen_ben_costs", "epl_liab_va_pba_gross_cap_std_scen_ben_costs",  "va_pba_gross_cap_std_scen_ben_costs",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_va_pba_gross_cap_std_scen_ben_costs, 'E','N', '3', 'P', (size_t)&modelOffset->va_pba_gross_cap_std_scen_ben_costs),
-	CashFlowCommonData(642, "va_pba_gross_cap_std_scen_margin", "epl_liab_va_pba_gross_cap_std_scen_margin",  "va_pba_gross_cap_std_scen_margin",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_va_pba_gross_cap_std_scen_margin, 'E','Y', '3', 'P', (size_t)&modelOffset->va_pba_gross_cap_std_scen_margin),
-	CashFlowCommonData(643, "va_pba_gross_res_std_scen_ben_costs", "epl_liab_va_pba_gross_res_std_scen_ben_costs",  "va_pba_gross_res_std_scen_ben_costs",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_va_pba_gross_res_std_scen_ben_costs, 'E','N', '3', 'P', (size_t)&modelOffset->va_pba_gross_res_std_scen_ben_costs),
-	CashFlowCommonData(644, "va_pba_gross_res_std_scen_margin", "epl_liab_va_pba_gross_res_std_scen_margin",  "va_pba_gross_res_std_scen_margin",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_va_pba_gross_res_std_scen_margin, 'E','Y', '3', 'P', (size_t)&modelOffset->va_pba_gross_res_std_scen_margin),
-	CashFlowCommonData(645, "va_pba_working_res", "epl_liab_va_pba_working_res",  "va_pba_working_res",  CashFlowCommonData::SUM,
+	CashFlowCommonData(563, "va_pba_cash_val", "epl_liab_va_pba_cash_val",  "va_pba_cash_val",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_va_pba_cash_val, 'E','N', '3', 'P', (size_t)&modelOffset->va_pba_cash_val),
+	CashFlowCommonData(564, "va_pba_working_res", "epl_liab_va_pba_working_res",  "va_pba_working_res",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_va_pba_working_res, 'E','N', '3', 'P', (size_t)&modelOffset->va_pba_working_res),
-	CashFlowCommonData(646, "withdrl_benefits", "epl_liab_withdrl_benefits",  "withdrl_benefits",  CashFlowCommonData::SUM,
+	CashFlowCommonData(565, "withdrl_benefits", "epl_liab_withdrl_benefits",  "withdrl_benefits",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&EPL_LIAB_UDF::epl_liab_withdrl_benefits, 'E','Y', '3', 'C', (size_t)&modelOffset->withdrl_benefits)
 };
 const CashFlowCommonData* EPL_LIAB::mCFStaticData[] = {
@@ -17891,87 +15243,6 @@ const CashFlowCommonData* EPL_LIAB::mCFStaticData[] = {
 	&EPL_LIAB::mCFStaticData_512[51],
 	&EPL_LIAB::mCFStaticData_512[52],
 	&EPL_LIAB::mCFStaticData_512[53],
-	&EPL_LIAB::mCFStaticData_512[54],
-	&EPL_LIAB::mCFStaticData_512[55],
-	&EPL_LIAB::mCFStaticData_512[56],
-	&EPL_LIAB::mCFStaticData_512[57],
-	&EPL_LIAB::mCFStaticData_512[58],
-	&EPL_LIAB::mCFStaticData_512[59],
-	&EPL_LIAB::mCFStaticData_512[60],
-	&EPL_LIAB::mCFStaticData_512[61],
-	&EPL_LIAB::mCFStaticData_512[62],
-	&EPL_LIAB::mCFStaticData_512[63],
-	&EPL_LIAB::mCFStaticData_512[64],
-	&EPL_LIAB::mCFStaticData_512[65],
-	&EPL_LIAB::mCFStaticData_512[66],
-	&EPL_LIAB::mCFStaticData_512[67],
-	&EPL_LIAB::mCFStaticData_512[68],
-	&EPL_LIAB::mCFStaticData_512[69],
-	&EPL_LIAB::mCFStaticData_512[70],
-	&EPL_LIAB::mCFStaticData_512[71],
-	&EPL_LIAB::mCFStaticData_512[72],
-	&EPL_LIAB::mCFStaticData_512[73],
-	&EPL_LIAB::mCFStaticData_512[74],
-	&EPL_LIAB::mCFStaticData_512[75],
-	&EPL_LIAB::mCFStaticData_512[76],
-	&EPL_LIAB::mCFStaticData_512[77],
-	&EPL_LIAB::mCFStaticData_512[78],
-	&EPL_LIAB::mCFStaticData_512[79],
-	&EPL_LIAB::mCFStaticData_512[80],
-	&EPL_LIAB::mCFStaticData_512[81],
-	&EPL_LIAB::mCFStaticData_512[82],
-	&EPL_LIAB::mCFStaticData_512[83],
-	&EPL_LIAB::mCFStaticData_512[84],
-	&EPL_LIAB::mCFStaticData_512[85],
-	&EPL_LIAB::mCFStaticData_512[86],
-	&EPL_LIAB::mCFStaticData_512[87],
-	&EPL_LIAB::mCFStaticData_512[88],
-	&EPL_LIAB::mCFStaticData_512[89],
-	&EPL_LIAB::mCFStaticData_512[90],
-	&EPL_LIAB::mCFStaticData_512[91],
-	&EPL_LIAB::mCFStaticData_512[92],
-	&EPL_LIAB::mCFStaticData_512[93],
-	&EPL_LIAB::mCFStaticData_512[94],
-	&EPL_LIAB::mCFStaticData_512[95],
-	&EPL_LIAB::mCFStaticData_512[96],
-	&EPL_LIAB::mCFStaticData_512[97],
-	&EPL_LIAB::mCFStaticData_512[98],
-	&EPL_LIAB::mCFStaticData_512[99],
-	&EPL_LIAB::mCFStaticData_512[100],
-	&EPL_LIAB::mCFStaticData_512[101],
-	&EPL_LIAB::mCFStaticData_512[102],
-	&EPL_LIAB::mCFStaticData_512[103],
-	&EPL_LIAB::mCFStaticData_512[104],
-	&EPL_LIAB::mCFStaticData_512[105],
-	&EPL_LIAB::mCFStaticData_512[106],
-	&EPL_LIAB::mCFStaticData_512[107],
-	&EPL_LIAB::mCFStaticData_512[108],
-	&EPL_LIAB::mCFStaticData_512[109],
-	&EPL_LIAB::mCFStaticData_512[110],
-	&EPL_LIAB::mCFStaticData_512[111],
-	&EPL_LIAB::mCFStaticData_512[112],
-	&EPL_LIAB::mCFStaticData_512[113],
-	&EPL_LIAB::mCFStaticData_512[114],
-	&EPL_LIAB::mCFStaticData_512[115],
-	&EPL_LIAB::mCFStaticData_512[116],
-	&EPL_LIAB::mCFStaticData_512[117],
-	&EPL_LIAB::mCFStaticData_512[118],
-	&EPL_LIAB::mCFStaticData_512[119],
-	&EPL_LIAB::mCFStaticData_512[120],
-	&EPL_LIAB::mCFStaticData_512[121],
-	&EPL_LIAB::mCFStaticData_512[122],
-	&EPL_LIAB::mCFStaticData_512[123],
-	&EPL_LIAB::mCFStaticData_512[124],
-	&EPL_LIAB::mCFStaticData_512[125],
-	&EPL_LIAB::mCFStaticData_512[126],
-	&EPL_LIAB::mCFStaticData_512[127],
-	&EPL_LIAB::mCFStaticData_512[128],
-	&EPL_LIAB::mCFStaticData_512[129],
-	&EPL_LIAB::mCFStaticData_512[130],
-	&EPL_LIAB::mCFStaticData_512[131],
-	&EPL_LIAB::mCFStaticData_512[132],
-	&EPL_LIAB::mCFStaticData_512[133],
-	&EPL_LIAB::mCFStaticData_512[134],
 	nullptr};
 //const CashFlowCommonData END@2
 
@@ -18039,31 +15310,33 @@ TableMgr<VariantTable> EPL_LIAB::mgr_;
 	Attribute::Descriptor EPL_LIAB::descriptor_0[] = {
 	Descriptor(0, Attribute::STR_ENUM,	"data_validation_defn", -1, (size_t)&modelOffset->data_validation_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &data_validation_defnEnumList, Feature(true)),
-	Descriptor(1, Attribute::STRING,	"epl_file", -1, (size_t)&modelOffset->epl_file,
+	Descriptor(1, Attribute::STRING,	"epl_column_headers", -1, (size_t)&modelOffset->epl_column_headers,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(2, Attribute::STRING,	"gaap_cohort", -1, (size_t)&modelOffset->gaap_cohort,
+	Descriptor(2, Attribute::STRING,	"epl_file", -1, (size_t)&modelOffset->epl_file,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(3, Attribute::STRING,	"loc_cohort", -1, (size_t)&modelOffset->loc_cohort,
+	Descriptor(3, Attribute::STRING,	"gaap_cohort", -1, (size_t)&modelOffset->gaap_cohort,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(4, Attribute::DOUBLE,	"pct_to_use_mp", Descriptor::NOT_INDEXED, (size_t)&modelOffset->pct_to_use_mp,
+	Descriptor(4, Attribute::STRING,	"loc_cohort", -1, (size_t)&modelOffset->loc_cohort,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(5, Attribute::STRING,	"proj_date", -1, (size_t)&modelOffset->proj_date,
+	Descriptor(5, Attribute::DOUBLE,	"pct_to_use_mp", Descriptor::NOT_INDEXED, (size_t)&modelOffset->pct_to_use_mp,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(6, Attribute::STR_ENUM,	"reins_defn", -1, (size_t)&modelOffset->reins_defn,
+	Descriptor(6, Attribute::STRING,	"proj_date", -1, (size_t)&modelOffset->proj_date,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
+	Descriptor(7, Attribute::STR_ENUM,	"reins_defn", -1, (size_t)&modelOffset->reins_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &reins_defnEnumList, Feature(true)),
-	Descriptor(7, Attribute::STRING,	"seg_id", -1, (size_t)&modelOffset->seg_id,
+	Descriptor(8, Attribute::STRING,	"seg_id", -1, (size_t)&modelOffset->seg_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(8, Attribute::STR_ENUM,	"use_mp", -1, (size_t)&modelOffset->use_mp,
+	Descriptor(9, Attribute::STR_ENUM,	"use_mp", -1, (size_t)&modelOffset->use_mp,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &use_mpEnumList, Feature(true)),
-	Descriptor(9, Attribute::INT,	"msnumelement", -1, (size_t)&modelOffset->msnumelement,
+	Descriptor(10, Attribute::INT,	"msnumelement", -1, (size_t)&modelOffset->msnumelement,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(10, Attribute::SCALAR_INT,	"commencement_period", -1, (size_t)&modelOffset->commencement_period,
+	Descriptor(11, Attribute::SCALAR_INT,	"commencement_period", -1, (size_t)&modelOffset->commencement_period,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&EPL_LIAB_UDF::epl_liab_commencement_period)),
-	Descriptor(11, Attribute::SCALAR_INT,	"maturity_period", -1, (size_t)&modelOffset->maturity_period,
+	Descriptor(12, Attribute::SCALAR_INT,	"maturity_period", -1, (size_t)&modelOffset->maturity_period,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&EPL_LIAB_UDF::epl_liab_maturity_period)),
-	Descriptor(12, Attribute::SCALAR_INT,	"proj_date_offset", -1, (size_t)&modelOffset->proj_date_offset,
+	Descriptor(13, Attribute::SCALAR_INT,	"proj_date_offset", -1, (size_t)&modelOffset->proj_date_offset,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&EPL_LIAB_UDF::epl_liab_proj_date_offset)),
-	Descriptor(13, Attribute::SCALAR_INT,	"reins_flag", -1, (size_t)&modelOffset->reins_flag,
+	Descriptor(14, Attribute::SCALAR_INT,	"reins_flag", -1, (size_t)&modelOffset->reins_flag,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&EPL_LIAB_UDF::epl_liab_reins_flag)),
 	};
 
@@ -18082,8 +15355,9 @@ TableMgr<VariantTable> EPL_LIAB::mgr_;
 	&EPL_LIAB::descriptor_0[11],
 	&EPL_LIAB::descriptor_0[12],
 	&EPL_LIAB::descriptor_0[13],
+	&EPL_LIAB::descriptor_0[14],
 	nullptr};
-	const size_t EPL_LIAB::sDescriptorCount = 14;
+	const size_t EPL_LIAB::sDescriptorCount = 15;
 
 //factory
 EPL_LIAB* EPL_LIAB::makeThis(int isSubmodel, ModelClass* owner, EPL_LIAB* peer, 
@@ -18194,29 +15468,20 @@ typedef xstring (EPL_LIAB_UDF::*sPFs) (xstring);
 
 // constructor if this model class is the base class of another model class
 EPL_LIAB::EPL_LIAB(int columnCount, Descriptor* mocd[], Product* persObj) : ModelClass(columnCount, mocd, persObj), Variable(*this)
-  , sm_bond_is(0)
-  , sm_bond_pv(0)
-  , sm_bond_ym(0)
-  , sm_mtg_is(0)
-  , sm_mtg_pv(0)
-  , sm_mtg_ym(0)
 
+	, adco(company_asset_adco)
+	, asset(company_asset)
 	, asset_sub_port(company_asset_asset_sub_port)
 	, bond(company_asset_bond)
 	, bond_cf(company_asset_bond_bond_cf)
-	, bond_is(company_asset_bond_bond_cf_bond_is)
-	, bond_pv(company_asset_bond_bond_cf_bond_pv)
-	, bond_ym(company_asset_bond_bond_cf_bond_ym)
 	, eio(company_asset_eio)
 	, epa(company_asset_epa)
 	, epl(company_liab_epl)
 	, hedge_grp(company_seg_hedge_grp)
-	, intex(company_asset_intex)
+	, liab(company_liab)
 	, mtg(company_asset_mtg)
 	, mtg_cf(company_asset_mtg_mtg_cf)
-	, mtg_is(company_asset_mtg_mtg_cf_mtg_is)
-	, mtg_pv(company_asset_mtg_mtg_cf_mtg_pv)
-	, mtg_ym(company_asset_mtg_mtg_cf_mtg_ym)
+	, rates(company_rates)
 	, seg(company_seg)
 	, sfas97rd(company_seg_sfas97rd)
 {
@@ -18232,30 +15497,21 @@ EPL_LIAB::EPL_LIAB(int columnCount, Descriptor* mocd[], Product* persObj) : Mode
 //constructor begincolumn
 EPL_LIAB::EPL_LIAB(const xstring &modelClassName,
 		int isSm, ModelClass *owner, ModelClass *peer, int mainRebase,
-		const char *name, ModelClass* arrayPersistentObj) : ModelClass(646, EPL_LIAB::descriptorTable, arrayPersistentObj), Variable(*this)
-  , sm_bond_is(0)
-  , sm_bond_pv(0)
-  , sm_bond_ym(0)
-  , sm_mtg_is(0)
-  , sm_mtg_pv(0)
-  , sm_mtg_ym(0)
+		const char *name, ModelClass* arrayPersistentObj) : ModelClass(565, EPL_LIAB::descriptorTable, arrayPersistentObj), Variable(*this)
 
+	, adco(company_asset_adco)
+	, asset(company_asset)
 	, asset_sub_port(company_asset_asset_sub_port)
 	, bond(company_asset_bond)
 	, bond_cf(company_asset_bond_bond_cf)
-	, bond_is(company_asset_bond_bond_cf_bond_is)
-	, bond_pv(company_asset_bond_bond_cf_bond_pv)
-	, bond_ym(company_asset_bond_bond_cf_bond_ym)
 	, eio(company_asset_eio)
 	, epa(company_asset_epa)
 	, epl(company_liab_epl)
 	, hedge_grp(company_seg_hedge_grp)
-	, intex(company_asset_intex)
+	, liab(company_liab)
 	, mtg(company_asset_mtg)
 	, mtg_cf(company_asset_mtg_mtg_cf)
-	, mtg_is(company_asset_mtg_mtg_cf_mtg_is)
-	, mtg_pv(company_asset_mtg_mtg_cf_mtg_pv)
-	, mtg_ym(company_asset_mtg_mtg_cf_mtg_ym)
+	, rates(company_rates)
 	, seg(company_seg)
 	, sfas97rd(company_seg_sfas97rd)
  // Tables...
@@ -18282,8 +15538,14 @@ EPL_LIAB::EPL_LIAB(const xstring &modelClassName,
        isMainModel = !isSm;
 		modelName = name;
 
-#ifdef __CREATE_COMP_COMP_CLASS_
+#ifdef __CREATE_AA_COMP_COMP_CLASS_
        company = 0;
+#endif
+#ifdef __CREATE_ASSET_ASSET_CLASS_
+       company_asset = 0;
+#endif
+#ifdef __CREATE_ADCO_ASSET_CLASS_
+       company_asset_adco = 0;
 #endif
 #ifdef __CREATE_A_SUBPORT_ASSET_CLASS_
        company_asset_asset_sub_port = 0;
@@ -18294,23 +15556,11 @@ EPL_LIAB::EPL_LIAB(const xstring &modelClassName,
 #ifdef __CREATE_BOND_CF_ASSET_CLASS_
        company_asset_bond_bond_cf = 0;
 #endif
-#ifdef __CREATE_BOND_CF_ASSET_CLASS_
-       company_asset_bond_bond_cf_bond_is = 0;
-#endif
-#ifdef __CREATE_BOND_CF_ASSET_CLASS_
-       company_asset_bond_bond_cf_bond_pv = 0;
-#endif
-#ifdef __CREATE_BOND_CF_ASSET_CLASS_
-       company_asset_bond_bond_cf_bond_ym = 0;
-#endif
 #ifdef __CREATE_EIO_ASSET_CLASS_
        company_asset_eio = 0;
 #endif
 #ifdef __CREATE_EPA_ASSET_CLASS_
        company_asset_epa = 0;
-#endif
-#ifdef __CREATE_INTEX_ASSET_CLASS_
-       company_asset_intex = 0;
 #endif
 #ifdef __CREATE_MTG_ASSET_CLASS_
        company_asset_mtg = 0;
@@ -18318,17 +15568,14 @@ EPL_LIAB::EPL_LIAB(const xstring &modelClassName,
 #ifdef __CREATE_MTG_CF_ASSET_CLASS_
        company_asset_mtg_mtg_cf = 0;
 #endif
-#ifdef __CREATE_MTG_CF_ASSET_CLASS_
-       company_asset_mtg_mtg_cf_mtg_is = 0;
-#endif
-#ifdef __CREATE_MTG_CF_ASSET_CLASS_
-       company_asset_mtg_mtg_cf_mtg_pv = 0;
-#endif
-#ifdef __CREATE_MTG_CF_ASSET_CLASS_
-       company_asset_mtg_mtg_cf_mtg_ym = 0;
+#ifdef __CREATE_LIAB_LIAB_CLASS_
+       company_liab = 0;
 #endif
 #ifdef __CREATE_EPL_LIAB_CLASS_
        company_liab_epl = 0;
+#endif
+#ifdef __CREATE_RATES_ECONOMY_CLASS_
+       company_rates = 0;
 #endif
 #ifdef __CREATE_SEG_COMP_CLASS_
        company_seg = 0;
@@ -18355,7 +15602,7 @@ EPL_LIAB::EPL_LIAB(const xstring &modelClassName,
 
 	setSlidingSpace();
 
-	for (int cf_no = 1; cf_no <= 646; cf_no++)
+	for (int cf_no = 1; cf_no <= 565; cf_no++)
 #ifdef CF_MEMORY
 		setPtr_col(cf_no, 0);
 #else
@@ -18396,8 +15643,14 @@ EPL_LIAB::EPL_LIAB(const xstring &modelClassName,
 
  void EPL_LIAB::copy_names() {
 
-#ifdef __CREATE_COMP_COMP_CLASS_
-		company = (COMP_COMP*)(findUnique("company"));
+#ifdef __CREATE_AA_COMP_COMP_CLASS_
+		company = (AA_COMP_COMP*)(findUnique("company"));
+#endif
+#ifdef __CREATE_ASSET_ASSET_CLASS_
+		company_asset = (ASSET_ASSET*)(findUnique("company|asset"));
+#endif
+#ifdef __CREATE_ADCO_ASSET_CLASS_
+		company_asset_adco = (ADCO_ASSET*)(findUnique("company|asset|adco"));
 #endif
 #ifdef __CREATE_A_SUBPORT_ASSET_CLASS_
 		company_asset_asset_sub_port = (A_SUBPORT_ASSET*)(findUnique("company|asset|asset_sub_port"));
@@ -18408,23 +15661,11 @@ EPL_LIAB::EPL_LIAB(const xstring &modelClassName,
 #ifdef __CREATE_BOND_CF_ASSET_CLASS_
 		company_asset_bond_bond_cf = (BOND_CF_ASSET*)(findUnique("company|asset|bond|bond_cf"));
 #endif
-#ifdef __CREATE_BOND_CF_ASSET_CLASS_
-		company_asset_bond_bond_cf_bond_is = (BOND_CF_ASSET*)(findUnique("company|asset|bond|bond_cf|bond_is"));
-#endif
-#ifdef __CREATE_BOND_CF_ASSET_CLASS_
-		company_asset_bond_bond_cf_bond_pv = (BOND_CF_ASSET*)(findUnique("company|asset|bond|bond_cf|bond_pv"));
-#endif
-#ifdef __CREATE_BOND_CF_ASSET_CLASS_
-		company_asset_bond_bond_cf_bond_ym = (BOND_CF_ASSET*)(findUnique("company|asset|bond|bond_cf|bond_ym"));
-#endif
 #ifdef __CREATE_EIO_ASSET_CLASS_
 		company_asset_eio = (EIO_ASSET*)(findUnique("company|asset|eio"));
 #endif
 #ifdef __CREATE_EPA_ASSET_CLASS_
 		company_asset_epa = (EPA_ASSET*)(findUnique("company|asset|epa"));
-#endif
-#ifdef __CREATE_INTEX_ASSET_CLASS_
-		company_asset_intex = (INTEX_ASSET*)(findUnique("company|asset|intex"));
 #endif
 #ifdef __CREATE_MTG_ASSET_CLASS_
 		company_asset_mtg = (MTG_ASSET*)(findUnique("company|asset|mtg"));
@@ -18432,17 +15673,14 @@ EPL_LIAB::EPL_LIAB(const xstring &modelClassName,
 #ifdef __CREATE_MTG_CF_ASSET_CLASS_
 		company_asset_mtg_mtg_cf = (MTG_CF_ASSET*)(findUnique("company|asset|mtg|mtg_cf"));
 #endif
-#ifdef __CREATE_MTG_CF_ASSET_CLASS_
-		company_asset_mtg_mtg_cf_mtg_is = (MTG_CF_ASSET*)(findUnique("company|asset|mtg|mtg_cf|mtg_is"));
-#endif
-#ifdef __CREATE_MTG_CF_ASSET_CLASS_
-		company_asset_mtg_mtg_cf_mtg_pv = (MTG_CF_ASSET*)(findUnique("company|asset|mtg|mtg_cf|mtg_pv"));
-#endif
-#ifdef __CREATE_MTG_CF_ASSET_CLASS_
-		company_asset_mtg_mtg_cf_mtg_ym = (MTG_CF_ASSET*)(findUnique("company|asset|mtg|mtg_cf|mtg_ym"));
+#ifdef __CREATE_LIAB_LIAB_CLASS_
+		company_liab = (LIAB_LIAB*)(findUnique("company|liab"));
 #endif
 #ifdef __CREATE_EPL_LIAB_CLASS_
 		company_liab_epl = (EPL_LIAB*)(findUnique("company|liab|epl"));
+#endif
+#ifdef __CREATE_RATES_ECONOMY_CLASS_
+		company_rates = (RATES_ECONOMY*)(findUnique("company|rates"));
 #endif
 #ifdef __CREATE_SEG_COMP_CLASS_
 		company_seg = (SEG_COMP*)(findUnique("company|seg"));
@@ -18663,12 +15901,6 @@ EPL_LIAB_persistent_object::EPL_LIAB_persistent_object(const xstring &modelClass
 			EPL_LIAB(modelClassName, isSm, owner, peer, mainRebase, name, arrayPersistentObj), 
 			mReadArray(true),
 			pfl(0)
-	, sm_bond_is(EPL_LIAB::sm_bond_is)
-	, sm_bond_pv(EPL_LIAB::sm_bond_pv)
-	, sm_bond_ym(EPL_LIAB::sm_bond_ym)
-	, sm_mtg_is(EPL_LIAB::sm_mtg_is)
-	, sm_mtg_pv(EPL_LIAB::sm_mtg_pv)
-	, sm_mtg_ym(EPL_LIAB::sm_mtg_ym)
 
 	{
 
@@ -18748,7 +15980,7 @@ void EPL_LIAB::after_startup(int decrement) {
 //ms_BeforeStartup END@2
 
 HVector<ModelClass::ddfStruct> EPL_LIAB::ddfVector;
-BitArray EPL_LIAB::dataVariables(14);
+BitArray EPL_LIAB::dataVariables(15);
 bool EPL_LIAB::hasBeenWritten = false;
 
 

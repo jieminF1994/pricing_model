@@ -1,13 +1,12 @@
 ﻿
 //MODELCLASS BEGIN
+//MODELCLASS aa_comp_comp
 //MODELCLASS adco_asset
 //MODELCLASS ann_pba_pba
 //MODELCLASS asset_asset
-//MODELCLASS automation
 //MODELCLASS a_subport_asset
 //MODELCLASS bond_asset
 //MODELCLASS bond_cf_asset
-//MODELCLASS comp_comp
 //MODELCLASS eio_asset
 //MODELCLASS epa_asset
 //MODELCLASS epl_liab
@@ -15,16 +14,14 @@
 //MODELCLASS fiacarvm_liab
 //MODELCLASS fia_liab
 //MODELCLASS hdg_grp_comp
-//MODELCLASS intex_asset
 //MODELCLASS invstrat_asset
 //MODELCLASS liab_liab
+//MODELCLASS mrb_gaap
 //MODELCLASS mtg_asset
 //MODELCLASS mtg_cf_asset
 //MODELCLASS rates_economy
 //MODELCLASS seg_comp
-//MODELCLASS sfas133_gaap
 //MODELCLASS sfas97rd_gaap
-//MODELCLASS util_rafm
 //MODELCLASS END
 
 #if defined(MICROSOFT)
@@ -75,14 +72,13 @@ extern MemCount gMem;
 extern MY_DLL Parmfile *p;
 #include "column2.h"
 #include "ModelClass\sfas97rd_gaap_udf.h"
+#include "ModelClass\aa_comp_comp.h"
 #include "ModelClass\adco_asset.h"
 #include "ModelClass\ann_pba_pba.h"
 #include "ModelClass\asset_asset.h"
-#include "ModelClass\automation.h"
 #include "ModelClass\a_subport_asset.h"
 #include "ModelClass\bond_asset.h"
 #include "ModelClass\bond_cf_asset.h"
-#include "ModelClass\comp_comp.h"
 #include "ModelClass\eio_asset.h"
 #include "ModelClass\epa_asset.h"
 #include "ModelClass\epl_liab.h"
@@ -90,15 +86,13 @@ extern MY_DLL Parmfile *p;
 #include "ModelClass\fiacarvm_liab.h"
 #include "ModelClass\fia_liab.h"
 #include "ModelClass\hdg_grp_comp.h"
-#include "ModelClass\intex_asset.h"
 #include "ModelClass\invstrat_asset.h"
 #include "ModelClass\liab_liab.h"
+#include "ModelClass\mrb_gaap.h"
 #include "ModelClass\mtg_asset.h"
 #include "ModelClass\mtg_cf_asset.h"
 #include "ModelClass\rates_economy.h"
 #include "ModelClass\seg_comp.h"
-#include "ModelClass\sfas133_gaap.h"
-#include "ModelClass\util_rafm.h"
 #pragma optimize( "gs", on )
 
 #include "generatedCppHeader.h"
@@ -109,7 +103,7 @@ extern MY_DLL Parmfile *p;
 //Redundant includes only for snip test:
 //iomanip included for "setprecision()"
 #include <iomanip>
-#include <strstream> //WTW - Gen2
+#include <strstream>
 typedef vector<vector<string>> sowfinput;
 typedef vector<string> sowfcols;
 typedef map <xstring, long, less <xstring> > sowfmap;
@@ -120,7 +114,9 @@ typedef vector<vector<string>> deptaskinput;
 typedef vector<string> deptaskcols;
 typedef map <xstring, long, less <xstring> > deptaskmap;
 typedef deptaskmap::iterator deptaskmapiter;
-//extern MY_DLL strstream log_screen; //WTW - Gen2 - MY_DLL is not supported
+const int pv = 0;
+const int is = 1;
+const int ym = 2;
 const int EFFECTIVE_RATE = 0;
 const int EFFECTIVE_ANNUAL = 1;
 const int NOMINAL_SEMIANNUAL = 2;
@@ -138,9 +134,8 @@ const double LEAST_ANNUAL_GROWTH_RATE = -0.9999;
 const double LEAST_BOND_EQUIVALENT_RATE = 0.0001;
 const double SPOT_SHIFT_FOR_EFFECTIVE_DURATION_CALCULATION = 0.0001;
 const double ONE_MILLION = 1000000.0;
-//WTW - Gen2 - Move Extern definitions to rates header
-//const double MINIMUM_MONTHLY_YIELD_RATIO = -0.9; // annual yield = (1.0-0.9)^12 = 1.0e-12
-//const double MAXIMUM_MONTHLY_YIELD_RATIO	 = 999999999.0; // annual yield = (1.0+999999999.0)^12 = 1.0e+120
+const double MINIMUM_MONTHLY_YIELD_RATIO = -0.9; // annual yield = (1.0-0.9)^12 = 1.0e-12
+const double MAXIMUM_MONTHLY_YIELD_RATIO	 = 999999999.0; // annual yield = (1.0+999999999.0)^12 = 1.0e+120
 const int DECIMALS_TO_ROUND = 6;
 const int ROUND_NEGATIVE_TOZERO = 0;
 const int ROUND_NEAR = 1;
@@ -154,11 +149,10 @@ const int SUM_OVER_NEGATIVE = -101;
 const int TIER = -98;
 const int ANY_GROUP = -99;
 const bool DO_NOT_ISSUE_WARNINGS = false;
-//WTW - Gen2 - Move Extern definitions to rates header
-//const int CALL_CODE = 1; 
-//const int PUT_CODE = 2; 
-//const int CONTINUOUS_PAYOUT_CODE = 3;
-//const int FUTURES_CODE = 4;
+const int CALL_CODE = 1;
+const int PUT_CODE = 2;
+const int CONTINUOUS_PAYOUT_CODE = 3;
+const int FUTURES_CODE = 4;
 // Model point type
 const int NEW_PURCH = 0;
 const int INIT_MP = 1;
@@ -208,11 +202,13 @@ const int HEDGE_CASH_FLOW = 0;
 const int HEDGE_MKT_VAL = 1;
 const int HEDGE_ARRAY_SIZE = 2;
 // global calculation flags
-//extern bool pricing_flag;//WTW - Gen2 - Move Extern definitions to rates header
+extern bool pricing_flag;
 extern bool factors_flag;
 extern bool nb_flag;
 extern bool alm_flag;
 extern bool tcm_flag;
+extern bool pba_disc_rate_flag;
+extern int pba_segment_size;
 extern bool avr_flag;
 extern bool imr_flag;
 extern bool gaap_flag;
@@ -220,17 +216,12 @@ extern bool tgt_cap_flag;
 extern bool stoch_flag;
 extern bool valn_flag;
 extern bool time_step_flag;
-extern bool sfas133_valn_flag;
+extern bool mrb_valn_flag;
 extern bool sop031_valn_flag;
 extern bool sfas97rd_valn_flag;
-extern bool sfas97lp_valn_flag;
-extern bool sfas97lp_gpr_valn_flag;
 extern bool sfas91_valn_flag;
-extern bool sfas60_valn_flag;
-extern bool sfas60_gpr_valn_flag;
+extern bool gaap_ldti_valn_flag;
 extern bool sfas120_nlp_valn_flag;
-extern bool sfas120_valn_flag;
-extern bool sfas120_gpr_valn_flag;
 extern bool loc_gpr_valn_flag;
 extern bool pba_valn_flag;
 extern bool pba_scen_amt_valn_flag;
@@ -239,6 +230,7 @@ extern bool res_scen_amt_valn_flag;
 extern bool res_det_res_valn_flag;
 extern bool res_ag38_8d_valn_flag;
 extern bool std_scen_valn_flag;
+extern bool std_scen_prescribed_assump_flag;
 extern bool rbc_std_scen_valn_flag;
 extern bool rbc_std_scen_step2_valn_flag;
 extern bool res_std_scen_valn_flag;
@@ -261,33 +253,32 @@ extern double aggregate_amount_threshold;
 extern double model_point_amount_threshold;
 extern double rate_ratio_threshold;
 extern vector<string> valn_periods;
+
 // utility functions - elaborated in rates/economy externs
-//WTW - Gen2 - Move Extern definitions to rates header
-/*extern double round_result(int rounding, int negative, double x, int n);
+extern double round_result(int rounding, int negative, double x, int n);
 extern double factorial(int n);
 extern int n_choose_k(int n, int k);
 extern xstring check_date_format(const xstring &date);
+extern int month_from_day_number(int nSerialDate);
+extern int year_from_day_number(int nSerialDate);
+extern int day_from_day_number(int nSerialDate);
+extern int month_number_from_date(int year, int month); 
+extern int day_number_from_date(int nYear, int nMonth, int nDay);
 extern int get_mth_from_date(const xstring &date);
 extern int get_yr_from_date(const xstring &date);
 extern int get_day_from_date(const xstring &date);
-extern int month_from_day_number(int nSerialDate);//WTW - Gen2 - add new formula to replace unsupported MonthFromDayNumber() function
-extern int year_from_day_number(int nSerialDate);//WTW - Gen2 - add new formula to replace unsupported YearFromDayNumber() function
-extern int day_from_day_number(int nSerialDate);//WTW - Gen2 - add new formula to replace unsupported DayFromDayNumber() function
-extern int month_number_from_date(int year, int month); //WTW - Gen2 - add new formula to replace unsupported MonthNumberFromDate() function
-extern int day_number_from_date(int nYear, int nMonth, int nDay); //WTW - Gen2 - add new formula to replace unsupported DayNumberFromDate() function
 extern int get_end_of_mth_day(int yr, int mth);
 extern xstring add_mths_to_date(const xstring &date, int mths);
 extern int get_mth_from_adj_date(const xstring &date, int mths);
 extern double convert_rate_basis(double orig_rate, double orig_rate_basis, double new_rate_basis);
 extern double convert_decrem_rate_basis(double orig_rate, double orig_rate_basis, double new_rate_basis);
-extern long int determine_tbl_size(int sNumberOfDims, ...);
 extern xstring get_file_name(const xstring &source_file);
 extern xstring get_file_path(const xstring &source_file);
-extern xstring get_base_group_name(const xstring &tag, bool seriatim_flag = false);
+extern xstring get_base_group_name(const xstring &tag, bool split_flag = false);
 extern xstring get_string_of_date(double date);
 extern xstring get_string_of_enum_val(StrEnum::EnumValue type);
 extern int date_diff(xstring first_date, xstring second_date);
-extern int number_of_decimals(double xxx, int digits);//WTW - Gen2 - replace preprocessor #define with formula
+extern int number_of_decimals(double xxx,int digits);
 extern xstring write_string(double value, int string_length, int significant_digits);
 extern xstring write_array_to_string(SmartArray <double> value_array, int low, int high);
 extern void read_from_string(xstring temp_string, SmartArray <double> &temp_array);
@@ -308,25 +299,8 @@ extern double bs_opt_val_continuous_highest_gain(int call_or_put, double current
 extern double bs_opt_val_highest_gain(int call_or_put, double current_price, double observed_max, double observed_min, double strike_price, double length_of_sampling_period, int sampling_freq, double yrs_to_expiry, double risk_free_rate, double init_div_yld, double index_vol, int scen_int_freq, int scen_index_freq);
 extern double bs_opt_val_mthly_sum_cap(int crediting_mths, int known_index_vals, double sum_capped_amts,  double mthly_cap_rate, double yrs_to_expiry, double risk_free_rate, double init_div_yld, double index_vol, int scen_int_freq, int scen_index_freq);
 extern double cumul_bivariate_normal_distribn(double x, double y, double rho);
-extern double cumul_normal_distribn(double x);*/
+extern double cumul_normal_distribn(double x);
 
-// RAFM SQLite
-#ifndef _RAFMSQLITE_H_
-#define _RAFMSQLITE_H_
-
-#include <string>
-#include <vector>
-
-using namespace std;
-
-// 20210614 STW: upgrade to RAFM 2.9
-/*
-extern void openDatabase(string dbPath);
-extern void closeDatabase();
-extern string readCsvFile(string csvPath);
-extern void executeQuery(string sql, vector<string>& columns, vector<vector<string>>& results);
-*/
-#endif
 #endif
 extern int trace_wanted;
 
@@ -336,66 +310,40 @@ extern MY_DLL int last_model_period;
 extern MY_DLL Message_handler *eh;
 
 deptaskinput sop031_valn_input;
-deptaskcols sop031_valn_input_cols;
-deptaskmap sop031_valn_input_pos;
-deptaskmapiter sop031_valn_input_pos_iter;
 deptaskinput sfas97rd_valn_input;
-deptaskcols sfas97rd_valn_input_cols;
-deptaskmap sfas97rd_valn_input_pos;
-deptaskmapiter sfas97rd_valn_input_pos_iter;
 sowfoutput sfas97rd_state_of_world_financial_output;
 sowfinput sfas97rd_state_of_world_financial_input;
-sowfcols sfas97rd_state_of_world_financial_cols;
 sowfmap sfas97rd_state_of_world_financial_input_pos;
 sowfmapiter sfas97rd_state_of_world_financial_input_pos_iter;
 const int ASSESS_SOP = 0;
 const int DB_BEN_SOP = 1;
-const int IB_BEN_SOP = 2;
-const int WB_BEN_SOP = 3;
-const int SG_BEN_SOP = 4;
-const int DTH_CLAIM_COST = 5;
-const int SOP_SIZE = 6;
+const int SG_BEN_SOP = 2;
+const int DTH_CLAIM_COST = 3;
+const int SOP_SIZE = 4;
 const int EGP = 0;
 const int INT_RATE = 1;
 const int SOP031_PBR_FV = 2;
 const int SOP031_PBR = 3;
 const int DAC_ACQ_EXP = 4;
-const int DAC_ACQ_EXP_LOSS_REC = 5;
-const int DAC_COMM = 6;
-const int DAC_COMM_LOSS_REC = 7;
-const int DAC_PREM_BONUS = 8;
-const int DAC_PREM_BONUS_LOSS_REC = 9;
-const int DAC_REINS_YRT_ASSET = 10;
-const int EMBED_DERIV_VAL = 11;
-const int K_CAPZD_ACQ_EXP = 12;
-const int K_CAPZD_COMM = 13;
-const int K_CAPZD_PREM_BONUS = 14;
-const int K_REINS_YRT_COST = 15;
-const int K_SOP031_GMDB_BEN_BR = 16;
-const int K_SOP031_PBR = 17;
-const int K_SOP031_ULSG_BEN_BR = 18;
-const int K_SOP031_UNEARN_REV_LIAB = 19;
-const int K_UNEARN_REV_LIAB = 20;
-const int SOP031_GMDB_BR = 21;
-const int SOP031_GMIB_BR = 22;
-const int SOP031_GMWB_BR = 23;
-const int SOP031_PBR_LIAB = 24;
-const int SOP031_ULSG_BR = 25;
-const int UNEARN_REV_LIAB = 26;
-const int GAAP_SCHEDULE_SIZE = 27;
-
-#if defined(__VA_LIAB_H_)
-// integers from VA_POL submodel
-extern int AV_B_GA;
-extern int AV_B_DCA;
-#endif//WTW - Gen2 - cannot have IF/ELSE in EXTERN section
-
-/*#else //WTW - Gen2 - Move outside of EXTERNS
-// integers from VA_POL submodel
-int AV_B_DCA = 0;
-int AV_B_GA = 1;
-#endif*/
-
+const int DAC_COMM = 5;
+const int DAC_PREM_BONUS = 6;
+const int DAC_REINS_YRT_ASSET = 7;
+const int EMBED_DERIV_VAL = 8;
+const int K_CAPZD_ACQ_EXP = 9;
+const int K_CAPZD_COMM = 10;
+const int K_CAPZD_PREM_BONUS = 11;
+const int K_REINS_YRT_COST = 12;
+const int K_SOP031_GMDB_BEN_BR = 13;
+const int K_SOP031_PBR = 14;
+const int K_SOP031_ULSG_BEN_BR = 15;
+const int K_SOP031_UNEARN_REV_LIAB = 16;
+const int K_UNEARN_REV_LIAB = 17;
+const int SOP031_GMDB_BR = 18;
+const int SOP031_PBR_LIAB = 19;
+const int SOP031_ULSG_BR = 20;
+const int UNEARN_REV_LIAB = 21;
+const int POLICIES_INF = 22;
+const int GAAP_SCHEDULE_SIZE = 23;
 
 extern MY_DLL long scenario_number;
 extern MY_DLL long layer;
@@ -408,7 +356,6 @@ extern const int& last_proj_task_loop;
 extern const int& proj_task_loop_num;
 extern const int& num_of_proj_task_loops;
 
-extern MY_DLL2 int use_overlay_code;
 extern MY_DLL int trace_level_wanted;
 extern MY_DLL int trace_level;
 extern MY_DLL bool bEmitTurboDebugger;
@@ -440,11 +387,12 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_acq_exp(int t) {
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	return sum_over_gaap("acq_exp", t);
-	
+
+{
 #if defined(__UL_LIAB_H_)
-if (this == ul_sfas97rd)
+if (model_name == UL_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return ul->acq_exp(t);
@@ -453,9 +401,10 @@ if (this == ul_sfas97rd)
 	return 0.0;	
 	}
 #endif
-
+}
+{
 #if defined(__VUL_LIAB_H_)
-if (this == vul_sfas97rd)
+if (model_name == VUL_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return vul->acq_exp(t);
@@ -464,9 +413,10 @@ if (this == vul_sfas97rd)
 	return 0.0;	
 	}
 #endif
-
+}
+{
 #if defined(__IUL_LIAB_H_)
-if (this == iul_sfas97rd)
+if (model_name == IUL_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return iul->acq_exp(t);
@@ -475,9 +425,10 @@ if (this == iul_sfas97rd)
 	return 0.0;	
 	}
 #endif
-
+}
+{
 #if defined(__VA_LIAB_H_)
-if (this == va_sfas97rd)
+if (model_name == VA_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return va->acq_exp(t);
@@ -486,9 +437,10 @@ if (this == va_sfas97rd)
 	return 0.0;	
 	}
 #endif
-
+}
+{
 #if defined(__FA_LIAB_H_)
-if (this == fa_sfas97rd)
+if (model_name == FA_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return fa->acq_exp(t);
@@ -497,9 +449,10 @@ if (this == fa_sfas97rd)
 	return 0.0;	
 	}
 #endif
-
+}
+{
 #if defined(__FIA_LIAB_H_)
-if (this == fia_sfas97rd)
+if (model_name == FIA_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return fia->acq_exp(t);
@@ -508,11 +461,10 @@ if (this == fia_sfas97rd)
 	return 0.0;	
 	}
 #endif
-	
+}
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -528,24 +480,46 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_agp(int t) {
 //^^^
 
 #line 1 "agp.SFAS97RD_GAAP.for"
-//WTW - Gen2 - split non time guard items
-if (/*valn_flag || */t <= start_period || t > final_period)
+if (t <= start_period || t > final_period)
 	return NO_AVG;
 	
 if (valn_flag)
 	return NO_AVG;
-
+	
 return max(0.0, egp_gain_exp(t)
 	            + egp_gain_inv(t)
 	            + egp_gain_mort(t)
 	            + egp_gain_surr(t)
 	            + egp_gain_persist_bon_ref(t)
                 - hedge_cost(t)
-	            - sfas133_liab_incr(t)
+	            - mrb_liab_incr(t)
+				- sfas133_liab_incr(t)
 	            - sop031_addl_liab_incr(t));
 
 }
 
+//@@ END
+
+//@@ START - agp_history
+// Cohort History Actual Gross Profits                                                                                             
+// Column:AGP_HISTORY
+//========================================================
+double SFAS97RD_GAAP_UDF::sfas97rd_gaap_agp_history(int t) {
+//^^^
+
+
+
+//^^^
+
+#line 1 "agp_history.SFAS97RD_GAAP.for"
+if (t > start_period)
+	return NO_AVG;
+
+cohort_id = cohort_id;
+
+return cohort_history_agp;
+
+}
 
 //@@ END
 
@@ -564,13 +538,9 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_amortzn_int_rate(int t) {
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (loss_recognition_flag)
-	return loss_rec_amortzn_int_rate(t);
-
 return gaap_amortzn_int_rate(t);
 
 }
-
 
 //@@ END
 
@@ -581,7 +551,7 @@ return gaap_amortzn_int_rate(t);
 double SFAS97RD_GAAP_UDF::sfas97rd_gaap_cal_mth(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(4,"cal_mth",t);
+	return rebase_value(5,"cal_mth",t);
 }
 
 
@@ -597,7 +567,6 @@ return proj_start_mth + t - 1
 
 }
 
-
 //@@ END
 
 //@@ START - cal_yr
@@ -607,7 +576,7 @@ return proj_start_mth + t - 1
 double SFAS97RD_GAAP_UDF::sfas97rd_gaap_cal_yr(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(5,"cal_yr",t);
+	return rebase_value(6,"cal_yr",t);
 }
 
 
@@ -622,7 +591,6 @@ return proj_start_yr + cal_yr_relative(t) - 1;
 
 }
 
-
 //@@ END
 
 //@@ START - cal_yr_relative
@@ -632,7 +600,7 @@ return proj_start_yr + cal_yr_relative(t) - 1;
 double SFAS97RD_GAAP_UDF::sfas97rd_gaap_cal_yr_relative(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(6,"cal_yr_relative",t);
+	return rebase_value(7,"cal_yr_relative",t);
 }
 
 
@@ -643,7 +611,6 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 return 1 + floor((proj_start_mth + t - 2) / 12.0);
 
 }
-
 
 //@@ END
 
@@ -665,31 +632,30 @@ if (!alm_flag || t <= start_period || t > final_period)
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	{
 	if (!reins_flag)
 		{
-		if (fabs(seg->gaap_liab_net(t - 1)) < aggregate_amount_threshold)
+		if (fabs(seg_element->gaap_liab_net(t - 1)) < aggregate_amount_threshold)
 			return NO_AVG;
 
-		return (seg->gaap_cap_gain_res(t)
-				+ seg->gaap_cap_gain_cap(t))
-				* liab_net(t - 1) / seg->gaap_liab_net(t - 1);
+		return (seg_element->gaap_cap_gain_res(t)
+				+ seg_element->gaap_cap_gain_cap(t))
+				* liab_net(t - 1) / seg_element->gaap_liab_net(t - 1);
 		}
 	else if (reins_flag)
 		{
-		if (fabs(seg->reins_gaap_liab_net(t - 1)) < aggregate_amount_threshold)
+		if (fabs(seg_element->reins_gaap_liab_net(t - 1)) < aggregate_amount_threshold)
 			return NO_AVG;
 
-		return seg->reins_gaap_cap_gain_res(t)
-			   * liab_net(t - 1) / seg->reins_gaap_liab_net(t - 1);
+		return seg_element->reins_gaap_cap_gain_res(t)
+			   * liab_net(t - 1) / seg_element->reins_gaap_liab_net(t - 1);
 		}
 	}
 
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -708,11 +674,12 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_cap_gain_fund(int t) {
 if (!alm_flag || t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	return sum_over_gaap("cap_gain_fund", t);
-	
+
+{	
 #if defined(__UL_LIAB_H_)
-if (this == ul_sfas97rd)
+if (model_name == UL_SFAS97RD)
 	{
 	if (alm_flag)
 		{
@@ -729,15 +696,16 @@ if (this == ul_sfas97rd)
 		return fund_val_bef_int
 	       	   * ul->units_inf(t - 1)
 			   * reins_pct
-			   * (pow(1.0 + ul->seg->eff_cap_gains_rate(t), 1.0 / 12.0) - 1.0);
+			   * (pow(1.0 + ul->seg_element->eff_cap_gains_rate(t), 1.0 / 12.0) - 1.0);
 		}
 	else 
 		return NO_AVG;
 	}	
 #endif
-
+}
+{
 #if defined(__VUL_LIAB_H_)
-if (this == vul_sfas97rd)
+if (model_name == VUL_SFAS97RD)
 	{
 	if (alm_flag)
 		{
@@ -755,15 +723,16 @@ if (this == vul_sfas97rd)
 		return fund_val_bef_int
 	       	   * vul->units_inf(t - 1)
 			   * reins_pct
-			   * (pow(1.0 + vul->seg->eff_cap_gains_rate(t), 1.0 / 12.0) - 1.0);
+			   * (pow(1.0 + vul->seg_element->eff_cap_gains_rate(t), 1.0 / 12.0) - 1.0);
 		}
 	else 
 		return NO_AVG;
 	}	
 #endif
-
+}
+{
 #if defined(__IUL_LIAB_H_)
-if (this == iul_sfas97rd)
+if (model_name == IUL_SFAS97RD)
 	{
 	if (alm_flag)
 		{
@@ -780,15 +749,16 @@ if (this == iul_sfas97rd)
 		return fund_val_bef_int
 	       	   * iul->units_inf(t - 1)
 			   * reins_pct
-			   * (pow(1.0 + iul->seg->eff_cap_gains_rate(t), 1.0 / 12.0) - 1.0);
+			   * (pow(1.0 + iul->seg_element->eff_cap_gains_rate(t), 1.0 / 12.0) - 1.0);
 		}
 	else 
 		return NO_AVG;
 	}	
 #endif
-
+}
+{
 #if defined(__VA_LIAB_H_)
-if (this == va_sfas97rd)
+if (model_name == VA_SFAS97RD)
 	{
 	if (alm_flag)
 		{
@@ -799,24 +769,21 @@ if (this == va_sfas97rd)
 		else if (reins_flag && va->reins_flag) //Ceded and MP Reinsured via Coinsurance
 			reins_pct = va->reins_pct;
 			
-		// ensure order of processing by calling mp_processed
-		va->mp_processed(t);
-
-		double av_b = (va->sm_va_pol->av_b_ga(t)
-		               + va->sm_va_pol->av_b_dca(t))
-					   * va->policies_b(t);
+		double av_b = va->sum_over_funds("av_b", t, GENERAL)
+		              + va->sum_over_funds("av_b", t, DCA);
 
 		return max(0.0, av_b)
 			   * reins_pct
-			   * (pow(1.0 + va->seg->eff_cap_gains_rate(t), 1.0 / 12.0) - 1.0);
+			   * (pow(1.0 + va->seg_element->eff_cap_gains_rate(t), 1.0 / 12.0) - 1.0);
 		}		
 	else 
 		return NO_AVG;
 	}				
 #endif
-
+}
+{
 #if defined(__FA_LIAB_H_)
-if (this == fa_sfas97rd)
+if (model_name == FA_SFAS97RD)
 	{
 	if (alm_flag)
 		{
@@ -829,15 +796,16 @@ if (this == fa_sfas97rd)
 			
 		return max(0.0, fa->fund_val_b(t))
 			   * reins_pct
-			   * (pow(1.0 + fa->seg->eff_cap_gains_rate(t), 1.0 / 12.0) - 1.0);
+			   * (pow(1.0 + fa->seg_element->eff_cap_gains_rate(t), 1.0 / 12.0) - 1.0);
 		}		
 	else 
 		return NO_AVG;
 	}				
 #endif
-
+}
+{
 #if defined(__FIA_LIAB_H_)
-if (this == fia_sfas97rd)
+if (model_name == FIA_SFAS97RD)
 	{
 	if (alm_flag)
 		{
@@ -850,17 +818,16 @@ if (this == fia_sfas97rd)
 			
 		return max(0.0, fia->fund_val_b(t))
 			   * reins_pct
-			   * (pow(1.0 + fia->seg->eff_cap_gains_rate(t), 1.0 / 12.0) - 1.0);
+			   * (pow(1.0 + fia->seg_element->eff_cap_gains_rate(t), 1.0 / 12.0) - 1.0);
 		}		
 	else 
 		return NO_AVG;
 	}				
 #endif
-
+}
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -879,7 +846,7 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_capzd_acq_exp(int t) {
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	{
 	//force call for reports
 	acq_exp(t);
@@ -891,8 +858,9 @@ if (this == sfas97rd)
 	return sum_over_gaap("capzd_acq_exp", t);
 	}
 
+{
 #if defined(__UL_LIAB_H_)
-if (this == ul_sfas97rd)
+if (model_name == UL_SFAS97RD)
 	{
 	if (t != ul->commencement_period + 1)
 		return NO_AVG;
@@ -942,9 +910,10 @@ if (this == ul_sfas97rd)
 	return 0.0;	
 	}
 #endif
-
+}
+{
 #if defined(__VUL_LIAB_H_)
-if (this == vul_sfas97rd)
+if (model_name == VUL_SFAS97RD)
 	{
 	if (t != vul->commencement_period + 1)
 		return NO_AVG;
@@ -994,9 +963,10 @@ if (this == vul_sfas97rd)
 	return 0.0;	
 	}
 #endif
-
+}
+{
 #if defined(__IUL_LIAB_H_)
-if (this == iul_sfas97rd)
+if (model_name == IUL_SFAS97RD)
 	{
 	if (t != iul->commencement_period + 1)
 		return NO_AVG;
@@ -1046,9 +1016,10 @@ if (this == iul_sfas97rd)
 	return 0.0;	
 	}
 #endif
-	
+}
+{
 #if defined(__VA_LIAB_H_)
-if (this == va_sfas97rd)
+if (model_name == VA_SFAS97RD)
 	{	
 	if (xint(va->pol_yr(t)) > 1)
 		return NO_AVG;
@@ -1083,9 +1054,10 @@ if (this == va_sfas97rd)
 	return 0.0;	
 	}
 #endif
-
+}
+{
 #if defined(__FA_LIAB_H_)
-if (this == fa_sfas97rd)
+if (model_name == FA_SFAS97RD)
 	{
 	if (fa->elapsed_mths > 0)
 		return NO_AVG;
@@ -1128,9 +1100,10 @@ if (this == fa_sfas97rd)
 	return 0.0;	
 	}
 #endif
-
+}
+{
 #if defined(__FIA_LIAB_H_)
-if (this == fia_sfas97rd)
+if (model_name == FIA_SFAS97RD)
 	{
 	if (fia->elapsed_mths > 0)
 		return NO_AVG;
@@ -1168,281 +1141,10 @@ if (this == fia_sfas97rd)
 	return 0.0;	
 	}
 #endif
-	
+}
 return NO_AVG;
 
 }
-
-
-//@@ END
-
-//@@ START - capzd_acq_exp_accum
-// Capitalized Acquisition Expenses Accumulation                                                                                             
-// Column:CAPZD_ACQ_EXP_ACCUM
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_capzd_acq_exp_accum(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "capzd_acq_exp_accum.SFAS97RD_GAAP.for"
-if (t < start_period || t > final_period)
-	return NO_AVG;
-
-if (xint(cal_yr(t)) < cohort_yr)
-	return NO_AVG;
-
-if (t == start_period)
-	{
-	if (valn_period == 0)
-		{
-		if (this == sfas97rd)
-			{
-			double def_acq_exp_accum = 0.0;
-			
-			for (int tt = cohort_first_issue_period + 1; tt <= 0; tt++)
-				{
-				date_lookup_gen2 = date(tt); //WTW - Gen2 - AtTime() not supported
-				double def_acq_exp = cohort_history_capzd_acq_exp/*.AtTime(tt)*/;
-				
-				def_acq_exp_accum 
-				= (def_acq_exp_accum + def_acq_exp) * (1.0 + gaap_int_rate_mthly);
-				}
-
-			return def_acq_exp_accum; 
-			}
-		else //  No History for cell pricing at issue period
-			return 0.0;	
-		}
-	else //valn_period != 0
-		return init_capzd_acq_exp_accum;
-	}
-
-return (capzd_acq_exp_accum(t - 1)
-	     + capzd_acq_exp(t))
-	   * (1.0 + gaap_amortzn_int_rate(t));
-
-}
-
-
-//@@ END
-
-//@@ START - capzd_acq_exp_accum_loss_rec_int_rate
-// Capitalized Acquisition Expenses Accumulation At Loss Recognition Interest Rate                                                                                             
-// Column:CAPZD_ACQ_EXP_ACCUM_LOSS_REC_INT_RATE
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_capzd_acq_exp_accum_loss_rec_int_rate(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "capzd_acq_exp_accum_loss_rec_int_rate.SFAS97RD_GAAP.for"
-if (t < start_period || t > final_period)
-	return NO_AVG;
-
-if (xint(cal_yr(t)) < cohort_yr)
-	return NO_AVG;
-
-if (t == start_period)
-	{
-	if (valn_period == 0)
-		{
-		if (this == sfas97rd)
-			{
-			double def_acq_exp_accum = 0.0;
-			
-			for (int tt = cohort_first_issue_period + 1; tt <= 0; tt++)
-				{
-				date_lookup_gen2 = date(tt); //WTW - Gen2 - AtTime() not supported
-				double def_acq_exp = cohort_history_capzd_acq_exp/*.AtTime(tt)*/;
-				
-				def_acq_exp_accum 
-				= (def_acq_exp_accum + def_acq_exp) * (1.0 + loss_rec_int_rate_mthly);
-				}
-
-			return def_acq_exp_accum; 
-			}
-		else //  No History for cell pricing at issue period
-			return 0.0;	
-		}
-	else //valn_period != 0
-		return init_capzd_acq_exp_accum_loss_rec_int_rate;
-	}
-
-return (capzd_acq_exp_accum_loss_rec_int_rate(t - 1)
-	     + capzd_acq_exp(t))
-	   * (1.0 + loss_rec_amortzn_int_rate(t));
-
-}
-
-
-//@@ END
-
-//@@ START - capzd_acq_exp_pv
-// Capitalized Acquisition Expenses Present Value                                                                                             
-// Column:CAPZD_ACQ_EXP_PV
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_capzd_acq_exp_pv(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "capzd_acq_exp_pv.SFAS97RD_GAAP.for"
-if (t < start_period || t >= final_period)
-	return NO_AVG;
-
-return capzd_acq_exp(t + 1)
-	   + (capzd_acq_exp_pv(t + 1)
-		  / (1.0 + gaap_amortzn_int_rate(t + 1)));
-
-}
-
-
-//@@ END
-
-//@@ START - capzd_acq_exp_pv_loss_rec_int_rate
-// Capitalized Acquisition Expenses Present Value At Loss Recognition Interest Rate                                                                                             
-// Column:CAPZD_ACQ_EXP_PV_LOSS_REC_INT_RATE
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_capzd_acq_exp_pv_loss_rec_int_rate(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "capzd_acq_exp_pv_loss_rec_int_rate.SFAS97RD_GAAP.for"
-if (t < start_period || t >= final_period)
-	return NO_AVG;
-
-return capzd_acq_exp(t + 1)
-	   + (capzd_acq_exp_pv_loss_rec_int_rate(t + 1)
-		  / (1.0 + loss_rec_amortzn_int_rate(t + 1)));
-
-}
-
-
-//@@ END
-
-//@@ START - capzd_comm_accum
-// Capitalized Commissions Accumulation                                                                                             
-// Column:CAPZD_COMM_ACCUM
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_capzd_comm_accum(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "capzd_comm_accum.SFAS97RD_GAAP.for"
-if (t < start_period || t > final_period)
-	return NO_AVG;
-
-if (xint(cal_yr(t)) < cohort_yr)
-	return NO_AVG;
-
-if (t == start_period)
-	{
-	if (valn_period == 0)
-		{
-		if (this == sfas97rd)
-			{
-			double def_comm_accum = 0.0;
-			
-			for (int tt = cohort_first_issue_period + 1; tt <= 0; tt++)
-				{
-				date_lookup_gen2 = date(tt); //WTW - Gen2 - AtTime() not supported
-				double def_comm_bom = cohort_history_capzd_comm_bom/*.AtTime(tt)*/;
-				date_lookup_gen2 = date(tt); //WTW - Gen2 - AtTime() not supported
-				double def_comm_eom = cohort_history_capzd_comm_eom/*.AtTime(tt)*/;								
-				
-				def_comm_accum 
-				= (def_comm_accum + def_comm_bom)
-				  * (1.0 + gaap_int_rate_mthly) 
-				  + def_comm_eom;
-				}
-							
-			return def_comm_accum; 
-			}
-		else //  No History for cell pricing at issue period
-			return 0.0;
-		}		
-	else //valn_period != 0
-		return init_capzd_comm_accum;	
-	}
-	
-return (capzd_comm_accum(t - 1) 
-        + capzd_comm_bom(t))
-	   * (1.0 + gaap_amortzn_int_rate(t))
-	   + capzd_comm_eom(t);
-
-}
-
-
-//@@ END
-
-//@@ START - capzd_comm_accum_loss_rec_int_rate
-// Capitalized Commissions Accumulation At Loss Recognition Interest Rate                                                                                             
-// Column:CAPZD_COMM_ACCUM_LOSS_REC_INT_RATE
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_capzd_comm_accum_loss_rec_int_rate(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "capzd_comm_accum_loss_rec_int_rate.SFAS97RD_GAAP.for"
-if (t < start_period || t > final_period)
-	return NO_AVG;
-
-if (xint(cal_yr(t)) < cohort_yr)
-	return NO_AVG;
-
-if (t == start_period)
-	{
-	if (valn_period == 0)
-		{
-		if (this == sfas97rd)
-			{
-			double def_comm_accum = 0.0;
-			
-			for (int tt = cohort_first_issue_period + 1; tt <= 0; tt++)
-				{
-				date_lookup_gen2 = date(tt); //WTW - Gen2 - AtTime() not supported
-				double def_comm_bom = cohort_history_capzd_comm_bom/*.AtTime(tt)*/;
-				date_lookup_gen2 = date(tt); //WTW - Gen2 - AtTime() not supported
-				double def_comm_eom = cohort_history_capzd_comm_eom/*.AtTime(tt)*/;								
-				
-				def_comm_accum 
-				= (def_comm_accum + def_comm_bom)
-				  * (1.0 + loss_rec_int_rate_mthly) 
-				  + def_comm_eom;
-				}
-							
-			return def_comm_accum; 
-			}
-		else //  No History for cell pricing at issue period
-			return 0.0;
-		}		
-	else //valn_period != 0
-		return init_capzd_comm_accum_loss_rec_int_rate;	
-	}
-	
-return (capzd_comm_accum(t - 1) 
-        + capzd_comm_bom(t))
-	   * (1.0 + loss_rec_amortzn_int_rate(t))
-	   + capzd_comm_eom(t);
-
-}
-
 
 //@@ END
 
@@ -1461,7 +1163,7 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_capzd_comm_bom(int t) {
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	{
 	// No deferrals after stated amortizaton period
 	if (!valn_flag && t > amortzn_period)
@@ -1469,9 +1171,10 @@ if (this == sfas97rd)
 
 	return sum_over_gaap("capzd_comm_bom", t);
 	}
-		
+	
+{
 #if defined(__UL_LIAB_H_)
-if (this == ul_sfas97rd)
+if (model_name == UL_SFAS97RD)
 	{
 	// No deferrals after stated amortizaton period
 	if (ul->isMainModel && !valn_flag && t > amortzn_period)
@@ -1480,9 +1183,10 @@ if (this == ul_sfas97rd)
 	return comm_excess_bom(t);
 	}
 #endif
-
+}
+{
 #if defined(__VUL_LIAB_H_)
-if (this == vul_sfas97rd)
+if (model_name == VUL_SFAS97RD)
 	{
 	// No deferrals after stated amortizaton period
 	if (vul->isMainModel && !valn_flag && t > amortzn_period)
@@ -1491,9 +1195,10 @@ if (this == vul_sfas97rd)
 	return comm_excess_bom(t);
 	}
 #endif
-
+}
+{
 #if defined(__IUL_LIAB_H_)
-if (this == iul_sfas97rd)
+if (model_name == IUL_SFAS97RD)
 	{
 	// No deferrals after stated amortizaton period
 	if (iul->isMainModel && !valn_flag && t > amortzn_period)
@@ -1502,9 +1207,10 @@ if (this == iul_sfas97rd)
 	return comm_excess_bom(t);
 	}
 #endif
-
+}
+{
 #if defined(__VA_LIAB_H_)
-if (this == va_sfas97rd)
+if (model_name == VA_SFAS97RD)
 	{
 	// No deferrals after stated amortizaton period
 	if (va->isMainModel && !valn_flag && t > amortzn_period)
@@ -1513,9 +1219,10 @@ if (this == va_sfas97rd)
 	return comm_excess_bom(t);
 	}
 #endif	
-	
+}
+{
 #if defined(__FA_LIAB_H_)
-if (this == fa_sfas97rd)
+if (model_name == FA_SFAS97RD)
 	{
 	// No deferrals after stated amortizaton period
 	if (fa->isMainModel && !valn_flag && t > amortzn_period)
@@ -1524,9 +1231,10 @@ if (this == fa_sfas97rd)
 	return comm_excess_bom(t);
 	}
 #endif
-
+}
+{
 #if defined(__FIA_LIAB_H_)
-if (this == fia_sfas97rd)
+if (model_name == FIA_SFAS97RD)
 	{
 	// No deferrals after stated amortizaton period
 	if (fia->isMainModel && !valn_flag && t > amortzn_period)
@@ -1535,11 +1243,10 @@ if (this == fia_sfas97rd)
 	return comm_excess_bom(t);
 	}
 #endif
-
+}
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -1558,7 +1265,7 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_capzd_comm_chargeback(int t) {
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	{
 	// No deferrals after stated amortizaton period
 	if (!valn_flag && t > amortzn_period)
@@ -1567,8 +1274,9 @@ if (this == sfas97rd)
 	return sum_over_gaap("capzd_comm_chargeback", t);
 	}
 
+{
 #if defined(__UL_LIAB_H_)
-if (this == ul_sfas97rd)
+if (model_name == UL_SFAS97RD)
 	{
 	// No deferrals after stated amortizaton period
 	if (ul->isMainModel && !valn_flag && t > amortzn_period)
@@ -1577,9 +1285,10 @@ if (this == ul_sfas97rd)
 	return comm_chargeback(t);
 	}
 #endif
-
+}
+{
 #if defined(__VUL_LIAB_H_)
-if (this == vul_sfas97rd)
+if (model_name == VUL_SFAS97RD)
 	{
 	// No deferrals after stated amortizaton period
 	if (vul->isMainModel && !valn_flag && t > amortzn_period)
@@ -1588,9 +1297,10 @@ if (this == vul_sfas97rd)
 	return comm_chargeback(t);
 	}
 #endif
-
+}
+{
 #if defined(__IUL_LIAB_H_)
-if (this == iul_sfas97rd)
+if (model_name == IUL_SFAS97RD)
 	{
 	// No deferrals after stated amortizaton period
 	if (iul->isMainModel && !valn_flag && t > amortzn_period)
@@ -1599,9 +1309,10 @@ if (this == iul_sfas97rd)
 	return comm_chargeback(t);
 	}
 #endif
-
+}
+{
 #if defined(__VA_LIAB_H_)
-if (this == va_sfas97rd)
+if (model_name == VA_SFAS97RD)
 	{
 	// No deferrals after stated amortizaton period
 	if (va->isMainModel && !valn_flag && t > amortzn_period)
@@ -1610,9 +1321,10 @@ if (this == va_sfas97rd)
 	return comm_chargeback(t);
 	}
 #endif
-
+}
+{
 #if defined(__FA_LIAB_H_)
-if (this == fa_sfas97rd)
+if (model_name == FA_SFAS97RD)
 	{
 	// No deferrals after stated amortizaton period
 	if (fa->isMainModel && !valn_flag && t > amortzn_period)
@@ -1621,9 +1333,10 @@ if (this == fa_sfas97rd)
 	return comm_chargeback(t);
 	}
 #endif
-
+}
+{
 #if defined(__FIA_LIAB_H_)
-if (this == fia_sfas97rd)
+if (model_name == FIA_SFAS97RD)
 	{
 	// No deferrals after stated amortizaton period
 	if (fia->isMainModel && !valn_flag && t > amortzn_period)
@@ -1632,11 +1345,10 @@ if (this == fia_sfas97rd)
 	return comm_chargeback(t);
 	}
 #endif
-
+}
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -1659,55 +1371,6 @@ return -capzd_comm_chargeback(t);
 
 }
 
-
-//@@ END
-
-//@@ START - capzd_comm_pv
-// Capitalized Commissions Present Value                                                                                             
-// Column:CAPZD_COMM_PV
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_capzd_comm_pv(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "capzd_comm_pv.SFAS97RD_GAAP.for"
-if (t < start_period || t >= final_period)
-	return NO_AVG;
-
-return capzd_comm_bom(t + 1)
-	   + ((capzd_comm_pv(t + 1) + capzd_comm_eom(t + 1))
-	      / (1.0 + gaap_amortzn_int_rate(t + 1)));
-
-}
-
-
-//@@ END
-
-//@@ START - capzd_comm_pv_loss_rec_int_rate
-// Capitalized Commissions Present Value At Loss Recognition Interest Rate                                                                                             
-// Column:CAPZD_COMM_PV_LOSS_REC_INT_RATE
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_capzd_comm_pv_loss_rec_int_rate(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "capzd_comm_pv_loss_rec_int_rate.SFAS97RD_GAAP.for"
-if (t < start_period || t >= final_period)
-	return NO_AVG;
-
-return capzd_comm_bom(t + 1)
-	   + ((capzd_comm_pv_loss_rec_int_rate(t + 1) + capzd_comm_eom(t + 1))
-	      / (1.0 + loss_rec_amortzn_int_rate(t + 1)));
-
-}
-
-
 //@@ END
 
 //@@ START - capzd_prem_bonus
@@ -1725,7 +1388,7 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_capzd_prem_bonus(int t) {
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	{
 	// No deferrals after stated amortizaton period
 	if (!valn_flag && t > amortzn_period)
@@ -1734,8 +1397,9 @@ if (this == sfas97rd)
 	return sum_over_gaap("capzd_prem_bonus", t);
 	}
 
+{
 #if defined(__VA_LIAB_H_)
-if (this == va_sfas97rd)
+if (model_name == VA_SFAS97RD)
 	{
 	// No deferrals after stated amortizaton period
 	if (va->isMainModel && !valn_flag && t > amortzn_period)
@@ -1751,9 +1415,10 @@ if (this == va_sfas97rd)
 	return 0.0;	
 	}
 #endif
-
+}
+{
 #if defined(__FA_LIAB_H_)
-if (this == fa_sfas97rd)
+if (model_name == FA_SFAS97RD)
 	{
 	// No deferrals after stated amortizaton period
 	if (fa->isMainModel && !valn_flag && t > amortzn_period)
@@ -1769,9 +1434,10 @@ if (this == fa_sfas97rd)
 	return 0.0;	
 	}
 #endif
-
+}
+{
 #if defined(__FIA_LIAB_H_)
-if (this == fia_sfas97rd)
+if (model_name == FIA_SFAS97RD)
 	{
 	// No deferrals after stated amortizaton period
 	if (fia->isMainModel && !valn_flag && t > amortzn_period)
@@ -1787,163 +1453,10 @@ if (this == fia_sfas97rd)
 	return 0.0;	
 	}
 #endif
-	
+}
 return NO_AVG;
 
 }
-
-
-//@@ END
-
-//@@ START - capzd_prem_bonus_accum
-// Capitalized Premium Bonus Accumulation                                                                                             
-// Column:CAPZD_PREM_BONUS_ACCUM
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_capzd_prem_bonus_accum(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "capzd_prem_bonus_accum.SFAS97RD_GAAP.for"
-if (t < start_period || t > final_period)
-	return NO_AVG;
-
-if (xint(cal_yr(t)) < cohort_yr)
-	return NO_AVG;
-
-if (t == start_period)
-	{
-	if (valn_period == 0)
-		{
-		if (this == sfas97rd)
-			{
-			double def_p_bon_accum = 0.0;
-			
-			for (int tt = cohort_first_issue_period + 1; tt <= 0; tt++)
-				{
-				date_lookup_gen2 = date(tt); //WTW - Gen2 - AtTime() not supported
-				double def_p_bon = cohort_history_capzd_prem_bonus/*.AtTime(tt)*/;
-				
-				def_p_bon_accum 
-				= def_p_bon_accum * (1.0 + gaap_int_rate_mthly) + def_p_bon;
-				}			
-			return def_p_bon_accum; 
-			}
-		else //  No History for cell pricing at issue period
-			return 0.0;	
-		}
-	else //valn_period != 0
-		return init_capzd_prem_bonus_accum;
-	}
-
-return (capzd_prem_bonus_accum(t - 1)
-	     + capzd_prem_bonus(t))
-	   * (1.0 + gaap_amortzn_int_rate(t));
-
-}
-
-
-//@@ END
-
-//@@ START - capzd_prem_bonus_accum_loss_rec_int_rate
-// Capitalized Premium Bonus Accumulation At Loss Recognition Interest Rate                                                                                             
-// Column:CAPZD_PREM_BONUS_ACCUM_LOSS_REC_INT_RATE
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_capzd_prem_bonus_accum_loss_rec_int_rate(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "capzd_prem_bonus_accum_loss_rec_int_rate.SFAS97RD_GAAP.for"
-if (t < start_period || t > final_period)
-	return NO_AVG;
-
-if (xint(cal_yr(t)) < cohort_yr)
-	return NO_AVG;
-
-if (t == start_period)
-	{
-	if (valn_period == 0)
-		{
-		if (this == sfas97rd)
-			{
-			double def_p_bon_accum = 0.0;
-			
-			for (int tt = cohort_first_issue_period + 1; tt <= 0; tt++)
-				{
-				date_lookup_gen2 = date(tt); //WTW - Gen2 - AtTime() not supported
-				double def_p_bon = cohort_history_capzd_prem_bonus/*.AtTime(tt)*/;
-				
-				def_p_bon_accum 
-				= def_p_bon_accum * (1.0 + loss_rec_int_rate_mthly) + def_p_bon;
-				}			
-			return def_p_bon_accum; 
-			}
-		else //  No History for cell pricing at issue period
-			return 0.0;	
-		}
-	else //valn_period != 0
-		return init_capzd_prem_bonus_accum_loss_rec_int_rate;
-	}
-
-return (capzd_prem_bonus_accum(t - 1)
-	     + capzd_prem_bonus(t))
-	   * (1.0 + loss_rec_amortzn_int_rate(t));
-
-}
-
-
-//@@ END
-
-//@@ START - capzd_prem_bonus_pv
-// Capitalized Premium Bonus Present Value                                                                                             
-// Column:CAPZD_PREM_BONUS_PV
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_capzd_prem_bonus_pv(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "capzd_prem_bonus_pv.SFAS97RD_GAAP.for"
-if (t < start_period || t >= final_period)
-	return NO_AVG;
-
-return capzd_prem_bonus(t + 1)
-	   + (capzd_prem_bonus_pv(t + 1)
-		  / (1.0 + gaap_amortzn_int_rate(t + 1)));
-
-}
-
-
-//@@ END
-
-//@@ START - capzd_prem_bonus_pv_loss_rec_int_rate
-// Capitalized Premium Bonus Present Value At Loss Recognition Interest Rate                                                                                             
-// Column:CAPZD_PREM_BONUS_PV_LOSS_REC_INT_RATE
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_capzd_prem_bonus_pv_loss_rec_int_rate(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "capzd_prem_bonus_pv_loss_rec_int_rate.SFAS97RD_GAAP.for"
-if (t < start_period || t >= final_period)
-	return NO_AVG;
-
-return capzd_prem_bonus(t + 1)
-	   + (capzd_prem_bonus_pv_loss_rec_int_rate(t + 1)
-		  / (1.0 + loss_rec_amortzn_int_rate(t + 1)));
-
-}
-
 
 //@@ END
 
@@ -1959,10 +1472,9 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_capzd_reins_yrt_cost(int t) {
 //^^^
 
 #line 1 "capzd_reins_yrt_cost.SFAS97RD_GAAP.for"
-//WTW - Gen2 - split non time guard items
-if (/*reins_flag || */t <= start_period || t > final_period)
+if (t <= start_period || t > final_period)
 	return NO_AVG;
-	
+
 if (reins_flag)
 	return NO_AVG;
 
@@ -1973,7 +1485,6 @@ if (!valn_flag && t > amortzn_period)
 return reins_yrt_cost(t);
 
 }
-
 
 //@@ END
 
@@ -1992,11 +1503,12 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_cash_flow_bom(int t) {
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	return sum_over_gaap("cash_flow_bom", t);
 
+{
 #if defined(__UL_LIAB_H_)
-if (this == ul_sfas97rd)
+if (model_name == UL_SFAS97RD)
 	{
 	if (!reins_flag) // Gross
 		return ul->direct_cash_flow_bom(t);
@@ -2009,9 +1521,10 @@ if (this == ul_sfas97rd)
 		       - maint_exp_bom(t);
 	}
 #endif
-
+}
+{
 #if defined(__IUL_LIAB_H_)
-if (this == iul_sfas97rd)
+if (model_name == IUL_SFAS97RD)
 	{
 	if (!reins_flag) // Gross
 		return iul->direct_cash_flow_bom(t);
@@ -2024,9 +1537,10 @@ if (this == iul_sfas97rd)
 		       - maint_exp_bom(t);
 	}
 #endif
-
+}
+{
 #if defined(__VUL_LIAB_H_)
-if (this == vul_sfas97rd)
+if (model_name == VUL_SFAS97RD)
 	{
 	if (!reins_flag) // Gross
 		return vul->direct_cash_flow_bom(t);
@@ -2039,9 +1553,10 @@ if (this == vul_sfas97rd)
 		       - maint_exp_bom(t);
 	}
 #endif
-
+}
+{
 #if defined(__FA_LIAB_H_)
-if (this == fa_sfas97rd)
+if (model_name == FA_SFAS97RD)
 	{		
 	if (!reins_flag) //Gross
 		return fa->direct_cash_flow_bom(t);
@@ -2051,9 +1566,10 @@ if (this == fa_sfas97rd)
 	return 0.0;
 	}
 #endif
-
+}
+{
 #if defined(__FIA_LIAB_H_)
-if (this == fia_sfas97rd)
+if (model_name == FIA_SFAS97RD)
 	{		
 	if (!reins_flag) //Gross
 		return fia->direct_cash_flow_bom(t);
@@ -2064,9 +1580,10 @@ if (this == fia_sfas97rd)
 	}
 
 #endif
-
+}
+{
 #if defined(__VA_LIAB_H_)
-if (this == va_sfas97rd)
+if (model_name == VA_SFAS97RD)
 	{		
 	if (!reins_flag) //Gross
 		return va->direct_cash_flow_bom(t);
@@ -2077,11 +1594,10 @@ if (this == va_sfas97rd)
 	}
 
 #endif
-
+}
 return 0.0;
 
 }
-
 
 //@@ END
 
@@ -2100,50 +1616,56 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_cash_flow_int(int t) {
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	return cash_flow_bom(t)
-	       * seg->cash_flow_rate_mthly(t);
+	       * seg_element->cash_flow_rate_mthly(t);
 
+{
 #if defined(__UL_LIAB_H_)
-if (this == ul_sfas97rd)
+if (model_name == UL_SFAS97RD)
 	return cash_flow_bom(t)
 	       * (pow(1.0 + ul->asset_yld(t), 1.0 / 12.0) - 1.0);	
 #endif
-
+}
+{
 #if defined(__IUL_LIAB_H_)
-if (this == iul_sfas97rd)
+if (model_name == IUL_SFAS97RD)
 	return cash_flow_bom(t)
 	       * (pow(1.0 + iul->asset_yld(t), 1.0 / 12.0) - 1.0);	
 #endif
-
+}
+{
 #if defined(__VUL_LIAB_H_)
-if (this == vul_sfas97rd)
+if (model_name == VUL_SFAS97RD)
 	return cash_flow_bom(t)
 	       * (pow(1.0 + vul->asset_yld(t), 1.0 / 12.0) - 1.0);	
 #endif
-
+}
+{
 #if defined(__FA_LIAB_H_)
-if (this == fa_sfas97rd)
+if (model_name == FA_SFAS97RD)
 	return cash_flow_bom(t)
 	       * (pow(1.0 + fa->asset_yld(t), 1.0 / 12.0) - 1.0);	
 #endif
-
+}
+{
 #if defined(__FIA_LIAB_H_)
-if (this == fia_sfas97rd)
+if (model_name == FIA_SFAS97RD)
 	return cash_flow_bom(t)
 	       * (pow(1.0 + fia->asset_yld(t), 1.0 / 12.0) - 1.0);	
 #endif
-
+}
+{
 #if defined(__VA_LIAB_H_)
-if (this == va_sfas97rd)
+if (model_name == VA_SFAS97RD)
 	return cash_flow_bom(t)
 	       * (pow(1.0 + va->asset_yld(t), 1.0 / 12.0) - 1.0);	
 #endif
+}
 
 return 0.0;
 
 }
-
 
 //@@ END
 
@@ -2162,11 +1684,12 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_charges(int t) {
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	return sum_over_gaap("charges", t);
 
+{
 #if defined(__UL_LIAB_H_)
-if (this == ul_sfas97rd)
+if (model_name == UL_SFAS97RD)
 	{
 	double base_charges = 0.0;
 	double addl_charges = 0.0;
@@ -2227,9 +1750,10 @@ if (this == ul_sfas97rd)
 		    + addl_charges;
 	}
 #endif
-
+}
+{
 #if defined(__VUL_LIAB_H_)
-if (this == vul_sfas97rd)
+if (model_name == VUL_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return max(0.0, min(vul->coi_chg(t),
@@ -2245,9 +1769,10 @@ if (this == vul_sfas97rd)
 
 	}
 #endif
-
+}
+{
 #if defined(__IUL_LIAB_H_)
-if (this == iul_sfas97rd)
+if (model_name == IUL_SFAS97RD)
 	{
 	double base_charges = 0.0;
 	double addl_charges = 0.0;
@@ -2315,9 +1840,10 @@ if (this == iul_sfas97rd)
 		    + addl_charges;
 	}
 #endif
-
+}
+{
 #if defined(__VA_LIAB_H_)
-if (this == va_sfas97rd)
+if (model_name == VA_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return va->gmdb_chg(t)
@@ -2339,9 +1865,10 @@ if (this == va_sfas97rd)
 		return 0.0;	
 	}
 #endif
-
+}
+{
 #if defined(__FIA_LIAB_H_)
-if (this == fia_sfas97rd)
+if (model_name == FIA_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return fia->gmwb_chg(t);
@@ -2353,11 +1880,10 @@ if (this == fia_sfas97rd)
 		return 0.0;	
 	}
 #endif
-	
+}
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -2376,11 +1902,12 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_comm_chargeback(int t) {
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	return sum_over_gaap("comm_chargeback", t);
-	
+
+{	
 #if defined(__UL_LIAB_H_)
-if (this == ul_sfas97rd)
+if (model_name == UL_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return ul->comm_chargeback(t);
@@ -2392,9 +1919,10 @@ if (this == ul_sfas97rd)
 	return NO_AVG;
 	}
 #endif
-
+}
+{
 #if defined(__VUL_LIAB_H_)
-if (this == vul_sfas97rd)
+if (model_name == VUL_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return vul->comm_chargeback(t);
@@ -2406,9 +1934,10 @@ if (this == vul_sfas97rd)
 	return NO_AVG;
 	}
 #endif
-
+}
+{
 #if defined(__IUL_LIAB_H_)
-if (this == iul_sfas97rd)
+if (model_name == IUL_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return iul->comm_chargeback(t);
@@ -2420,9 +1949,10 @@ if (this == iul_sfas97rd)
 	return NO_AVG;
 	}
 #endif
-
+}
+{
 #if defined(__VA_LIAB_H_)
-if (this == va_sfas97rd)
+if (model_name == VA_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return va->comm_chargeback(t);
@@ -2434,9 +1964,10 @@ if (this == va_sfas97rd)
 	return 0.0;	
 	}
 #endif	
-	
+}
+{
 #if defined(__FA_LIAB_H_)
-if (this == fa_sfas97rd)
+if (model_name == FA_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return fa->comm_chargeback(t);
@@ -2448,9 +1979,10 @@ if (this == fa_sfas97rd)
 	return 0.0;	
 	}
 #endif	
-
+}
+{
 #if defined(__FIA_LIAB_H_)
-if (this == fia_sfas97rd)
+if (model_name == FIA_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return fia->comm_chargeback(t);
@@ -2462,11 +1994,10 @@ if (this == fia_sfas97rd)
 	return 0.0;	
 	}
 #endif	
-
+}
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -2485,11 +2016,12 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_comm_excess_bom(int t) {
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	return sum_over_gaap("comm_excess_bom", t);
 
+{
 #if defined(__UL_LIAB_H_)
-if (this == ul_sfas97rd)
+if (model_name == UL_SFAS97RD)
 	{
     if (!reins_flag) //Gross
     	return max(0.0, ul->comm_bom(t) - comm_trail_bom(t));
@@ -2502,9 +2034,10 @@ if (this == ul_sfas97rd)
     return 0.0;
 	}
 #endif
-
+}
+{
 #if defined(__VUL_LIAB_H_)
-if (this == vul_sfas97rd)
+if (model_name == VUL_SFAS97RD)
 	{
     if (!reins_flag) //Gross
     	return max(0.0, vul->comm_bom(t) - comm_trail_bom(t));
@@ -2517,9 +2050,10 @@ if (this == vul_sfas97rd)
     return 0.0;
 	}
 #endif
-
+}
+{
 #if defined(__IUL_LIAB_H_)
-if (this == iul_sfas97rd)
+if (model_name == IUL_SFAS97RD)
 	{
     if (!reins_flag) //Gross
     	return max(0.0, iul->comm_bom(t) - comm_trail_bom(t));
@@ -2532,9 +2066,10 @@ if (this == iul_sfas97rd)
     return 0.0;
 	}
 #endif
-
+}
+{
 #if defined(__VA_LIAB_H_)
-if (this == va_sfas97rd)
+if (model_name == VA_SFAS97RD)
     {
     if (!reins_flag) //Gross
         return max(0.0, va->comm_bom(t) - comm_trail_bom(t));
@@ -2551,9 +2086,10 @@ if (this == va_sfas97rd)
     return 0.0;
     }
 #endif
-
+}
+{
 #if defined(__FA_LIAB_H_)
-if (this == fa_sfas97rd)
+if (model_name == FA_SFAS97RD)
     {
     if (!reins_flag) //Gross
     	return max(0.0, fa->comm_bom(t) - comm_trail_bom(t));
@@ -2565,9 +2101,10 @@ if (this == fa_sfas97rd)
     return 0.0;
     }
 #endif
-
+}
+{
 #if defined(__FIA_LIAB_H_)
-if (this == fia_sfas97rd)
+if (model_name == FIA_SFAS97RD)
     {
     if (!reins_flag) //Gross
     	return max(0.0, fia->comm_bom(t) - comm_trail_bom(t));
@@ -2579,11 +2116,10 @@ if (this == fia_sfas97rd)
     return 0.0;
     }
 #endif
-
+}
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -2603,7 +2139,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - comm_trail_bom
@@ -2621,11 +2156,12 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_comm_trail_bom(int t) {
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	return sum_over_gaap("comm_trail_bom", t);
-	
+
+{	
 #if defined(__UL_LIAB_H_)
-if (this == ul_sfas97rd)
+if (model_name == UL_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		{
@@ -2651,9 +2187,10 @@ if (this == ul_sfas97rd)
 	return 0.0;	
 	}
 #endif
-
+}
+{
 #if defined(__VUL_LIAB_H_)
-if (this == vul_sfas97rd)
+if (model_name == VUL_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		{
@@ -2679,9 +2216,10 @@ if (this == vul_sfas97rd)
 	return 0.0;	
 	}
 #endif	
-	
+}
+{
 #if defined(__IUL_LIAB_H_)
-if (this == iul_sfas97rd)
+if (model_name == IUL_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		{
@@ -2707,24 +2245,36 @@ if (this == iul_sfas97rd)
 	return 0.0;	
 	}
 #endif
-
+}
+{
 #if defined(__VA_LIAB_H_)
-if (this == va_sfas97rd)
+if (model_name == VA_SFAS97RD)
 	{
 	double gross_comm_bom_trail = 0.0;
 	
 	if (va->pol_yr(t) > va->prem_term)
+		{
+		va->comm_py_lookup = va->pol_yr(comm_pct_fund_ult_index);
+		double comm_pct_fund_local = va->comm_pct_fund;
 		gross_comm_bom_trail
 		= va->fund_val(t - 1)
-		  * va->comm_pct_fund.AtTime(comm_pct_fund_ult_index)
+		  * comm_pct_fund_local
 		  / 12.0;
+		}
 	else
+		{
+		va->comm_py_lookup = va->pol_yr(prem_term_period);
+		double comm_pct_prem_local = va->comm_pct_prem;
+		va->comm_py_lookup = va->pol_yr(comm_pct_fund_ult_index);
+		double comm_pct_fund_local = va->comm_pct_fund;
+
 		gross_comm_bom_trail
 		= va->prem_paid(t) 
-	      * va->comm_pct_prem.AtTime(prem_term_period)
+	      * comm_pct_prem_local
 		  + va->fund_val(t - 1)
-		    * va->comm_pct_fund.AtTime(comm_pct_fund_ult_index)
+		    * comm_pct_fund_local
 			/ 12.0;	
+		}
 
 	if (!reins_flag) //Gross
 		return gross_comm_bom_trail;
@@ -2741,23 +2291,28 @@ if (this == va_sfas97rd)
 	return 0.0;	
 	}
 #endif	
-	
+}
+{
 #if defined(__FA_LIAB_H_)
-if (this == fa_sfas97rd)
+if (model_name == FA_SFAS97RD)
 	{
 	double gross_comm_bom_trail = 0.0;
-	
+	fa->pol_yr_lookup = fa->pol_yr(comm_pct_fund_ult_index);
+	double comm_pct_fund_local = fa->comm_pct_fund;
+	fa->pol_yr_lookup = fa->pol_yr(prem_term_period);
+	double comm_pct_prem_local = fa->comm_pct_prem;
+
 	if (fa->pol_yr(t) > fa->prem_term)
 		gross_comm_bom_trail
 		= fa->fund_val_fixed(t - 1)
-		  * fa->comm_pct_fund.AtTime(comm_pct_fund_ult_index)
+		  * comm_pct_fund_local
 		  / 12.0;
 	else
 		gross_comm_bom_trail
 		= fa->prem_paid(t) 
-	      * fa->comm_pct_prem.AtTime(prem_term_period)
+	      * comm_pct_prem_local
 		  + fa->fund_val_fixed(t - 1)
-		    * fa->comm_pct_fund.AtTime(comm_pct_fund_ult_index)
+		    * comm_pct_fund_local
 			/ 12.0;	
 	
 	if (!reins_flag) //Gross
@@ -2770,13 +2325,15 @@ if (this == fa_sfas97rd)
 	return 0.0;	
 	}
 #endif
-
+}
+{
 #if defined(__FIA_LIAB_H_)
-if (this == fia_sfas97rd)
+if (model_name == FIA_SFAS97RD)
 	{
+	comm_py_lookup = fia->pol_yr(comm_pct_fund_ult_index);
 	double gross_comm_bom_trail	//for single premium product, no trail commission from commission as percent of premium
 	= fia->fund_val_fixed(t - 1)
-	  * fia->comm_pct_fund.AtTime(comm_pct_fund_ult_index)
+	  * fia->comm_pct_fund
 	  / 12.0;
 		
 	if (!reins_flag) //Gross
@@ -2789,11 +2346,10 @@ if (this == fia_sfas97rd)
 	return 0.0;	
 	}
 #endif
-
+}
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -2813,7 +2369,6 @@ return NO_AVG;
 
 }
 
-
 //@@ END
 
 //@@ START - credited_int
@@ -2823,7 +2378,7 @@ return NO_AVG;
 double SFAS97RD_GAAP_UDF::sfas97rd_gaap_credited_int(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(35,"credited_int",t);
+	return rebase_value(24,"credited_int",t);
 }
 
 
@@ -2834,11 +2389,12 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	return sum_over_gaap("credited_int", t);
-	
+
+{	
 #if defined(__UL_LIAB_H_)
-if (this == ul_sfas97rd)
+if (model_name == UL_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return max(0.0, ul->credited_int(t));
@@ -2848,9 +2404,10 @@ if (this == ul_sfas97rd)
 		return 0.0;
 	}	
 #endif
-
+}
+{
 #if defined(__VUL_LIAB_H_)
-if (this == vul_sfas97rd)
+if (model_name == VUL_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return max(0.0, vul->credited_int_ga(t));
@@ -2860,9 +2417,10 @@ if (this == vul_sfas97rd)
 		return 0.0;
 	}	
 #endif
-
+}
+{
 #if defined(__IUL_LIAB_H_)
-if (this == iul_sfas97rd)
+if (model_name == IUL_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return max(0.0, iul->credited_int(t));
@@ -2872,9 +2430,10 @@ if (this == iul_sfas97rd)
 		return 0.0;
 	}	
 #endif
-
+}
+{
 #if defined(__VA_LIAB_H_)
-if (this == va_sfas97rd)
+if (model_name == VA_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return va->credited_int_ga(t);
@@ -2884,9 +2443,10 @@ if (this == va_sfas97rd)
 		return 0.0;	
 	}
 #endif
-
+}
+{
 #if defined(__FA_LIAB_H_)
-if (this == fa_sfas97rd)
+if (model_name == FA_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return fa->credited_int(t);
@@ -2896,9 +2456,10 @@ if (this == fa_sfas97rd)
 		return 0.0;	
 	}
 #endif
-
+}
+{
 #if defined(__FIA_LIAB_H_)
-if (this == fia_sfas97rd)
+if (model_name == FIA_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return fia->credited_int(t);
@@ -2908,11 +2469,10 @@ if (this == fia_sfas97rd)
 		return 0.0;	
 	}
 #endif
-
+}
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -2935,12 +2495,18 @@ if (t == start_period)
 	{
 	if (sfas97rd_valn_flag) 
 		{
-		if (loss_recognition_flag)
-			return k_capzd_acq_exp(t) * egp_pv_loss_rec_int_rate(t)
-			       - capzd_acq_exp_pv_loss_rec_int_rate(t);
+		if (valn_period == 0)
+			{
+			if (model_name == SFAS97RD)
+				{
+				cohort_id = cohort_id;
+				return cohort_history_dac_acq_exp;
+				}
 
-		return k_capzd_acq_exp(t) * egp_pv(t)
-				- capzd_acq_exp_pv(t);
+			return 0.0;//  No History for cell pricing at issue period
+			}
+
+		return init_dac_acq_exp;		
 		}
 
 	// (valn_period >= 0 && !valn_flag)
@@ -2954,16 +2520,13 @@ if ((!sfas97rd_valn_flag && !valn_flag)
 	&& t == start_period + 1 && valn_period > 0) 
 	return dac_acq_exp_sch(t - 1)
 			+ capzd_acq_exp(t)
-			+ dac_acq_exp_int(t)
 			- dac_acq_exp_amortzn(t);
 	
 return dac_acq_exp(t - 1)
 		+ capzd_acq_exp(t)
-		+ dac_acq_exp_int(t)
 		- dac_acq_exp_amortzn(t);
 
 }
-
 
 //@@ END
 
@@ -2982,10 +2545,9 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_dac_acq_exp_amortzn(int t) {
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-return egp(t) * k_capzd_acq_exp(t - 1);
+return k_capzd_acq_exp(t) * policies_inf(t);
 
 }
-
 
 //@@ END
 
@@ -3009,196 +2571,6 @@ return dac_acq_exp(t)
 
 }
 
-
-//@@ END
-
-//@@ START - dac_acq_exp_int
-// DAC Acquisition Expense Interest                                                                                             
-// Column:DAC_ACQ_EXP_INT
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_dac_acq_exp_int(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "dac_acq_exp_int.SFAS97RD_GAAP.for"
-if (t <= start_period || t > final_period)
-	return NO_AVG;
-
-double dac_acq_exp_prev_local = 0.0;
-
-if ((!sfas97rd_valn_flag && !valn_flag)
-	&& t == start_period + 1 && valn_period > 0) 
-	dac_acq_exp_prev_local = dac_acq_exp_sch(t - 1);
-else 
-	dac_acq_exp_prev_local = dac_acq_exp(t - 1);
-
-return (dac_acq_exp_prev_local + capzd_acq_exp(t))
-		* amortzn_int_rate(t);
-
-}
-
-
-//@@ END
-
-//@@ START - dac_acq_exp_loss_rec
-// DAC Acquisition Expense Loss Recognition                                                                                             
-// Column:DAC_ACQ_EXP_LOSS_REC
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_dac_acq_exp_loss_rec(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "dac_acq_exp_loss_rec.SFAS97RD_GAAP.for"
-if (loss_recognition_defn == NO)
-	return NO_AVG;	
-
-if (t < start_period || t > final_period)
-	return NO_AVG;
-
-if (xint(cal_yr(t)) < cohort_yr)
-	return NO_AVG;
-
-if (t == start_period)
-	{
-	if (sfas97rd_valn_flag)
-		{
-		double def_acq_exp_total = capzd_acq_exp_accum_loss_rec_int_rate(t) + capzd_acq_exp_pv_loss_rec_int_rate(t);
-		double def_comm_total = capzd_comm_accum_loss_rec_int_rate(t) + capzd_comm_pv_loss_rec_int_rate(t);
-		double def_comm_loss_rec_accum = dac_comm_loss_rec_accum(t);
-		double egp_total_avail = (egp_accum_loss_rec_int_rate(t) + egp_pv_loss_rec_int_rate(t) - (def_comm_total - def_comm_loss_rec_accum));
-		double loss_rec_prev = 0.0;
-
-		if (valn_period == 0)
-			{			
-			if (this == sfas97rd)
-				loss_rec_prev = dac_acq_exp_loss_rec_hist_accum(t);
-
-			else//  No History for cell pricing at issue period
-				loss_rec_prev = 0.0;	
-			}
-		else//valn_period != 0
-			loss_rec_prev = dac_acq_exp_loss_rec_hist_accum(t);
-		
-		return max(0.0, def_acq_exp_total - loss_rec_prev - egp_total_avail);
-		}
-
-	// (valn_period >= 0 && !valn_flag)
-	return gaap_schedule[DAC_ACQ_EXP_LOSS_REC][0];	
-	}
-
-return 0.0;
-
-}
-
-
-//@@ END
-
-//@@ START - dac_acq_exp_loss_rec_accum
-// DAC Acquisition Expense Loss Recognition Accumulation                                                                                             
-// Column:DAC_ACQ_EXP_LOSS_REC_ACCUM
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_dac_acq_exp_loss_rec_accum(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "dac_acq_exp_loss_rec_accum.SFAS97RD_GAAP.for"
-if (loss_recognition_defn == NO)
-	return NO_AVG;
-
-if (t < start_period || t > final_period)
-	return NO_AVG;
-
-if (xint(cal_yr(t)) < cohort_yr)
-	return NO_AVG;
-	
-if (t == start_period)
-	{
-	if (valn_period == 0)
-		{
-		if (this == sfas97rd)
-			return dac_acq_exp_loss_rec_hist_accum(t) + dac_acq_exp_loss_rec(t); 
-
-		//  No History for cell pricing at issue period
-		return 0.0;	
-		}	
-
-	//valn_period != 0
-	return dac_acq_exp_loss_rec_hist_accum(t) + dac_acq_exp_loss_rec(t);
-	}	
-
-return dac_acq_exp_loss_rec_accum(t - 1) 
-       * (1.0 + loss_rec_amortzn_int_rate(t))
-	   + dac_acq_exp_loss_rec(t);
-
-}
-
-
-//@@ END
-
-//@@ START - dac_acq_exp_loss_rec_hist_accum
-// DAC Acquisition Expense Loss Recognition History Accumulation                                                                                             
-// Column:DAC_ACQ_EXP_LOSS_REC_HIST_ACCUM
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_dac_acq_exp_loss_rec_hist_accum(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "dac_acq_exp_loss_rec_hist_accum.SFAS97RD_GAAP.for"
-if (loss_recognition_defn == NO)
-	return NO_AVG;
-
-if (t < start_period || t > final_period)
-	return NO_AVG;
-
-if (xint(cal_yr(t)) < cohort_yr)
-	return NO_AVG;
-	
-if (t == start_period)
-	{
-	if (valn_period == 0)
-		{
-		if (this == sfas97rd)
-			{
-			double def_acq_exp_loss_rec_accum = 0.0;
-			
-			for (int tt = cohort_first_issue_period + 1; tt <= 0; tt++)
-				{
-				date_lookup_gen2 = date(tt); //WTW - Gen2 - AtTime() not supported
-				double def_acq_exp_loss_rec = cohort_history_dac_acq_exp_loss/*.AtTime(tt)*/;
-				
-				def_acq_exp_loss_rec_accum 
-				= def_acq_exp_loss_rec_accum 
-				  * (1.0 + loss_rec_int_rate_mthly) 
-				  + def_acq_exp_loss_rec;
-				}			
-
-			return def_acq_exp_loss_rec_accum; 
-			}
-		//  No History for cell pricing at issue period
-		return 0.0;	
-		}	
-
-	//valn_period != 0
-	return init_dac_acq_exp_loss_rec_accum;
-	}	
-
-return NO_AVG;
-
-}
-
-
 //@@ END
 
 //@@ START - dac_acq_exp_sch
@@ -3213,17 +2585,15 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_dac_acq_exp_sch(int t) {
 //^^^
 
 #line 1 "dac_acq_exp_sch.SFAS97RD_GAAP.for"
-//WTW - Gen2 - split non time guard items
-if (/*valn_flag || */t < start_period || t > final_period)
+if (t < start_period || t > final_period)
 	return NO_AVG;
-	
+
 if (valn_flag)
 	return NO_AVG;
 
-return gaap_schedule[DAC_ACQ_EXP][0];
+return gaap_schedule[DAC_ACQ_EXP][t];
 
 }
-
 
 //@@ END
 
@@ -3246,12 +2616,18 @@ if (t == start_period)
 	{
 	if (sfas97rd_valn_flag)
 		{
-		if (loss_recognition_flag)
-			return k_capzd_comm(t) * egp_pv_loss_rec_int_rate(t)
-				   - capzd_comm_pv_loss_rec_int_rate(t);
+		if (valn_period == 0)
+			{
+			if (model_name == SFAS97RD)
+				{
+				cohort_id = cohort_id;
+				return cohort_history_dac_comm;
+				}
 
-		return k_capzd_comm(t) * egp_pv(t)
-			   - capzd_comm_pv(t);
+			return 0.0;//  No History for cell pricing at issue period
+			}
+
+		return init_dac_comm;		
 		}
 	// !valn_flag
 	if (valn_period == 0)
@@ -3265,17 +2641,14 @@ if ((!sfas97rd_valn_flag && !valn_flag)
 	return dac_comm_sch(t - 1)
 		   + capzd_comm_bom(t)
 		   + capzd_comm_eom(t)		
-		   + dac_comm_int(t)
 		   - dac_comm_amortzn(t);
 	
 return dac_comm(t - 1)
 	   + capzd_comm_bom(t)
 	   + capzd_comm_eom(t)	
-	   + dac_comm_int(t)
 	   - dac_comm_amortzn(t);
 
 }
-
 
 //@@ END
 
@@ -3294,10 +2667,9 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_dac_comm_amortzn(int t) {
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-return egp(t) * k_capzd_comm(t - 1);
+return k_capzd_comm(t) * policies_inf(t);
 
 }
-
 
 //@@ END
 
@@ -3321,194 +2693,6 @@ return dac_comm(t)
 
 }
 
-
-//@@ END
-
-//@@ START - dac_comm_int
-// DAC Commission Interest                                                                                             
-// Column:DAC_COMM_INT
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_dac_comm_int(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "dac_comm_int.SFAS97RD_GAAP.for"
-if (t <= start_period || t > final_period)
-	return NO_AVG;
-
-double dac_com_prev_local = 0.0;
-
-if ((!sfas97rd_valn_flag && !valn_flag)
-	&& t == start_period + 1 && valn_period > 0) 
-	dac_com_prev_local = dac_comm_sch(t - 1);
-else 
-	dac_com_prev_local = dac_comm(t - 1);
-
-return (dac_com_prev_local + capzd_comm_bom(t))
-		* amortzn_int_rate(t);
-
-}
-
-
-//@@ END
-
-//@@ START - dac_comm_loss_rec
-// DAC Commission Loss Recognition                                                                                             
-// Column:DAC_COMM_LOSS_REC
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_dac_comm_loss_rec(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "dac_comm_loss_rec.SFAS97RD_GAAP.for"
-if (loss_recognition_defn == NO)
-	return NO_AVG;
-
-if (t < start_period || t > final_period)
-	return NO_AVG;
-	
-if (xint(cal_yr(t)) < cohort_yr)
-	return NO_AVG;
-
-if (t == start_period)
-	{
-	if (sfas97rd_valn_flag)
-		{
-		double def_comm_total = capzd_comm_accum_loss_rec_int_rate(t) + capzd_comm_pv_loss_rec_int_rate(t);
-		double egp_total_avail = egp_accum_loss_rec_int_rate(t) + egp_pv_loss_rec_int_rate(t);
-		double loss_rec_prev = 0.0;
-		
-		if (valn_period == 0)
-			{			
-			if (this == sfas97rd)
-				loss_rec_prev = dac_comm_loss_rec_hist_accum(t);
-
-			else//  No History for cell pricing at issue period
-				loss_rec_prev = 0.0;	
-			}
-		else//valn_period != 0
-			loss_rec_prev = dac_comm_loss_rec_hist_accum(t);
-		
-		return max(0.0, def_comm_total - loss_rec_prev - egp_total_avail);
-		}
-
-	// (valn_period >= 0 && !valn_flag)
-	return gaap_schedule[DAC_COMM_LOSS_REC][0];	
-	}
-
-return NO_AVG;
-
-}
-
-
-//@@ END
-
-//@@ START - dac_comm_loss_rec_accum
-// DAC Commission Loss Recognition Accumulation                                                                                             
-// Column:DAC_COMM_LOSS_REC_ACCUM
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_dac_comm_loss_rec_accum(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "dac_comm_loss_rec_accum.SFAS97RD_GAAP.for"
-if (loss_recognition_defn == NO)
-	return NO_AVG;
-
-if (t < start_period || t > final_period)
-	return NO_AVG;
-
-if (xint(cal_yr(t)) < cohort_yr)
-	return NO_AVG;
-
-if (t == start_period)
-	{
-	if (valn_period == 0)
-		{			
-		if (this == sfas97rd)
-			return dac_comm_loss_rec_hist_accum(t) + dac_comm_loss_rec(t); 
-
-		//  No History for cell pricing at issue period
-		return 0.0;	
-		}						
-
-	//valn_period != 0
-	return dac_comm_loss_rec_hist_accum(t) + dac_comm_loss_rec(t);
-	}	
-		
-return dac_comm_loss_rec_accum(t - 1) 
-       * (1.0 + loss_rec_amortzn_int_rate(t))
-	   + dac_comm_loss_rec(t);
-
-}
-
-
-//@@ END
-
-//@@ START - dac_comm_loss_rec_hist_accum
-// DAC Commission Loss Recognition History Accumulation                                                                                             
-// Column:DAC_COMM_LOSS_REC_HIST_ACCUM
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_dac_comm_loss_rec_hist_accum(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "dac_comm_loss_rec_hist_accum.SFAS97RD_GAAP.for"
-if (loss_recognition_defn == NO)
-	return NO_AVG;
-
-if (t < start_period || t > final_period)
-	return NO_AVG;
-
-if (xint(cal_yr(t)) < cohort_yr)
-	return NO_AVG;
-
-if (t == start_period)
-	{
-	if (valn_period == 0)
-		{			
-		if (this == sfas97rd)
-			{
-			double def_dac_comm_loss_rec_accum = 0.0;
-			
-			for (int tt = cohort_first_issue_period + 1; tt <= 0; tt++)
-				{
-				date_lookup_gen2 = date(tt); //WTW - Gen2 - AtTime() not supported
-				double def_dac_comm_loss_rec = cohort_history_dac_comm_loss/*.AtTime(tt)*/;
-				
-				def_dac_comm_loss_rec_accum 
-				= def_dac_comm_loss_rec_accum 
-				  * (1.0 + loss_rec_int_rate_mthly) 
-				  + def_dac_comm_loss_rec;
-				}			
-
-			return def_dac_comm_loss_rec_accum; 
-			}
-		//  No History for cell pricing at issue period
-		return 0.0;	
-		}						
-
-	//valn_period != 0
-	return init_dac_comm_loss_rec_accum;
-	}	
-		
-return NO_AVG;
-
-}
-
-
 //@@ END
 
 //@@ START - dac_comm_sch
@@ -3523,17 +2707,15 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_dac_comm_sch(int t) {
 //^^^
 
 #line 1 "dac_comm_sch.SFAS97RD_GAAP.for"
-//WTW - Gen2 - split non time guard items
-if (/*valn_flag || */t < start_period || t > final_period)
+if (t < start_period || t > final_period)
 	return NO_AVG;
-	
+
 if (valn_flag)
 	return NO_AVG;
 
-return gaap_schedule[DAC_COMM][0];
+return gaap_schedule[DAC_COMM][t];
 
 }
-
 
 //@@ END
 
@@ -3559,7 +2741,6 @@ return dac_acq_exp_incr(t)
 
 }
 
-
 //@@ END
 
 //@@ START - dac_prem_bonus
@@ -3581,13 +2762,20 @@ if (t == start_period)
 	{
 	if (sfas97rd_valn_flag)
 		{
-		if (loss_recognition_flag)
-			return k_capzd_prem_bonus(t) * egp_pv_loss_rec_int_rate(t)
-				   - capzd_prem_bonus_pv_loss_rec_int_rate(t);
+		if (valn_period == 0)
+			{
+			if (model_name == SFAS97RD)
+				{
+				cohort_id = cohort_id;
+				return cohort_history_dac_prem_bonus;
+				}
 
-		return k_capzd_prem_bonus(t) * egp_pv(t)
-			   - capzd_prem_bonus_pv(t);
+			return 0.0;//  No History for cell pricing at issue period
+			}
+
+		return init_dac_prem_bonus;		
 		}
+
 		// (!valn_flag)
 	if (valn_period == 0 )
 		return dac_prem_bonus_sch(t);
@@ -3599,16 +2787,13 @@ if ((!sfas97rd_valn_flag && !valn_flag)
 	&& t == start_period + 1 && valn_period > 0) 
 	return dac_prem_bonus_sch(t - 1)
 		   + capzd_prem_bonus(t)
-  		   + dac_prem_bonus_int(t)
   		   - dac_prem_bonus_amortzn(t);
 	
 return dac_prem_bonus(t - 1)
 	   + capzd_prem_bonus(t)
-	   + dac_prem_bonus_int(t)
 	   - dac_prem_bonus_amortzn(t);
 
 }
-
 
 //@@ END
 
@@ -3627,10 +2812,9 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_dac_prem_bonus_amortzn(int t) {
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-return egp(t) * k_capzd_prem_bonus(t - 1);
+return k_capzd_prem_bonus(t) * policies_inf(t);
 
 }
-
 
 //@@ END
 
@@ -3654,199 +2838,6 @@ return dac_prem_bonus(t)
 
 }
 
-
-//@@ END
-
-//@@ START - dac_prem_bonus_int
-// DAC Premium Bonus Interest                                                                                             
-// Column:DAC_PREM_BONUS_INT
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_dac_prem_bonus_int(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "dac_prem_bonus_int.SFAS97RD_GAAP.for"
-if (t <= start_period || t > final_period)
-	return NO_AVG;
-
-double dac_prem_bonus_prev_local = 0.0;
-
-if ((!sfas97rd_valn_flag && !valn_flag)
-	&& t == start_period + 1 && valn_period > 0) 
-	dac_prem_bonus_prev_local = dac_prem_bonus_sch(t - 1);
-else 
-	dac_prem_bonus_prev_local = dac_prem_bonus(t - 1);
-	
-return (dac_prem_bonus_prev_local + capzd_prem_bonus(t))
-		* amortzn_int_rate(t);
-
-}
-
-
-//@@ END
-
-//@@ START - dac_prem_bonus_loss_rec
-// DAC Premium Bonus Loss Recognition                                                                                             
-// Column:DAC_PREM_BONUS_LOSS_REC
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_dac_prem_bonus_loss_rec(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "dac_prem_bonus_loss_rec.SFAS97RD_GAAP.for"
-if (loss_recognition_defn == NO)
-	return NO_AVG;	
-
-if (t < start_period || t > final_period)
-	return NO_AVG;
-
-if (xint(cal_yr(t)) < cohort_yr)
-	return NO_AVG;
-
-if (t == start_period)
-	{
-	if (sfas97rd_valn_flag)
-		{
-		double def_acq_exp_total = capzd_acq_exp_accum_loss_rec_int_rate(t) + capzd_acq_exp_pv_loss_rec_int_rate(t);
-		double def_comm_total = capzd_comm_accum_loss_rec_int_rate(t) + capzd_comm_pv_loss_rec_int_rate(t);
-		double def_prem_bon_total = capzd_prem_bonus_accum_loss_rec_int_rate(t) + capzd_prem_bonus_pv_loss_rec_int_rate(t);
-		double def_comm_loss_rec_accum = dac_comm_loss_rec_accum(t);
-		double def_acq_exp_loss_rec_accum = dac_acq_exp_loss_rec_accum(t);
-		double egp_total_avail = (egp_accum_loss_rec_int_rate(t) + egp_pv_loss_rec_int_rate(t) - (def_comm_total - def_comm_loss_rec_accum) 
-		                          - (def_acq_exp_total - def_acq_exp_loss_rec_accum));
-		double loss_rec_prev = 0.0;
-
-		if (valn_period == 0)
-			{
-			if (this == sfas97rd)
-				loss_rec_prev = dac_prem_bonus_loss_rec_hist_accum(t); 
-
-			else //  No History for cell pricing at issue period
-				loss_rec_prev = 0.0;	
-			}	
-		else //valn_period != 0
-			loss_rec_prev = dac_prem_bonus_loss_rec_hist_accum(t);
-		
-		return max(0.0, def_prem_bon_total - loss_rec_prev - egp_total_avail);
-		}
-
-	// (valn_period >= 0 && !valn_flag)
-	return gaap_schedule[DAC_PREM_BONUS_LOSS_REC][0];	
-	}
-
-return 0.0;
-
-}
-
-
-//@@ END
-
-//@@ START - dac_prem_bonus_loss_rec_accum
-// DAC Premium Bonus Loss Recognition Accumulation                                                                                             
-// Column:DAC_PREM_BONUS_LOSS_REC_ACCUM
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_dac_prem_bonus_loss_rec_accum(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "dac_prem_bonus_loss_rec_accum.SFAS97RD_GAAP.for"
-if (loss_recognition_defn == NO)
-	return NO_AVG;
-
-if (t < start_period || t > final_period)
-	return NO_AVG;
-
-if (xint(cal_yr(t)) < cohort_yr)
-	return NO_AVG;
-	
-if (t == start_period)
-	{
-	if (valn_period == 0)
-		{
-		if (this == sfas97rd)
-			return dac_prem_bonus_loss_rec_hist_accum(t) + dac_prem_bonus_loss_rec(t); 
-
-		//  No History for cell pricing at issue period
-		return 0.0;	
-		}	
-
-	//valn_period != 0
-	return dac_prem_bonus_loss_rec_hist_accum(t) + dac_prem_bonus_loss_rec(t);
-	}	
-
-return dac_prem_bonus_loss_rec_accum(t - 1) 
-       * (1.0 + loss_rec_amortzn_int_rate(t))
-	   + dac_prem_bonus_loss_rec(t);
-
-}
-
-
-//@@ END
-
-//@@ START - dac_prem_bonus_loss_rec_hist_accum
-// DAC Premium Bonus Loss Recognition History Accumulation                                                                                             
-// Column:DAC_PREM_BONUS_LOSS_REC_HIST_ACCUM
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_dac_prem_bonus_loss_rec_hist_accum(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "dac_prem_bonus_loss_rec_hist_accum.SFAS97RD_GAAP.for"
-if (loss_recognition_defn == NO)
-	return NO_AVG;
-
-if (t < start_period || t > final_period)
-	return NO_AVG;
-
-if (xint(cal_yr(t)) < cohort_yr)
-	return NO_AVG;
-	
-if (t == start_period)
-	{
-	if (valn_period == 0)
-		{
-		if (this == sfas97rd)
-			{
-			double def_prem_bonus_loss_rec_accum = 0.0;
-			
-			for (int tt = cohort_first_issue_period + 1; tt <= 0; tt++)
-				{
-				date_lookup_gen2 = date(tt); //WTW - Gen2 - AtTime() not supported
-				double def_prem_bonus_loss_rec = cohort_history_dac_prem_bonus_loss/*.AtTime(tt)*/;
-				
-				def_prem_bonus_loss_rec_accum 
-				= def_prem_bonus_loss_rec_accum 
-				  * (1.0 + loss_rec_int_rate_mthly) 
-				  + def_prem_bonus_loss_rec;
-				}			
-
-			return def_prem_bonus_loss_rec_accum; 
-			}
-		//  No History for cell pricing at issue period
-		return 0.0;	
-		}	
-
-	//valn_period != 0
-	return init_dac_prem_bonus_loss_rec_accum;
-	}	
-
-return NO_AVG;
-
-}
-
-
 //@@ END
 
 //@@ START - dac_prem_bonus_sch
@@ -3861,17 +2852,15 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_dac_prem_bonus_sch(int t) {
 //^^^
 
 #line 1 "dac_prem_bonus_sch.SFAS97RD_GAAP.for"
-//WTW - Gen2 - split non time guard items
-if (/*valn_flag || */t < start_period || t > final_period)
+if (t < start_period || t > final_period)
 	return NO_AVG;
-	
+
 if (valn_flag)
 	return NO_AVG;
 
-return gaap_schedule[DAC_PREM_BONUS][0];
+return gaap_schedule[DAC_PREM_BONUS][t];
 
 }
-
 
 //@@ END
 
@@ -3896,8 +2885,20 @@ if (!cohort_reins_yrt_indicator)
 if (t == start_period)
 	{
 	if (sfas97rd_valn_flag)
-		return k_reins_yrt_cost(t) * egp_pv(t)
-				- reins_yrt_cost_pv(t);
+		{
+		if (valn_period == 0)
+			{
+			if (model_name == SFAS97RD)
+				{
+				cohort_id = cohort_id;
+				return cohort_history_dac_reins_yrt_asset;
+				}
+
+			return 0.0;//  No History for cell pricing at issue period
+			}
+
+		return init_dac_reins_yrt_asset;		
+		}
 
 	// (!valn_flag)
 	if (valn_period == 0)
@@ -3910,16 +2911,13 @@ if ((!sfas97rd_valn_flag && !valn_flag)
 	&& t == start_period + 1 && valn_period > 0) 
 	return dac_reins_yrt_asset_sch(t - 1)
 		   + capzd_reins_yrt_cost(t)
-		   + dac_reins_yrt_asset_int(t)
 		   - dac_reins_yrt_asset_amortzn(t);
 	
 return dac_reins_yrt_asset(t - 1)
 	   + capzd_reins_yrt_cost(t)
-	   + dac_reins_yrt_asset_int(t)
        - dac_reins_yrt_asset_amortzn(t);
 
 }
-
 
 //@@ END
 
@@ -3941,10 +2939,9 @@ if (t <= start_period || t > final_period)
 if (!cohort_reins_yrt_indicator)
 	return NO_AVG;
 
-return egp(t) * k_reins_yrt_cost(t - 1);
+return  k_reins_yrt_cost(t) * policies_inf(t);
 
 }
-
 
 //@@ END
 
@@ -3968,41 +2965,6 @@ return dac_reins_yrt_asset(t)
 
 }
 
-
-//@@ END
-
-//@@ START - dac_reins_yrt_asset_int
-// DAC YRT Reinsurance Asset Interest                                                                                             
-// Column:DAC_REINS_YRT_ASSET_INT
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_dac_reins_yrt_asset_int(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "dac_reins_yrt_asset_int.SFAS97RD_GAAP.for"
-if (t <= start_period || t > final_period)
-	return NO_AVG;
-
-if (!cohort_reins_yrt_indicator)
-	return NO_AVG;
-
-double dac_reins_yrt_asset_prev_local = 0.0;
-
-if ((!sfas97rd_valn_flag && !valn_flag)
-	&& t == start_period + 1 && valn_period > 0) 
-	dac_reins_yrt_asset_prev_local = dac_reins_yrt_asset_sch(t - 1);
-else 
-	dac_reins_yrt_asset_prev_local = dac_reins_yrt_asset(t - 1);
-
-return dac_reins_yrt_asset_prev_local
-	   * gaap_amortzn_int_rate(t);
-
-}
-
-
 //@@ END
 
 //@@ START - dac_reins_yrt_asset_sch
@@ -4017,20 +2979,18 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_dac_reins_yrt_asset_sch(int t) {
 //^^^
 
 #line 1 "dac_reins_yrt_asset_sch.SFAS97RD_GAAP.for"
-//WTW - Gen2 - split non time guard items
-if (/*valn_flag || */t < start_period || t > final_period)
+if (t < start_period || t > final_period)
 	return NO_AVG;
-	
+
 if (valn_flag)
 	return NO_AVG;
 
 if (!cohort_reins_yrt_indicator)
 	return NO_AVG;
 	
-return gaap_schedule[DAC_REINS_YRT_ASSET][0];
+return gaap_schedule[DAC_REINS_YRT_ASSET][t];
 
 }
-
 
 //@@ END
 
@@ -4054,11 +3014,10 @@ int year = cal_yr(t);
 int month = cal_mth(t);
 int day = 1;
 
-//return DayNumberFromDate(year, month, day);
-return day_number_from_date(year, month, day);//WTW - Gen2 - DayNumberFromDate() unsupported function
+return day_number_from_date(year, month, day);
+
 
 }
-
 
 //@@ END
 
@@ -4077,7 +3036,7 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_deferred_loads(int t) {
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	{
 	// No deferrals after stated amortizaton period
 	if (!valn_flag && t > amortzn_period)
@@ -4085,9 +3044,10 @@ if (this == sfas97rd)
 
 	return sum_over_gaap("deferred_loads" , t);
 	}
-	
+
+{	
 #if defined(__UL_LIAB_H_)
-if (this == ul_sfas97rd)
+if (model_name == UL_SFAS97RD)
 	{
 	// No deferrals after stated amortizaton period
 	if (ul->isMainModel && !valn_flag && t > amortzn_period)
@@ -4183,9 +3143,10 @@ if (this == ul_sfas97rd)
 		   * reins_pct;
 	}
 #endif
-
+}
+{
 #if defined(__VUL_LIAB_H_)
-if (this == vul_sfas97rd)
+if (model_name == VUL_SFAS97RD)
 	{
 	// No deferrals after stated amortizaton period
 	if (vul->isMainModel && !valn_flag && t > amortzn_period)
@@ -4284,9 +3245,10 @@ if (this == vul_sfas97rd)
 	return 0.0;
 	}
 #endif
-
+}
+{
 #if defined(__IUL_LIAB_H_)
-if (this == iul_sfas97rd)
+if (model_name == IUL_SFAS97RD)
 	{
 	// No deferrals after stated amortizaton period
 	if (iul->isMainModel && !valn_flag && t > amortzn_period)
@@ -4381,11 +3343,11 @@ if (this == iul_sfas97rd)
 		   * reins_pct;
 	}
 #endif
-	
+}
+
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -4411,14 +3373,13 @@ if (t == start_period)
 	{
 	if (valn_period == 0)
 		{
-		if (this == sfas97rd)
+		if (model_name == SFAS97RD)
 			{
 			double def_loads_accum = 0.0;
 			
 			for (int tt = cohort_first_issue_period + 1; tt <= 0; tt++)
 				{
-				date_lookup_gen2 = date(tt); //WTW - Gen2 - AtTime() not supported
-				double def_loads = cohort_history_deferred_load/*.AtTime(tt)*/;
+				double def_loads = deferred_loads_history(tt);
 				
 				def_loads_accum 
 				= (def_loads_accum + def_loads) * (1.0 + gaap_int_rate_mthly);
@@ -4440,6 +3401,28 @@ return (deferred_loads_accum(t - 1)
 
 }
 
+//@@ END
+
+//@@ START - deferred_loads_history
+// Cohort History Deferred Load                                                                                             
+// Column:DEFERRED_LOADS_HISTORY
+//========================================================
+double SFAS97RD_GAAP_UDF::sfas97rd_gaap_deferred_loads_history(int t) {
+//^^^
+
+
+
+//^^^
+
+#line 1 "deferred_loads_history.SFAS97RD_GAAP.for"
+if (t > start_period)
+	return NO_AVG;
+
+cohort_id = cohort_id;
+
+return cohort_history_deferred_load;
+
+}
 
 //@@ END
 
@@ -4464,7 +3447,6 @@ return deferred_loads(t + 1)
 
 }
 
-
 //@@ END
 
 //@@ START - dth_claim_cost
@@ -4482,11 +3464,12 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_dth_claim_cost(int t) {
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	return sum_over_gaap("dth_claim_cost", t);
 
+{
 #if defined(__UL_LIAB_H_)
-if (this == ul_sfas97rd)
+if (model_name == UL_SFAS97RD)
 	{
 	double claim_cost = 0.0;
 	
@@ -4503,9 +3486,10 @@ if (this == ul_sfas97rd)
 	return NO_AVG;
 	}
 #endif
-
+}
+{
 #if defined(__VUL_LIAB_H_)
-if (this == vul_sfas97rd)
+if (model_name == VUL_SFAS97RD)
 	{
 	double claim_cost = 0.0;
 	
@@ -4522,9 +3506,10 @@ if (this == vul_sfas97rd)
 	return NO_AVG;
 	}
 #endif
-
+}
+{
 #if defined(__IUL_LIAB_H_)
-if (this == iul_sfas97rd)
+if (model_name == IUL_SFAS97RD)
 	{
 	double claim_cost = 0.0;
 	
@@ -4541,9 +3526,10 @@ if (this == iul_sfas97rd)
 	return NO_AVG;
 	}
 #endif
-
+}
+{
 #if defined(__VA_LIAB_H_)
-if (this == va_sfas97rd)
+if (model_name == VA_SFAS97RD)
 	{
 	if (!reins_flag)
 		return va->dth_benefits(t)
@@ -4557,9 +3543,10 @@ if (this == va_sfas97rd)
 	return NO_AVG;
 	}
 #endif
-
+}
+{
 #if defined(__FA_LIAB_H_)
-if (this == fa_sfas97rd)
+if (model_name == FA_SFAS97RD)
 	{
 	if (!reins_flag)
 		return fa->dth_benefits(t)
@@ -4573,9 +3560,10 @@ if (this == fa_sfas97rd)
 	return NO_AVG;
 	}
 #endif
-
+}
+{
 #if defined(__FIA_LIAB_H_)
-if (this == fia_sfas97rd)
+if (model_name == FIA_SFAS97RD)
 	{
 	if (!reins_flag)
 		return fia->dth_benefits(t)
@@ -4589,11 +3577,10 @@ if (this == fia_sfas97rd)
 	return NO_AVG;
 	}
 #endif
-
+}
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -4630,7 +3617,6 @@ return gaap_schedule[EGP][t];
 
 }
 
-
 //@@ END
 
 //@@ START - egp_accum
@@ -4655,14 +3641,13 @@ if (t == start_period)
 	{
 	if (valn_period == 0)
 		{					
-		if (this == sfas97rd)
+		if (model_name == SFAS97RD)
 			{
 			double egp_accum = 0.0;
 			
 			for (int tt = cohort_first_issue_period + 1; tt <= 0; tt++)
 				{
-				date_lookup_gen2 = date(tt); //WTW - Gen2 - AtTime() not supported
-				double egp = cohort_history_agp/*.AtTime(tt)*/;
+				double egp = agp_history(tt);
 				
 				egp_accum = egp_accum * (1.0 + gaap_int_rate_mthly) + egp;
 				}
@@ -4684,61 +3669,6 @@ return egp_accum(t - 1)
 
 }
 
-
-//@@ END
-
-//@@ START - egp_accum_loss_rec_int_rate
-// EGP Accumulation At Loss Recognition Interest Rate                                                                                             
-// Column:EGP_ACCUM_LOSS_REC_INT_RATE
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_egp_accum_loss_rec_int_rate(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "egp_accum_loss_rec_int_rate.SFAS97RD_GAAP.for"
-if (t < start_period || t > final_period)
-	return NO_AVG;
-	
-if (xint(cal_yr(t)) < cohort_yr)
-	return NO_AVG;
-	
-if (t == start_period)
-	{
-	if (valn_period == 0)
-		{					
-		if (this == sfas97rd)
-			{
-			double egp_accum = 0.0;
-			
-			for (int tt = cohort_first_issue_period + 1; tt <= 0; tt++)
-				{
-				date_lookup_gen2 = date(tt); //WTW - Gen2 - AtTime() not supported
-				double egp = cohort_history_agp/*.AtTime(tt)*/;
-				
-				egp_accum = egp_accum * (1.0 + loss_rec_int_rate_mthly) + egp;
-				}
-
-			return egp_accum; 
-			}
-
-		//  No History for cell pricing at issue period
-		return 0.0;	
-		}		
-
-	//valn_period != 0
-	return init_egp_accum_loss_rec_int_rate;
-	}
-	
-return egp_accum_loss_rec_int_rate(t - 1) 
-       * (1.0 + loss_rec_amortzn_int_rate(t))
-       + agp(t);
-
-}
-
-
 //@@ END
 
 //@@ START - egp_gain_exp
@@ -4756,11 +3686,12 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_egp_gain_exp(int t) {
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	{
 	//force call for reports
 	charges(t);
 	
+	{
 	#if defined(__UL_LIAB_H_)
 	double product_loads = loads(t);
 	double def_loads = deferred_loads(t);
@@ -4777,7 +3708,8 @@ if (this == sfas97rd)
 		
 	return product_loads - def_loads - non_def_exp;
 	#endif
-
+	}
+	{
 	#if defined(__VUL_LIAB_H_)
 	double product_loads = loads(t);
 	double def_loads = deferred_loads(t);
@@ -4794,7 +3726,8 @@ if (this == sfas97rd)
 		
 	return product_loads - def_loads - non_def_exp;
 	#endif
-
+	}
+	{
 	#if defined(__IUL_LIAB_H_)
 	double product_loads = loads(t);
 	double def_loads = deferred_loads(t);
@@ -4811,7 +3744,8 @@ if (this == sfas97rd)
 		
 	return product_loads - def_loads - non_def_exp;
 	#endif
-
+	}
+	{
 	#if defined(__VA_LIAB_H_)
 	double fees_and_charges = loads(t);
 	double non_def_exp = maint_exp_bom(t)
@@ -4827,7 +3761,8 @@ if (this == sfas97rd)
 	
 	return fees_and_charges - non_def_exp;
 	#endif
-
+	}
+	{
 	#if defined(__FA_LIAB_H_)
 	double fa_loads = loads(t);
 	double non_defer_exp = maint_exp_bom(t)
@@ -4843,7 +3778,8 @@ if (this == sfas97rd)
 	
 	return fa_loads - non_defer_exp;
 	#endif
-	
+	}
+	{
 	#if defined(__FIA_LIAB_H_)
 	double fia_loads = loads(t);
 	double non_defer_exp = maint_exp_bom(t)
@@ -4860,9 +3796,11 @@ if (this == sfas97rd)
 	return fia_loads - non_defer_exp;
 	#endif
 	}
+	}
 
+{
 #if defined(__UL_LIAB_H_)
-if (this == ul_sfas97rd)
+if (model_name == UL_SFAS97RD)
 	{
 	double product_loads = 0.0;
 	double def_loads = 0.0;
@@ -4900,9 +3838,10 @@ if (this == ul_sfas97rd)
 	return product_loads - def_loads - non_def_exp;
 	}
 #endif
-
+}
+{
 #if defined(__VUL_LIAB_H_)
-if (this == vul_sfas97rd)
+if (model_name == VUL_SFAS97RD)
 	{
 	double product_loads = 0.0;
 	double def_loads = 0.0;
@@ -4925,9 +3864,10 @@ if (this == vul_sfas97rd)
 	return product_loads - def_loads - non_def_exp;
 	}
 #endif
-
+}
+{
 #if defined(__IUL_LIAB_H_)
-if (this == iul_sfas97rd)
+if (model_name == IUL_SFAS97RD)
 	{
 	double product_loads = 0.0;
 	double def_loads = 0.0;
@@ -4950,9 +3890,10 @@ if (this == iul_sfas97rd)
 	return product_loads - def_loads - non_def_exp;
 	}
 #endif
-
+}
+{
 #if defined(__VA_LIAB_H_)
-if (this == va_sfas97rd)
+if (model_name == VA_SFAS97RD)
 	{
 	double fees_and_charges = 0.0;			
 	double non_def_exp = 0.0;
@@ -4992,9 +3933,10 @@ if (this == va_sfas97rd)
 	return fees_and_charges - non_def_exp;
 	}
 #endif
-
+}
+{
 #if defined(__FA_LIAB_H_)
-if (this == fa_sfas97rd)
+if (model_name == FA_SFAS97RD)
 	{
 	double fees_and_charges = 0.0;			
 	double non_def_exp = 0.0;
@@ -5034,9 +3976,10 @@ if (this == fa_sfas97rd)
 	return fees_and_charges - non_def_exp;
 	}
 #endif
-
+}
+{
 #if defined(__FIA_LIAB_H_)
-if (this == fia_sfas97rd)
+if (model_name == FIA_SFAS97RD)
 	{
 	double fees_and_charges = 0.0;			
 	double non_def_exp = 0.0;
@@ -5076,11 +4019,10 @@ if (this == fia_sfas97rd)
 	return fees_and_charges - non_def_exp;
 	}
 #endif
-	
+}
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -5099,16 +4041,17 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_egp_gain_inv(int t) {
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	{
 	//force call for reports
 	credited_int(t);
 
 	return sum_over_gaap("egp_gain_inv", t);
 	}
-	
+
+{	
 #if defined(__UL_LIAB_H_)
-if (this == ul_sfas97rd)
+if (model_name == UL_SFAS97RD)
 	{
 	double int_earned = inv_inc_fund(t) + cap_gain_fund(t);			
 	double int_credited = credited_int(t);
@@ -5116,9 +4059,10 @@ if (this == ul_sfas97rd)
 	return int_earned - int_credited;		
 	}
 #endif
-
+}
+{
 #if defined(__VUL_LIAB_H_)
-if (this == vul_sfas97rd)
+if (model_name == VUL_SFAS97RD)
 	{
 	double int_earned = inv_inc_fund(t) + cap_gain_fund(t);			
 	double int_credited = credited_int(t);
@@ -5126,9 +4070,10 @@ if (this == vul_sfas97rd)
 	return int_earned - int_credited;		
 	}
 #endif
-
+}
+{
 #if defined(__IUL_LIAB_H_)
-if (this == iul_sfas97rd)
+if (model_name == IUL_SFAS97RD)
 	{
 	double int_earned = inv_inc_fund(t) + cap_gain_fund(t);			
 	double int_credited = credited_int(t);
@@ -5136,9 +4081,10 @@ if (this == iul_sfas97rd)
 	return int_earned - int_credited;		
 	}
 #endif
-	
+}
+{
 #if defined(__VA_LIAB_H_)
-if (this == va_sfas97rd)
+if (model_name == VA_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return va->fixed_spread(t)
@@ -5150,9 +4096,10 @@ if (this == va_sfas97rd)
 		return 0.0;	
 	}
 #endif
-
+}
+{
 #if defined(__FA_LIAB_H_)
-if (this == fa_sfas97rd)
+if (model_name == FA_SFAS97RD)
 	{
 	double int_earned = inv_inc_fund(t) + cap_gain_fund(t);			
 	double int_credited = credited_int(t);
@@ -5160,9 +4107,10 @@ if (this == fa_sfas97rd)
 	return int_earned - int_credited;		
 	}
 #endif
-
+}
+{
 #if defined(__FIA_LIAB_H_)
-if (this == fia_sfas97rd)
+if (model_name == FIA_SFAS97RD)
 	{
 	double int_earned = inv_inc_fund(t) + cap_gain_fund(t);			
 	double int_credited = credited_int(t);
@@ -5170,11 +4118,10 @@ if (this == fia_sfas97rd)
 	return int_earned - int_credited;   			
 	}
 #endif
-	
+}	
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -5196,33 +4143,31 @@ if (t <= start_period || t > final_period)
 double charges = 0.0;
 double claim_cost = 0.0;
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	{
 	// use average SOP 03-1 benefits if running SFAS97RD valn.
 	if (sfas97rd_valn_flag) 
 		{
 		charges = this->charges(t);
 
+		{
 		#if defined(__UL_LIAB_H_)
 		if (sop031_flag)
 			claim_cost = sop031_array[DTH_CLAIM_COST][t];
 		#endif
-				
+		}
+		{
 		#if defined(__VUL_LIAB_H_)
 		if (sop031_flag)
 			claim_cost = sop031_array[DTH_CLAIM_COST][t];
 		#endif
-
+		}
+		{
 		#if defined(__IUL_LIAB_H_)
 		if (sop031_flag)
 			claim_cost = sop031_array[DTH_CLAIM_COST][t];
 		#endif
-
-		#if defined(__VA_LIAB_H_)
-		claim_cost = sop031_array[DB_BEN_SOP][t]
-			         + sop031_array[IB_BEN_SOP][t]
-					 + sop031_array[WB_BEN_SOP][t];
-		#endif									
+		}
 
 		if (sop031_flag)
 			return charges - claim_cost;
@@ -5231,8 +4176,9 @@ if (this == sfas97rd)
 	return sum_over_gaap("egp_gain_mort", t);
 	}
 	
+{
 #if defined(__UL_LIAB_H_)
-if (this == ul_sfas97rd)
+if (model_name == UL_SFAS97RD)
 	{
 	charges = this->charges(t);
 
@@ -5249,9 +4195,10 @@ if (this == ul_sfas97rd)
 	return charges - claim_cost;
 	}
 #endif
-
+}
+{
 #if defined(__VUL_LIAB_H_)
-if (this == vul_sfas97rd)
+if (model_name == VUL_SFAS97RD)
 	{
 	charges = this->charges(t);
 
@@ -5268,9 +4215,10 @@ if (this == vul_sfas97rd)
 	return charges - claim_cost;
 	}
 #endif
-
+}
+{
 #if defined(__IUL_LIAB_H_)
-if (this == iul_sfas97rd)
+if (model_name == IUL_SFAS97RD)
 	{
 	charges = this->charges(t);
 
@@ -5287,93 +4235,17 @@ if (this == iul_sfas97rd)
 	return charges - claim_cost;
 	}
 #endif
-
-#if defined(__VA_LIAB_H_)
-if (this == va_sfas97rd)
-	{
-	// use average SOP 03-1 benefits if running SFAS97RD valn.
-	if (pricing_flag && sfas97rd_valn_flag)
-		{
-		claim_cost = sop031_array[DB_BEN_SOP][t]
-				 	+ sop031_array[IB_BEN_SOP][t]
-				 	+ sop031_array[WB_BEN_SOP][t];
-		}
-	
-	if (!reins_flag)
-		{ //Gross
-		charges = va->gmab_chg(t) 
-				   + va->gmib_chg(t) 
-				   + va->gmwb_chg(t) 
-				   + va->gmdb_chg(t)
-				   + va->eeb_chg(t);
-
-		// capture actual single experience results if running GAAP financial projection				
-		if (!sfas97rd_valn_flag && !valn_flag) 
-			{
-			claim_cost = va->maturity_claims_gmab(t) 
-						+ gmdb_ben(t) 
-						+ gmib_ben(t)
-						+ gmwb_ben(t)
-						+ va->dth_claims_eeb(t);
-			}						
-		}
-	else if (reins_flag && va->reins_flag) //Ceded and MP Reinsured
-		{
-		charges = va->reins_prem_gmab(t) 
-				   + va->reins_prem_gmib(t) 
-				   + va->reins_prem_gmwb(t) 
-				   + va->reins_prem_gmdb(t)
-				   + va->reins_prem_eeb(t);
-
-		// capture actual single experience results if running GAAP financial projection				
-		if (!sfas97rd_valn_flag && !valn_flag) 
-			{
-			claim_cost = va->reins_maturity_claims_gmab(t) 
-						+ gmdb_ben(t) 
-						+ gmib_ben(t)
-						+ gmwb_ben(t)
-						+ va->reins_dth_ben_eeb(t) ; // these columns should return the ceded claims portion
-			}				
-		}
-	//else return 0.0 //Ceded and MP Not Reinsured
-	return charges - claim_cost;	
-	}
-#endif
-
+}
+{
 #if defined(__FA_LIAB_H_)
-if (this == fa_sfas97rd)
+if (model_name == FA_SFAS97RD)
 	return - dth_claim_cost(t);
 #endif
+}
 
-#if defined(__FIA_LIAB_H_)
-if (this == fia_sfas97rd)
-	{
-	double egp_excess_claims = 0.0;
-
-	if (!reins_flag)
-		{ //Gross
-		double base = fia->dth_ben_inf_bef(t) - host_contract_val_bef(t);
-		
-		double dth_claims = base * fia->dth_claim_rate_mthly(t);
-
-		egp_excess_claims = dth_claims;																
-		}
-	else if (reins_flag && fia->reins_flag) //Ceded and MP Reinsured
-		{
-		double base = fia->dth_ben_inf_bef(t) - host_contract_val_bef(t);
-		
-		double dth_claims = base * fia->dth_claim_rate_mthly(t);
-		egp_excess_claims = dth_claims * fia->reins_pct;
-		}
-	//else return 0.0 //Ceded and MP Not Reinsured
-	return - egp_excess_claims;	
-	}
-#endif
-	
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -5384,7 +4256,7 @@ return NO_AVG;
 double SFAS97RD_GAAP_UDF::sfas97rd_gaap_egp_gain_persist_bon_ref(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(77,"egp_gain_persist_bon_ref",t);
+	return rebase_value(53,"egp_gain_persist_bon_ref",t);
 }
 
 
@@ -5398,7 +4270,6 @@ if (t <= start_period || t > final_period)
 return - persist_bon_ref(t);
 
 }
-
 
 //@@ END
 
@@ -5417,11 +4288,12 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_egp_gain_surr(int t) {
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	return sum_over_gaap("egp_gain_surr", t);
-	
+
+{	
 #if defined(__UL_LIAB_H_)
-if (this == ul_sfas97rd)
+if (model_name == UL_SFAS97RD)
 	{
 	double released_surr = max(0.0, ul->fund_released_surr(t));			
 	double released_withdrl = max(0.0, ul->fund_released_withdrl(t));
@@ -5447,9 +4319,10 @@ if (this == ul_sfas97rd)
 	return surr_gain + withdrl_gain + maturities_gain;	
 	}
 #endif
-	
+}
+{
 #if defined(__VUL_LIAB_H_)
-if (this == vul_sfas97rd)
+if (model_name == VUL_SFAS97RD)
 	{
 	double released_surr = max(0.0, vul->fund_released_surr(t));			
 	double released_withdrl = max(0.0, vul->fund_released_withdrl(t));
@@ -5475,9 +4348,10 @@ if (this == vul_sfas97rd)
 	return surr_gain + withdrl_gain + maturities_gain;	
 	}
 #endif
-
+}
+{
 #if defined(__IUL_LIAB_H_)
-if (this == iul_sfas97rd)
+if (model_name == IUL_SFAS97RD)
 	{
 	double released_surr = max(0.0, iul->fund_released_surr(t));			
 	double released_withdrl = max(0.0, iul->fund_released_withdrl(t));
@@ -5503,9 +4377,10 @@ if (this == iul_sfas97rd)
 	return surr_gain + withdrl_gain + maturities_gain;	
 	}
 #endif
-
+}
+{
 #if defined(__VA_LIAB_H_)
-if (this == va_sfas97rd)
+if (model_name == VA_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return va->surr_chg(t);
@@ -5521,9 +4396,10 @@ if (this == va_sfas97rd)
 	return 0.0;	
 	}
 #endif	
-
+}
+{
 #if defined(__FA_LIAB_H_)
-if (this == fa_sfas97rd)
+if (model_name == FA_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return fa->surr_chg(t);
@@ -5535,9 +4411,10 @@ if (this == fa_sfas97rd)
 	return 0.0;	
 	}
 #endif	
-
+}
+{
 #if defined(__FIA_LIAB_H_)
-if (this == fia_sfas97rd)
+if (model_name == FIA_SFAS97RD)
 	{
 	double egp_excess_claims = 0.0;
 	double egp_excess_claims_lapse = 0.0;
@@ -5567,11 +4444,10 @@ if (this == fia_sfas97rd)
 	return 0.0;		
 	}
 #endif	
-	
+}	
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -5594,30 +4470,6 @@ return (egp(t + 1) + egp_pv(t + 1))
 	   / (1.0 + gaap_amortzn_int_rate(t + 1));
 
 }
-
-
-//@@ END
-
-//@@ START - egp_pv_loss_rec_int_rate
-// EGP Present Value At Loss Recognition Interest Rate                                                                                             
-// Column:EGP_PV_LOSS_REC_INT_RATE
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_egp_pv_loss_rec_int_rate(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "egp_pv_loss_rec_int_rate.SFAS97RD_GAAP.for"
-if (t < start_period || t >= final_period)
-	return NO_AVG;
-	
-return (egp(t + 1) + egp_pv_loss_rec_int_rate(t + 1))
-	   / (1.0 + loss_rec_amortzn_int_rate(t + 1));
-
-}
-
 
 //@@ END
 
@@ -5660,16 +4512,9 @@ return sop031_array[ASSESS_SOP][t]
    	 * (1.0 + gaap_amortzn_int_rate(t));
 #endif
 
-#if defined(__VA_LIAB_H_)
-return sop031_array[ASSESS_SOP][t] 
-   	+ egp_sop031_assess_accum(t - 1) 
-   	 * (1.0 + gaap_amortzn_int_rate(t));
-#endif
-
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -5697,7 +4542,6 @@ return sop031_array[DB_BEN_SOP][t]
 
 }
 
-
 //@@ END
 
 //@@ START - egp_sop031_gmdb_liab
@@ -5719,107 +4563,6 @@ return max(0.0 , egp_sop031_assess_accum(t) * sop031_gmdb_br(0)
 				 - egp_sop031_gmdb_ben_accum(t));
 
 }
-
-
-//@@ END
-
-//@@ START - egp_sop031_gmib_ben_accum
-// EGP SOP 03-1 GMIB Benefits Accumulation                                                                                             
-// Column:EGP_SOP031_GMIB_BEN_ACCUM
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_egp_sop031_gmib_ben_accum(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "egp_sop031_gmib_ben_accum.SFAS97RD_GAAP.for"
-if (t < start_period || t > final_period)
-	return NO_AVG;
-
-if (t == start_period)
-	return sop031_gmib_ben_accum(t);
-
-return sop031_array[IB_BEN_SOP][t]
-		+ egp_sop031_gmib_ben_accum(t - 1)
-		  * (1.0 + gaap_amortzn_int_rate(t));
-
-}
-
-
-//@@ END
-
-//@@ START - egp_sop031_gmib_liab
-// EGP SOP 03-1 GMIB Liability                                                                                             
-// Column:EGP_SOP031_GMIB_LIAB
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_egp_sop031_gmib_liab(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "egp_sop031_gmib_liab.SFAS97RD_GAAP.for"
-if (t < start_period || t > final_period)
-	return NO_AVG;
-
-return max(0.0 , egp_sop031_assess_accum(t) * sop031_gmib_br(0) 
-				 - egp_sop031_gmib_ben_accum(t));
-
-}
-
-
-//@@ END
-
-//@@ START - egp_sop031_gmwb_ben_accum
-// EGP SOP 03-1 GMWB Benefit Accumulation                                                                                             
-// Column:EGP_SOP031_GMWB_BEN_ACCUM
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_egp_sop031_gmwb_ben_accum(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "egp_sop031_gmwb_ben_accum.SFAS97RD_GAAP.for"
-if (t < start_period || t > final_period)
-	return NO_AVG;
-
-if (t == start_period)
-	return sop031_gmwb_ben_accum(t);
-
-return sop031_array[WB_BEN_SOP][t]
-		+ egp_sop031_gmwb_ben_accum(t - 1)
-		  * (1.0 + gaap_amortzn_int_rate(t));
-
-}
-
-
-//@@ END
-
-//@@ START - egp_sop031_gmwb_liab
-// EGP SOP 03-1 GMWB Liability                                                                                             
-// Column:EGP_SOP031_GMWB_LIAB
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_egp_sop031_gmwb_liab(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "egp_sop031_gmwb_liab.SFAS97RD_GAAP.for"
-if (t < start_period || t > final_period)
-	return NO_AVG;
-
-return max(0.0 , egp_sop031_assess_accum(t) * sop031_gmwb_br(0) 
-				 - egp_sop031_gmwb_ben_accum(t));
-
-}
-
 
 //@@ END
 
@@ -5862,20 +4605,12 @@ if (sfas97rd_valn_flag && valn_flag)
 	= (egp_sop031_ulsg_liab(t) - egp_sop031_ulsg_liab(t - 1));
 	#endif
 
-	#if defined(__VA_LIAB_H_)
-	egp_sop031_res_incr_initial
-	= (egp_sop031_gmdb_liab(t) - egp_sop031_gmdb_liab(t - 1))
-	   + (egp_sop031_gmib_liab(t) - egp_sop031_gmib_liab(t - 1))
-	   + (egp_sop031_gmwb_liab(t) - egp_sop031_gmwb_liab(t - 1));
-	#endif
-
 	return egp_sop031_res_incr_initial;
 	}
 
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -5903,7 +4638,6 @@ return sop031_array[SG_BEN_SOP][t]
 
 }
 
-
 //@@ END
 
 //@@ START - egp_sop031_ulsg_liab
@@ -5926,7 +4660,6 @@ return max(0.0, egp_sop031_assess_accum(t) * sop031_ulsg_br(0)
 
 }
 
-
 //@@ END
 
 //@@ START - embed_deriv_cash_flow
@@ -5944,11 +4677,12 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_embed_deriv_cash_flow(int t) {
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	return sum_over_gaap("embed_deriv_cash_flow", t);
 
+{
 #if defined(__IUL_LIAB_H_)
-if (this == iul_sfas97rd)
+if (model_name == IUL_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return iul->dth_benefits(t)
@@ -5966,13 +4700,11 @@ if (this == iul_sfas97rd)
 		return 0.0;	
 	}
 #endif
+}
 
-
-
-
-
+{
 #if defined(__FIA_LIAB_H_)
-if (this == fia_sfas97rd)
+if (model_name == FIA_SFAS97RD)
 	{
 	double cf_base = max(0, fia->fund_val_fixed(t) - fia->min_contract_val(t));
 	
@@ -5984,11 +4716,10 @@ if (this == fia_sfas97rd)
 		return 0.0;	
 	}
 #endif
-
+}
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -6007,7 +4738,7 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_embed_deriv_cash_flow_pv(int t) {
 if (t < start_period || t > final_period)
 	return NO_AVG;
 
-double spot_rate = rates->get_int_rate(t, "Govt", GET_SPOT_RATE, SHORT_TERM_RATE_TERM, 0, EFFECTIVE_ANNUAL, NO_SHIFT,0);//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
+double spot_rate = rates_ptr->get_int_rate(t, "Govt", GET_SPOT_RATE, SHORT_TERM_RATE_TERM, 0, EFFECTIVE_ANNUAL, NO_SHIFT);
 
 double disc_factor = 1.0 / pow(1.0 + spot_rate, t / 12.0);
 
@@ -6015,7 +4746,6 @@ return embed_deriv_cash_flow_pv(t + 1)
        + embed_deriv_cash_flow(t) * disc_factor;
 
 }
-
 
 //@@ END
 
@@ -6034,50 +4764,47 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_embed_deriv_val(int t) {
 if (t < start_period || t > final_period)
 	return NO_AVG;
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	{
 	double fund_val_current = 0.0;
 	double fund_val_previous1 = model_point_amount_threshold;
 	double fund_val_previous2 = model_point_amount_threshold;
 	int mp = 0;
-	map <int, long, less <int> > ::iterator mp_map_iter;//Gen2 - 9/6/2024 - replace mpmap with full definition
-	
-	#if defined(__FIA_LIAB_H_)
+	map <int, long, less <int> >::iterator mp_map_iter;
+	{
+	#if defined(__FIA_LIAB_H_) && defined(__AA_COMP_COMP_H_)
 	if (fia_mp_map.size())
 		{
-		FIA_LIAB *current_fia_element;
-
 		for (mp_map_iter = fia_mp_map.begin(); 
 		     mp_map_iter !=fia_mp_map.end(); 
 		     mp_map_iter++)
 			{
 			mp = mp_map_iter->first;
-			current_fia_element = liab->sm_fia[mp];
 			
-			if (t < current_fia_element->commencement_period
-				|| t > current_fia_element->maturity_period)
+			if (t < liab->sm_fia[mp]->commencement_period
+				|| t > liab->sm_fia[mp]->maturity_period)
 				continue;
 	
 			// Skip new issue commencement period
-			if (current_fia_element->elapsed_mths <= 0
-				&& t == current_fia_element->commencement_period)
+			if (liab->sm_fia[mp]->elapsed_mths <= 0
+				&& t == liab->sm_fia[mp]->commencement_period)
 				continue;
 	
-			if (t != current_fia_element->commencement_period
-				&& fabs(current_fia_element->policies_b(t)) < rate_ratio_threshold)
+			if (t != liab->sm_fia[mp]->commencement_period
+				&& fabs(liab->sm_fia[mp]->policies_b(t)) < rate_ratio_threshold)
 				continue;
 	
 			if ((t - 1) >= start_period)
 				{
-				fund_val_previous1 += current_fia_element->Column("fund_val_b_bef").Value(t);
-				fund_val_previous2 += current_fia_element->Column("fund_val_fixed").Value(t - 1);
+				fund_val_previous1 += liab->sm_fia[mp]->Column("fund_val_b_bef").Value(t);
+				fund_val_previous2 += liab->sm_fia[mp]->Column("fund_val_fixed").Value(t - 1);
 				}
 	
-			fund_val_current += current_fia_element->Column("fund_val_fixed").Value(t);
+			fund_val_current += liab->sm_fia[mp]->Column("fund_val_fixed").Value(t);
 			}
 		}
 	#endif
-
+	}
 	if (fund_val_previous1 <= model_point_amount_threshold)
 		return 0.0;
 			
@@ -6117,15 +4844,15 @@ if (this == sfas97rd)
 		   / fund_val_previous2
 		   * fund_val_current;
 	}
-
+{
 #if defined(__FIA_LIAB_H_)
-if (this == fia_sfas97rd)
+if (model_name == FIA_SFAS97RD)
 	{
 	if (pricing_flag && t == start_period
 			&& valn_period == 0)
 		return NO_AVG;
 	
-	if (fia->fia->fund_val_b_bef(t) <= model_point_amount_threshold)
+	if (fia->fund_val_b_bef(t) <= model_point_amount_threshold)
 			return 0.0;
 	
 	if (t == start_period
@@ -6162,11 +4889,10 @@ if (this == fia_sfas97rd)
 	
     }
 #endif
-
+}
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -6188,7 +4914,6 @@ if (time_step_flag && !valn_flag)
 return 1.0;
 
 }
-
 
 //@@ END
 
@@ -6212,7 +4937,6 @@ return fund_val_fixed(t)
 
 }
 
-
 //@@ END
 
 //@@ START - fund_val_bef_int
@@ -6230,11 +4954,12 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_fund_val_bef_int(int t) {
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	return sum_over_gaap("fund_val_bef_int", t);
 	
+{
 #if defined(__UL_LIAB_H_)
-if (this == ul_sfas97rd)
+if (model_name == UL_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		{
@@ -6264,9 +4989,10 @@ if (this == ul_sfas97rd)
 		return 0.0;	
 	}
 #endif
-
+}
+{
 #if defined(__VUL_LIAB_H_)
-if (this == vul_sfas97rd)
+if (model_name == VUL_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		{
@@ -6305,9 +5031,10 @@ if (this == vul_sfas97rd)
 		return 0.0;	
 	}
 #endif
-
+}
+{
 #if defined(__IUL_LIAB_H_)
-if (this == iul_sfas97rd)
+if (model_name == IUL_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		{
@@ -6337,9 +5064,10 @@ if (this == iul_sfas97rd)
 		return 0.0;	
 	}
 #endif
-
+}
+{
 #if defined(__VA_LIAB_H_)
-if (this == va_sfas97rd)
+if (model_name == VA_SFAS97RD)
 	if (!reins_flag) //Gross
 		return va->fund_val_b(t);
 	else if (reins_flag && va->reins_flag) //Ceded and MP Reinsured
@@ -6348,9 +5076,10 @@ if (this == va_sfas97rd)
 	else //Ceded and MP Not Reinsured
 		return 0.0;	
 #endif
-
+}
+{
 #if defined(__FA_LIAB_H_)
-if (this == fa_sfas97rd)
+if (model_name == FA_SFAS97RD)
 	if (!reins_flag) //Gross
 		return fa->fund_val_b(t);
 	else if (reins_flag && fa->reins_flag) //Ceded and MP Reinsured
@@ -6359,9 +5088,10 @@ if (this == fa_sfas97rd)
 	else //Ceded and MP Not Reinsured
 		return 0.0;	
 #endif
-
+}
+{
 #if defined(__FIA_LIAB_H_)
-if (this == fia_sfas97rd)
+if (model_name == FIA_SFAS97RD)
 	if (!reins_flag) //Gross
 		return fia->fund_val_b(t);
 	else if (reins_flag && fia->reins_flag) //Ceded and MP Reinsured
@@ -6370,11 +5100,10 @@ if (this == fia_sfas97rd)
 	else //Ceded and MP Not Reinsured
 		return 0.0;	
 #endif
-
+}
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -6396,11 +5125,12 @@ if (t < start_period || t > final_period)
 // force call fund_val_sa for reporting
 fund_val_sa(t);
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	return sum_over_gaap("fund_val_fixed", t);
 
+{
 #if defined(__UL_LIAB_H_)
-if (this == ul_sfas97rd)
+if (model_name == UL_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return max(0.0, ul->fund_val_fixed(t));
@@ -6410,9 +5140,10 @@ if (this == ul_sfas97rd)
 		return 0.0;	
 	}	
 #endif
-
+}
+{
 #if defined(__VUL_LIAB_H_)
-if (this == vul_sfas97rd)
+if (model_name == VUL_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return vul->pol_loan(t) 
@@ -6425,10 +5156,11 @@ if (this == vul_sfas97rd)
 		return 0.0;	
 	}	
 #endif
-
-// Use SFAS97 treatment until SFAS133 methodology is implemented
+}
+{
+// Use SFAS97 treatment until MRB methodology is implemented
 #if defined(__IUL_LIAB_H_)
-if (this == iul_sfas97rd)
+if (model_name == IUL_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return max(0.0, iul->fund_val_fixed(t));
@@ -6438,9 +5170,10 @@ if (this == iul_sfas97rd)
 		return 0.0;	
 	}	
 #endif
-	
+}
+{
 #if defined(__VA_LIAB_H_)
-if (this == va_sfas97rd)
+if (model_name == VA_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return va->fund_val_fixed(t);
@@ -6450,9 +5183,10 @@ if (this == va_sfas97rd)
 		return 0.0;	
 	}
 #endif
-
+}
+{
 #if defined(__FA_LIAB_H_)
-if (this == fa_sfas97rd)
+if (model_name == FA_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return fa->fund_val_fixed(t);
@@ -6462,16 +5196,16 @@ if (this == fa_sfas97rd)
 		return 0.0;	
 	}
 #endif
-
+}
+{
 #if defined(__FIA_LIAB_H_)
-if (this == fia_sfas97rd)
+if (model_name == FIA_SFAS97RD)
 	return 0.0;	
 #endif
-
+}
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -6490,16 +5224,12 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_fund_val_sa(int t) {
 if (t < start_period || t > final_period)
 	return NO_AVG;
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	return sum_over_gaap("fund_val_sa", t);
 
-#if defined(__UL_LIAB_H_)
-if (this == ul_sfas97rd)
-	return NO_AVG;
-#endif
-
+{
 #if defined(__VUL_LIAB_H_)
-if (this == vul_sfas97rd)
+if (model_name == VUL_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return vul->fund_val_sa(t);
@@ -6510,9 +5240,10 @@ if (this == vul_sfas97rd)
 		return 0.0;	
 	}
 #endif
-	
+}
+{
 #if defined(__VA_LIAB_H_)
-if (this == va_sfas97rd)
+if (model_name == VA_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return va->fund_val_sa(t);
@@ -6523,11 +5254,10 @@ if (this == va_sfas97rd)
 		return 0.0;	
 	}
 #endif
-
+}
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -6550,7 +5280,6 @@ return gaap_int_rate_mthly;
 
 }
 
-
 //@@ END
 
 //@@ START - gmab_ben
@@ -6568,16 +5297,12 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_gmab_ben(int t) {
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	return sum_over_gaap("gmab_ben", t);
 	
-#if defined(__UL_LIAB_H_)
-if (this == ul_sfas97rd)
-	return NO_AVG;
-#endif
-
+{
 #if defined(__VA_LIAB_H_)
-if (this == va_sfas97rd)
+if (model_name == VA_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return va->maturity_claims_gmab(t);
@@ -6589,11 +5314,11 @@ if (this == va_sfas97rd)
 	return 0.0;	
 	}
 #endif
+}
 
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -6612,16 +5337,12 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_gmdb_ben(int t) {
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	return sum_over_gaap("gmdb_ben", t);
-	
-#if defined(__UL_LIAB_H_)
-if (this == ul_sfas97rd)
-	return NO_AVG;
-#endif
 
+{	
 #if defined(__VUL_LIAB_H_)
-if (this == vul_sfas97rd)
+if (model_name == VUL_SFAS97RD)
 	{
 	if (vul->gmdb_defn == NOT_APPLICABLE
 		|| t > vul->gmdb_ben_term_period + 1
@@ -6647,9 +5368,10 @@ if (this == vul_sfas97rd)
 	return 0.0;	
 	}	
 #endif
-
+}
+{
 #if defined(__VA_LIAB_H_)
-if (this == va_sfas97rd)
+if (model_name == VA_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return va->dth_claims_gmdb(t);
@@ -6661,11 +5383,11 @@ if (this == va_sfas97rd)
 	return 0.0;	
 	}
 #endif
+}
 
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -6684,16 +5406,12 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_gmib_ben(int t) {
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	return sum_over_gaap("gmib_ben", t);
 	
-#if defined(__UL_LIAB_H_)
-if (this == ul_sfas97rd)
-	return NO_AVG;
-#endif
-
+{
 #if defined(__VA_LIAB_H_)
-if (this == va_sfas97rd)
+if (model_name == VA_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return va->ann_claims_gmib(t);
@@ -6705,11 +5423,11 @@ if (this == va_sfas97rd)
 	return 0.0;	
 	}	
 #endif
+}
 
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -6728,16 +5446,12 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_gmwb_ben(int t) {
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	return sum_over_gaap("gmwb_ben", t);
 	
-#if defined(__UL_LIAB_H_)
-if (this == ul_sfas97rd)
-	return NO_AVG;
-#endif
-
+{
 #if defined(__VA_LIAB_H_)
-if (this == va_sfas97rd)
+if (model_name == VA_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return va->ann_claims_gmwb(t);
@@ -6749,11 +5463,11 @@ if (this == va_sfas97rd)
 	return 0.0;	
 	}
 #endif
+}
 
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -6769,44 +5483,41 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_hedge_cash_flow(int t) {
 //^^^
 
 #line 1 "hedge_cash_flow.SFAS97RD_GAAP.for"
-//WTW - Gen2 - split non time guard items
-if (/*valn_flag || */t <= start_period || t > final_period)
-	return NO_AVG;
-	
-if (valn_flag)
-	return NO_AVG;
+if (t <= start_period || t > final_period)
+	return NO_AVG;	
 
-if (this == sfas97rd)
+if (valn_flag)
+	return NO_AVG;	
+
+if (model_name == SFAS97RD)
+	{
 	{
 	#if defined(__FIA_LIAB_H_) || defined(__IUL_LIAB_H_)
 	return sum_over_gaap("hedge_cash_flow", t);
 	#endif
-	
+	}
 	if (reins_flag)
-		return (seg->hedge_gross_array[HEDGE_CASH_FLOW][t]
-		        - seg->hedge_net_array[HEDGE_CASH_FLOW][t])
+		return (seg_element->hedge_gross_array[HEDGE_CASH_FLOW][t]
+		        - seg_element->hedge_net_array[HEDGE_CASH_FLOW][t])
 		        * hedge_alloc_factor;
 		
-	return seg->hedge_gross_array[HEDGE_CASH_FLOW][t]
+	return seg_element->hedge_gross_array[HEDGE_CASH_FLOW][t]
 	       * hedge_alloc_factor;
 	}
 
-#if defined(__UL_LIAB_H_)
-if (this == ul_sfas97rd)
-	return NO_AVG;
-#endif
-
+{
 #if defined(__IUL_LIAB_H_)
-if (this == iul_sfas97rd)
+if (model_name == IUL_SFAS97RD)
 	{
 	// Need to allocate hedge cash flows from hedge group into model point like FIA
 
 	return NO_AVG;
 	}
 #endif
-
+}
+{
 #if defined(__VA_LIAB_H_)
-if (this == va_sfas97rd)
+if (model_name == VA_SFAS97RD)
 	{
 	if (reins_flag)
 		return (va->hedge_gross_array[HEDGE_CASH_FLOW][t]
@@ -6817,16 +5528,17 @@ if (this == va_sfas97rd)
 	       * hedge_alloc_factor;
 	}
 #endif
-
+}
+{
 #if defined(__FIA_LIAB_H_)
-if (this == fia_sfas97rd && !fia->isMainModel)
+if (model_name == FIA_SFAS97RD && !fia->isMainModel)
 	{
 	double hedge_grp_fund_val = 0.0;
 	double fia_mp_hedge_amt = 0.0;
 	
-	for (int hedge_group = 0; hedge_group < fia->seg->hedge_grps.size(); hedge_group++)
+	for (int hedge_group = 0; hedge_group < fia->seg_element->hedge_grps.size(); hedge_group++)
 		{
-		xstring hedge_grp_name = fia->seg->hedge_grps[hedge_group];
+		xstring hedge_grp_name = fia->seg_element->hedge_grps[hedge_group];
 		double fia_mp_fund_val = 0.0;
 		
 		for (int account = 0; account < fia->sm_fia_account.size(); account++)
@@ -6835,10 +5547,10 @@ if (this == fia_sfas97rd && !fia->isMainModel)
 				fia_mp_fund_val += fia->sm_fia_account[account]->fund_val_e(t);
 			}
 		
-		hedge_grp_fund_val = fia->seg->sm_hedge_grp[hedge_group]->fund_val_fixed(t);
+		hedge_grp_fund_val = fia->seg_element->sm_hedge_grp[hedge_group][0]->fund_val_fixed(t);
 		
 		if (hedge_grp_fund_val > model_point_amount_threshold)
-			fia_mp_hedge_amt += fia->seg->sm_hedge_grp[hedge_group]->hedge_cash_flow(t) 
+			fia_mp_hedge_amt += fia->seg_element->sm_hedge_grp[hedge_group][0]->hedge_cash_flow(t)
 						   	    * fia_mp_fund_val / hedge_grp_fund_val;
 		else 
 			fia_mp_hedge_amt = 0.0;
@@ -6850,11 +5562,10 @@ if (this == fia_sfas97rd && !fia->isMainModel)
 	return fia_mp_hedge_amt;
 	}
 #endif
-
+}
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -6870,10 +5581,9 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_hedge_cost(int t) {
 //^^^
 
 #line 1 "hedge_cost.SFAS97RD_GAAP.for"
-//WTW - Gen2 - split non time guard items
-if (/*!alm_flag || valn_flag || */t <= start_period || t > final_period)
+if (t <= start_period || t > final_period)
 	return NO_AVG;
-	
+
 if (!alm_flag || valn_flag)
 	return NO_AVG;
 
@@ -6881,7 +5591,6 @@ return - (hedge_cash_flow(t)
           + hedge_mkt_val_incr(t));
 
 }
-
 
 //@@ END
 
@@ -6897,49 +5606,41 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_hedge_mkt_val(int t) {
 //^^^
 
 #line 1 "hedge_mkt_val.SFAS97RD_GAAP.for"
-//WTW - Gen2 - split non time guard items
-if (/*valn_flag || */t < start_period || t > final_period)
+if (t < start_period || t > final_period)
 	return NO_AVG;
-	
+
 if (valn_flag)
 	return NO_AVG;
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
+	{
 	{
 	#if defined(__FIA_LIAB_H_) || defined(__IUL_LIAB_H_)
 	return sum_over_gaap("hedge_mkt_val", t);
 	#endif
-	
+	}
 	if (reins_flag)
-		return (seg->hedge_gross_array[HEDGE_MKT_VAL][t]
-		        - seg->hedge_net_array[HEDGE_MKT_VAL][t])
+		return (seg_element->hedge_gross_array[HEDGE_MKT_VAL][t]
+		        - seg_element->hedge_net_array[HEDGE_MKT_VAL][t])
 		        * hedge_alloc_factor;
 		
-	return seg->hedge_gross_array[HEDGE_MKT_VAL][t]
+	return seg_element->hedge_gross_array[HEDGE_MKT_VAL][t]
 	       * hedge_alloc_factor;
 	}
 
-#if defined(__UL_LIAB_H_)
-if (this == ul_sfas97rd)
-	return NO_AVG;
-#endif
-
-#if defined(__VUL_LIAB_H_)
-if (this == vul_sfas97rd)
-	return NO_AVG;
-#endif
-
+{
 #if defined(__IUL_LIAB_H_)
-if (this == iul_sfas97rd && !iul->isMainModel)
+if (model_name == IUL_SFAS97RD && !iul->isMainModel)
 	{
 	// Need to allocate hedge market value to model point like FIA
 
 	return NO_AVG;
 	}
 #endif
-
+}
+{
 #if defined(__VA_LIAB_H_)
-if (this == va_sfas97rd)
+if (model_name == VA_SFAS97RD)
 	{
 	if (reins_flag)
 		return (va->hedge_gross_array[HEDGE_MKT_VAL][t]
@@ -6950,16 +5651,17 @@ if (this == va_sfas97rd)
 	       * hedge_alloc_factor;
 	}
 #endif
-
+}
+{
 #if defined(__FIA_LIAB_H_)
-if (this == fia_sfas97rd && !fia->isMainModel)
+if (model_name == FIA_SFAS97RD && !fia->isMainModel)
 	{
 	double hedge_grp_fund_val = 0.0;
 	double fia_mp_hedge_amt = 0.0;
 	
-	for (int hedge_group = 0; hedge_group < fia->seg->hedge_grps.size(); hedge_group++)
+	for (int hedge_group = 0; hedge_group < fia->seg_element->hedge_grps.size(); hedge_group++)
 		{
-		xstring hedge_grp_name = fia->seg->hedge_grps[hedge_group];
+		xstring hedge_grp_name = fia->seg_element->hedge_grps[hedge_group];
 		double fia_mp_fund_val = 0.0;
 		
 		for (int account = 0; account < fia->sm_fia_account.size(); account++)
@@ -6968,10 +5670,10 @@ if (this == fia_sfas97rd && !fia->isMainModel)
 				fia_mp_fund_val += fia->sm_fia_account[account]->fund_val_e(t);
 			}
 		
-		hedge_grp_fund_val = fia->seg->sm_hedge_grp[hedge_group]->fund_val_fixed(t);
+		hedge_grp_fund_val = fia->seg_element->sm_hedge_grp[hedge_group][0]->fund_val_fixed(t);
 		
 		if (hedge_grp_fund_val > model_point_amount_threshold)
-			fia_mp_hedge_amt += fia->seg->sm_hedge_grp[hedge_group]->hedge_mkt_val(t) 
+			fia_mp_hedge_amt += fia->seg_element->sm_hedge_grp[hedge_group][0]->hedge_mkt_val(t)
 						  	    * fia_mp_fund_val / hedge_grp_fund_val;
 		else 
 			fia_mp_hedge_amt = 0.0;
@@ -6983,11 +5685,10 @@ if (this == fia_sfas97rd && !fia->isMainModel)
 	return fia_mp_hedge_amt;
 	}
 #endif
-
+}
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -7003,8 +5704,7 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_hedge_mkt_val_incr(int t) {
 //^^^
 
 #line 1 "hedge_mkt_val_incr.SFAS97RD_GAAP.for"
-//WTW - Gen2 - split non time guard items
-if (/*valn_flag || */t <= start_period || t > final_period)
+if (t <= start_period || t > final_period)
 	return NO_AVG;
 	
 if (valn_flag)
@@ -7014,7 +5714,6 @@ return hedge_mkt_val(t)
        - hedge_mkt_val(t - 1);
 
 }
-
 
 //@@ END
 
@@ -7033,29 +5732,29 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_host_contract_cred_int(int t) {
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	return sum_over_gaap("host_contract_cred_int", t);
-
+{
 #if defined(__FIA_LIAB_H_)
-if (this == fia_sfas97rd)
+if (model_name == FIA_SFAS97RD)
 	{
 	return host_contract_val(t - 1) 
 		   * (pow(1.0 + host_accrual_rate , 1.0 / 12.0) - 1.0);
 	}
 #endif
-
+}
+{
 #if defined(__IUL_LIAB_H_)
-if (this == iul_sfas97rd)
+if (model_name == IUL_SFAS97RD)
 	{
 	return host_contract_val(t - 1) 
 		   * (pow(1.0 + host_accrual_rate , 1.0 / 12.0) - 1.0);
 	}
 #endif
-
+}
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -7074,11 +5773,12 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_host_contract_val(int t) {
 if (t < start_period || t > final_period)
 	return NO_AVG;
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	return sum_over_gaap("host_contract_val", t);
 
+{
 #if defined(__FIA_LIAB_H_)
-if (this == fia_sfas97rd)
+if (model_name == FIA_SFAS97RD)
 	{
 	double dth_claims = host_contract_val_bef(t) * fia->dth_claim_rate_mthly(t);
 	
@@ -7105,11 +5805,11 @@ if (this == fia_sfas97rd)
 		return 0.0;
 	}
 #endif
+}
 
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -7128,11 +5828,11 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_host_contract_val_bef(int t) {
 if (t < start_period || t > final_period)
 	return NO_AVG;
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	return sum_over_gaap("host_contract_val_bef", t);
-
+{
 #if defined(__FIA_LIAB_H_)
-if (this == fia_sfas97rd)
+if (model_name == FIA_SFAS97RD)
 	{
 	double host_value_bef = 0.0;
 	
@@ -7173,11 +5873,10 @@ if (this == fia_sfas97rd)
 		   * pow(1.0 + host_accrual_rate, 1.0 /12.0);
 	}
 #endif
-
+}
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -7193,7 +5892,11 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_initialize(int t) {
 //^^^
 
 #line 1 "initialize.SFAS97RD_GAAP.for"
-if (this != sfas97rd)
+if (t != 0)
+	return NO_AVG;
+
+if (model_name != SFAS97RD)
+	{
 	{
 	#if defined(__UL_LIAB_H_)
 	if (ul->isMainModel)
@@ -7209,11 +5912,12 @@ if (this != sfas97rd)
 		if (!valn_flag)
 			get_gaap_schedule_items();
 	
-		if (valn_period > 0)
+		if (valn_period > 0 && ul->mp_id != "mp_time_step")
 			read_state_of_world_financial();
 		}
 	#endif
-
+	}
+	{
 	#if defined(__VUL_LIAB_H_)
 	if (vul->isMainModel)
 		{
@@ -7228,11 +5932,12 @@ if (this != sfas97rd)
 		if (!valn_flag)
 			get_gaap_schedule_items();
 	
-		if (valn_period > 0)
+		if (valn_period > 0 && vul->mp_id != "mp_time_step")
 			read_state_of_world_financial();
 		}
 	#endif
-
+	}
+	{
 	#if defined(__IUL_LIAB_H_)
 	if (iul->isMainModel)
 		{
@@ -7247,48 +5952,51 @@ if (this != sfas97rd)
 		if (!valn_flag)
 			get_gaap_schedule_items();
 	
-		if (valn_period > 0)
+		if (valn_period > 0 && iul->mp_id != "mp_time_step")
 			read_state_of_world_financial();
 		}
 	#endif
-
+	}
+	{
 	#if defined(__VA_LIAB_H_)
 	if (va->isMainModel)
 		{
 		if (!valn_flag)
 			get_gaap_schedule_items();
 	
-		if (valn_period > 0)
+		if (valn_period > 0 && va->mp_id != "mp_time_step")
 			read_state_of_world_financial();
 		}
 	#endif
-
+	}
+	{
 	#if defined(__FA_LIAB_H_)
 	if (fa->isMainModel)
 		{
 		if (!valn_flag)
 			get_gaap_schedule_items();
 	
-		if (valn_period > 0)
+		if (valn_period > 0 && fa->mp_id != "mp_time_step")
 			read_state_of_world_financial();
 		}
 	#endif
-
+	}
+	{
 	#if defined(__FIA_LIAB_H_)
 	if (fia->isMainModel)
 		{
 		if (!valn_flag)
 			get_gaap_schedule_items();
 	
-		if (valn_period > 0)
+		if (valn_period > 0 && fia->mp_id != "mp_time_step")
 			read_state_of_world_financial();
 		}
 	#endif
-
+	}
 	return 1.0;
-	}	
-
-// else (this == sfas97rd)
+	}			
+//else (model_name == SFAS97RD)
+int cohort_mp_count = 0;
 
 // clear elements from maps
 ul_mp_map.clear();
@@ -7302,28 +6010,29 @@ epl_mp_map.clear();
 // dimension 0 - getElementNumber(0) refers to cohort group
 // dimension 1 - getElementNumber(1) refers to reinsurance definition
 int cohort_col = getElementNumber(0); 
-int cohort_mp_count = 0;
+
 int mp = 0;
-map <int, long, less <int> >::iterator mp_map_iter;//Gen2 - 9/6/2024 - replace mpmap with full definition
+map <int, long, less <int> >::iterator mp_map_iter;
 
 // initialize cohort_first_issue_period, cohort_last_issue_period and cohort_max_maturity_period
 if (reins_flag)
 	{
 	cohort_first_issue_period 
-	= seg->sm_sfas97rd[getElementNumber(0)][0]->cohort_first_issue_period;
+	= seg_element->sm_sfas97rd[getElementNumber(0)][0]->cohort_first_issue_period;
 
 	cohort_last_issue_period 
-	= seg->sm_sfas97rd[getElementNumber(0)][0]->cohort_last_issue_period;
+	= seg_element->sm_sfas97rd[getElementNumber(0)][0]->cohort_last_issue_period;
 
 	cohort_max_maturity_period 
-	= seg->sm_sfas97rd[getElementNumber(0)][0]->cohort_max_maturity_period;
+	= seg_element->sm_sfas97rd[getElementNumber(0)][0]->cohort_max_maturity_period;
 	}
 
 // Set GAAP History Table for Gross or Ceded Business
-#if defined(__UL_LIAB_H_)
-for (mp_map_iter = seg->ul_mp_map.begin();
-	 mp_map_iter != seg->ul_mp_map.end();
-	 mp_map_iter++)
+{
+#if defined(__UL_LIAB_H_) && defined(__AA_COMP_COMP_H_)
+for (mp_map_iter = seg_element->ul_mp_map.begin();
+		mp_map_iter != seg_element->ul_mp_map.end();
+		mp_map_iter++)
 	{
 	mp = mp_map_iter->first;
 
@@ -7336,7 +6045,7 @@ for (mp_map_iter = seg->ul_mp_map.begin();
 		mp_cohort_map_id = mp_cohort_gross;
 		
 	if (setup_cohorts(liab->sm_ul[mp]->issue_yr, liab->sm_ul[mp]->plan_code, 
-					  mp_cohort_map_id, cohort_id))
+						mp_cohort_map_id, cohort_id))
 		{
 		if (reins_flag)
 			liab->sm_ul[mp]->sfas97rd_cohort_id_ceded = cohort_id;
@@ -7359,11 +6068,12 @@ for (mp_map_iter = seg->ul_mp_map.begin();
 
 	}
 #endif
-
-#if defined(__VUL_LIAB_H_)
-for (mp_map_iter = seg->vul_mp_map.begin();
-	 mp_map_iter != seg->vul_mp_map.end();
-	 mp_map_iter++)
+}
+{
+#if defined(__VUL_LIAB_H_) && defined(__AA_COMP_COMP_H_)
+for (mp_map_iter = seg_element->vul_mp_map.begin();
+		mp_map_iter != seg_element->vul_mp_map.end();
+		mp_map_iter++)
 	{
 	mp = mp_map_iter->first;
 
@@ -7376,7 +6086,7 @@ for (mp_map_iter = seg->vul_mp_map.begin();
 		mp_cohort_map_id = mp_cohort_gross;
 		
 	if (setup_cohorts(liab->sm_vul[mp]->issue_yr, liab->sm_vul[mp]->plan_code, 
-					  mp_cohort_map_id, cohort_id))
+						mp_cohort_map_id, cohort_id))
 		{
 		if (reins_flag)
 			liab->sm_vul[mp]->sfas97rd_cohort_id_ceded = cohort_id;
@@ -7398,11 +6108,12 @@ for (mp_map_iter = seg->vul_mp_map.begin();
 		}
 	}
 #endif
-
-#if defined(__IUL_LIAB_H_)
-for (mp_map_iter = seg->iul_mp_map.begin();
-	 mp_map_iter != seg->iul_mp_map.end();
-	 mp_map_iter++)
+}
+{
+#if defined(__IUL_LIAB_H_) && defined(__AA_COMP_COMP_H_)
+for (mp_map_iter = seg_element->iul_mp_map.begin();
+		mp_map_iter != seg_element->iul_mp_map.end();
+		mp_map_iter++)
 	{
 	mp = mp_map_iter->first;
 
@@ -7415,7 +6126,7 @@ for (mp_map_iter = seg->iul_mp_map.begin();
 		mp_cohort_map_id = mp_cohort_gross;
 		
 	if (setup_cohorts(liab->sm_iul[mp]->issue_yr, liab->sm_iul[mp]->plan_code, 
-					  mp_cohort_map_id, cohort_id))
+						mp_cohort_map_id, cohort_id))
 		{
 		if (reins_flag)
 			liab->sm_iul[mp]->sfas97rd_cohort_id_ceded = cohort_id;
@@ -7437,11 +6148,12 @@ for (mp_map_iter = seg->iul_mp_map.begin();
 		}
 	}
 #endif
-
-#if defined(__VA_LIAB_H_)
-for (mp_map_iter = seg->va_mp_map.begin();
-	 mp_map_iter != seg->va_mp_map.end();
-	 mp_map_iter++)
+}
+{
+#if defined(__VA_LIAB_H_) && defined(__AA_COMP_COMP_H_)
+for (mp_map_iter = seg_element->va_mp_map.begin();
+		mp_map_iter != seg_element->va_mp_map.end();
+		mp_map_iter++)
 	{
 	mp = mp_map_iter->first;
 
@@ -7454,7 +6166,7 @@ for (mp_map_iter = seg->va_mp_map.begin();
 		mp_cohort_map_id = mp_cohort_gross;
 		
 	if (setup_cohorts(liab->sm_va[mp]->issue_yr, liab->sm_va[mp]->plan_code, 
-					  mp_cohort_map_id, cohort_id))
+						mp_cohort_map_id, cohort_id))
 		{
 		if (reins_flag)
 			liab->sm_va[mp]->sfas97rd_cohort_id_ceded = cohort_id;
@@ -7473,11 +6185,12 @@ for (mp_map_iter = seg->va_mp_map.begin();
 		}
 	}
 #endif
-
-#if defined(__FA_LIAB_H_)
-for (mp_map_iter = seg->fa_mp_map.begin();
-	 mp_map_iter != seg->fa_mp_map.end();
-	 mp_map_iter++)
+}
+{
+#if defined(__FA_LIAB_H_) && defined(__AA_COMP_COMP_H_)
+for (mp_map_iter = seg_element->fa_mp_map.begin();
+		mp_map_iter != seg_element->fa_mp_map.end();
+		mp_map_iter++)
 	{
 	mp = mp_map_iter->first;
 
@@ -7490,7 +6203,7 @@ for (mp_map_iter = seg->fa_mp_map.begin();
 		mp_cohort_map_id = mp_cohort_gross;
 		
 	if (setup_cohorts(liab->sm_fa[mp]->issue_yr, liab->sm_fa[mp]->plan_code, 
-					  mp_cohort_map_id, cohort_id))
+						mp_cohort_map_id, cohort_id))
 		{
 		if (reins_flag)
 			liab->sm_fa[mp]->sfas97rd_cohort_id_ceded = cohort_id;
@@ -7509,11 +6222,12 @@ for (mp_map_iter = seg->fa_mp_map.begin();
 		}
 	}
 #endif
-
-#if defined(__FIA_LIAB_H_)
-for (mp_map_iter = seg->fia_mp_map.begin();
-	 mp_map_iter != seg->fia_mp_map.end();
-	 mp_map_iter++)
+}
+{
+#if defined(__FIA_LIAB_H_) && defined(__AA_COMP_COMP_H_)
+for (mp_map_iter = seg_element->fia_mp_map.begin();
+		mp_map_iter != seg_element->fia_mp_map.end();
+		mp_map_iter++)
 	{
 	mp = mp_map_iter->first;
 
@@ -7526,7 +6240,7 @@ for (mp_map_iter = seg->fia_mp_map.begin();
 		mp_cohort_map_id = mp_cohort_gross;
 		
 	if (setup_cohorts(liab->sm_fia[mp]->issue_yr, liab->sm_fia[mp]->plan_code, 
-					  mp_cohort_map_id, cohort_id))
+						mp_cohort_map_id, cohort_id))
 		{
 		if (reins_flag)
 			liab->sm_fia[mp]->sfas97rd_cohort_id_ceded = cohort_id;
@@ -7536,6 +6250,7 @@ for (mp_map_iter = seg->fia_mp_map.begin();
 			if (liab->sm_fia[mp]->reins_flag)
 				cohort_reins_indicator = 1;
 			}
+		cohort_id = cohort_id;
 		liab->sm_fia[mp]->gaap_int_rate = fia_gaap_int_rate;
 		cohort_first_issue_period = min(cohort_first_issue_period, -liab->sm_fia[mp]->elapsed_mths);
 		cohort_last_issue_period = max(cohort_last_issue_period, -liab->sm_fia[mp]->elapsed_mths);
@@ -7545,15 +6260,17 @@ for (mp_map_iter = seg->fia_mp_map.begin();
 		}
 	}
 #endif
-
-#if defined(__EPL_LIAB_H_)
-if (seg->epl_mp_map.size())
+}
+{
+#if defined(__EPL_LIAB_H_) && defined(__AA_COMP_COMP_H_)
+if (seg_element->epl_mp_map.size())
 	{
 	// Determine cohort_first_issue_period
 	// Find earliest cohort issue period from cohort data
 	int cohort_first_issue_yr = 9999;
 	vector<string> issue_yrs;
-	split_string_usl(cohort_issue_yrs.c_str(), issue_yrs, ",");//WTW - Gen2 - split_tring internal RAFM function
+	cohort_id = cohort_id;
+	split_string_usl(cohort_issue_yrs.c_str(), issue_yrs, ",");
 
 	// Use t_low as first_issue_period if all issue years are included in the cohort
 	if (xstring(issue_yrs[0]) == "ALL")
@@ -7568,14 +6285,14 @@ if (seg->epl_mp_map.size())
 
 		cohort_first_issue_period 
 		= min(cohort_first_issue_period,
-			  MonthNumberFromDate(cohort_first_issue_yr, 1)
-			  - MonthNumberFromDate(proj_start_yr, proj_start_mth));
+				month_number_from_date(cohort_first_issue_yr, 1)
+				- month_number_from_date(proj_start_yr, proj_start_mth));
 		}
 	}
 
-for (mp_map_iter = seg->epl_mp_map.begin();
-	 mp_map_iter != seg->epl_mp_map.end();
-	 mp_map_iter++)
+for (mp_map_iter = seg_element->epl_mp_map.begin();
+		mp_map_iter != seg_element->epl_mp_map.end();
+		mp_map_iter++)
 	{
 	mp = mp_map_iter->first;
 
@@ -7596,19 +6313,19 @@ for (mp_map_iter = seg->epl_mp_map.begin();
 		}
 	}
 #endif
-
+}
 // Set cohort id as group name, crucial as this will be used as the key id to retrive values from the output files
 if (cohort_mp_count > 0 
-    || (seg->sfas97rd_seriatim_cohort_used.size() > cohort_col 
-        && seg->sfas97rd_seriatim_cohort_used[cohort_col]))
-	{
+	|| (seg_element->sfas97rd_seriatim_cohort_used.size() > cohort_col 
+		&& seg_element->sfas97rd_seriatim_cohort_used[cohort_col]))
+	{	
 	if (reins_flag)
 		reins_defn = "Ceded";
 	else
 		reins_defn = "Gross";
 			
 	xstring cohort_group = cohort_id + "|" + reins_defn;
-	//this->setGroup(cohort_group);	WTW - Gen2 - this submodel is not used and this is line is only for ALM runs
+	this->setGroup(cohort_group);
 
 	if (!valn_flag)
 		get_gaap_schedule_items();
@@ -7616,11 +6333,10 @@ if (cohort_mp_count > 0
 	if (valn_period > 0)
 		read_state_of_world_financial();
 	}
-	
+
 return cohort_mp_count;
 
 }
-
 
 //@@ END
 
@@ -7639,31 +6355,32 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_inv_inc(int t) {
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	{
 	if (!reins_flag)
 		{
-		if (fabs(seg->gaap_liab_net(t - 1) - seg->pol_loan(t - 1)) < aggregate_amount_threshold)
+		if (fabs(seg_element->gaap_liab_net(t - 1) - seg_element->pol_loan(t - 1)) < aggregate_amount_threshold)
 			return NO_AVG;
 
-		return (seg->gaap_inv_inc_res(t)
-				+ seg->gaap_inv_inc_cap(t))
+		return (seg_element->gaap_inv_inc_res(t)
+				+ seg_element->gaap_inv_inc_cap(t))
 				* (liab_net(t - 1) - pol_loan(t - 1))
-				  / (seg->gaap_liab_net(t - 1) - seg->pol_loan(t - 1))
+				  / (seg_element->gaap_liab_net(t - 1) - seg_element->pol_loan(t - 1))
 				+ pol_loan_inc(t);
 		}
 	else if (reins_flag)
 		{
-		if (fabs(seg->reins_gaap_liab_net(t - 1)) < aggregate_amount_threshold)
+		if (fabs(seg_element->reins_gaap_liab_net(t - 1)) < aggregate_amount_threshold)
 			return NO_AVG;
 
-		return seg->reins_gaap_inv_inc_res(t)
-			   * liab_net(t - 1) / seg->reins_gaap_liab_net(t - 1);
+		return seg_element->reins_gaap_inv_inc_res(t)
+			   * liab_net(t - 1) / seg_element->reins_gaap_liab_net(t - 1);
 		}
 	}
 
+{
 #if defined(__UL_LIAB_H_)
-if (this == ul_sfas97rd)
+if (model_name == UL_SFAS97RD)
 	{
 	if (!reins_flag)
 		return ul->gaap_inv_inc_res(t)
@@ -7672,9 +6389,10 @@ if (this == ul_sfas97rd)
 		return ul->reins_gaap_inv_inc_res(t);
 	}
 #endif
-
+}
+{
 #if defined(__IUL_LIAB_H_)
-if (this == iul_sfas97rd)
+if (model_name == IUL_SFAS97RD)
 	{
 	if (!reins_flag)
 		return iul->gaap_inv_inc_res(t)
@@ -7683,9 +6401,10 @@ if (this == iul_sfas97rd)
 		return iul->reins_gaap_inv_inc_res(t);
 	}
 #endif
-
+}
+{
 #if defined(__VUL_LIAB_H_)
-if (this == vul_sfas97rd)
+if (model_name == VUL_SFAS97RD)
 	{
 	if (!reins_flag)
 		return vul->gaap_inv_inc_res(t)
@@ -7694,9 +6413,10 @@ if (this == vul_sfas97rd)
 		return vul->reins_gaap_inv_inc_res(t);
 	}
 #endif
-
+}
+{
 #if defined(__FA_LIAB_H_)
-if (this == fa_sfas97rd)
+if (model_name == FA_SFAS97RD)
 	{
 	if (!reins_flag)
 		return fa->gaap_inv_inc_res(t)
@@ -7705,20 +6425,10 @@ if (this == fa_sfas97rd)
 		return fa->reins_gaap_inv_inc_res(t);
 	}
 #endif
-
-#if defined(__FA_LIAB_H_)
-if (this == fa_sfas97rd)
-	{
-	if (!reins_flag)
-		return fa->gaap_inv_inc_res(t)
-		       + fa->gaap_inv_inc_cap(t);
-	else if (fa->reins_flag)
-		return fa->reins_gaap_inv_inc_res(t);
-	}
-#endif
-
+}
+{
 #if defined(__VA_LIAB_H_)
-if (this == va_sfas97rd)
+if (model_name == VA_SFAS97RD)
 	{
 	if (!reins_flag)
 		return va->gaap_inv_inc_res(t)
@@ -7727,9 +6437,10 @@ if (this == va_sfas97rd)
 		return va->reins_gaap_inv_inc_res(t);
 	}
 #endif
-
+}
+{
 #if defined(__FIA_LIAB_H_)
-if (this == fia_sfas97rd)
+if (model_name == FIA_SFAS97RD)
 	{
 	if (!reins_flag)
 		return fia->gaap_inv_inc_res(t)
@@ -7738,11 +6449,11 @@ if (this == fia_sfas97rd)
 		return fia->reins_gaap_inv_inc_res(t);
 	}
 #endif
+}
 
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -7761,11 +6472,12 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_inv_inc_fund(int t) {
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	return sum_over_gaap("inv_inc_fund", t);
-	
+
+{	
 #if defined(__UL_LIAB_H_)
-if (this == ul_sfas97rd)
+if (model_name == UL_SFAS97RD)
 	{
 	double reins_pct = 0.0;
 		
@@ -7781,9 +6493,10 @@ if (this == ul_sfas97rd)
 		   * reins_pct;
 	}	
 #endif
-
+}
+{
 #if defined(__VUL_LIAB_H_)
-if (this == vul_sfas97rd)
+if (model_name == VUL_SFAS97RD)
 	{
 	double reins_pct = 0.0;
 		
@@ -7800,9 +6513,10 @@ if (this == vul_sfas97rd)
 		   * reins_pct;
 	}	
 #endif
-
+}
+{
 #if defined(__IUL_LIAB_H_)
-if (this == iul_sfas97rd)
+if (model_name == IUL_SFAS97RD)
 	{
 	double reins_pct = 0.0;
 		
@@ -7818,14 +6532,10 @@ if (this == iul_sfas97rd)
 		   * reins_pct;
 	}	
 #endif
-
-#if defined(__VA_LIAB_H_)
-if (this == va_sfas97rd)
-	return NO_AVG;
-#endif
-
+}
+{
 #if defined(__FA_LIAB_H_)
-if (this == fa_sfas97rd)
+if (model_name == FA_SFAS97RD)
 	{
 	double reins_pct = 0.0;
 	
@@ -7839,9 +6549,10 @@ if (this == fa_sfas97rd)
 		   * reins_pct;
 	}		
 #endif
-
+}
+{
 #if defined(__FIA_LIAB_H_)
-if (this == fia_sfas97rd)
+if (model_name == FIA_SFAS97RD)
 	{
 	double reins_pct = 0.0;
 	
@@ -7855,11 +6566,10 @@ if (this == fia_sfas97rd)
 		   * reins_pct;
 	}				
 #endif
-
+}
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -7878,39 +6588,22 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_k_capzd_acq_exp(int t) {
 if (t < start_period || t > final_period)
 	return NO_AVG;
 
-if (t == start_period)
+if (sfas97rd_valn_flag)
 	{
-	if (sfas97rd_valn_flag)
-		{
-		double capzd_acq_exp_total = 0.0;
-		double egp_total = 0.0;
+	if (policies_inf_sum(t) < rate_ratio_threshold)//DAC is capitalized and amortized as incurred, so k_dac can change in between valuation dates
+		return NO_AVG;
 
-		if (loss_recognition_flag)
-			{
-			capzd_acq_exp_total = capzd_acq_exp_accum_loss_rec_int_rate(t) + capzd_acq_exp_pv_loss_rec_int_rate(t);
-			egp_total = egp_accum_loss_rec_int_rate(t) + egp_pv_loss_rec_int_rate(t);
-			}
-		else
-			{	 
-			capzd_acq_exp_total = capzd_acq_exp_accum(t) + capzd_acq_exp_pv(t);
-			egp_total = egp_accum(t) + egp_pv(t);
-			}
+	double dac_prev = dac_acq_exp(t - 1)
+					  + capzd_acq_exp(t);
 
-		if (egp_total <= model_point_amount_threshold)
-			return 0.0;
-			
-		return (capzd_acq_exp_total - dac_acq_exp_loss_rec_accum(t))
-				/ egp_total;		
-		}
-
-	// (valn_period >= 0 && !valn_flag)
-	return k_capzd_acq_exp_sch(t);
+	return dac_prev / policies_inf_sum(t);
 	}
 
-return k_capzd_acq_exp(t - 1);
+// (valn_period >= 0 && !valn_flag)
+return k_capzd_acq_exp_sch(t);
+
 
 }
-
 
 //@@ END
 
@@ -7926,17 +6619,15 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_k_capzd_acq_exp_sch(int t) {
 //^^^
 
 #line 1 "k_capzd_acq_exp_sch.SFAS97RD_GAAP.for"
-//WTW - Gen2 - split non time guard items
-if (/*valn_flag || */t < start_period || t > final_period)
+if (t < start_period || t > final_period)
 	return NO_AVG;
 	
 if (valn_flag)
 	return NO_AVG;
 
-return gaap_schedule[K_CAPZD_ACQ_EXP][0];
+return gaap_schedule[K_CAPZD_ACQ_EXP][t];
 
 }
-
 
 //@@ END
 
@@ -7955,39 +6646,22 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_k_capzd_comm(int t) {
 if (t < start_period || t > final_period)
 	return NO_AVG;
 
-if (t == start_period)
+if (sfas97rd_valn_flag)
 	{
-	if (sfas97rd_valn_flag)
-		{
-		double capzd_comm_total = 0.0;
-		double egp_total = 0.0;
+	if (policies_inf_sum(t) < rate_ratio_threshold)//DAC is capitalized and amortized as incurred, so k_dac can change in between valuation dates
+		return NO_AVG;
 
-		if (loss_recognition_flag)
-			{
-			capzd_comm_total = capzd_comm_accum_loss_rec_int_rate(t) + capzd_comm_pv_loss_rec_int_rate(t);
-			egp_total = egp_accum_loss_rec_int_rate(t) + egp_pv_loss_rec_int_rate(t);
-			}
-		else
-			{	 
-			capzd_comm_total = capzd_comm_accum(t) + capzd_comm_pv(t);
-			egp_total = egp_accum(t) + egp_pv(t);
-			}
+	double dac_prev = dac_comm(t - 1)
+						+ capzd_comm_bom(t)
+						+ capzd_comm_eom(t);
 
-		if (egp_total <= model_point_amount_threshold)
-			return 0.0;
-		
-		return (capzd_comm_total - dac_comm_loss_rec_accum(t))
-				/ egp_total;								
-		}
-
-	// (valn_period >= 0 && !valn_flag)
-	return k_capzd_comm_sch(t);
+	return dac_prev / policies_inf_sum(t);
 	}
 
-return k_capzd_comm(t - 1);
+// (valn_period >= 0 && !valn_flag)
+return k_capzd_comm_sch(t);
 
 }
-
 
 //@@ END
 
@@ -8003,17 +6677,15 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_k_capzd_comm_sch(int t) {
 //^^^
 
 #line 1 "k_capzd_comm_sch.SFAS97RD_GAAP.for"
-//WTW - Gen2 - split non time guard items
-if (/*valn_flag || */t < start_period || t > final_period)
+if (t < start_period || t > final_period)
 	return NO_AVG;
 	
 if (valn_flag)
 	return NO_AVG;
 
-return gaap_schedule[K_CAPZD_COMM][0];
+return gaap_schedule[K_CAPZD_COMM][t];
 
 }
-
 
 //@@ END
 
@@ -8032,39 +6704,21 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_k_capzd_prem_bonus(int t) {
 if (t < start_period || t > final_period)
 	return NO_AVG;
 
-if (t == start_period)
+if (sfas97rd_valn_flag)
 	{
-	if (sfas97rd_valn_flag)
-		{
-		double capzd_prem_bonus_total = 0.0;
-		double egp_total = 0.0;
+	if (policies_inf_sum(t) < rate_ratio_threshold)//DAC is capitalized and amortized as incurred, so k_dac can change in between valuation dates
+		return NO_AVG;
 
-		if (loss_recognition_flag)
-			{
-			capzd_prem_bonus_total = capzd_prem_bonus_accum_loss_rec_int_rate(t) + capzd_prem_bonus_pv_loss_rec_int_rate(t);
-			egp_total = egp_accum_loss_rec_int_rate(t) + egp_pv_loss_rec_int_rate(t);
-			}
-		else
-			{	 
-			capzd_prem_bonus_total = capzd_prem_bonus_accum(t) + capzd_prem_bonus_pv(t);
-			egp_total = egp_accum(t) + egp_pv(t);
-			}
+	double dac_prev = dac_prem_bonus(t - 1)
+					  + capzd_prem_bonus(t);
 
-		if (egp_total <= model_point_amount_threshold)
-			return 0.0;
-			
-		return (capzd_prem_bonus_total - dac_prem_bonus_loss_rec_accum(t))
-				/ egp_total;		
-		}
-
-	// (valn_period >= 0 && !valn_flag)
-	return k_capzd_prem_bonus_sch(t);
+	return dac_prev / policies_inf_sum(t);
 	}
 
-return k_capzd_prem_bonus(t - 1);
+// (valn_period >= 0 && !valn_flag)
+return k_capzd_prem_bonus_sch(t);
 
 }
-
 
 //@@ END
 
@@ -8080,17 +6734,15 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_k_capzd_prem_bonus_sch(int t) {
 //^^^
 
 #line 1 "k_capzd_prem_bonus_sch.SFAS97RD_GAAP.for"
-//WTW - Gen2 - split non time guard items
-if (/*valn_flag || */t < start_period || t > final_period)
+if (t < start_period || t > final_period)
 	return NO_AVG;
 	
 if (valn_flag)
 	return NO_AVG;
 
-return gaap_schedule[K_CAPZD_PREM_BONUS][0];
+return gaap_schedule[K_CAPZD_PREM_BONUS][t];
 
 }
-
 
 //@@ END
 
@@ -8112,25 +6764,21 @@ if (t < start_period || t > final_period)
 if (!cohort_reins_yrt_indicator)
 	return NO_AVG;
 
-if (t == start_period)
+if (sfas97rd_valn_flag)
 	{
-	if (sfas97rd_valn_flag)
-		{
-		if ((egp_accum(t) + egp_pv(t)) <= model_point_amount_threshold)
-			return 0.0;
-		
-		return (reins_yrt_cost_accum(t) + reins_yrt_cost_pv(t))
-				/ (egp_accum(t) + egp_pv(t));		
-		}
+	if (policies_inf_sum(t) < rate_ratio_threshold)//DAC is capitalized and amortized as incurred, so k_dac can change in between valuation dates
+		return NO_AVG;
 
-	// (valn_period >= 0 && !valn_flag)
-	return k_reins_yrt_cost_sch(t);
+	double dac_prev = dac_reins_yrt_asset(t - 1)
+						+ capzd_reins_yrt_cost(t);
+
+	return dac_prev / policies_inf_sum(t);
 	}
 
-return k_reins_yrt_cost(t - 1);
+// (valn_period >= 0 && !valn_flag)
+return k_reins_yrt_cost_sch(t);
 
 }
-
 
 //@@ END
 
@@ -8146,8 +6794,7 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_k_reins_yrt_cost_sch(int t) {
 //^^^
 
 #line 1 "k_reins_yrt_cost_sch.SFAS97RD_GAAP.for"
-//WTW - Gen2 - split non time guard items
-if (/*valn_flag || */t < start_period || t > final_period)
+if (t < start_period || t > final_period)
 	return NO_AVG;
 	
 if (valn_flag)
@@ -8156,10 +6803,9 @@ if (valn_flag)
 if (!cohort_reins_yrt_indicator)
 	return NO_AVG;
 
-return gaap_schedule[K_REINS_YRT_COST][0];
+return gaap_schedule[K_REINS_YRT_COST][t];
 
 }
-
 
 //@@ END
 
@@ -8198,7 +6844,6 @@ return k_sop031_gmdb_ben_br(t - 1);
 
 }
 
-
 //@@ END
 
 //@@ START - k_sop031_gmdb_ben_br_sch
@@ -8219,7 +6864,6 @@ if (valn_flag || t < start_period || t > final_period)
 return gaap_schedule[K_SOP031_GMDB_BEN_BR][0];
 
 }
-
 
 //@@ END
 
@@ -8257,7 +6901,6 @@ return k_sop031_pbr(t - 1);
 
 }
 
-
 //@@ END
 
 //@@ START - k_sop031_pbr_sch
@@ -8272,8 +6915,7 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_k_sop031_pbr_sch(int t) {
 //^^^
 
 #line 1 "k_sop031_pbr_sch.SFAS97RD_GAAP.for"
-//WTW - Gen2 - split non time guard items
-if (/*valn_flag || */t < start_period || t > final_period)
+if (t < start_period || t > final_period)
 	return NO_AVG;
 	
 if (valn_flag)
@@ -8282,7 +6924,6 @@ if (valn_flag)
 return gaap_schedule[K_SOP031_PBR][0];
 
 }
-
 
 //@@ END
 
@@ -8321,7 +6962,6 @@ return k_sop031_ulsg_ben_br(t - 1);
 
 }
 
-
 //@@ END
 
 //@@ START - k_sop031_ulsg_ben_br_sch
@@ -8342,7 +6982,6 @@ if (valn_flag || t < start_period || t > final_period)
 return gaap_schedule[K_SOP031_ULSG_BEN_BR][0];
 
 }
-
 
 //@@ END
 
@@ -8382,7 +7021,6 @@ return k_sop031_unearn_rev_liab(t - 1);
 
 }
 
-
 //@@ END
 
 //@@ START - k_sop031_unearn_rev_liab_sch
@@ -8404,7 +7042,6 @@ return gaap_schedule[K_SOP031_UNEARN_REV_LIAB][0];
 
 }
 
-
 //@@ END
 
 //@@ START - k_unearn_rev_liab
@@ -8422,25 +7059,21 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_k_unearn_rev_liab(int t) {
 if (t < start_period || t > final_period)
 	return NO_AVG;
 
-if (t == start_period)
+if (sfas97rd_valn_flag)
 	{
-	if (sfas97rd_valn_flag)
-		{
-		if ((egp_accum(t) + egp_pv(t)) <= model_point_amount_threshold)
-			return 0.0;
-			
-		return (deferred_loads_accum(t) + deferred_loads_pv(t))
-				/ (egp_accum(t) + egp_pv(t));								
-		}
+	if (policies_inf_sum(t) < rate_ratio_threshold)//DAC is capitalized and amortized as incurred, so k_dac can change in between valuation dates
+		return NO_AVG;
 
-	// (valn_period >= 0 && !valn_flag)
-	return k_unearn_rev_liab_sch(t);
+	double dac_prev = unearn_rev_liab(t - 1)
+						+ deferred_loads(t);
+
+	return dac_prev / policies_inf_sum(t);
 	}
 
-return k_unearn_rev_liab(t - 1);
+// (valn_period >= 0 && !valn_flag)
+return k_unearn_rev_liab_sch(t);
 
 }
-
 
 //@@ END
 
@@ -8456,17 +7089,15 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_k_unearn_rev_liab_sch(int t) {
 //^^^
 
 #line 1 "k_unearn_rev_liab_sch.SFAS97RD_GAAP.for"
-//WTW - Gen2 - split non time guard items
-if (/*valn_flag || */t < start_period || t > final_period)
+if (t < start_period || t > final_period)
 	return NO_AVG;
-	
+
 if (valn_flag)
 	return NO_AVG;
 
-return gaap_schedule[K_UNEARN_REV_LIAB][0];
+return gaap_schedule[K_UNEARN_REV_LIAB][t];
 
 }
-
 
 //@@ END
 
@@ -8487,15 +7118,15 @@ if (t < start_period || t > final_period)
 
 return fund_val_fixed(t)
 	   + unearn_rev_liab(t)
-	   + sfas133_liab(t)
-       + sop031_addl_liab(t)
+	   + mrb_liab(t)
+       + sfas133_liab(t)
+	   + sop031_addl_liab(t)
 	   - dac_acq_exp(t)
 	   - dac_comm(t)
 	   - dac_prem_bonus(t)
 	   - dac_reins_yrt_asset(t);
 
 }
-
 
 //@@ END
 
@@ -8514,11 +7145,12 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_loads(int t) {
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	return sum_over_gaap("loads", t);
 
+{
 #if defined(__UL_LIAB_H_)
-if (this == ul_sfas97rd)
+if (model_name == UL_SFAS97RD)
 	{
 	if (!reins_flag)
 		return max(0.0, min(ul->loads(t),
@@ -8532,9 +7164,10 @@ if (this == ul_sfas97rd)
 	return NO_AVG;
 	}
 #endif
-
+}
+{
 #if defined(__VUL_LIAB_H_)
-if (this == vul_sfas97rd)
+if (model_name == VUL_SFAS97RD)
 	{
 	if (!reins_flag)
 		return max(0.0, min(vul->loads(t) + vul->sub_adv_fees(t),
@@ -8548,9 +7181,10 @@ if (this == vul_sfas97rd)
 	return NO_AVG;
 	}
 #endif
-
+}
+{
 #if defined(__IUL_LIAB_H_)
-if (this == iul_sfas97rd)
+if (model_name == IUL_SFAS97RD)
 	{
 	if (!reins_flag)
 		return max(0.0, min(iul->loads(t),
@@ -8564,9 +7198,10 @@ if (this == iul_sfas97rd)
 	return NO_AVG;
 	}
 #endif
-
+}
+{
 #if defined(__VA_LIAB_H_)
-if (this == va_sfas97rd)
+if (model_name == VA_SFAS97RD)
 	{
 	if (!reins_flag)
 		return va->admin_fee(t)
@@ -8587,9 +7222,10 @@ if (this == va_sfas97rd)
 	return NO_AVG;
 	}
 #endif
-
+}
+{
 #if defined(__FA_LIAB_H_)
-if (this == fa_sfas97rd)
+if (model_name == FA_SFAS97RD)
 	{
 	if (!reins_flag)
 		return fa->admin_fee(t) + fa->load_prem(t);
@@ -8600,9 +7236,10 @@ if (this == fa_sfas97rd)
 	return NO_AVG;
 	}
 #endif
-
+}
+{
 #if defined(__FIA_LIAB_H_)
-if (this == fia_sfas97rd)
+if (model_name == FIA_SFAS97RD)
 	{
 	if (!reins_flag)
 		return fia->admin_fee(t);
@@ -8613,11 +7250,10 @@ if (this == fia_sfas97rd)
 	return NO_AVG;
 	}
 #endif
-
+}
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -8636,11 +7272,12 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_loc_cost(int t) {
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	return sum_over_gaap("loc_cost", t);
 
+{
 #if defined(__UL_LIAB_H_)
-if (this == ul_sfas97rd)
+if (model_name == UL_SFAS97RD)
 	{
 	if (!reins_flag)
 		return ul->loc_cost(t);
@@ -8648,9 +7285,10 @@ if (this == ul_sfas97rd)
 	return 0.0;
 	}
 #endif
-
+}
+{
 #if defined(__IUL_LIAB_H_)
-if (this == iul_sfas97rd)
+if (model_name == IUL_SFAS97RD)
 	{
 	if (!reins_flag)
 		return iul->loc_cost(t);
@@ -8658,33 +7296,11 @@ if (this == iul_sfas97rd)
 	return 0.0;
 	}
 #endif
+}
 
 return NO_AVG;
 
 }
-
-
-//@@ END
-
-//@@ START - loss_rec_amortzn_int_rate
-// Loss Recognition Amortization Interest Rate                                                                                             
-// Column:LOSS_REC_AMORTZN_INT_RATE
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_loss_rec_amortzn_int_rate(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "loss_rec_amortzn_int_rate.SFAS97RD_GAAP.for"
-if (t <= start_period || t > final_period)
-	return NO_AVG;
-
-return loss_rec_int_rate_mthly;
-
-}
-
 
 //@@ END
 
@@ -8695,7 +7311,7 @@ return loss_rec_int_rate_mthly;
 double SFAS97RD_GAAP_UDF::sfas97rd_gaap_maint_exp_bom(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(136,"maint_exp_bom",t);
+	return rebase_value(106,"maint_exp_bom",t);
 }
 
 
@@ -8706,11 +7322,12 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	return sum_over_gaap("maint_exp_bom", t);
-	
+
+{	
 #if defined(__UL_LIAB_H_)
-if (this == ul_sfas97rd)
+if (model_name == UL_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return ul->maint_exp_bom(t);
@@ -8719,9 +7336,10 @@ if (this == ul_sfas97rd)
 	return 0.0;	
 	}
 #endif
-
+}
+{
 #if defined(__VUL_LIAB_H_)
-if (this == vul_sfas97rd)
+if (model_name == VUL_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return vul->maint_exp_bom(t);
@@ -8730,9 +7348,10 @@ if (this == vul_sfas97rd)
 	return 0.0;	
 	}
 #endif
-
+}
+{
 #if defined(__IUL_LIAB_H_)
-if (this == iul_sfas97rd)
+if (model_name == IUL_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return iul->maint_exp_bom(t);
@@ -8741,9 +7360,10 @@ if (this == iul_sfas97rd)
 	return 0.0;	
 	}
 #endif
-
+}
+{
 #if defined(__VA_LIAB_H_)
-if (this == va_sfas97rd)
+if (model_name == VA_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return va->maint_exp_bom(t);
@@ -8760,9 +7380,10 @@ if (this == va_sfas97rd)
 	return 0.0;	
 	}
 #endif
-
+}
+{
 #if defined(__FA_LIAB_H_)
-if (this == fa_sfas97rd)
+if (model_name == FA_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return fa->maint_exp_bom(t);
@@ -8774,9 +7395,10 @@ if (this == fa_sfas97rd)
 	return 0.0;	
 	}
 #endif
-
+}
+{
 #if defined(__FIA_LIAB_H_)
-if (this == fia_sfas97rd)
+if (model_name == FIA_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return fia->maint_exp_bom(t);
@@ -8788,11 +7410,10 @@ if (this == fia_sfas97rd)
 	return 0.0;	
 	}
 #endif
-	
+}
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -8811,11 +7432,12 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_maint_exp_eom(int t) {
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	return sum_over_gaap("maint_exp_eom", t);
 	
+{
 #if defined(__UL_LIAB_H_)
-if (this == ul_sfas97rd)
+if (model_name == UL_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return ul->maint_exp_eom(t);
@@ -8828,9 +7450,10 @@ if (this == ul_sfas97rd)
 	return 0.0;	
 	}
 #endif
-
+}
+{
 #if defined(__VUL_LIAB_H_)
-if (this == vul_sfas97rd)
+if (model_name == VUL_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return vul->maint_exp_eom(t);
@@ -8843,9 +7466,10 @@ if (this == vul_sfas97rd)
 	return 0.0;	
 	}
 #endif
-
+}
+{
 #if defined(__IUL_LIAB_H_)
-if (this == iul_sfas97rd)
+if (model_name == IUL_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return iul->maint_exp_eom(t);
@@ -8859,9 +7483,10 @@ if (this == iul_sfas97rd)
 	return 0.0;	
 	}
 #endif
-
+}
+{
 #if defined(__VA_LIAB_H_)
-if (this == va_sfas97rd)
+if (model_name == VA_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return va->maint_exp_eom(t);
@@ -8879,9 +7504,10 @@ if (this == va_sfas97rd)
 	return 0.0;	
 	}
 #endif
-
+}
+{
 #if defined(__FA_LIAB_H_)
-if (this == fa_sfas97rd)
+if (model_name == FA_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return fa->maint_exp_eom(t);
@@ -8894,9 +7520,10 @@ if (this == fa_sfas97rd)
 	return 0.0;	
 	}
 #endif
-
+}
+{
 #if defined(__FIA_LIAB_H_)
-if (this == fia_sfas97rd)
+if (model_name == FIA_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return fia->maint_exp_eom(t);
@@ -8909,11 +7536,10 @@ if (this == fia_sfas97rd)
 	return 0.0;	
 	}
 #endif
-	
+}	
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -8924,7 +7550,7 @@ return NO_AVG;
 double SFAS97RD_GAAP_UDF::sfas97rd_gaap_modco_liab(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(138,"modco_liab",t);
+	return rebase_value(108,"modco_liab",t);
 }
 
 
@@ -8935,35 +7561,39 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 if (!reins_flag || t < start_period || t > final_period)
 	return NO_AVG;
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	return sum_over_gaap("modco_liab", t);
-	
+
+{	
 #if defined(__UL_LIAB_H_)
-if (this == ul_sfas97rd)
+if (model_name == UL_SFAS97RD)
 	{
 	return ul->sum_over_reinsurance("stat_res_mp_prelim", t, MODIFIED_COINSURANCE)
 		   + ul->sum_over_reinsurance("stat_unearn_prem_res", t, MODIFIED_COINSURANCE);
 	}
 #endif
-
+}
+{
 #if defined(__VUL_LIAB_H_)
-if (this == vul_sfas97rd)
+if (model_name == VUL_SFAS97RD)
 	{
 	return vul->sum_over_reinsurance("stat_res_mp_prelim", t, MODIFIED_COINSURANCE)
 		   + vul->sum_over_reinsurance("stat_unearn_prem_res", t, MODIFIED_COINSURANCE);
 	}
 #endif
-
+}
+{
 #if defined(__IUL_LIAB_H_)
-if (this == iul_sfas97rd)
+if (model_name == IUL_SFAS97RD)
 	{
 	return iul->sum_over_reinsurance("stat_res_mp_prelim", t, MODIFIED_COINSURANCE)
 		   + iul->sum_over_reinsurance("stat_unearn_prem_res", t, MODIFIED_COINSURANCE);
 	}
 #endif
-
+}
+{
 #if defined(__VA_LIAB_H_)
-if (this == va_sfas97rd)
+if (model_name == VA_SFAS97RD)
 	{
 	if (va->reins_flag)
 		return va->reins_stat_res(t);
@@ -8971,11 +7601,11 @@ if (this == va_sfas97rd)
 	return NO_AVG;
 	}
 #endif
-	
+}
+
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -8998,7 +7628,6 @@ return modco_liab(t) - modco_liab(t - 1);
 
 }
 
-
 //@@ END
 
 //@@ START - modco_res_adj
@@ -9008,7 +7637,7 @@ return modco_liab(t) - modco_liab(t - 1);
 double SFAS97RD_GAAP_UDF::sfas97rd_gaap_modco_res_adj(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(140,"modco_res_adj",t);
+	return rebase_value(110,"modco_res_adj",t);
 }
 
 
@@ -9019,11 +7648,12 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 if (!reins_flag || t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	return sum_over_gaap("modco_res_adj", t);
 	
+{
 #if defined(__UL_LIAB_H_)
-if (this == ul_sfas97rd)
+if (model_name == UL_SFAS97RD)
 	{
 	if (ul->modco_flag)
 		return ul->reins_modco_res_adj(t);
@@ -9031,9 +7661,10 @@ if (this == ul_sfas97rd)
 	return NO_AVG;
 	}
 #endif
-
+}
+{
 #if defined(__VUL_LIAB_H_)
-if (this == vul_sfas97rd)
+if (model_name == VUL_SFAS97RD)
 	{
 	if (vul->modco_flag)
 		return vul->reins_modco_res_adj(t);
@@ -9041,9 +7672,10 @@ if (this == vul_sfas97rd)
 	return NO_AVG;
 	}
 #endif
-
+}
+{
 #if defined(__IUL_LIAB_H_)
-if (this == iul_sfas97rd)
+if (model_name == IUL_SFAS97RD)
 	{
 	if (iul->modco_flag)
 		return iul->reins_modco_res_adj(t);
@@ -9051,9 +7683,10 @@ if (this == iul_sfas97rd)
 	return NO_AVG;
 	}
 #endif
-
+}
+{
 #if defined(__VA_LIAB_H_)
-if (this == va_sfas97rd)
+if (model_name == VA_SFAS97RD)
 	{
 	if (va->reins_flag)
 		return va->reins_modco_res_adj(t);
@@ -9061,11 +7694,252 @@ if (this == va_sfas97rd)
 	return NO_AVG;
 	}
 #endif
-	
+}
+
 return NO_AVG;
 
 }
 
+//@@ END
+
+//@@ START - mrb_gmab_liab
+// MRB GMAB Liability                                                                                             
+// Column:MRB_GMAB_LIAB
+//========================================================
+double SFAS97RD_GAAP_UDF::sfas97rd_gaap_mrb_gmab_liab(int t) {
+//^^^
+
+
+
+//^^^
+
+#line 1 "mrb_gmab_liab.SFAS97RD_GAAP.for"
+if (t < start_period || t > final_period)
+	return NO_AVG;
+
+if (valn_flag) // No MRB guaranteed benefit value included in SFAS97RD valuations
+	return NO_AVG;
+
+if (t == start_period && valn_period != 0)
+	return init_mrb_gmab_liab;
+
+if (model_name == SFAS97RD)
+	return sum_over_gaap("mrb_gmab_liab", t);
+
+{
+#if defined(__MRB_GAAP_H_)
+{
+#if defined(__VA_LIAB_H_)
+if (model_name == VA_SFAS97RD)
+	{
+	if (!va->sm_va_mrb.size())
+		return NO_AVG;
+
+	return va->sm_va_mrb[getElementNumber()]->gmab_liab(t);
+	}	
+#endif
+}
+#endif
+}
+
+return NO_AVG;
+
+}
+
+//@@ END
+
+//@@ START - mrb_gmdb_liab
+// MRB GMDB Liability                                                                                             
+// Column:MRB_GMDB_LIAB
+//========================================================
+double SFAS97RD_GAAP_UDF::sfas97rd_gaap_mrb_gmdb_liab(int t) {
+//^^^
+
+
+
+//^^^
+
+#line 1 "mrb_gmdb_liab.SFAS97RD_GAAP.for"
+if (t < start_period || t > final_period) // No MRB guaranteed benefit value included in SFAS97RD valuations
+	return NO_AVG;
+
+if (valn_flag)
+	return NO_AVG;
+
+if (t == start_period && valn_period != 0)
+	return init_mrb_gmdb_liab;
+
+if (model_name == SFAS97RD)
+	return sum_over_gaap("mrb_gmdb_liab", t);
+
+{
+#if defined(__MRB_GAAP_H_)
+{
+#if defined(__VA_LIAB_H_)
+if (model_name == VA_SFAS97RD)
+	{
+	if (!va->sm_va_mrb.size())
+		return NO_AVG;
+
+	return va->sm_va_mrb[getElementNumber()]->gmdb_liab(t);
+	}
+#endif
+}
+#endif
+}
+
+return NO_AVG;
+
+}
+
+//@@ END
+
+//@@ START - mrb_gmib_liab
+// MRB GMIB Liability                                                                                             
+// Column:MRB_GMIB_LIAB
+//========================================================
+double SFAS97RD_GAAP_UDF::sfas97rd_gaap_mrb_gmib_liab(int t) {
+//^^^
+
+
+
+//^^^
+
+#line 1 "mrb_gmib_liab.SFAS97RD_GAAP.for"
+if (t < start_period || t > final_period)
+	return NO_AVG;
+
+if (valn_flag) // No MRB guaranteed benefit value included in SFAS97RD valuations
+	return NO_AVG;
+
+if (t == start_period && valn_period != 0)
+	return init_mrb_gmib_liab;
+
+if (model_name == SFAS97RD)
+	return sum_over_gaap("mrb_gmib_liab", t);
+
+{
+#if defined(__MRB_GAAP_H_)
+{
+#if defined(__VA_LIAB_H_)
+if (model_name == VA_SFAS97RD)
+	{
+	if (!va->sm_va_mrb.size())
+		return NO_AVG;
+
+	return va->sm_va_mrb[getElementNumber()]->gmib_liab(t);
+	}
+#endif
+}
+#endif
+}
+
+return NO_AVG;
+
+}
+
+//@@ END
+
+//@@ START - mrb_gmwb_liab
+// MRB GMWB Liability                                                                                             
+// Column:MRB_GMWB_LIAB
+//========================================================
+double SFAS97RD_GAAP_UDF::sfas97rd_gaap_mrb_gmwb_liab(int t) {
+//^^^
+
+
+
+//^^^
+
+#line 1 "mrb_gmwb_liab.SFAS97RD_GAAP.for"
+if (t < start_period || t > final_period)
+	return NO_AVG;
+
+if (valn_flag) // No MRB guaranteed benefit value included in SFAS97RD valuations
+	return NO_AVG;
+
+if (t == start_period && valn_period != 0)
+	return init_mrb_gmwb_liab;
+
+if (model_name == SFAS97RD)
+	return sum_over_gaap("mrb_gmwb_liab", t);
+
+{
+#if defined(__MRB_GAAP_H_)
+{
+#if defined(__VA_LIAB_H_)
+if (model_name == VA_SFAS97RD)
+	{
+	if (!va->sm_va_mrb.size())
+		return NO_AVG;
+
+	return va->sm_va_mrb[getElementNumber()]->gmwb_liab(t);
+	}
+#endif
+}
+{
+#if defined(__FIA_LIAB_H_)
+if (model_name == FIA_SFAS97RD)
+	{
+	if (!fia->sm_fia_mrb.size())
+		return NO_AVG;
+
+	return fia->sm_fia_mrb[getElementNumber()]->gmwb_liab(t);
+	}
+#endif
+}
+#endif
+}
+
+return NO_AVG;
+
+}
+
+//@@ END
+
+//@@ START - mrb_liab
+// Market Risk Benefits Liability                                                                                             
+// Column:MRB_LIAB
+//========================================================
+double SFAS97RD_GAAP_UDF::sfas97rd_gaap_mrb_liab(int t) {
+//^^^
+
+
+
+//^^^
+
+#line 1 "mrb_liab.SFAS97RD_GAAP.for"
+if (t < start_period || t > final_period)
+	return NO_AVG;
+
+return mrb_gmab_liab(t)
+       + mrb_gmib_liab(t)
+       + mrb_gmwb_liab(t)
+	   + mrb_gmdb_liab(t);
+
+}
+
+//@@ END
+
+//@@ START - mrb_liab_incr
+// Market Risk Benefits Liability Increase                                                                                             
+// Column:MRB_LIAB_INCR
+//========================================================
+double SFAS97RD_GAAP_UDF::sfas97rd_gaap_mrb_liab_incr(int t) {
+//^^^
+
+
+
+//^^^
+
+#line 1 "mrb_liab_incr.SFAS97RD_GAAP.for"
+if (t <= start_period || t > final_period)
+	return NO_AVG;
+
+return mrb_liab(t)
+       - mrb_liab(t - 1);
+
+}
 
 //@@ END
 
@@ -9084,11 +7958,12 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_persist_bon_ref(int t) {
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 	
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	return sum_over_gaap("persist_bon_ref", t);
 	
+{
 #if defined(__UL_LIAB_H_)
-if (this == ul_sfas97rd)
+if (model_name == UL_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		{
@@ -9108,9 +7983,10 @@ if (this == ul_sfas97rd)
 	return 0.0;
 	}
 #endif
-
+}
+{
 #if defined(__VUL_LIAB_H_)
-if (this == vul_sfas97rd)
+if (model_name == VUL_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		{
@@ -9133,11 +8009,11 @@ if (this == vul_sfas97rd)
 	return 0.0;
 	}
 #endif
+}
 
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -9156,11 +8032,12 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_pol_loan(int t) {
 if (t < start_period || t > final_period)
 	return NO_AVG;
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	return sum_over_gaap("pol_loan", t);
 
+{
 #if defined(__UL_LIAB_H_)
-if (this == ul_sfas97rd)
+if (model_name == UL_SFAS97RD)
 	{
 	if (!reins_flag)
 		return ul->pol_loan(t);
@@ -9169,9 +8046,10 @@ if (this == ul_sfas97rd)
 	return 0.0; 
 	}
 #endif
-
+}
+{
 #if defined(__IUL_LIAB_H_)
-if (this == iul_sfas97rd)
+if (model_name == IUL_SFAS97RD)
 	{
 	if (!reins_flag)
 		return iul->pol_loan(t);
@@ -9180,9 +8058,10 @@ if (this == iul_sfas97rd)
 	return 0.0; 
 	}
 #endif
-
+}
+{
 #if defined(__VUL_LIAB_H_)
-if (this == vul_sfas97rd)
+if (model_name == VUL_SFAS97RD)
 	{
 	if (!reins_flag)
 		return vul->pol_loan(t);
@@ -9191,11 +8070,11 @@ if (this == vul_sfas97rd)
 	return 0.0; 
 	}
 #endif
+}
 
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -9214,11 +8093,12 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_pol_loan_inc(int t) {
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	return sum_over_gaap("pol_loan_inc", t);
 
+{
 #if defined(__UL_LIAB_H_)
-if (this == ul_sfas97rd)
+if (model_name == UL_SFAS97RD)
 	{
 	if (!reins_flag)
 		return ul->pol_loan_inc(t);	
@@ -9226,9 +8106,10 @@ if (this == ul_sfas97rd)
 	return NO_AVG;
 	}
 #endif
-
+}
+{
 #if defined(__IUL_LIAB_H_)
-if (this == iul_sfas97rd)
+if (model_name == IUL_SFAS97RD)
 	{
 	if (!reins_flag)
 		return iul->pol_loan_inc(t);	
@@ -9236,9 +8117,10 @@ if (this == iul_sfas97rd)
 	return NO_AVG;
 	}
 #endif
-
+}
+{
 #if defined(__VUL_LIAB_H_)
-if (this == vul_sfas97rd)
+if (model_name == VUL_SFAS97RD)
 	{
 	if (!reins_flag)
 		return vul->pol_loan_inc(t);	
@@ -9246,84 +8128,128 @@ if (this == vul_sfas97rd)
 	return NO_AVG;
 	}
 #endif
+}
 
 return 0.0;
 
 }
 
-
 //@@ END
 
-//@@ START - policies_b
-// Policies In Force Beginning of Month                                                                                             
-// Column:POLICIES_B
+//@@ START - policies_inf
+// Policies In Force End of Month                                                                                             
+// Column:POLICIES_INF
 //========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_policies_b(int t) {
+double SFAS97RD_GAAP_UDF::sfas97rd_gaap_policies_inf(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(144,"policies_b",t);
+	return rebase_value(120,"policies_inf",t);
 }
 
 
 
 //^^^
 
-#line 1 "policies_b.SFAS97RD_GAAP.for"
-if (t <= start_period || t > final_period)
+#line 1 "policies_inf.SFAS97RD_GAAP.for"
+if (t < start_period || t > final_period)
 	return NO_AVG;
 
-if (this == sfas97rd)
-	return sum_over_gaap("policies_b", t);
-	
+if (model_name == SFAS97RD)
+	return sum_over_gaap("policies_inf", t);
+
+{	
 #if defined(__UL_LIAB_H_)
-if (this == ul_sfas97rd)
-	{
-	if (t == ul->commencement_period + 1)
-		return ul->policies_issued(t);
-
-	return ul->policies_inf(t - 1);
-	}
+if (model_name == UL_SFAS97RD)
+	return ul->policies_inf(t);
 #endif
-
+}
+{
 #if defined(__VUL_LIAB_H_)
-if (this == vul_sfas97rd)
-	{
-	if (t == vul->commencement_period + 1)
-		return vul->policies_issued(t);
-
-	return vul->policies_inf(t - 1);
-	}
+if (model_name == VUL_SFAS97RD)
+	return vul->policies_inf(t);
 #endif
-
+}
+{
 #if defined(__IUL_LIAB_H_)
-if (this == iul_sfas97rd)
-	{
-	if (t == iul->commencement_period + 1)
-		return iul->policies_issued(t);
-
-	return iul->policies_inf(t - 1);
-	}
+if (model_name == IUL_SFAS97RD)
+	return iul->policies_inf(t);
 #endif
-
+}
+{
 #if defined(__VA_LIAB_H_)
-if (this == va_sfas97rd)
-	return va->policies_b(t);
+if (model_name == VA_SFAS97RD)
+	return va->policies_inf(t);
 #endif
-
+}
+{
 #if defined(__FA_LIAB_H_)
-if (this == fa_sfas97rd)
-	return fa->policies_b(t);
+if (model_name == FA_SFAS97RD)
+	return fa->policies_inf(t);
 #endif
-
+}
+{
 #if defined(__FIA_LIAB_H_)
-if (this == fia_sfas97rd)
-	return fia->policies_b(t);
+if (model_name == FIA_SFAS97RD)
+	return fia->policies_inf(t);
 #endif
-
+}
 return NO_AVG;
 
 }
 
+//@@ END
+
+//@@ START - policies_inf_sch
+// Policies In Force Schedule                                                                                             
+// Column:POLICIES_INF_SCH
+//========================================================
+double SFAS97RD_GAAP_UDF::sfas97rd_gaap_policies_inf_sch(int t) {
+//^^^
+if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
+	return rebase_value(121,"policies_inf_sch",t);
+}
+
+
+
+//^^^
+
+#line 1 "policies_inf_sch.SFAS97RD_GAAP.for"
+if (t < start_period || t > final_period)
+	return NO_AVG;
+
+if (valn_flag)
+	return NO_AVG;
+
+return gaap_schedule[POLICIES_INF][t];
+
+}
+
+//@@ END
+
+//@@ START - policies_inf_sum
+// Policies In Force total value over the life of cohort                                                                                             
+// Column:POLICIES_INF_SUM
+//========================================================
+double SFAS97RD_GAAP_UDF::sfas97rd_gaap_policies_inf_sum(int t) {
+//^^^
+if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
+	return rebase_value(122,"policies_inf_sum",t);
+}
+
+
+
+//^^^
+
+#line 1 "policies_inf_sum.SFAS97RD_GAAP.for"
+if (t < start_period || t > final_period)
+	return NO_AVG;
+
+policies_inf_sch(t);//Force call for DAC Adjustment calculation
+
+return policies_inf(t)
+	   + policies_inf_sum(t + 1);
+
+}
 
 //@@ END
 
@@ -9342,11 +8268,12 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_prem_bonus(int t) {
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	return sum_over_gaap("prem_bonus", t);
 
+{
 #if defined(__VA_LIAB_H_)
-if (this == va_sfas97rd)
+if (model_name == VA_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return va->prem_bonus(t);
@@ -9358,9 +8285,10 @@ if (this == va_sfas97rd)
 	return 0.0;	
 	}
 #endif
-
+}
+{
 #if defined(__FA_LIAB_H_)
-if (this == fa_sfas97rd)
+if (model_name == FA_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return fa->prem_bonus(t);
@@ -9372,9 +8300,10 @@ if (this == fa_sfas97rd)
 	return 0.0;	
 	}
 #endif
-
+}
+{
 #if defined(__FIA_LIAB_H_)
-if (this == fia_sfas97rd)
+if (model_name == FIA_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return fia->prem_bonus(t);
@@ -9386,11 +8315,10 @@ if (this == fia_sfas97rd)
 	return 0.0;	
 	}
 #endif
-	
+}	
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -9409,11 +8337,12 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_prem_tax(int t) {
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	return sum_over_gaap("prem_tax", t);
 	
+{
 #if defined(__UL_LIAB_H_)
-if (this == ul_sfas97rd)
+if (model_name == UL_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return ul->prem_tax(t);
@@ -9425,9 +8354,10 @@ if (this == ul_sfas97rd)
 	return 0.0;	
 	}
 #endif
-
+}
+{
 #if defined(__VUL_LIAB_H_)
-if (this == vul_sfas97rd)
+if (model_name == VUL_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return vul->prem_tax(t);
@@ -9439,9 +8369,10 @@ if (this == vul_sfas97rd)
 	return 0.0;	
 	}
 #endif
-
+}
+{
 #if defined(__IUL_LIAB_H_)
-if (this == iul_sfas97rd)
+if (model_name == IUL_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return iul->prem_tax(t);
@@ -9453,10 +8384,10 @@ if (this == iul_sfas97rd)
 	return 0.0;	
 	}
 #endif
-
-
+}
+{
 #if defined(__VA_LIAB_H_)
-if (this == va_sfas97rd)
+if (model_name == VA_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return va->prem_tax(t);
@@ -9473,9 +8404,10 @@ if (this == va_sfas97rd)
 	return 0.0;	
 	}
 #endif
-	
+}
+{
 #if defined(__FA_LIAB_H_)
-if (this == fa_sfas97rd)
+if (model_name == FA_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return fa->prem_tax(t);
@@ -9487,9 +8419,10 @@ if (this == fa_sfas97rd)
 	return 0.0;	
 	}
 #endif	
-
+}
+{
 #if defined(__FIA_LIAB_H_)
-if (this == fia_sfas97rd)
+if (model_name == FIA_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return fia->prem_tax(t);
@@ -9501,11 +8434,10 @@ if (this == fia_sfas97rd)
 	return 0.0;	
 	}
 #endif	
-	
+}	
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -9516,7 +8448,7 @@ return NO_AVG;
 double SFAS97RD_GAAP_UDF::sfas97rd_gaap_refund(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(147,"refund",t);
+	return rebase_value(125,"refund",t);
 }
 
 
@@ -9527,11 +8459,12 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 if (!reins_flag || t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	return sum_over_gaap("refund", t);
 	
+{
 #if defined(__UL_LIAB_H_)
-if (this == ul_sfas97rd)
+if (model_name == UL_SFAS97RD)
 	{
 	if (ul->reins_flag)
 		return ul->sum_over_reinsurance("ref", t, COINSURANCE)
@@ -9542,9 +8475,10 @@ if (this == ul_sfas97rd)
 	return NO_AVG;
 	}
 #endif
-
+}
+{
 #if defined(__VUL_LIAB_H_)
-if (this == vul_sfas97rd)
+if (model_name == VUL_SFAS97RD)
 	{
 	if (vul->reins_flag)
 		return  vul->sum_over_reinsurance("ref", t, MODIFIED_COINSURANCE)
@@ -9553,9 +8487,10 @@ if (this == vul_sfas97rd)
 	return NO_AVG;
 	}
 #endif
-
+}
+{
 #if defined(__IUL_LIAB_H_)
-if (this == iul_sfas97rd)
+if (model_name == IUL_SFAS97RD)
 	{
 	if (iul->reins_flag)
 		return iul->sum_over_reinsurance("ref", t, COINSURANCE)
@@ -9566,9 +8501,10 @@ if (this == iul_sfas97rd)
 	return NO_AVG;
 	}
 #endif
-
+}
+{
 #if defined(__VA_LIAB_H_)
-if (this == va_sfas97rd)
+if (model_name == VA_SFAS97RD)
 	{
 	if (va->reins_flag)
 		return va->reins_ref(t);
@@ -9576,11 +8512,11 @@ if (this == va_sfas97rd)
 	return NO_AVG;
 	}
 #endif
-	
+}
+
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -9596,18 +8532,18 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_reins_yrt_cost(int t) {
 //^^^
 
 #line 1 "reins_yrt_cost.SFAS97RD_GAAP.for"
-//WTW - Gen2 - split non time guard items
-if (/*reins_flag || */t <= start_period || t > final_period)
+if (t <= start_period || t > final_period)
 	return NO_AVG;
-	
+
 if (reins_flag)
 	return NO_AVG;
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	return sum_over_gaap("reins_yrt_cost", t);
-	
+
+{	
 #if defined(__UL_LIAB_H_)
-if (this == ul_sfas97rd)
+if (model_name == UL_SFAS97RD)
 	{
 	if (ul->reins_flag) 
 		{
@@ -9629,9 +8565,10 @@ if (this == ul_sfas97rd)
 		}
 	}
 #endif
-
+}
+{
 #if defined(__VUL_LIAB_H_)
-if (this == vul_sfas97rd)
+if (model_name == VUL_SFAS97RD)
 	{
 	if (vul->reins_flag)
 		{
@@ -9653,9 +8590,10 @@ if (this == vul_sfas97rd)
 		}
 	}
 #endif
-	
+}
+{
 #if defined(__IUL_LIAB_H_)
-if (this == iul_sfas97rd)
+if (model_name == IUL_SFAS97RD)
 	{
 	if (iul->reins_flag)
 		{
@@ -9677,89 +8615,11 @@ if (this == iul_sfas97rd)
 		}
 	}
 #endif
+}
 
 return NO_AVG;
 
 }
-
-
-//@@ END
-
-//@@ START - reins_yrt_cost_accum
-// YRT Reinsurance Cost Accumulation                                                                                             
-// Column:REINS_YRT_COST_ACCUM
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_reins_yrt_cost_accum(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "reins_yrt_cost_accum.SFAS97RD_GAAP.for"
-if (t < start_period || t > final_period)
-	return NO_AVG;
-	
-if (xint(cal_yr(t)) < cohort_yr)
-	return NO_AVG;
-	
-if (t == start_period)
-	{
-	if (valn_period == 0)
-		{
-		if (this == sfas97rd)
-			{
-			double def_reins_yrt_cost_accum = 0.0;
-			
-			for (int tt = cohort_first_issue_period + 1; tt <= 0; tt++)
-				{
-				date_lookup_gen2 = date(tt); //WTW - Gen2 - AtTime() not supported
-				double def_reins_yrt_cost = cohort_history_reins_yrt_cost/*.AtTime(tt)*/;
-				
-				def_reins_yrt_cost_accum 
-				= def_reins_yrt_cost_accum * (1.0 + gaap_int_rate_mthly) + def_reins_yrt_cost;
-				}			
-			
-			return def_reins_yrt_cost_accum; 
-			}
-		//  No History for cell pricing at issue period
-		return 0.0;	
-		}	
-
-	//valn_period != 0
-	return init_reins_yrt_cost_accum;
-	}
-	
-return reins_yrt_cost_accum(t - 1) 
-       * (1.0 + gaap_amortzn_int_rate(t))
-	   + capzd_reins_yrt_cost(t);
-
-}
-
-
-//@@ END
-
-//@@ START - reins_yrt_cost_pv
-// YRT Reinsurance Cost Present Value                                                                                             
-// Column:REINS_YRT_COST_PV
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_reins_yrt_cost_pv(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "reins_yrt_cost_pv.SFAS97RD_GAAP.for"
-if (t < start_period || t >= final_period)
-	return NO_AVG;
-
-return (capzd_reins_yrt_cost(t + 1)
-		+ reins_yrt_cost_pv(t + 1))
-	   / (1.0 + gaap_amortzn_int_rate(t + 1));
-
-}
-
 
 //@@ END
 
@@ -9778,11 +8638,12 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_rider_charges(int t) {
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	return sum_over_gaap("rider_charges", t);
 
+{
 #if defined(__UL_LIAB_H_)
-if (this == ul_sfas97rd)
+if (model_name == UL_SFAS97RD)
 	{
 	if (!reins_flag)
 		return max(0.0, min(ul->rider_chg(t),
@@ -9794,9 +8655,10 @@ if (this == ul_sfas97rd)
 		   * ul->reins_pct;
 	}
 #endif
-
+}
+{
 #if defined(__VUL_LIAB_H_)
-if (this == vul_sfas97rd)
+if (model_name == VUL_SFAS97RD)
 	{
 	if (!reins_flag)
 		return max(0.0, min(vul->rider_chg(t),
@@ -9808,9 +8670,10 @@ if (this == vul_sfas97rd)
 		   * vul->reins_pct;
 	}
 #endif
-
+}
+{
 #if defined(__IUL_LIAB_H_)
-if (this == iul_sfas97rd)
+if (model_name == IUL_SFAS97RD)
 	{
 	if (!reins_flag)
 		return max(0.0, min(iul->rider_chg(t),
@@ -9822,180 +8685,16 @@ if (this == iul_sfas97rd)
 		   * iul->reins_pct;
 	}
 #endif
+}
 
 return NO_AVG;
 
 }
-
-
-//@@ END
-
-//@@ START - sfas133_fia_iul_liab
-// SFAS 133 FIA and IUL Liability                                                                                             
-// Column:SFAS133_FIA_IUL_LIAB
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_sfas133_fia_iul_liab(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas133_fia_iul_liab.SFAS97RD_GAAP.for"
-if (t < start_period || t > final_period)
-	return NO_AVG;
-
-return embed_deriv_val(t)
-       + host_contract_val(t);
-
-}
-
-
-//@@ END
-
-//@@ START - sfas133_gmab_liab
-// SFAS 133 GMAB Liability                                                                                             
-// Column:SFAS133_GMAB_LIAB
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_sfas133_gmab_liab(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas133_gmab_liab.SFAS97RD_GAAP.for"
-//WTW - Gen2 - split non time guard items
-if (/*valn_flag || */t < start_period || t > final_period)
-	return NO_AVG;
-	
-if (valn_flag)
-	return NO_AVG;
-
-if (t == start_period && valn_period != 0)
-	return init_sfas133_gmab_liab;
-
-if (this == sfas97rd)
-	return sum_over_gaap("sfas133_gmab_liab", t);
-
-#if defined(__SFAS133_GAAP_H_)
-#if defined(__VA_LIAB_H_)
-if (this == va_sfas97rd)
-	{
-	if (!va->sm_va_sfas133.size())
-		return NO_AVG;
-
-	return va->sm_va_sfas133[getElementNumber()]->gmab_liab(t);
-	}	
-#endif
-#endif
-return NO_AVG;
-
-}
-
-
-//@@ END
-
-//@@ START - sfas133_gmib_liab
-// SFAS 133 GMIB Liability                                                                                             
-// Column:SFAS133_GMIB_LIAB
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_sfas133_gmib_liab(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas133_gmib_liab.SFAS97RD_GAAP.for"
-//WTW - Gen2 - split non time guard items
-if (/*valn_flag || */t < start_period || t > final_period)
-	return NO_AVG;
-	
-if (valn_flag)
-	return NO_AVG;
-
-if (t == start_period && valn_period != 0)
-	return init_sfas133_gmib_liab;
-
-if (this == sfas97rd)
-	return sum_over_gaap("sfas133_gmib_liab", t);
-
-#if defined(__SFAS133_GAAP_H_)
-#if defined(__VA_LIAB_H_)
-if (this == va_sfas97rd)
-	{
-	if (!va->sm_va_sfas133.size())
-		return NO_AVG;
-
-	return va->sm_va_sfas133[getElementNumber()]->gmib_liab(t);
-	}
-#endif
-#endif
-
-return NO_AVG;
-
-}
-
-
-//@@ END
-
-//@@ START - sfas133_gmwb_liab
-// SFAS 133 GMWB Liability                                                                                             
-// Column:SFAS133_GMWB_LIAB
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_sfas133_gmwb_liab(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sfas133_gmwb_liab.SFAS97RD_GAAP.for"
-//WTW - Gen2 - split non time guard items
-if (/*valn_flag || */t < start_period || t > final_period)
-	return NO_AVG;
-	
-if (valn_flag)
-	return NO_AVG;
-
-if (t == start_period && valn_period != 0)
-	return init_sfas133_gmwb_liab;
-
-if (this == sfas97rd)
-	return sum_over_gaap("sfas133_gmwb_liab", t);
-
-#if defined(__SFAS133_GAAP_H_)
-#if defined(__VA_LIAB_H_)
-if (this == va_sfas97rd)
-	{
-	if (!va->sm_va_sfas133.size())
-		return NO_AVG;
-
-	return va->sm_va_sfas133[getElementNumber()]->gmwb_liab(t);
-	}
-#endif
-
-#if defined(__FIA_LIAB_H_)
-if (this == fia_sfas97rd)
-	{
-	if (!fia->sm_fia_sfas133.size())
-		return NO_AVG;
-
-	return fia->sm_fia_sfas133[getElementNumber()]->gmwb_liab(t);
-	}
-#endif
-#endif
-
-return NO_AVG;
-
-}
-
 
 //@@ END
 
 //@@ START - sfas133_liab
-// SFAS 133 Liability                                                                                             
+// SFAS 133 Liability (FIA and IUL)                                                                                             
 // Column:SFAS133_LIAB
 //========================================================
 double SFAS97RD_GAAP_UDF::sfas97rd_gaap_sfas133_liab(int t) {
@@ -10009,13 +8708,10 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_sfas133_liab(int t) {
 if (t < start_period || t > final_period)
 	return NO_AVG;
 
-return sfas133_gmab_liab(t)
-       + sfas133_gmib_liab(t)
-       + sfas133_gmwb_liab(t)
-       + sfas133_fia_iul_liab(t);
+return embed_deriv_val(t)
+       + host_contract_val(t);
 
 }
-
 
 //@@ END
 
@@ -10038,7 +8734,6 @@ return sfas133_liab(t)
        - sfas133_liab(t - 1);
 
 }
-
 
 //@@ END
 
@@ -10074,16 +8769,9 @@ return sop031_ulsg_liab(t)
 	   + stat_res_rider(t);
 #endif
 
-#if defined(__VA_LIAB_H_)
-return sop031_gmdb_liab(t)
-       + sop031_gmib_liab(t)
-       + sop031_gmwb_liab(t);
-#endif
-
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -10107,7 +8795,6 @@ return sop031_addl_liab(t)
 
 }
 
-
 //@@ END
 
 //@@ START - sop031_assess
@@ -10125,11 +8812,12 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_assess(int t) {
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	return sum_over_gaap("sop031_assess", t);
 
+{
 #if defined(__UL_LIAB_H_)
-if (this == ul_sfas97rd)
+if (model_name == UL_SFAS97RD)
 	{// these are assessment components without URL
 	double int_gain = 0.0;
 	double surr_gain = 0.0;
@@ -10154,9 +8842,10 @@ if (this == ul_sfas97rd)
 		   + surr_gain;
 	}
 #endif
-
+}
+{
 #if defined(__VUL_LIAB_H_)
-if (this == vul_sfas97rd)
+if (model_name == VUL_SFAS97RD)
 	{// these are assessment components without URL
 	double int_gain = 0.0;
 	double surr_gain = 0.0;
@@ -10181,9 +8870,10 @@ if (this == vul_sfas97rd)
 		   + surr_gain;
 	}
 #endif
-
+}
+{
 #if defined(__IUL_LIAB_H_)
-if (this == iul_sfas97rd)
+if (model_name == IUL_SFAS97RD)
 	{// these are assessment components without URL
 	double int_gain = 0.0;
 	double surr_gain = 0.0;
@@ -10208,71 +8898,11 @@ if (this == iul_sfas97rd)
 		   + surr_gain;
 	}
 #endif
-
-#if defined(__VA_LIAB_H_)
-if (this == va_sfas97rd)
-	{
-	double exp_rev = 0.0;
-	double guar_ben_rev = 0.0;
-	double int_rev = 0.0;
-	double reins_pct = va->reins_pct;
-	
-	if (!reins_flag) //Gross
-		{	
-		exp_rev = va->admin_fee(t)
-				+ va->m_and_e_fee(t)	
-				+ va->sub_adv_fees(t)
-				+ va->surr_chg(t);
-		
-		guar_ben_rev 
-		        = va->gmab_chg(t) 
-		        + va->gmdb_chg(t)
-		        + va->eeb_chg(t) 
-				+ va->gmib_chg(t) 
-				+ va->gmwb_chg(t);
-		
-		int_rev = egp_gain_inv(t);
-		}
-	else if (reins_flag && va->reins_flag) //Ceded and MP Reinsured
-		{
-		if (va->reins_coverage_defn == RIDER_ONLY)
-			exp_rev = 0.0;
-		else	
-			exp_rev = (va->admin_fee(t)
-					   + va->m_and_e_fee(t)
-					   + va->sub_adv_fees(t)
-					   + va->surr_chg(t))
-					   * va->reins_pct;
-		
-		guar_ben_rev
-				= va->reins_prem_gmab(t)
-				+ va->reins_prem_gmdb(t)
-				+ va->reins_prem_gmib(t)
-				+ va->reins_prem_gmwb(t)
-				+ va->reins_prem_eeb(t);
-		
-		int_rev = egp_gain_inv(t);		
-		}
-
-	//else Ceded and MP Not Reinsured 
-	return exp_rev + guar_ben_rev + int_rev;
-	}
-#endif
-
-#if defined(__FA_LIAB_H_)
-if (this == fa_sfas97rd)
-	return NO_AVG;
-#endif
-
-#if defined(__FIA_LIAB_H_)
-if (this == fia_sfas97rd)
-	return NO_AVG;
-#endif
+}
 
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -10293,19 +8923,20 @@ if (t < start_period || t > final_period)
 
 if (xint(cal_yr(t)) < cohort_yr)
 	return NO_AVG;
-	
+
+{
+#if defined(__UL_LIAB_H_) || defined(__VUL_LIAB_H_) || defined(__IUL_LIAB_H_)	
 if (t == start_period)
 	{
 	if (valn_period == 0)
 		{
-		if (this == sfas97rd)
+		if (model_name == SFAS97RD)
 			{
 			double assess_accum = 0.0;
 			
 			for (int tt = cohort_first_issue_period + 1; tt <= 0; tt++)
 				{
-				date_lookup_gen2 = date(tt); //WTW - Gen2 - AtTime() not supported
-				double assess = cohort_history_sop031_assess/*.AtTime(tt)*/;
+				double assess = sop031_assess_history(tt);
 
 				assess_accum 
 				= assess_accum * (1.0 + gaap_int_rate_mthly) + assess;
@@ -10321,18 +8952,40 @@ if (t == start_period)
 	return init_sop031_assess_accum;
 	}
 	
-double url_amortzn = 0.0;
-
-#if defined(__UL_LIAB_H_) || defined(__VUL_LIAB_H_) || defined(__IUL_LIAB_H_)
-url_amortzn = sop031_unearn_rev_liab_incr(t);
-#endif
+double url_amortzn = sop031_unearn_rev_liab_incr(t);
 
 return sop031_assess_accum(t - 1) 
        * (1.0 + gaap_amortzn_int_rate(t))
        + sop031_assess(t) - url_amortzn;
+#endif
+}
+
+return NO_AVG;
 
 }
 
+//@@ END
+
+//@@ START - sop031_assess_history
+// Cohort History SOP 03-1 Assessments                                                                                             
+// Column:SOP031_ASSESS_HISTORY
+//========================================================
+double SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_assess_history(int t) {
+//^^^
+
+
+
+//^^^
+
+#line 1 "sop031_assess_history.SFAS97RD_GAAP.for"
+if (t > start_period)
+	return NO_AVG;
+
+cohort_id = cohort_id;
+
+return cohort_history_sop031_assess;
+
+}
 
 //@@ END
 
@@ -10357,16 +9010,9 @@ return (sop031_array[ASSESS_SOP][t + 1] - sop031_unearn_rev_liab_incr(t + 1)
 		/ (1.0 + gaap_amortzn_int_rate(t + 1));
 #endif
 
-#if defined(__VA_LIAB_H_)
-return (sop031_array[ASSESS_SOP][t + 1]
-		+ sop031_assess_pv(t + 1)) 
-		/ (1.0 + gaap_amortzn_int_rate(t + 1));
-#endif
-
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -10394,7 +9040,6 @@ return max(0.0, egp_gain_inv(t)
 
 }
 
-
 //@@ END
 
 //@@ START - sop031_egp_accum
@@ -10419,14 +9064,13 @@ if (t == start_period)
 	{
 	if (valn_period == 0)
 		{					
-		if (this == sfas97rd)
+		if (model_name == SFAS97RD)
 			{
 			double egp_accum = 0.0;
 			
 			for (int tt = cohort_first_issue_period + 1; tt <= 0; tt++)
 				{
-				date_lookup_gen2 = date(tt); //WTW - Gen2 - AtTime() not supported
-				double egp = cohort_history_agp/*.AtTime(tt)*/;
+				double egp = agp_history(tt);
 				
 				egp_accum 
 				= egp_accum * (1.0 + gaap_int_rate_mthly) + egp;
@@ -10448,7 +9092,6 @@ return sop031_egp_accum(t - 1)
        + sop031_egp(t);
 
 }
-
 
 //@@ END
 
@@ -10472,7 +9115,6 @@ return (sop031_egp(t + 1) + sop031_egp_pv(t + 1))
 
 }
 
-
 //@@ END
 
 //@@ START - sop031_gmdb_ben_accum
@@ -10492,19 +9134,20 @@ if (t < start_period || t > final_period)
 	
 if (xint(cal_yr(t)) < cohort_yr)
 	return NO_AVG;	
-	
+
+{	
+#if defined(__VUL_LIAB_H_)	
 if (t == start_period)
 	{
 	if (valn_period == 0)
 		{
-		if (this == sfas97rd)
+		if (model_name == SFAS97RD)
 			{
 			double db_ben_accum = 0.0;
 			
 			for (int tt = cohort_first_issue_period + 1; tt <= 0; tt++)
 				{
-				date_lookup_gen2 = date(tt); //WTW - Gen2 - AtTime() not supported
-				double db_ben = cohort_history_sop031_gmdb_benefits/*.AtTime(tt)*/;
+				double db_ben = sop031_gmdb_benefits_history(tt);
 				
 				db_ben_accum 
 				= db_ben_accum * (1.0 + gaap_int_rate_mthly) + db_ben;
@@ -10524,8 +9167,12 @@ return sop031_gmdb_ben_accum(t - 1)
        * (1.0 + gaap_amortzn_int_rate(t))
        + gmdb_ben(t);
 
+#endif
 }
 
+return NO_AVG;
+
+}
 
 //@@ END
 
@@ -10550,6 +9197,28 @@ return (sop031_array[DB_BEN_SOP][t + 1]
 
 }
 
+//@@ END
+
+//@@ START - sop031_gmdb_benefits_history
+// Cohort History SOP03-1 GMDB Benefits                                                                                             
+// Column:SOP031_GMDB_BENEFITS_HISTORY
+//========================================================
+double SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_gmdb_benefits_history(int t) {
+//^^^
+
+
+
+//^^^
+
+#line 1 "sop031_gmdb_benefits_history.SFAS97RD_GAAP.for"
+if (t > start_period)
+	return NO_AVG;
+
+cohort_id = cohort_id;
+
+return cohort_history_sop031_gmdb_benefits;
+
+}
 
 //@@ END
 
@@ -10600,7 +9269,6 @@ return sop031_gmdb_br(t - 1);
 
 }
 
-
 //@@ END
 
 //@@ START - sop031_gmdb_br_sch
@@ -10615,17 +9283,15 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_gmdb_br_sch(int t) {
 //^^^
 
 #line 1 "sop031_gmdb_br_sch.SFAS97RD_GAAP.for"
-//WTW - Gen2 - split non time guard items
-if (/*valn_flag || */t < start_period || t > final_period)
+if (t < start_period || t > final_period)
 	return NO_AVG;
-	
+
 if (valn_flag)
 	return NO_AVG;
 
 return gaap_schedule[SOP031_GMDB_BR][0];
 
 }
-
 
 //@@ END
 
@@ -10649,374 +9315,6 @@ return max(0.0 , sop031_assess_accum(t) * sop031_gmdb_br(t)
 
 }
 
-
-//@@ END
-
-//@@ START - sop031_gmib_ben_accum
-// SOP 03-1 GMIB Benefit Accumulation                                                                                             
-// Column:SOP031_GMIB_BEN_ACCUM
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_gmib_ben_accum(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sop031_gmib_ben_accum.SFAS97RD_GAAP.for"
-//WTW - Gen2 - split non time guard items
-if (/*!gmib_sop031_flag ||*/ t < start_period || t > final_period)
-	return NO_AVG;
-
-if (!gmib_sop031_flag)
-	return NO_AVG;
-
-if (xint(cal_yr(t)) < cohort_yr)
-	return NO_AVG;	
-
-if (t == start_period)
-	{
-	if (valn_period == 0)
-		{
-		if (this == sfas97rd)
-			{
-			double ib_ben_accum = 0.0;
-			
-			for (int tt = cohort_first_issue_period + 1; tt <= 0; tt++)
-				{
-				date_lookup_gen2 = date(tt); //WTW - Gen2 - AtTime() not supported
-				double ib_ben = cohort_history_sop031_gmib_benefits/*.AtTime(tt)*/;
-				
-				ib_ben_accum 
-				= ib_ben_accum * (1.0 + gaap_int_rate_mthly) + ib_ben;
-				}			
-			return ib_ben_accum; 
-			}
-
-		//  No History for cell pricing at issue period
-		return 0.0;	
-		}	
-
-	//valn_period != 0
-	return init_sop031_gmib_ben_accum;
-	}
-		
-return sop031_gmib_ben_accum(t - 1) 
-       * (1.0 + gaap_amortzn_int_rate(t))
-       + gmib_ben(t);
-
-}
-
-
-//@@ END
-
-//@@ START - sop031_gmib_ben_pv
-// SOP 03-1 GMIB Benefit Present Value                                                                                             
-// Column:SOP031_GMIB_BEN_PV
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_gmib_ben_pv(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sop031_gmib_ben_pv.SFAS97RD_GAAP.for"
-//WTW - Gen2 - split non time guard items
-if (/*!gmib_sop031_flag ||*/ t < start_period || t >= final_period)
-	return NO_AVG;
-
-if (!gmib_sop031_flag)
-	return NO_AVG;
-
-return (sop031_array[IB_BEN_SOP][t + 1]
-		+ sop031_gmib_ben_pv(t + 1)) 
-		/ (1.0 + gaap_amortzn_int_rate(t + 1));
-
-}
-
-
-//@@ END
-
-//@@ START - sop031_gmib_br
-// SOP 03-1 GMIB Benefit Ratio                                                                                             
-// Column:SOP031_GMIB_BR
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_gmib_br(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sop031_gmib_br.SFAS97RD_GAAP.for"
-//WTW - Gen2 - split non time guard items
-if (/*!gmib_sop031_flag ||*/ t < start_period || t > final_period)
-	return NO_AVG;
-
-if (!gmib_sop031_flag)
-	return NO_AVG;
-
-if (t == start_period)
-	{
-	if (sfas97rd_valn_flag)
-		{
-		if ((sop031_assess_accum(t) + sop031_assess_pv(t)) <= model_point_amount_threshold)
-			return 0.0;
-
-		// values are - if accum, TO point in time , - if pv, AT point in time
-		return (sop031_gmib_ben_accum(t) + sop031_gmib_ben_pv(t)) 
-			   / (sop031_assess_accum(t) + sop031_assess_pv(t));
-		}	
-
-	if (valn_period == 0)
-		return sop031_gmib_br_sch(t);
-	else
-		return init_sop031_gmib_br;	
-	}
-else
-	{
-	if (t == start_period + 1 && !valn_flag)
-		return sop031_gmib_br_sch(t - 1);
-	}
-
-return sop031_gmib_br(t - 1);
-
-}
-
-
-//@@ END
-
-//@@ START - sop031_gmib_br_sch
-// SOP 03-1 GMIB Benefit Ratio Schedule                                                                                             
-// Column:SOP031_GMIB_BR_SCH
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_gmib_br_sch(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sop031_gmib_br_sch.SFAS97RD_GAAP.for"
-//WTW - Gen2 - split non time guard items
-if (/*!gmib_sop031_flag || valn_flag ||*/ t < start_period || t > final_period)
-	return NO_AVG;
-
-if (!gmib_sop031_flag || valn_flag)
-	return NO_AVG;
-return gaap_schedule[SOP031_GMIB_BR][0];
-
-}
-
-
-//@@ END
-
-//@@ START - sop031_gmib_liab
-// SOP 03-1 GMIB Liability                                                                                             
-// Column:SOP031_GMIB_LIAB
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_gmib_liab(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sop031_gmib_liab.SFAS97RD_GAAP.for"
-if (!gmib_sop031_flag || t < start_period || t > final_period)
-	return NO_AVG;
-
-return max(0.0 , sop031_assess_accum(t) * sop031_gmib_br(t)
-				 - sop031_gmib_ben_accum(t));
-
-}
-
-
-//@@ END
-
-//@@ START - sop031_gmwb_ben_accum
-// SOP 03-1 GMWB Benefit Accumulation                                                                                             
-// Column:SOP031_GMWB_BEN_ACCUM
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_gmwb_ben_accum(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sop031_gmwb_ben_accum.SFAS97RD_GAAP.for"
-//WTW - Gen2 - split non time guard items
-if (/*!gmwb_sop031_flag ||*/ t < start_period || t > final_period)
-	return NO_AVG;
-
-if (!gmwb_sop031_flag)
-	return NO_AVG;
-
-if (xint(cal_yr(t)) < cohort_yr)
-	return NO_AVG;	
-
-if (t == start_period)
-	{
-	if (valn_period == 0)
-		{
-		if (this == sfas97rd)
-			{
-			double wb_ben_accum = 0.0;
-			
-			for (int tt = cohort_first_issue_period + 1; tt <= 0; tt++)
-				{
-				date_lookup_gen2 = date(tt); //WTW - Gen2 - AtTime() not supported
-				double wb_ben = cohort_history_sop031_gmwb_benefits/*.AtTime(tt)*/;
-				
-				wb_ben_accum 
-				= wb_ben_accum * (1.0 + gaap_int_rate_mthly) + wb_ben;
-				}			
-			return wb_ben_accum; 
-			}
-
-		//  No History for cell pricing at issue period
-		return 0.0;	
-		}	
-
-	//valn_period != 0
-	return init_sop031_gmwb_ben_accum;
-	}
-		
-return sop031_gmwb_ben_accum(t - 1) 
-       * (1.0 + gaap_amortzn_int_rate(t))
-       + gmwb_ben(t);
-
-}
-
-
-//@@ END
-
-//@@ START - sop031_gmwb_ben_pv
-// SOP 03-1 GMWB Benefit Present Value                                                                                             
-// Column:SOP031_GMWB_BEN_PV
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_gmwb_ben_pv(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sop031_gmwb_ben_pv.SFAS97RD_GAAP.for"
-//WTW - Gen2 - split non time guard items
-if (/*!gmwb_sop031_flag ||*/ t < start_period || t >= final_period)
-	return NO_AVG;
-
-if (!gmwb_sop031_flag)
-	return NO_AVG;
-
-return (sop031_array[WB_BEN_SOP][t + 1]
-		+ sop031_gmwb_ben_pv(t + 1))
-		/ (1.0 + gaap_amortzn_int_rate(t + 1));
-
-}
-
-
-//@@ END
-
-//@@ START - sop031_gmwb_br
-// SOP 03-1 GMWB Benefit Ratio                                                                                             
-// Column:SOP031_GMWB_BR
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_gmwb_br(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sop031_gmwb_br.SFAS97RD_GAAP.for"
-//WTW - Gen2 - split non time guard items
-if (/*!gmwb_sop031_flag ||*/ t < start_period || t > final_period)
-	return NO_AVG;
-
-if (!gmwb_sop031_flag)
-	return NO_AVG;
-
-if (t == start_period)
-	{
-	if (sfas97rd_valn_flag)
-		{
-		if ((sop031_assess_accum(t) + sop031_assess_pv(t)) <= model_point_amount_threshold)
-			return 0.0;
-
-		// values are - if accum, TO point in time , - if pv, AT point in time
-		return (sop031_gmwb_ben_accum(t) + sop031_gmwb_ben_pv(t)) 
-			   / (sop031_assess_accum(t) + sop031_assess_pv(t));
-		}
-
-	if (valn_period == 0)
-		return sop031_gmwb_br_sch(t);
-	else
-		return init_sop031_gmwb_br;
-	}
-else
-	{
-	if (t == start_period + 1 && !valn_flag)
-		return sop031_gmwb_br_sch(t - 1);
-	}
-
-return sop031_gmwb_br(t - 1);
-
-}
-
-
-//@@ END
-
-//@@ START - sop031_gmwb_br_sch
-// SOP 03-1 GMWB Benefit Ratio Schedule                                                                                             
-// Column:SOP031_GMWB_BR_SCH
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_gmwb_br_sch(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sop031_gmwb_br_sch.SFAS97RD_GAAP.for"
-//WTW - Gen2 - split non time guard items
-if (/*!gmwb_sop031_flag || valn_flag ||*/ t < start_period || t > final_period)
-	return NO_AVG;
-
-if (!gmwb_sop031_flag || valn_flag)
-	return NO_AVG;
-
-return gaap_schedule[SOP031_GMWB_BR][0];
-
-}
-
-
-//@@ END
-
-//@@ START - sop031_gmwb_liab
-// SOP 03-1 GMWB Liability                                                                                             
-// Column:SOP031_GMWB_LIAB
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_gmwb_liab(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "sop031_gmwb_liab.SFAS97RD_GAAP.for"
-if (!gmwb_sop031_flag || t < start_period || t > final_period)
-	return NO_AVG;
-
-return max(0.0, sop031_assess_accum(t) * sop031_gmwb_br(t) 
-                - sop031_gmwb_ben_accum(t));
-
-}
-
-
 //@@ END
 
 //@@ START - sop031_pbr
@@ -11036,11 +9334,12 @@ if (t <= start_period || t > pbr_final_period)
 
 if (sfas97rd_valn_flag)
 	{
-	if (this == sfas97rd)
+	if (model_name == SFAS97RD)
 		return sum_over_gaap("sop031_pbr", t);
-		
+	
+	{
 	#if defined(__UL_LIAB_H_)
-	if (this == ul_sfas97rd)
+	if (model_name == UL_SFAS97RD)
 		{
 		if (!reins_flag) //Gross
 			return (ul->sm_ul_ifund_curr->persist_bon(t) 
@@ -11057,9 +9356,10 @@ if (sfas97rd_valn_flag)
 		return 0.0;
 		}
 	#endif
-
+	}
+	{
 	#if defined(__VUL_LIAB_H_)
-	if (this == vul_sfas97rd)
+	if (model_name == VUL_SFAS97RD)
 		{
 		if (!reins_flag) //Gross
 			return (vul->sm_vul_ifund_curr->persist_bon(t)) 
@@ -11074,14 +9374,14 @@ if (sfas97rd_valn_flag)
 		return 0.0;
 		}
 	#endif
-	
+	}
+
 	return NO_AVG;
 	}
 
 return gaap_schedule[SOP031_PBR][t];
 
 }
-
 
 //@@ END
 
@@ -11097,10 +9397,9 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_pbr_accum(int t) {
 //^^^
 
 #line 1 "sop031_pbr_accum.SFAS97RD_GAAP.for"
-//WTW - Gen2 - split non time guard items
-if (/*sop031_ul_vul_iul_defn == NO || */t < start_period || t > pbr_final_period)
+if (t < start_period || t > pbr_final_period)
 	return NO_AVG;
-
+	
 if (sop031_ul_vul_iul_defn == NO)
 	return NO_AVG;
 	
@@ -11111,14 +9410,13 @@ if (t == start_period)
 	{
 	if (valn_period == 0)
 		{
-		if (this == sfas97rd)
+		if (model_name == SFAS97RD)
 			{
 			double pbr_accum = 0.0;
 			
 			for (int tt = cohort_first_issue_period + 1; tt <= 0; tt++)
 				{
-				date_lookup_gen2 = date(tt); //WTW - Gen2 - AtTime() not supported
-				double pbr = cohort_history_sop031_pbr_benefits/*.AtTime(tt)*/;
+				double pbr = sop031_pbr_benefits_history(tt);
 				pbr_accum = pbr_accum * (1.0 + gaap_int_rate_mthly) + pbr;
 				}
 			return pbr_accum;
@@ -11136,6 +9434,28 @@ return sop031_pbr_accum(t - 1)
 
 }
 
+//@@ END
+
+//@@ START - sop031_pbr_benefits_history
+// Cohort History SOP 03-1 Persistency Bonus/Refund Benefits                                                                                             
+// Column:SOP031_PBR_BENEFITS_HISTORY
+//========================================================
+double SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_pbr_benefits_history(int t) {
+//^^^
+
+
+
+//^^^
+
+#line 1 "sop031_pbr_benefits_history.SFAS97RD_GAAP.for"
+if (t > start_period)
+	return NO_AVG;
+
+cohort_id = cohort_id;
+
+return cohort_history_sop031_pbr_benefits;
+
+}
 
 //@@ END
 
@@ -11151,20 +9471,20 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_pbr_fund_val(int t) {
 //^^^
 
 #line 1 "sop031_pbr_fund_val.SFAS97RD_GAAP.for"
-//WTW - Gen2 - split non time guard items
-if (/*sop031_ul_vul_iul_defn == NO || */t < start_period || t > pbr_final_period)
-	return NO_AVG;
-
-if (sop031_ul_vul_iul_defn == NO)
+if (t < start_period || t > pbr_final_period)
 	return NO_AVG;
 	
+if (sop031_ul_vul_iul_defn == NO)
+	return NO_AVG;
+
 if (sfas97rd_valn_flag)
 	{
-	if (this == sfas97rd)
+	if (model_name == SFAS97RD)
 		return max(0.0, sum_over_gaap("sop031_pbr_fund_val", t));
 
+	{
 	#if defined(__UL_LIAB_H_)
-	if (this == ul_sfas97rd)
+	if (model_name == UL_SFAS97RD)
 		{
 		double sop031_pbr_fund_val
 		= ul->fund_val_aft_withdrl_per_unit(t)
@@ -11188,9 +9508,10 @@ if (sfas97rd_valn_flag)
 			return 0.0;	
 		}
 	#endif
-
+	}
+	{
 	#if defined(__VUL_LIAB_H_)
-	if (this == vul_sfas97rd)
+	if (model_name == VUL_SFAS97RD)
 		{
 		double sop031_pbr_fund_val
 		= vul->fund_val_aft_withdrl_per_unit(t)   
@@ -11221,13 +9542,14 @@ if (sfas97rd_valn_flag)
 			return 0.0;	
 		}
 	#endif
+	}
+
 	return NO_AVG;
 	}
 
 return gaap_schedule[SOP031_PBR_FV][t];
 
 }
-
 
 //@@ END
 
@@ -11253,14 +9575,13 @@ if (t == start_period)
 	{
 	if (valn_period == 0)
 		{
-		if (this == sfas97rd)
+		if (model_name == SFAS97RD)
 			{
 			double fvf_accum = 0.0;
 			
 			for (int tt = cohort_first_issue_period + 1; tt <= 0; tt++)
 				{
-				date_lookup_gen2 = date(tt); //WTW - Gen2 - AtTime() not supported
-				double fvf = cohort_history_sop031_pbr_fund_val/*.AtTime(tt)*/;
+				double fvf = sop031_pbr_fund_val_history(tt);
 				
 				fvf_accum
 				= fvf_accum * (1.0 + gaap_int_rate_mthly) + fvf;
@@ -11283,6 +9604,28 @@ return sop031_pbr_fund_val_accum(t - 1)
 
 }
 
+//@@ END
+
+//@@ START - sop031_pbr_fund_val_history
+// Cohort History SOP 03-1 Persistency Bonus/Refund Fund Value                                                                                             
+// Column:SOP031_PBR_FUND_VAL_HISTORY
+//========================================================
+double SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_pbr_fund_val_history(int t) {
+//^^^
+
+
+
+//^^^
+
+#line 1 "sop031_pbr_fund_val_history.SFAS97RD_GAAP.for"
+if (t > start_period)
+	return NO_AVG;
+
+cohort_id = cohort_id;
+
+return cohort_history_sop031_pbr_fund_val;
+
+}
 
 //@@ END
 
@@ -11306,7 +9649,6 @@ return (sop031_pbr_fund_val(t + 1) + sop031_pbr_fund_val_pv(t + 1))
 
 }
 
-
 //@@ END
 
 //@@ START - sop031_pbr_liab
@@ -11321,8 +9663,7 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_pbr_liab(int t) {
 //^^^
 
 #line 1 "sop031_pbr_liab.SFAS97RD_GAAP.for"
-//WTW - Gen2 - split non time guard items
-if (/*sop031_ul_vul_iul_defn == NO || */t < start_period || t > pbr_final_period)
+if (t < start_period || t > pbr_final_period)
 	return NO_AVG;
 
 if (sop031_ul_vul_iul_defn == NO)
@@ -11354,7 +9695,6 @@ return max(0.0, sop031_pbr_liab(t - 1)
 
 }
 
-
 //@@ END
 
 //@@ START - sop031_pbr_liab_amortzn
@@ -11378,7 +9718,6 @@ if (xint(cal_yr(t)) < cohort_yr)
 return sop031_pbr_fund_val(t) * k_sop031_pbr(t - 1);
 
 }
-
 
 //@@ END
 
@@ -11410,7 +9749,6 @@ return sop031_pbr_liab_prev_local
 
 }
 
-
 //@@ END
 
 //@@ START - sop031_pbr_liab_sch
@@ -11425,8 +9763,7 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_pbr_liab_sch(int t) {
 //^^^
 
 #line 1 "sop031_pbr_liab_sch.SFAS97RD_GAAP.for"
-//WTW - Gen2 - split non time guard items
-if (/*sop031_ul_vul_iul_defn == NO || valn_flag || */t < start_period || t > pbr_final_period)
+if (t < start_period || t > pbr_final_period)
 	return NO_AVG;
 
 if (sop031_ul_vul_iul_defn == NO || valn_flag)
@@ -11435,7 +9772,6 @@ if (sop031_ul_vul_iul_defn == NO || valn_flag)
 return gaap_schedule[SOP031_PBR_LIAB][0];
 
 }
-
 
 //@@ END
 
@@ -11451,19 +9787,17 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_pbr_pv(int t) {
 //^^^
 
 #line 1 "sop031_pbr_pv.SFAS97RD_GAAP.for"
-//WTW - Gen2 - split non time guard items
-if (/*sop031_ul_vul_iul_defn == NO || */t < start_period || t >= pbr_final_period)
-	return NO_AVG;
-
-if (sop031_ul_vul_iul_defn == NO)
+if (t < start_period || t >= pbr_final_period)
 	return NO_AVG;
 	
+if (sop031_ul_vul_iul_defn == NO)
+	return NO_AVG;
+
 return (sop031_pbr(t + 1)
 		+ sop031_pbr_pv(t + 1))
 		/ (1.0 + gaap_amortzn_int_rate(t + 1));
 
 }
-
 
 //@@ END
 
@@ -11482,11 +9816,12 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_pbr_units_inf(int t) {
 if (sop031_ul_vul_iul_defn == NO || t < start_period || t > pbr_final_period)
 	return NO_AVG;
 	
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	return NO_AVG;
-	
+
+{	
 #if defined(__UL_LIAB_H_)
-if (this == ul_sfas97rd)
+if (model_name == UL_SFAS97RD)
 	{
 	if (t == start_period)
 		return ul->units_inf(t);
@@ -11508,9 +9843,10 @@ if (this == ul_sfas97rd)
 	       - sop031_pbr_maturities_units;  
 	}
 #endif
-
+}
+{
 #if defined(__VUL_LIAB_H_)
-if (this == vul_sfas97rd)
+if (model_name == VUL_SFAS97RD)
 	{
 	if (t == start_period)
 		return vul->units_inf(t);
@@ -11532,11 +9868,33 @@ if (this == vul_sfas97rd)
 	       - sop031_pbr_maturities_units;  
 	}
 #endif
-
+}
 return NO_AVG;
 
 }
 
+//@@ END
+
+//@@ START - sop031_sg_benefits_history
+// Cohort History SOP 03-1 ULSG Benefits                                                                                             
+// Column:SOP031_SG_BENEFITS_HISTORY
+//========================================================
+double SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_sg_benefits_history(int t) {
+//^^^
+
+
+
+//^^^
+
+#line 1 "sop031_sg_benefits_history.SFAS97RD_GAAP.for"
+if (t > start_period)
+	return NO_AVG;
+
+cohort_id = cohort_id;
+
+return cohort_history_sop031_sg_benefits;
+
+}
 
 //@@ END
 
@@ -11552,8 +9910,7 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_ulsg_ben_accum(int t) {
 //^^^
 
 #line 1 "sop031_ulsg_ben_accum.SFAS97RD_GAAP.for"
-//WTW - Gen2 - split non time guard items
-if (/*sop031_ul_vul_iul_defn == NO || */t < start_period || t > final_period)
+if (t < start_period || t > final_period)
 	return NO_AVG;
 
 if (sop031_ul_vul_iul_defn == NO)
@@ -11566,14 +9923,13 @@ if (t == start_period)
 	{
 	if (valn_period == 0)
 		{
-		if (this == sfas97rd)
+		if (model_name == SFAS97RD)
 			{
 			double sg_ben_accum = 0.0;
 			
 			for (int tt = cohort_first_issue_period + 1; tt <= 0; tt++)
 				{
-				date_lookup_gen2 = date(tt); //WTW - Gen2 - AtTime() not supported
-				double sg_ben = cohort_history_sop031_sg_benefits/*.AtTime(tt)*/;
+				double sg_ben = sop031_sg_benefits_history(tt);
 				
 				sg_ben_accum 
 				= sg_ben_accum * (1.0 + gaap_int_rate_mthly) + sg_ben;
@@ -11595,7 +9951,6 @@ return sop031_ulsg_ben_accum(t - 1)
 
 }
 
-
 //@@ END
 
 //@@ START - sop031_ulsg_ben_pv
@@ -11610,8 +9965,7 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_ulsg_ben_pv(int t) {
 //^^^
 
 #line 1 "sop031_ulsg_ben_pv.SFAS97RD_GAAP.for"
-//WTW - Gen2 - split non time guard items
-if (/*sop031_ul_vul_iul_defn == NO || */t < start_period || t >= final_period)
+if (t < start_period || t >= final_period)
 	return NO_AVG;
 
 if (sop031_ul_vul_iul_defn == NO)
@@ -11622,7 +9976,6 @@ return (sop031_array[SG_BEN_SOP][t + 1]
 		/ (1.0 + gaap_amortzn_int_rate(t + 1));
 
 }
-
 
 //@@ END
 
@@ -11638,8 +9991,7 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_ulsg_br(int t) {
 //^^^
 
 #line 1 "sop031_ulsg_br.SFAS97RD_GAAP.for"
-//WTW - Gen2 - split non time guard items
-if (/*sop031_ul_vul_iul_defn == NO || */t < start_period || t > final_period)
+if (t < start_period || t > final_period)
 	return NO_AVG;
 
 if (sop031_ul_vul_iul_defn == NO)
@@ -11672,7 +10024,6 @@ return sop031_ulsg_br(t - 1);
 
 }
 
-
 //@@ END
 
 //@@ START - sop031_ulsg_br_sch
@@ -11687,8 +10038,7 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_ulsg_br_sch(int t) {
 //^^^
 
 #line 1 "sop031_ulsg_br_sch.SFAS97RD_GAAP.for"
-//WTW - Gen2 - split non time guard items
-if (/*sop031_ul_vul_iul_defn == NO || valn_flag || */t < start_period || t > final_period)
+if (t < start_period || t > final_period)
 	return NO_AVG;
 
 if (sop031_ul_vul_iul_defn == NO || valn_flag)
@@ -11697,7 +10047,6 @@ if (sop031_ul_vul_iul_defn == NO || valn_flag)
 return gaap_schedule[SOP031_ULSG_BR][0];
 
 }
-
 
 //@@ END
 
@@ -11720,7 +10069,6 @@ return max(0.0, sop031_assess_accum(t) * sop031_ulsg_br(t)
                 - sop031_ulsg_ben_accum(t));
 
 }
-
 
 //@@ END
 
@@ -11751,7 +10099,6 @@ return k_sop031_unearn_rev_liab(t)
 
 }
 
-
 //@@ END
 
 //@@ START - startup
@@ -11766,85 +10113,56 @@ double SFAS97RD_GAAP_UDF::virtual_startup(int t) {
 //^^^
 
 #line 1 "startup.SFAS97RD_GAAP.for"
+#if 0 // START_HEADER
+#define __SFAS97RD_GAAP_H_
+#endif // END_HEADER
+
 #if 0 // START_EXTERNS
 deptaskinput sop031_valn_input;
-deptaskcols sop031_valn_input_cols;
-deptaskmap sop031_valn_input_pos;
-deptaskmapiter sop031_valn_input_pos_iter;
 deptaskinput sfas97rd_valn_input;
-deptaskcols sfas97rd_valn_input_cols;
-deptaskmap sfas97rd_valn_input_pos;
-deptaskmapiter sfas97rd_valn_input_pos_iter;
 sowfoutput sfas97rd_state_of_world_financial_output;
 sowfinput sfas97rd_state_of_world_financial_input;
-sowfcols sfas97rd_state_of_world_financial_cols;
 sowfmap sfas97rd_state_of_world_financial_input_pos;
 sowfmapiter sfas97rd_state_of_world_financial_input_pos_iter;
 const int ASSESS_SOP = 0;
 const int DB_BEN_SOP = 1;
-const int IB_BEN_SOP = 2;
-const int WB_BEN_SOP = 3;
-const int SG_BEN_SOP = 4;
-const int DTH_CLAIM_COST = 5;
-const int SOP_SIZE = 6;
+const int SG_BEN_SOP = 2;
+const int DTH_CLAIM_COST = 3;
+const int SOP_SIZE = 4;
 const int EGP = 0;
 const int INT_RATE = 1;
 const int SOP031_PBR_FV = 2;
 const int SOP031_PBR = 3;
 const int DAC_ACQ_EXP = 4;
-const int DAC_ACQ_EXP_LOSS_REC = 5;
-const int DAC_COMM = 6;
-const int DAC_COMM_LOSS_REC = 7;
-const int DAC_PREM_BONUS = 8;
-const int DAC_PREM_BONUS_LOSS_REC = 9;
-const int DAC_REINS_YRT_ASSET = 10;
-const int EMBED_DERIV_VAL = 11;
-const int K_CAPZD_ACQ_EXP = 12;
-const int K_CAPZD_COMM = 13;
-const int K_CAPZD_PREM_BONUS = 14;
-const int K_REINS_YRT_COST = 15;
-const int K_SOP031_GMDB_BEN_BR = 16;
-const int K_SOP031_PBR = 17;
-const int K_SOP031_ULSG_BEN_BR = 18;
-const int K_SOP031_UNEARN_REV_LIAB = 19;
-const int K_UNEARN_REV_LIAB = 20;
-const int SOP031_GMDB_BR = 21;
-const int SOP031_GMIB_BR = 22;
-const int SOP031_GMWB_BR = 23;
-const int SOP031_PBR_LIAB = 24;
-const int SOP031_ULSG_BR = 25;
-const int UNEARN_REV_LIAB = 26;
-const int GAAP_SCHEDULE_SIZE = 27;
-
-#if defined(__VA_LIAB_H_)
-// integers from VA_POL submodel
-extern int AV_B_GA;
-extern int AV_B_DCA;
-#endif//WTW - Gen2 - cannot have IF/ELSE in EXTERN section
-
-/*#else //WTW - Gen2 - Move outside of EXTERNS
-// integers from VA_POL submodel
-int AV_B_DCA = 0;
-int AV_B_GA = 1;
-#endif*/
-
+const int DAC_COMM = 5;
+const int DAC_PREM_BONUS = 6;
+const int DAC_REINS_YRT_ASSET = 7;
+const int EMBED_DERIV_VAL = 8;
+const int K_CAPZD_ACQ_EXP = 9;
+const int K_CAPZD_COMM = 10;
+const int K_CAPZD_PREM_BONUS = 11;
+const int K_REINS_YRT_COST = 12;
+const int K_SOP031_GMDB_BEN_BR = 13;
+const int K_SOP031_PBR = 14;
+const int K_SOP031_ULSG_BEN_BR = 15;
+const int K_SOP031_UNEARN_REV_LIAB = 16;
+const int K_UNEARN_REV_LIAB = 17;
+const int SOP031_GMDB_BR = 18;
+const int SOP031_PBR_LIAB = 19;
+const int SOP031_ULSG_BR = 20;
+const int UNEARN_REV_LIAB = 21;
+const int POLICIES_INF = 22;
+const int GAAP_SCHEDULE_SIZE = 23;
 #endif // END_EXTERNS
 
 #if 0 // START_CLASS
-#if !defined(__VA_LIAB_H_) //WTW - Gen2 - Move outside of EXTERNS
-// integers from VA_POL submodel
-int AV_B_DCA = 0;
-int AV_B_GA = 1;
-#endif
-
-//typedef map <int, long, less <int> > mpmap;//Gen2 - 9/6/2024 - comment out typedef
-map <int, long, less <int> > ul_mp_map;//Gen2 - 9/6/2024 - replace mpmap with full definition
-map <int, long, less <int> > vul_mp_map;//Gen2 - 9/6/2024 - replace mpmap with full definition
-map <int, long, less <int> > iul_mp_map;//Gen2 - 9/6/2024 - replace mpmap with full definition
-map <int, long, less <int> > va_mp_map;//Gen2 - 9/6/2024 - replace mpmap with full definition
-map <int, long, less <int> > fa_mp_map;//Gen2 - 9/6/2024 - replace mpmap with full definition
-map <int, long, less <int> > fia_mp_map;//Gen2 - 9/6/2024 - replace mpmap with full definition
-map <int, long, less <int> > epl_mp_map;//Gen2 - 9/6/2024 - replace mpmap with full definition
+map <int, long, less <int> > ul_mp_map;
+map <int, long, less <int> > vul_mp_map;
+map <int, long, less <int> > iul_mp_map;
+map <int, long, less <int> > va_mp_map;
+map <int, long, less <int> > fa_mp_map;
+map <int, long, less <int> > fia_mp_map;
+map <int, long, less <int> > epl_mp_map;
 xstring reins_defn;
 int cohort_reins_indicator;
 int cohort_reins_yrt_indicator;
@@ -11854,42 +10172,40 @@ int cohort_max_maturity_period;
 SmartArray <SmartArray <double> > sop031_array;
 SmartArray <SmartArray <double> > gaap_schedule;
 double init_dac_acq_exp;
-double init_dac_acq_exp_loss_rec;
-double init_capzd_acq_exp_accum;
-double init_capzd_acq_exp_accum_loss_rec_int_rate;
-double init_dac_acq_exp_loss_rec_accum;
+double init_dac_acq_exp_sch;
 double init_dac_comm;
-double init_dac_comm_loss_rec;
-double init_capzd_comm_accum;
-double init_capzd_comm_accum_loss_rec_int_rate;
-double init_dac_comm_loss_rec_accum;
+double init_dac_comm_sch;
 double init_dac_prem_bonus;
-double init_dac_prem_bonus_loss_rec;
-double init_capzd_prem_bonus_accum;
-double init_capzd_prem_bonus_accum_loss_rec_int_rate;
-double init_dac_prem_bonus_loss_rec_accum;
+double init_dac_prem_bonus_sch;
 double init_egp_accum;
-double init_egp_accum_loss_rec_int_rate;
 double init_sop031_assess_accum;
 double init_sop031_gmdb_ben_accum;
-double init_sop031_gmib_ben_accum;
-double init_sop031_gmwb_ben_accum;
 double init_sop031_pbr_accum;
 double init_deferred_loads_accum;
 double init_unearn_rev_liab;
+double init_unearn_rev_liab_sch;
 double init_dac_reins_yrt_asset;
-double init_reins_yrt_cost_accum;
+double init_dac_reins_yrt_asset_sch;
 double init_sop031_pbr_fund_val_accum;
 double init_embed_deriv_val;
-double init_sfas133_gmab_liab;
-double init_sfas133_gmib_liab;
-double init_sfas133_gmwb_liab;
+double init_mrb_gmab_liab;
+double init_mrb_gmib_liab;
+double init_mrb_gmwb_liab;
+double init_mrb_gmdb_liab;
 double init_sop031_ulsg_ben_accum;
 double init_sop031_gmdb_br;
-double init_sop031_gmib_br;
-double init_sop031_gmwb_br;
 double init_sop031_pbr_liab;
 double init_sop031_ulsg_br;
+double init_policies_inf_sch;
+
+#if defined(__AA_COMP_COMP_H_)
+RATES_ECONOMY /*modelobject_name: RATES*/ *rates_ptr;
+#else
+RATES_ECONOMY /*modelobject_name: FIA_RATES*/ *rates_ptr;
+#endif
+
+SEG_COMP * seg_element;
+
 #endif // END_CLASS
 
 #if 0 // START_CONSTRUCTOR
@@ -11899,42 +10215,31 @@ cohort_first_issue_period = 0;
 cohort_last_issue_period = -9999;
 cohort_max_maturity_period = -9999;
 init_dac_acq_exp = 0.0;
-init_dac_acq_exp_loss_rec = 0.0;
-init_capzd_acq_exp_accum = 0.0;
-init_capzd_acq_exp_accum_loss_rec_int_rate = 0.0;
-init_dac_acq_exp_loss_rec_accum = 0.0;
+init_dac_acq_exp_sch = 0.0;
 init_dac_comm = 0.0;
-init_dac_comm_loss_rec = 0.0;
-init_capzd_comm_accum = 0.0;
-init_capzd_comm_accum_loss_rec_int_rate = 0.0;
-init_dac_comm_loss_rec_accum = 0.0;
+init_dac_comm_sch = 0.0;
 init_dac_prem_bonus = 0.0;
-init_dac_prem_bonus_loss_rec = 0.0;
-init_capzd_prem_bonus_accum = 0.0;
-init_capzd_prem_bonus_accum_loss_rec_int_rate = 0.0;
-init_dac_prem_bonus_loss_rec_accum = 0.0;
+init_dac_prem_bonus_sch = 0.0;
 init_egp_accum = 0.0;
-init_egp_accum_loss_rec_int_rate = 0.0;
 init_sop031_assess_accum = 0.0;
 init_sop031_gmdb_ben_accum = 0.0;
-init_sop031_gmib_ben_accum = 0.0;
-init_sop031_gmwb_ben_accum = 0.0;
 init_sop031_pbr_accum = 0.0;
 init_deferred_loads_accum = 0.0;
 init_unearn_rev_liab = 0.0;
+init_unearn_rev_liab_sch = 0.0;
 init_dac_reins_yrt_asset = 0.0;
-init_reins_yrt_cost_accum = 0.0;
+init_dac_reins_yrt_asset_sch = 0.0;
 init_sop031_pbr_fund_val_accum = 0.0;
 init_embed_deriv_val = 0.0;
-init_sfas133_gmab_liab = 0.0;
-init_sfas133_gmib_liab = 0.0;
-init_sfas133_gmwb_liab = 0.0;
+init_mrb_gmab_liab = 0.0;
+init_mrb_gmib_liab = 0.0;
+init_mrb_gmwb_liab = 0.0;
+init_mrb_gmdb_liab = 0.0;
 init_sop031_ulsg_ben_accum = 0.0;
 init_sop031_gmdb_br = 0.0;
-init_sop031_gmib_br = 0.0;
-init_sop031_gmwb_br = 0.0;
 init_sop031_pbr_liab = 0.0;
 init_sop031_ulsg_br = 0.0;
+init_policies_inf_sch = 0.0;
 #endif // END_CONSTRUCTOR
 
 #if 0 // START_TERMINATOR
@@ -11946,8 +10251,9 @@ if (getElementNumber() == 0)
 else
 	cohort_reins_defn = CEDED;
 
+{
 #if defined (__UL_LIAB_H_)
-if (this == ul_sfas97rd)
+if (model_name == UL_SFAS97RD)
 	{
 	if (pricing_flag)
 		{
@@ -11963,9 +10269,10 @@ if (this == ul_sfas97rd)
 	cohort_max_maturity_period = ul->maturity_period;
 	}
 #endif
-
+}
+{
 #if defined (__VUL_LIAB_H_)
-if (this == vul_sfas97rd)
+if (model_name == VUL_SFAS97RD)
 	{
 	if (pricing_flag)
 		{
@@ -11981,9 +10288,10 @@ if (this == vul_sfas97rd)
 	cohort_max_maturity_period = vul->maturity_period;
 	}
 #endif
-
+}
+{
 #if defined (__IUL_LIAB_H_)
-if (this == iul_sfas97rd)
+if (model_name == IUL_SFAS97RD)
 	{
 	if (pricing_flag)
 		{
@@ -11999,9 +10307,10 @@ if (this == iul_sfas97rd)
 	cohort_max_maturity_period = iul->maturity_period;
 	}
 #endif
-
+}
+{
 #if defined (__VA_LIAB_H_)
-if (this == va_sfas97rd)
+if (model_name == VA_SFAS97RD)
 	{
 	if (pricing_flag)
 		{
@@ -12017,9 +10326,10 @@ if (this == va_sfas97rd)
 	cohort_max_maturity_period = va->maturity_period;
 	}
 #endif
-
+}
+{
 #if defined (__FA_LIAB_H_)
-if (this == fa_sfas97rd)
+if (model_name == FA_SFAS97RD)
 	{
 	if (pricing_flag)
 		{
@@ -12035,9 +10345,10 @@ if (this == fa_sfas97rd)
 	cohort_max_maturity_period = fa->maturity_period;
 	}
 #endif
-
+}
+{
 #if defined (__FIA_LIAB_H_)
-if (this == fia_sfas97rd)
+if (model_name == FIA_SFAS97RD)
 	{
 	if (pricing_flag)
 		{
@@ -12052,12 +10363,11 @@ if (this == fia_sfas97rd)
 		
 	cohort_max_maturity_period = fia->maturity_period;
 	}
-#endif
-
+	#endif
+}
 return 1.0;
 
 }
-
 
 //@@ END
 
@@ -12076,11 +10386,12 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_stat_res_rider(int t) {
 if (t < start_period || t > final_period)
 	return NO_AVG;
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	return sum_over_gaap("stat_res_rider", t);
 
+{
 #if defined(__UL_LIAB_H_)
-if (this == ul_sfas97rd)
+if (model_name == UL_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return ul->stat_res_rider_mp(t) + ul->stat_unearn_prem_res_rider(t);
@@ -12088,9 +10399,10 @@ if (this == ul_sfas97rd)
 	return 0.0;
 	}
 #endif
-
+}
+{
 #if defined(__IUL_LIAB_H_)
-if (this == iul_sfas97rd)
+if (model_name == IUL_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return iul->stat_res_rider_mp(t) + iul->stat_unearn_prem_res_rider(t);
@@ -12098,9 +10410,10 @@ if (this == iul_sfas97rd)
 	return 0.0;
 	}
 #endif
-
+}
+{
 #if defined(__VUL_LIAB_H_)
-if (this == vul_sfas97rd)
+if (model_name == VUL_SFAS97RD)
 	{
 	if (!reins_flag) //Gross
 		return vul->stat_res_rider_mp(t) + vul->stat_unearn_prem_res_rider(t);
@@ -12108,11 +10421,11 @@ if (this == vul_sfas97rd)
 	return 0.0;
 	}
 #endif
+}
 
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -12128,18 +10441,18 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_ulsg_ben(int t) {
 //^^^
 
 #line 1 "ulsg_ben.SFAS97RD_GAAP.for"
-//WTW - Gen2 - split non time guard items
-if (/*sop031_ul_vul_iul_defn == NO || */t <= start_period || t > final_period)
+if (t <= start_period || t > final_period)
 	return NO_AVG;
 
 if (sop031_ul_vul_iul_defn == NO)
 	return NO_AVG;
 
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	return sum_over_gaap("ulsg_ben", t);
 
+{
 #if defined(__UL_LIAB_H_)
-if (this == ul_sfas97rd)
+if (model_name == UL_SFAS97RD)
 	{
 	if (!ul->sg_indicator (t - 1))
 		return NO_AVG;
@@ -12161,9 +10474,10 @@ if (this == ul_sfas97rd)
 	return 0.0;	
 	}	
 #endif
-
+}
+{
 #if defined(__IUL_LIAB_H_)
-if (this == iul_sfas97rd)
+if (model_name == IUL_SFAS97RD)
 	{
 	if (!iul->sg_indicator (t - 1))
 		return NO_AVG;
@@ -12185,11 +10499,10 @@ if (this == iul_sfas97rd)
 	return 0.0;	
 	}	
 #endif
-
+}
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -12211,7 +10524,20 @@ if (t < start_period || t > final_period)
 if (t == start_period)
 	{
 	if (sfas97rd_valn_flag)
-		return egp_pv(t) * k_unearn_rev_liab(t) - deferred_loads_pv(t);
+		{
+		if (valn_period == 0)
+			{
+			if (model_name == SFAS97RD)
+				{
+				cohort_id = cohort_id;
+				return cohort_history_unearn_rev_liab;
+				}
+
+			return 0.0;//  No History for cell pricing at issue period
+			}
+
+		return init_unearn_rev_liab;
+		}	
 	
 	// !valn_flag
 	if (valn_period == 0)
@@ -12224,67 +10550,13 @@ if ((!sfas97rd_valn_flag && !valn_flag)
 	&& t == start_period + 1 && valn_period > 0) 
 	return unearn_rev_liab_sch(t - 1)
 		   + deferred_loads(t)
-	 	   + unearn_rev_liab_int(t)
 	 	   - unearn_rev_liab_amortzn(t);
 
 return unearn_rev_liab(t - 1) 
 	   + deferred_loads(t)
-	   + unearn_rev_liab_int(t)
 	   - unearn_rev_liab_amortzn(t);
 
 }
-
-
-//@@ END
-
-//@@ START - unearn_rev_liab_accum
-// Unearned Revenue Liability Accumulation                                                                                             
-// Column:UNEARN_REV_LIAB_ACCUM
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_unearn_rev_liab_accum(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "unearn_rev_liab_accum.SFAS97RD_GAAP.for"
-if (t < start_period || t > final_period)
-	return NO_AVG;
-
-if (xint(cal_yr(t)) < cohort_yr)
-	return NO_AVG;	
-
-if (t == start_period)
-	{
-	if (valn_period == 0)
-		{
-		if (this == sfas97rd)
-			{
-			double url_accum = 0.0;
-			
-			for (int tt = cohort_first_issue_period + 1; tt <= 0; tt++)
-				{
-				date_lookup_gen2 = date(tt); //WTW - Gen2 - AtTime() not supported
-				double url = cohort_history_unearn_rev_liab/*.AtTime(tt)*/;
-				
-				url_accum 
-				= url_accum * (1.0 + gaap_int_rate_mthly) + url;
-				}			
-			return url_accum; 
-			}
-		else //  No History for cell pricing at issue period
-			return 0.0;	
-		}	
-	else //valn_period != 0
-		return init_unearn_rev_liab;
-	}
-		
-return unearn_rev_liab_accum(t - 1) * (1.0 + gaap_amortzn_int_rate(t))
-         + unearn_rev_liab(t);
-
-}
-
 
 //@@ END
 
@@ -12303,10 +10575,9 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_unearn_rev_liab_amortzn(int t) {
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-return egp(t) * k_unearn_rev_liab(t - 1);
+return  k_unearn_rev_liab(t) * policies_inf(t);
 
 }
-
 
 //@@ END
 
@@ -12330,38 +10601,6 @@ return unearn_rev_liab(t)
 
 }
 
-
-//@@ END
-
-//@@ START - unearn_rev_liab_int
-// Unearned Revenue Liability Interest                                                                                             
-// Column:UNEARN_REV_LIAB_INT
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_unearn_rev_liab_int(int t) {
-//^^^
-
-
-
-//^^^
-
-#line 1 "unearn_rev_liab_int.SFAS97RD_GAAP.for"
-if (t <= start_period || t > final_period)
-	return NO_AVG;
-
-double unearn_rev_liab_prev_local = 0.0;
-
-if ((!sfas97rd_valn_flag && !valn_flag)
-	&& t == start_period + 1 && valn_period > 0) 
-	unearn_rev_liab_prev_local = unearn_rev_liab_sch(t - 1);
-else 
-	unearn_rev_liab_prev_local = unearn_rev_liab(t - 1);
-	
-return (unearn_rev_liab_prev_local + deferred_loads(t))
-		* gaap_amortzn_int_rate(t);
-
-}
-
-
 //@@ END
 
 //@@ START - unearn_rev_liab_released
@@ -12384,7 +10623,6 @@ return deferred_loads(t)
 
 }
 
-
 //@@ END
 
 //@@ START - unearn_rev_liab_sch
@@ -12399,17 +10637,15 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_unearn_rev_liab_sch(int t) {
 //^^^
 
 #line 1 "unearn_rev_liab_sch.SFAS97RD_GAAP.for"
-//WTW - Gen2 - split non time guard items
-if (/*valn_flag || */t < start_period || t > final_period)
+if (t < start_period || t > final_period)
 	return NO_AVG;
 
 if (valn_flag)
 	return NO_AVG;
 
-return gaap_schedule[UNEARN_REV_LIAB][0];
+return gaap_schedule[UNEARN_REV_LIAB][t];
 
 }
-
 
 //@@ END
 
@@ -12430,7 +10666,6 @@ return amortzn_mths + cohort_last_issue_period;
 
 }
 
-
 //@@ END
 
 //@@ START - comm_pct_fund_ult_index
@@ -12442,34 +10677,46 @@ int SFAS97RD_GAAP_UDF::sfas97rd_gaap_comm_pct_fund_ult_index() {
 
 
 #line 1 "comm_pct_fund_ult_index.SFAS97RD_GAAP.for"
+{
 #if defined(__UL_LIAB_H_)
-return ul->maturity_period_gmp;
+if (model_name == SFAS97RD || model_name == UL_SFAS97RD)
+	return ul->maturity_period_gmp;
 #endif	
-
+}
+{
 #if defined(__VUL_LIAB_H_)
-return vul->maturity_period_gmp;
+if (model_name == SFAS97RD || model_name == VUL_SFAS97RD)
+	return vul->maturity_period_gmp;
 #endif
-
+}
+{
 #if defined(__IUL_LIAB_H_)
-return iul->maturity_period_gmp;
+if (model_name == SFAS97RD || model_name == IUL_SFAS97RD)
+	return iul->maturity_period_gmp;
 #endif
-
+}
+{
 #if defined(__VA_LIAB_H_)
-return va->maturity_period;
+if (model_name == SFAS97RD || model_name == VA_SFAS97RD)
+	return va->maturity_period;
 #endif	
-
+}
+{
 #if defined(__FA_LIAB_H_)
-return fa->maturity_period;
+if (model_name == SFAS97RD || model_name == FA_SFAS97RD)
+	return fa->maturity_period;
 #endif	
-
+}
+{
 #if defined(__FIA_LIAB_H_)
-return fia->maturity_period;
+if (model_name == SFAS97RD || model_name == FIA_SFAS97RD)
+	return fia->maturity_period;
 #endif
+}
 
 return 0;
 
 }
-
 
 //@@ END
 
@@ -12489,7 +10736,6 @@ return amortzn_period;
 
 }
 
-
 //@@ END
 
 //@@ START - gaap_int_rate
@@ -12502,12 +10748,17 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_gaap_int_rate() {
 
 #line 1 "gaap_int_rate.SFAS97RD_GAAP.for"
 if (cohort_reins_defn == GROSS)
+	{
+	cohort_id = cohort_id;
+
 	return cohort_gaap_int_rate_gross;
+	}
+
+cohort_id = cohort_id;
 
 return cohort_gaap_int_rate_ceded;
 
 }
-
 
 //@@ END
 
@@ -12524,83 +10775,6 @@ return pow(1.0 + gaap_int_rate, 1.0 / 12.0) - 1.0;
 
 }
 
-
-//@@ END
-
-//@@ START - gmib_defn
-// GMIB Definition                                                                                             
-// Calculated Variable:GMIB_DEFN
-//========================================================
-int SFAS97RD_GAAP_UDF::sfas97rd_gaap_gmib_defn() {
-//^^^
-
-
-#line 1 "gmib_defn.SFAS97RD_GAAP.for"
-if (reins_flag)
-	return gmib_ceded_defn;
-
-return gmib_gross_defn;
-
-}
-
-
-//@@ END
-
-//@@ START - gmib_sop031_flag
-// GMIB SOP 03-1 Flag                                                                                             
-// Calculated Variable:GMIB_SOP031_FLAG
-//========================================================
-int SFAS97RD_GAAP_UDF::sfas97rd_gaap_gmib_sop031_flag() {
-//^^^
-
-
-#line 1 "gmib_sop031_flag.SFAS97RD_GAAP.for"
-if (gmib_defn == SOP031)
-	return 1;
-
-return 0;
-
-}
-
-
-//@@ END
-
-//@@ START - gmwb_defn
-// GMWB Definition                                                                                             
-// Calculated Variable:GMWB_DEFN
-//========================================================
-int SFAS97RD_GAAP_UDF::sfas97rd_gaap_gmwb_defn() {
-//^^^
-
-
-#line 1 "gmwb_defn.SFAS97RD_GAAP.for"
-if (reins_flag)
-	return gmwb_ceded_defn;
-
-return gmwb_gross_defn;
-
-}
-
-
-//@@ END
-
-//@@ START - gmwb_sop031_flag
-// GMWB SOP 03-1 Flag                                                                                             
-// Calculated Variable:GMWB_SOP031_FLAG
-//========================================================
-int SFAS97RD_GAAP_UDF::sfas97rd_gaap_gmwb_sop031_flag() {
-//^^^
-
-
-#line 1 "gmwb_sop031_flag.SFAS97RD_GAAP.for"
-if (gmwb_defn == SOP031)
-	return 1;
-
-return 0;
-
-}
-
-
 //@@ END
 
 //@@ START - hedge_alloc_factor
@@ -12612,56 +10786,49 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_hedge_alloc_factor() {
 
 
 #line 1 "hedge_alloc_factor.SFAS97RD_GAAP.for"
-#if defined(__SFAS133_GAAP_H_) && defined(__VA_LIAB_H_)
-if (this == sfas97rd)
+{
+#if defined(__MRB_GAAP_H_) && defined(__VA_LIAB_H_)
+if (model_name == SFAS97RD)
 	{
 	double pv_claims_total = 0.0;
 	double pv_claims_cohort = 0.0;
 	StrEnum::EnumValue sum_over_type = GROSS;
 
-// RD Need to fix this for sfas133 redesign
-//	if (!seg->sm_sfas133.size())
+// RD Need to fix this for mrb redesign
+//	if (!seg->sm_mrb.size())
 //		return 0.0;
 
 	if (reins_flag)
 		sum_over_type = CEDED;	
 
 	pv_claims_total = 1.0;
-//	= seg->sum_over_sfas133("pv_gmab_claim", 0, sum_over_type)
-//	  + seg->sum_over_sfas133("pv_gmib_claim", 0, sum_over_type)
-//	  + seg->sum_over_sfas133("pv_gmwb_claim", 0, sum_over_type);
+//	= seg->sum_over_mrb("pv_gmab_claim", 0, sum_over_type)
+//	  + seg->sum_over_mrb("pv_gmib_claim", 0, sum_over_type)
+//	  + seg->sum_over_mrb("pv_gmwb_claim", 0, sum_over_type);
 
 	if (fabs(pv_claims_total) < model_point_amount_threshold)
 		return 0.0;
 
 	pv_claims_cohort = 0.0;
-//	= seg->sm_sfas133[getElementNumber(0)][getElementNumber(1)]->pv_gmab_claim(0)
-//	  + seg->sm_sfas133[getElementNumber(0)][getElementNumber(1)]->pv_gmib_claim(0)
-//	  + seg->sm_sfas133[getElementNumber(0)][getElementNumber(1)]->pv_gmwb_claim(0);
+//	= seg->sm_mrb[getElementNumber(0)][getElementNumber(1)]->pv_gmab_claim(0)
+//	  + seg->sm_mrb[getElementNumber(0)][getElementNumber(1)]->pv_gmib_claim(0)
+//	  + seg->sm_mrb[getElementNumber(0)][getElementNumber(1)]->pv_gmwb_claim(0);
 
 	return pv_claims_cohort / pv_claims_total;
 	}
 
-#if defined(__UL_LIAB_H_)
-if (this == ul_sfas97rd)
-	return 0.0;
-#endif
-
-#if defined(__VUL_LIAB_H_)
-if (this == vul_sfas97rd)
-	return 0.0;
-#endif
-
+{
 #if defined(__VA_LIAB_H_)
-if (this == va_sfas97rd)
+if (model_name == VA_SFAS97RD)
 	return 1.0;
 #endif
+}
 #endif
+}
 
 return 0.0;
 
 }
-
 
 //@@ END
 
@@ -12674,109 +10841,52 @@ double SFAS97RD_GAAP_UDF::sfas97rd_gaap_host_accrual_rate() {
 
 
 #line 1 "host_accrual_rate.SFAS97RD_GAAP.for"
+{
 #if defined(__FIA_LIAB_H_)
-if (fia->elapsed_mths <= 0) 
+if (model_name == SFAS97RD || model_name == FIA_SFAS97RD)
 	{
-	double host_value = 0.0;
-	double ult_guar_fv = 0.0;
-	
-	int num_yrs = amortzn_mths / 12; 
-	
-	// Determine host accrual rate
-	// Calculate ultimate guarantee fund value
-	if (!reins_flag) //Gross
+	if (fia->elapsed_mths <= 0) 
 		{
-		host_value = fia->prem_paid(fia->commencement_period + 1) 
-					 - embed_deriv_val(fia->commencement_period + 1);
+		double host_value = 0.0;
+		double ult_guar_fv = 0.0;
+	
+		int num_yrs = amortzn_mths / 12; 
+	
+		// Determine host accrual rate
+		// Calculate ultimate guarantee fund value
+		if (!reins_flag) //Gross
+			{
+			host_value = fia->prem_paid(fia->commencement_period + 1) 
+						 - embed_deriv_val(fia->commencement_period + 1);
 		
-		ult_guar_fv = fia->contract_val_net_consideration_pct
-			 		 * fia->prem_paid(fia->commencement_period + 1)
-			 		 * pow(1.0 + fia->crediting_rate_gtd , num_yrs);
+			ult_guar_fv = fia->contract_val_net_consideration_pct
+			 			 * fia->prem_paid(fia->commencement_period + 1)
+			 			 * pow(1.0 + fia->crediting_rate_gtd , num_yrs);
 					 
-		return pow((ult_guar_fv / host_value), 1.0 / num_yrs) - 1.0;	 
-		}
-	else if (reins_flag && fia->reins_flag) //Ceded and MP Reinsured
-		{
-		host_value = fia->prem_paid(fia->commencement_period + 1) * fia->reins_pct 
-					 - embed_deriv_val(fia->commencement_period + 1);
+			return pow((ult_guar_fv / host_value), 1.0 / num_yrs) - 1.0;	 
+			}
+		else if (reins_flag && fia->reins_flag) //Ceded and MP Reinsured
+			{
+			host_value = fia->prem_paid(fia->commencement_period + 1) * fia->reins_pct 
+						 - embed_deriv_val(fia->commencement_period + 1);
 		
-		ult_guar_fv = fia->contract_val_net_consideration_pct
-			 		 * fia->prem_paid(fia->commencement_period + 1) * fia->reins_pct
-			 		 * pow(1.0 + fia->crediting_rate_gtd, num_yrs);
+			ult_guar_fv = fia->contract_val_net_consideration_pct
+			 			 * fia->prem_paid(fia->commencement_period + 1) * fia->reins_pct
+			 			 * pow(1.0 + fia->crediting_rate_gtd, num_yrs);
 					 
-		return pow((ult_guar_fv / host_value), 1.0 / num_yrs) - 1.0;	
+			return pow((ult_guar_fv / host_value), 1.0 / num_yrs) - 1.0;	
+			}
+		else //Ceded and MP Not Reinsured
+			return 0.0;
 		}
-	else //Ceded and MP Not Reinsured
-		return 0.0;
+
+	return fia->host_accrual_rate;
 	}
-
-return fia->host_accrual_rate;
 #endif
-
+}
 return 0;
 
 }
-
-
-//@@ END
-
-//@@ START - loss_rec_int_rate
-// Loss Recognition Interest Rate                                                                                             
-// Calculated Variable:LOSS_REC_INT_RATE
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_loss_rec_int_rate() {
-//^^^
-
-
-#line 1 "loss_rec_int_rate.SFAS97RD_GAAP.for"
-if (cohort_reins_defn == GROSS)
-	return cohort_loss_recognition_int_rate_gross;
-
-return cohort_loss_recognition_int_rate_ceded;
-
-}
-
-
-//@@ END
-
-//@@ START - loss_rec_int_rate_mthly
-// Loss Recognition Interest Rate Monthly                                                                                             
-// Calculated Variable:LOSS_REC_INT_RATE_MTHLY
-//========================================================
-double SFAS97RD_GAAP_UDF::sfas97rd_gaap_loss_rec_int_rate_mthly() {
-//^^^
-
-
-#line 1 "loss_rec_int_rate_mthly.SFAS97RD_GAAP.for"
-return pow(1.0 + loss_rec_int_rate, 1.0 / 12.0) - 1.0;
-
-}
-
-
-//@@ END
-
-//@@ START - loss_recognition_flag
-// Loss Recognition Flag                                                                                             
-// Calculated Variable:LOSS_RECOGNITION_FLAG
-//========================================================
-int SFAS97RD_GAAP_UDF::sfas97rd_gaap_loss_recognition_flag() {
-//^^^
-
-
-#line 1 "loss_recognition_flag.SFAS97RD_GAAP.for"
-if (loss_recognition_defn == NO)
-	return 0;
-
-if ((dac_acq_exp_loss_rec_accum(0)
-     + dac_comm_loss_rec_accum(0)
-	 + dac_prem_bonus_loss_rec_accum(0))
-	> 0.0)
-	return 1;
-
-return 0;
-
-}
-
 
 //@@ END
 
@@ -12789,10 +10899,11 @@ int SFAS97RD_GAAP_UDF::sfas97rd_gaap_pbr_final_period() {
 
 
 #line 1 "pbr_final_period.SFAS97RD_GAAP.for"
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	{	
-	map <int, long, less <int> >::iterator mp_map_iter;//Gen2 - 9/6/2024 - replace mpmap with full definition
+	map <int, long, less <int> >::iterator mp_map_iter;
 
+	{
 	#if defined(__UL_LIAB_H_)
 	if (ul_mp_map.size())
 		{
@@ -12815,7 +10926,8 @@ if (this == sfas97rd)
 		return pbr_final_period;		
 		}
 	#endif
-
+	}
+	{
 	#if defined(__VUL_LIAB_H_)
 	if (vul_mp_map.size())
 		{
@@ -12838,34 +10950,29 @@ if (this == sfas97rd)
 		return pbr_final_period;		
 		}
 	#endif
-
+	}
+	{
 	#if defined(__IUL_LIAB_H_)
 	return 0;
 	#endif
 	}
+	}
 
+{
 #if defined(__UL_LIAB_H_)
-if (this == ul_sfas97rd)
+if (model_name == UL_SFAS97RD)
 	return ul->sm_ul_ifund_curr->persist_bon_ref_last_period;
 #endif
-
+}
+{
 #if defined(__VUL_LIAB_H_)
-if (this == vul_sfas97rd)
+if (model_name == VUL_SFAS97RD)
 	return vul->sm_vul_ifund_curr->persist_bon_last_period;
 #endif
-
-#if defined(__IUL_LIAB_H_)
-return 0;
-#endif
-
-#if defined(__EPL_LIAB_H_)
-return 0;
-#endif
-	
+}
 return 0;
 
 }
-
 
 //@@ END
 
@@ -12878,34 +10985,46 @@ int SFAS97RD_GAAP_UDF::sfas97rd_gaap_prem_term_period() {
 
 
 #line 1 "prem_term_period.SFAS97RD_GAAP.for"
+{
 #if defined(__UL_LIAB_H_)
-return ul->commencement_period + ul->prem_term * 12;
+if (model_name == SFAS97RD || model_name == UL_SFAS97RD)
+	return ul->commencement_period + ul->prem_term * 12;
 #endif
-
+}
+{
 #if defined(__VUL_LIAB_H_)
-return vul->commencement_period + vul->prem_term * 12;
+if (model_name == SFAS97RD || model_name == VUL_SFAS97RD)
+	return vul->commencement_period + vul->prem_term * 12;
 #endif
-
+}
+{
 #if defined(__IUL_LIAB_H_)
-return iul->commencement_period + iul->prem_term * 12;
+if (model_name == SFAS97RD || model_name == IUL_SFAS97RD)
+	return iul->commencement_period + iul->prem_term * 12;
 #endif
-
+}
+{
 #if defined(__VA_LIAB_H_)
-return -va->elapsed_mths + va->prem_term * 12;
+if (model_name == SFAS97RD || model_name == VA_SFAS97RD)
+	return -va->elapsed_mths + va->prem_term * 12;
 #endif
-
+}
+{
 #if defined(__FA_LIAB_H_)
-return -fa->elapsed_mths + fa->prem_term * 12;
+if (model_name == SFAS97RD || model_name == FA_SFAS97RD)
+	return -fa->elapsed_mths + fa->prem_term * 12;
 #endif
-
+}
+{
 #if defined(__FIA_LIAB_H_)
-return -fia->elapsed_mths; // single premium
+if (model_name == SFAS97RD || model_name == FIA_SFAS97RD)
+	return -fia->elapsed_mths; // single premium
 #endif
+}
 
 return 9999;
 
 }
-
 
 //@@ END
 
@@ -12922,7 +11041,6 @@ return add_mths_to_date(proj_date, valn_period);
 
 }
 
-
 //@@ END
 
 //@@ START - proj_start_date
@@ -12934,10 +11052,9 @@ int SFAS97RD_GAAP_UDF::sfas97rd_gaap_proj_start_date() {
 
 
 #line 1 "proj_start_date.SFAS97RD_GAAP.for"
-return MonthNumberFromDate(proj_start_yr, proj_start_mth);
+return day_number_from_date(proj_start_yr, proj_start_mth, 1);
 
 }
-
 
 //@@ END
 
@@ -12959,7 +11076,6 @@ return proj_mth + 1;
 
 }
 
-
 //@@ END
 
 //@@ START - proj_start_yr
@@ -12980,7 +11096,6 @@ return get_yr_from_date(proj_date_adj);
 
 }
 
-
 //@@ END
 
 //@@ START - reins_flag
@@ -12999,7 +11114,6 @@ int SFAS97RD_GAAP_UDF::sfas97rd_gaap_reins_flag() {
 return getElementNumber();
 
 }
-
 
 //@@ END
 
@@ -13034,7 +11148,6 @@ return 1;
 
 }
 
-
 //@@ END
 
 //@@ START - start_period
@@ -13047,43 +11160,48 @@ int SFAS97RD_GAAP_UDF::sfas97rd_gaap_start_period() {
 
 #line 1 "start_period.SFAS97RD_GAAP.for"
 // Will be 0 for already in force cohorts, positive value for yet to be active cohorts
-if (this == sfas97rd)
+if (model_name == SFAS97RD)
 	return 0;
 
+{
 #if defined(__UL_LIAB_H_)
-if (this == ul_sfas97rd)
+if (model_name == UL_SFAS97RD)
 	return ul->start_period;
 #endif
-
+}
+{
 #if defined(__VUL_LIAB_H_)
-if (this == vul_sfas97rd)
+if (model_name == VUL_SFAS97RD)
 	return vul->start_period;
 #endif
-
+}
+{
 #if defined(__IUL_LIAB_H_)
-if (this == iul_sfas97rd)
+if (model_name == IUL_SFAS97RD)
 	return iul->start_period;
 #endif
-
+}
+{
 #if defined(__VA_LIAB_H_)
-if (this == va_sfas97rd)
+if (model_name == VA_SFAS97RD)
 	return va->start_period;
 #endif
-
+}
+{
 #if defined(__FA_LIAB_H_)
-if (this == fa_sfas97rd)
+if (model_name == FA_SFAS97RD)
 	return fa->start_period;
 #endif
-
+}
+{
 #if defined(__FIA_LIAB_H_)
-if (this == fia_sfas97rd)
+if (model_name == FIA_SFAS97RD)
 	return fia->start_period;
 #endif
-
+}
 return 0;
 
 }
-
 
 //@@ END
 
@@ -13096,10 +11214,9 @@ xstring SFAS97RD_GAAP_UDF::sfas97rd_gaap_state_of_world_financial_file_path() {
 
 
 #line 1 "state_of_world_financial_file_path.SFAS97RD_GAAP.for"
-return "<*grid_output_data*>";
+return "<*data*>";
 
 }
-
 
 //@@ END
 
@@ -13132,146 +11249,70 @@ if (!sfas97rd_valn_flag && !valn_flag)
 	if (first_time)
 		{
 		first_time = false;
+		
+		OutputFileReader ofr;
+		sfas97rd_valn_input = ofr.readFile(file_name.getStdStr(), 
+										  {"task_loop", "group", "period", "egp" , "gaap_amortzn_int_rate" , "sop031_pbr_fund_val", "sop031_pbr",
+										   "dac_acq_exp", "dac_comm", "dac_prem_bonus", "dac_reins_yrt_asset", "embed_deriv_val",
+										   "k_capzd_acq_exp", "k_capzd_comm", "k_capzd_prem_bonus", "k_reins_yrt_cost", "k_sop031_gmdb_ben_br", "k_sop031_pbr", "k_sop031_ulsg_ben_br", "k_sop031_unearn_rev_liab",
+										   "k_unearn_rev_liab", "sop031_gmdb_br", "sop031_pbr_liab", "sop031_ulsg_br", "unearn_rev_liab", "policies_inf"});
 
-		//string database_name = working_directory() + "sfas97rd_get_gaap_schedule_items.db";
-		xstring database_name = working_directory() + "sfas97rd_get_gaap_schedule_items.db";
-		openDatabase(database_name.getStdStr());//WTW - Gen2 - add ".getStdStr()"
-		string table_name = readCsvFile(file_name.getStdStr());
-
-		// Retrieve valuation results
-		xstring report_columns = xstring("_egp, _gaap_amortzn_int_rate, _sop031_pbr_fund_val, _sop031_pbr, ") 
-								 + xstring("_dac_acq_exp, _dac_acq_exp_loss_rec, _dac_comm, _dac_comm_loss_rec, _dac_prem_bonus, _dac_prem_bonus_loss_rec, _dac_reins_yrt_asset, _embed_deriv_val, ")
-								 + xstring("_k_capzd_acq_exp, _k_capzd_comm, _k_capzd_prem_bonus, _k_reins_yrt_cost, _k_sop031_gmdb_ben_br, _k_sop031_pbr, _k_sop031_ulsg_ben_br, _k_sop031_unearn_rev_liab, ")
-								 + xstring("_k_unearn_rev_liab, _sop031_gmdb_br, _sop031_gmib_br, _sop031_gmwb_br, _sop031_pbr_liab, _sop031_ulsg_br, _unearn_rev_liab");
-
-		xstring sql = "SELECT TRIM(_group) AS vgroup, "
-					  +(xstring)"CAST(_period AS INTEGER) AS vperiod, "
-					  +(xstring)"_time, "
-					  + report_columns
-					  + (xstring)" FROM '"
-					  + table_name 
-					  + (xstring)"' WHERE (vperiod <= "
-					  + xstring(last_proj_period)
-					  + (xstring)") AND _time NOT LIKE 'PV%' AND _time NOT LIKE 'IRR%'";
-
-		executeQuery(sql.getStdStr(), sfas97rd_valn_input_cols, sfas97rd_valn_input);
-		closeDatabase();
-		remove(database_name.c_str());
-
-		if (!sfas97rd_valn_input_cols.size())
+		if (!sfas97rd_valn_input.size())
 			{
 			throw FatalError("Could not read SFAS97RD valuation file: " 
 							  + file_name + " "
 							  + "Please check your data.");
 			}
 
-		// Create map of group start positions, group is column 0 of query results
-		// Strip any leading "|" character
-		xstring output_group_name;
-		output_group_name = xstring(sfas97rd_valn_input[0][0]);
-
-		if (output_group_name(0, 1) == "|")
-			output_group_name = output_group_name(1, output_group_name.length()-1);   
-
-		sfas97rd_valn_input_pos[output_group_name] = 0;
-
-		for (int row = 1; row < sfas97rd_valn_input.size(); row++)
-			{
-			if (!eq(sfas97rd_valn_input[row][0], sfas97rd_valn_input[row - 1][0]))
-				{
-				output_group_name = xstring(sfas97rd_valn_input[row][0]);
-
-				if (output_group_name(0, 1) == "|")
-					output_group_name = output_group_name(1, output_group_name.length()-1);   
-
-				sfas97rd_valn_input_pos[output_group_name] = row;
-				}
-			}
 		}
 
-	xstring group_name;
+	xstring group_name = get_base_group_name(group, true);
 
-	if (this != sfas97rd)// Used for cell pricing
-		{
-		#if defined(__UL_LIAB_H_)
-			group_name = get_base_group_name(ul->group, false);//WTW - Gen2 - Move Extern definitions to rates header
-			group_name += "|" + group;
-		#endif
+	int period = 0;
+	int start_row = 0;
+
+	for (int row = 0; row < sfas97rd_valn_input.size(); row++)
+        {
+		if (!eq(sfas97rd_valn_input[row][1], group_name))
+			continue;
+		
+		if (eq(sfas97rd_valn_input[row][2], ""))//blank period signifies a PV or IRR column
+			continue;
+
+		period = atoi(sfas97rd_valn_input[row][2].c_str());
 	
-		#if defined(__VUL_LIAB_H_)
-			group_name = get_base_group_name(vul->group, false);//WTW - Gen2 - Move Extern definitions to rates header
-			group_name += "|" + group;
-		#endif
+		if (period == 0)
+			start_row = row;
 
-		#if defined(__IUL_LIAB_H_)
-			group_name = get_base_group_name(iul->group, false);//WTW - Gen2 - Move Extern definitions to rates header
-			group_name += "|" + group;
-		#endif
+		if (period < last_proj_period + 1)
+			{
+			gaap_schedule[EGP][period] = atof(sfas97rd_valn_input[row][3].c_str());
+			gaap_schedule[INT_RATE][period] = atof(sfas97rd_valn_input[row][4].c_str());
+			gaap_schedule[SOP031_PBR_FV][period] = atof(sfas97rd_valn_input[row][5].c_str());
+			gaap_schedule[SOP031_PBR][period] = atof(sfas97rd_valn_input[row][6].c_str());
 
-		#if defined(__VA_LIAB_H_)
-			group_name = get_base_group_name(va->group, false);//WTW - Gen2 - Move Extern definitions to rates header
-			group_name += "|" + group;
-		#endif
+			gaap_schedule[DAC_ACQ_EXP][period] = atof(sfas97rd_valn_input[row][7].c_str());
+			gaap_schedule[DAC_COMM][period] = atof(sfas97rd_valn_input[row][8].c_str());
+			gaap_schedule[DAC_PREM_BONUS][period] = atof(sfas97rd_valn_input[row][9].c_str());
+			gaap_schedule[DAC_REINS_YRT_ASSET][period] = atof(sfas97rd_valn_input[row][10].c_str());
+			gaap_schedule[EMBED_DERIV_VAL][period] = atof(sfas97rd_valn_input[start_row][11].c_str());
+			gaap_schedule[K_CAPZD_ACQ_EXP][period] = atof(sfas97rd_valn_input[row][12].c_str());
+			gaap_schedule[K_CAPZD_COMM][period] = atof(sfas97rd_valn_input[row][13].c_str());
+			gaap_schedule[K_CAPZD_PREM_BONUS][period] = atof(sfas97rd_valn_input[row][14].c_str());
+			gaap_schedule[K_REINS_YRT_COST][period] = atof(sfas97rd_valn_input[row][15].c_str());
+			gaap_schedule[K_SOP031_GMDB_BEN_BR][period] = atof(sfas97rd_valn_input[start_row][16].c_str());
+			gaap_schedule[K_SOP031_PBR][period] = atof(sfas97rd_valn_input[start_row][17].c_str());
+			gaap_schedule[K_SOP031_ULSG_BEN_BR][period] = atof(sfas97rd_valn_input[start_row][18].c_str());
+			gaap_schedule[K_SOP031_UNEARN_REV_LIAB][period] = atof(sfas97rd_valn_input[start_row][19].c_str());
+			gaap_schedule[K_UNEARN_REV_LIAB][period] = atof(sfas97rd_valn_input[row][20].c_str());
+			gaap_schedule[SOP031_GMDB_BR][period] = atof(sfas97rd_valn_input[start_row][21].c_str());
+			gaap_schedule[SOP031_PBR_LIAB][period] = atof(sfas97rd_valn_input[start_row][22].c_str());
+			gaap_schedule[SOP031_ULSG_BR][period] = atof(sfas97rd_valn_input[start_row][23].c_str());
+			gaap_schedule[UNEARN_REV_LIAB][period] = atof(sfas97rd_valn_input[row][24].c_str());
+			gaap_schedule[POLICIES_INF][period] = atof(sfas97rd_valn_input[row][25].c_str());
+			}
 
-		#if defined(__FA_LIAB_H_)
-			group_name = get_base_group_name(fa->group, false);//WTW - Gen2 - Move Extern definitions to rates header
-			group_name += "|" + group;
-		#endif
-
-		#if defined(__FIA_LIAB_H_)
-			group_name = get_base_group_name(fia->group, false);//WTW - Gen2 - Move Extern definitions to rates header
-			group_name += "|" + group;
-		#endif
-		}
-	else // Used for cohorts
-		group_name = seg_id + "|" + group;
-
-	// Find group start position
-	int sfas97rd_valn_input_row = 0;
-	if ((sfas97rd_valn_input_pos_iter 
-		 = sfas97rd_valn_input_pos.find(group_name)) != sfas97rd_valn_input_pos.end())
-		{
-		sfas97rd_valn_input_row = sfas97rd_valn_input_pos_iter->second;
-
-		int start_row = sfas97rd_valn_input_row;
-		int end_row = start_row + last_proj_period + 1;
-		int period = 0;
-
-		for (int row = start_row; row < end_row; row++)
-            {
-            gaap_schedule[EGP][period] = atof(sfas97rd_valn_input[row][3].c_str());
-            gaap_schedule[INT_RATE][period] = atof(sfas97rd_valn_input[row][4].c_str());
-            gaap_schedule[SOP031_PBR_FV][period] = atof(sfas97rd_valn_input[row][5].c_str());
-            gaap_schedule[SOP031_PBR][period] = atof(sfas97rd_valn_input[row][6].c_str());
-
-            // these schedule values are always from the start_row
-            gaap_schedule[DAC_ACQ_EXP][period] = atof(sfas97rd_valn_input[start_row][7].c_str());
-            gaap_schedule[DAC_ACQ_EXP_LOSS_REC][period] = atof(sfas97rd_valn_input[start_row][8].c_str());
-            gaap_schedule[DAC_COMM][period] = atof(sfas97rd_valn_input[start_row][9].c_str());
-            gaap_schedule[DAC_COMM_LOSS_REC][period] = atof(sfas97rd_valn_input[start_row][10].c_str());
-            gaap_schedule[DAC_PREM_BONUS][period] = atof(sfas97rd_valn_input[start_row][11].c_str());
-            gaap_schedule[DAC_PREM_BONUS_LOSS_REC][period] = atof(sfas97rd_valn_input[start_row][12].c_str());
-            gaap_schedule[DAC_REINS_YRT_ASSET][period] = atof(sfas97rd_valn_input[start_row][13].c_str());
-            gaap_schedule[EMBED_DERIV_VAL][period] = atof(sfas97rd_valn_input[start_row][14].c_str());
-            gaap_schedule[K_CAPZD_ACQ_EXP][period] = atof(sfas97rd_valn_input[start_row][15].c_str());
-            gaap_schedule[K_CAPZD_COMM][period] = atof(sfas97rd_valn_input[start_row][16].c_str());
-            gaap_schedule[K_CAPZD_PREM_BONUS][period] = atof(sfas97rd_valn_input[start_row][17].c_str());
-            gaap_schedule[K_REINS_YRT_COST][period] = atof(sfas97rd_valn_input[start_row][18].c_str());
-            gaap_schedule[K_SOP031_GMDB_BEN_BR][period] = atof(sfas97rd_valn_input[start_row][19].c_str());
-            gaap_schedule[K_SOP031_PBR][period] = atof(sfas97rd_valn_input[start_row][20].c_str());
-            gaap_schedule[K_SOP031_ULSG_BEN_BR][period] = atof(sfas97rd_valn_input[start_row][21].c_str());
-            gaap_schedule[K_SOP031_UNEARN_REV_LIAB][period] = atof(sfas97rd_valn_input[start_row][22].c_str());
-            gaap_schedule[K_UNEARN_REV_LIAB][period] = atof(sfas97rd_valn_input[start_row][23].c_str());
-            gaap_schedule[SOP031_GMDB_BR][period] = atof(sfas97rd_valn_input[start_row][24].c_str());
-            gaap_schedule[SOP031_GMIB_BR][period] = atof(sfas97rd_valn_input[start_row][25].c_str());
-            gaap_schedule[SOP031_GMWB_BR][period] = atof(sfas97rd_valn_input[start_row][26].c_str());
-            gaap_schedule[SOP031_PBR_LIAB][period] = atof(sfas97rd_valn_input[start_row][27].c_str());
-            gaap_schedule[SOP031_ULSG_BR][period] = atof(sfas97rd_valn_input[start_row][28].c_str());
-            gaap_schedule[UNEARN_REV_LIAB][period] = atof(sfas97rd_valn_input[start_row][29].c_str());
-
-            period++;
-            }
-		}
+        }
 	}
 }
 
@@ -13282,7 +11323,6 @@ void SFAS97RD_GAAP::get_sop031_valn_results(void)
 {
 xstring file_name = xstring(replaceWildcards(sop031_results));
 
-int periods = 1440; // Must get all results from the output file since cohorts can have different remaining periods
 int cohort_periods = max(1, final_period + 1);
 
 if (sop031_array.size() < SOP_SIZE)
@@ -13307,165 +11347,73 @@ if (first_time)
 	{
 	first_time = false;
 
-	//string database_name = working_directory() + "sfas97rd_get_sop031_valn_results.db";
-	xstring database_name = working_directory() + "sfas97rd_get_sop031_valn_results.db";
-	openDatabase(database_name.getStdStr());//WTW - Gen2 - add ".getStdStr()"
-	string table_name = readCsvFile(file_name.getStdStr());
-
-	// Retrieve valuation results
-	xstring report_columns = "";
-	report_columns = xstring("_sop031_assess, _gmdb_ben, _gmib_ben, _gmwb_ben, _ulsg_ben, _dth_claim_cost");
-
-	xstring sql = (xstring)"SELECT TRIM(_group) AS vgroup, "
-			      + (xstring)"CAST(_period AS INTEGER) AS vperiod, _time, "
-				  + report_columns
-				  + (xstring)" FROM '"
-		          + table_name 
-		   		  + (xstring)"' WHERE (vperiod < "
-		   		  + xstring(periods)
-		   		  + (xstring)") AND _time NOT LIKE 'PV%' AND _time NOT LIKE 'IRR%'"
-				  + (xstring)" ORDER BY vgroup";
-
-	executeQuery(sql.getStdStr(), sop031_valn_input_cols, sop031_valn_input);
-	closeDatabase();
-	remove(database_name.c_str());
-
-	if (!sop031_valn_input_cols.size())
+	OutputFileReader ofr;
+	sop031_valn_input = ofr.readFile(file_name.getStdStr(), {"task_loop", "group", "period", "sop031_assess", "gmdb_ben", "ulsg_ben", "dth_claim_cost"});
+											
+	if (!sop031_valn_input.size())
 		{
 		throw FatalError("Could not read SOP03-1 valuation file: " 
 			              + file_name + ". "
 			              + "Please check your data.");
 		}
-
-	// Create map of group start positions, group is column 0 of query results
-	// Strip any leading "|" character
-	xstring output_group_name;
-	output_group_name = xstring(sop031_valn_input[0][0]);
-
-    if (output_group_name(0, 1) == "|")
-		output_group_name = output_group_name(1, output_group_name.length()-1);   
-
-	sop031_valn_input_pos[output_group_name] = 0;
-
-	for (int row = 1; row < sop031_valn_input.size(); row++)
-		{
-		if (!eq(sop031_valn_input[row][0], sop031_valn_input[row - 1][0]))
-			{      
-			output_group_name = xstring(sop031_valn_input[row][0]);
-
-			if (output_group_name(0, 1) == "|")
-				output_group_name = output_group_name(1, output_group_name.length() - 1);   
-
-			sop031_valn_input_pos[output_group_name] = row;
-			}
-		}
 	}
 
-xstring group_name;
+xstring group_name = get_base_group_name(group, true);
 
-if (this != sfas97rd)// Cell pricing
+int period = 0;
+int task_loop_counter = 0;
+
+for (int row = 0; row < sop031_valn_input.size(); row++)
 	{
-	#if defined(__UL_LIAB_H_)
-	group_name = get_base_group_name(ul->group, true);
-	group_name += "|" + group;
-	#endif
+	if (!eq(sop031_valn_input[row][1], group_name))
+		continue;
 	
-	#if defined(__VUL_LIAB_H_)
-	group_name = get_base_group_name(vul->group, true);
-	group_name += "|" + group;
-	#endif
+	if (eq(sop031_valn_input[row][2], ""))//blank period signifies a PV or IRR column
+		continue;
 
-	#if defined(__IUL_LIAB_H_)
-	group_name = get_base_group_name(iul->group, true);
-	group_name += "|" + group;
-	#endif
+	period = atoi(sop031_valn_input[row][2].c_str());
 
-	#if defined(__VA_LIAB_H_)
-	group_name = get_base_group_name(va->group, true);
-	group_name += "|" + group;
-	#endif
+	if (period == 0)
+		task_loop_counter += 1;
+
+	if (period < cohort_periods)
+		{
+		sop031_array[ASSESS_SOP][period] += atof(sop031_valn_input[row][3].c_str());
+		sop031_array[DB_BEN_SOP][period] += atof(sop031_valn_input[row][4].c_str());
+		sop031_array[SG_BEN_SOP][period] += atof(sop031_valn_input[row][5].c_str());
+		sop031_array[DTH_CLAIM_COST][period] += atof(sop031_valn_input[row][6].c_str());
+		}
 	}
-else // Portfolio cohorts
-	group_name = seg_id + "|" + group;
 
-// Find group start position
-int sop031_valn_input_row = 0;
-int sop031_valn_next_input_row = sop031_valn_input.size();
-if ((sop031_valn_input_pos_iter 
-     = sop031_valn_input_pos.find(group_name)) != sop031_valn_input_pos.end())
+int proj_task_loops = task_loop_counter;
+
+for (period = 0; period < cohort_periods; period++)
 	{
-	sop031_valn_input_row = sop031_valn_input_pos_iter->second;
+	sop031_array[ASSESS_SOP][period] /= proj_task_loops;
+	sop031_array[DB_BEN_SOP][period] /= proj_task_loops;
+	sop031_array[SG_BEN_SOP][period] /= proj_task_loops;
+	sop031_array[DTH_CLAIM_COST][period] /= proj_task_loops;		
+	}			
 
-	// Determine the number of rows for the group
-	deptaskmapiter temp_iter;
-	for (temp_iter = sop031_valn_input_pos.begin();
-		 temp_iter != sop031_valn_input_pos.end();
-		 temp_iter++) 
-		{
-		if (temp_iter->second > sop031_valn_input_row)
-			sop031_valn_next_input_row = min(sop031_valn_next_input_row, temp_iter->second);
-		}
+// Validate data
+double assess_chk = 0.0;
+double db_chk = 0.0;
+double sg_chk = 0.0;
+double dcc_chk = 0.0;
 
-	int start_row = sop031_valn_input_row;
-	int end_row = sop031_valn_next_input_row;
-
-	int period = 0;
-	int task_loop_counter = 0;
-
-	for (int row = start_row; row < end_row; row++)
-		{
-		period = atoi(sop031_valn_input[row][1].c_str());
-
-		if (period == 0)
-			task_loop_counter +=1;
-
-		if (period < cohort_periods)
-			{
-			sop031_array[ASSESS_SOP][period] += atof(sop031_valn_input[row][3].c_str());
-			sop031_array[DB_BEN_SOP][period] += atof(sop031_valn_input[row][4].c_str());
-			sop031_array[IB_BEN_SOP][period] += atof(sop031_valn_input[row][5].c_str());
-			sop031_array[WB_BEN_SOP][period] += atof(sop031_valn_input[row][6].c_str());
-			sop031_array[SG_BEN_SOP][period] += atof(sop031_valn_input[row][7].c_str());
-			sop031_array[DTH_CLAIM_COST][period] += atof(sop031_valn_input[row][8].c_str());
-			}
-		}
-
-//	int proj_task_loops = max(1, (end_row - start_row) / cohort_periods);
-	int proj_task_loops = task_loop_counter;
-
-	for (period = 0; period < cohort_periods; period++)
-		{
-		sop031_array[ASSESS_SOP][period] /= proj_task_loops;
-		sop031_array[DB_BEN_SOP][period] /= proj_task_loops;
-		sop031_array[IB_BEN_SOP][period] /= proj_task_loops;
-		sop031_array[WB_BEN_SOP][period] /= proj_task_loops;
-		sop031_array[SG_BEN_SOP][period] /= proj_task_loops;
-		sop031_array[DTH_CLAIM_COST][period] /= proj_task_loops;		
-		}			
-
-	// Validate data
-	double assess_chk = 0.0;
-	double db_chk = 0.0;
-	double ib_chk = 0.0;
-	double wb_chk = 0.0;
-	double sg_chk = 0.0;
-	double dcc_chk = 0.0;
-
-	for (period = 0; period < cohort_periods; period++)
-		{
-		assess_chk += sop031_array[ASSESS_SOP][period];
-		db_chk += sop031_array[DB_BEN_SOP][period];
-		ib_chk += sop031_array[IB_BEN_SOP][period];
-		wb_chk += sop031_array[WB_BEN_SOP][period];
-		sg_chk += sop031_array[SG_BEN_SOP][period];
-		dcc_chk += sop031_array[DTH_CLAIM_COST][period];
-		}
-
-	if (final_period > 0
-		&& (assess_chk + db_chk + ib_chk + wb_chk + sg_chk + dcc_chk) == 0.0)
-		log_screen << "Warning: Cohort " << group_name << " does not have any SOP 03-1 cash flow items assigned to it. "
-		           << "Please check SOP 03-1 valuation file: " << file_name << "." << MSG_USER;		
+for (period = 0; period < cohort_periods; period++)
+	{
+	assess_chk += sop031_array[ASSESS_SOP][period];
+	db_chk += sop031_array[DB_BEN_SOP][period];
+	sg_chk += sop031_array[SG_BEN_SOP][period];
+	dcc_chk += sop031_array[DTH_CLAIM_COST][period];
 	}
+
+if (final_period > 0
+	&& (assess_chk + db_chk + sg_chk + dcc_chk) == 0.0)
+	log_screen << "Warning: Cohort " << group_name << " does not have any SOP 03-1 cash flow items assigned to it. "
+		        << "Please check SOP 03-1 valuation file: " << file_name << "." << MSG_USER;		
+	
 }
 
 
@@ -13485,18 +11433,18 @@ if (first_time)
 	  + "sfas97rd_state_of_world_financial_" + xstring(proj_set_loop_num)
 	  + "_" + xstring(proj_set_sub_loop_num) + ".csv");
 
-	//string database_name = working_directory() + "sfas97rd_read_state_of_world_financial.db";
-	xstring database_name = working_directory() + "sfas97rd_read_state_of_world_financial.db";
-	openDatabase(database_name.getStdStr());//WTW - Gen2 - add ".getStdStr()"
-	string table_name = readCsvFile(state_of_world_financial_file.getStdStr());
+	OutputFileReader ofr;
+	sfas97rd_state_of_world_financial_input = ofr.readFile(state_of_world_financial_file.getStdStr(), 
+											  {"group","dac_acq_exp","dac_acq_exp_sch","dac_comm","dac_comm_sch",
+											   "dac_prem_bonus","dac_prem_bonus_sch","egp_accum","sop031_assess_accum",
+											   "sop031_gmdb_ben_accum","sop031_pbr_accum","deferred_loads_accum",
+											   "unearn_rev_liab","unearn_rev_liab_sch","dac_reins_yrt_asset",
+											   "dac_reins_yrt_asset_sch","sop031_pbr_fund_val_accum","embed_deriv_val",
+											   "mrb_gmab_liab","mrb_gmib_liab","mrb_gmwb_liab","mrb_gmdb_liab",
+											   "sop031_ulsg_ben_accum","sop031_gmdb_br","sop031_pbr_liab","sop031_ulsg_br",
+											   "policies_inf_sch"});
 
-	xstring sql = (xstring)"SELECT * FROM " + table_name;
-
-	executeQuery(sql.getStdStr(), sfas97rd_state_of_world_financial_cols, sfas97rd_state_of_world_financial_input);
-	closeDatabase();
-	remove(database_name.c_str());
-
-	if (!sfas97rd_state_of_world_financial_cols.size())
+	if (!sfas97rd_state_of_world_financial_input.size())
 		{
 		throw FatalError("Could not read SFAS97RD State of World Financial File: " 
 			              + state_of_world_financial_file + " "
@@ -13514,47 +11462,37 @@ if (first_time)
 	}
 
 int sfas97rd_state_of_world_financial_row = 0;
+xstring group_name = get_base_group_name(group, true);
 if ((sfas97rd_state_of_world_financial_input_pos_iter 
-     = sfas97rd_state_of_world_financial_input_pos.find(group)) != sfas97rd_state_of_world_financial_input_pos.end())
+     = sfas97rd_state_of_world_financial_input_pos.find(group_name)) != sfas97rd_state_of_world_financial_input_pos.end())
 	sfas97rd_state_of_world_financial_row = sfas97rd_state_of_world_financial_input_pos_iter->second;
 
 init_dac_acq_exp = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][1].c_str());
-init_dac_acq_exp_loss_rec = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][2].c_str());
-init_capzd_acq_exp_accum = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][3].c_str());
-init_capzd_acq_exp_accum_loss_rec_int_rate = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][4].c_str());
-init_dac_acq_exp_loss_rec_accum = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][5].c_str());
-init_dac_comm = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][6].c_str());
-init_dac_comm_loss_rec = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][7].c_str());
-init_capzd_comm_accum = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][8].c_str());
-init_capzd_comm_accum_loss_rec_int_rate = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][9].c_str());
-init_dac_comm_loss_rec_accum = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][10].c_str());
-init_dac_prem_bonus = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][11].c_str());
-init_dac_prem_bonus_loss_rec = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][12].c_str());
-init_capzd_prem_bonus_accum = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][13].c_str());
-init_capzd_prem_bonus_accum_loss_rec_int_rate = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][14].c_str());
-init_dac_prem_bonus_loss_rec_accum = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][15].c_str());
-init_egp_accum = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][16].c_str());
-init_egp_accum_loss_rec_int_rate = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][17].c_str());
-init_sop031_assess_accum = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][18].c_str());
-init_sop031_gmdb_ben_accum = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][19].c_str());
-init_sop031_gmib_ben_accum = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][20].c_str());
-init_sop031_gmwb_ben_accum = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][21].c_str());
-init_sop031_pbr_accum = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][22].c_str());
-init_deferred_loads_accum = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][23].c_str());
-init_unearn_rev_liab = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][24].c_str());
-init_dac_reins_yrt_asset = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][25].c_str());
-init_reins_yrt_cost_accum = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][26].c_str());
-init_sop031_pbr_fund_val_accum = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][27].c_str());
-init_embed_deriv_val = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][28].c_str());
-init_sfas133_gmab_liab = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][29].c_str());
-init_sfas133_gmib_liab = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][30].c_str());
-init_sfas133_gmwb_liab = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][31].c_str());
-init_sop031_ulsg_ben_accum = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][32].c_str());
-init_sop031_gmdb_br = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][33].c_str());
-init_sop031_gmib_br = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][34].c_str());
-init_sop031_gmwb_br = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][35].c_str());
-init_sop031_pbr_liab = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][36].c_str());
-init_sop031_ulsg_br = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][37].c_str());
+init_dac_acq_exp_sch = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][2].c_str());
+init_dac_comm = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][3].c_str());
+init_dac_comm_sch = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][4].c_str());
+init_dac_prem_bonus = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][5].c_str());
+init_dac_prem_bonus_sch = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][6].c_str());
+init_egp_accum = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][7].c_str());
+init_sop031_assess_accum = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][8].c_str());
+init_sop031_gmdb_ben_accum = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][9].c_str());
+init_sop031_pbr_accum = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][10].c_str());
+init_deferred_loads_accum = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][11].c_str());
+init_unearn_rev_liab = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][12].c_str());
+init_unearn_rev_liab_sch = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][13].c_str());
+init_dac_reins_yrt_asset = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][14].c_str());
+init_dac_reins_yrt_asset_sch = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][15].c_str());
+init_sop031_pbr_fund_val_accum = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][16].c_str());
+init_embed_deriv_val = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][17].c_str());
+init_mrb_gmab_liab = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][18].c_str());
+init_mrb_gmib_liab = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][19].c_str());
+init_mrb_gmwb_liab = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][20].c_str());
+init_mrb_gmdb_liab = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][21].c_str());
+init_sop031_ulsg_ben_accum = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][22].c_str());
+init_sop031_gmdb_br = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][23].c_str());
+init_sop031_pbr_liab = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][24].c_str());
+init_sop031_ulsg_br = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][25].c_str());
+init_policies_inf_sch = atof(sfas97rd_state_of_world_financial_input[sfas97rd_state_of_world_financial_row][26].c_str());
 
 return;
 }
@@ -13572,9 +11510,10 @@ xstring mp_iss_yr = xstring(mp_iss_yr_int);
 // Parse and stores multiple issue yrs and plan code into vectors
 // Set lookup key
 cohort_id = cohort;
+split_string_usl(cohort_issue_yrs.c_str(), issue_yrs, ",");
 
-split_string_usl(cohort_issue_yrs.c_str(), issue_yrs, ",");//WTW - Gen2 - split_tring internal RAFM function
-split_string_usl(cohort_plan_codes.c_str(), plan_codes, ",");//WTW - Gen2 - split_tring internal RAFM function
+cohort_id = cohort;
+split_string_usl(cohort_plan_codes.c_str(), plan_codes, ",");
 
 // Sets sfas97rd cohort's variable assumptions
 if (issue_yrs.size() > 0)
@@ -13627,17 +11566,19 @@ return false;
 
 
 #line 1 "sum_over_gaap.SFAS97RD_GAAP.for"                                                                                   
-double SFAS97RD_GAAP::sum_over_gaap(const xstring &colname, int t)
+double SFAS97RD_GAAP::sum_over_gaap(const xstring &/* CiProxyFormula */colname, const int /* CiProxyTime */ t)
 {
 double total = 0.0;
 int mp = 0;
 int colnum = 0;
-map <int, long, less <int> >::iterator mp_map_iter;//Gen2 - 9/6/2024 - replace mpmap with full definition
+xstring colname_epl = "";
 
-#if defined(__UL_LIAB_H_)
+map <int, long, less <int> >::iterator mp_map_iter;
+
+{
+#if defined(__UL_LIAB_H_) && defined(__AA_COMP_COMP_H_)
 if (ul_mp_map.size())
 	{
-	UL_LIAB *current_ul_element;
 	colnum = liab->sm_ul[0]->sm_ul_sfas97rd[0]->Column(colname).Number();	
 
 	if (colnum < 0)
@@ -13651,37 +11592,36 @@ if (ul_mp_map.size())
 			 mp_map_iter++)
 			{
 			mp = mp_map_iter->first;		
-			current_ul_element = liab->sm_ul[mp];
 			
-			if (t < current_ul_element->commencement_period
-				|| t > current_ul_element->maturity_period)
+			if (t < liab->sm_ul[mp]->commencement_period
+				|| t > liab->sm_ul[mp]->maturity_period)
 				continue;
 
 			// Skip new issues commencement period
-			if (current_ul_element->commencement_period >= 0
-				&& t == current_ul_element->commencement_period)
+			if (liab->sm_ul[mp]->commencement_period >= 0
+				&& t == liab->sm_ul[mp]->commencement_period)
 				continue;
 
-			if (t > current_ul_element->start_period
-				&& fabs(current_ul_element->units_inf(t - 1)) < rate_ratio_threshold)
+			if (t > liab->sm_ul[mp]->start_period
+				&& fabs(liab->sm_ul[mp]->units_inf(t - 1)) < rate_ratio_threshold)
 				continue;
 
 			if (!reins_flag) //Gross Run
-				total += current_ul_element->sm_ul_sfas97rd[0]->Column(colnum).Value(t);
+				total += liab->sm_ul[mp]->sm_ul_sfas97rd[0]->Column(colnum).Value(t);
 
-			else if (reins_flag && current_ul_element->reins_flag && current_ul_element->coins_flag) //Ceded Run && MP Reinsured
-				total += current_ul_element->sm_ul_sfas97rd[1]->Column(colnum).Value(t);
+			else if (reins_flag && liab->sm_ul[mp]->reins_flag && liab->sm_ul[mp]->coins_flag) //Ceded Run && MP Reinsured
+				total += liab->sm_ul[mp]->sm_ul_sfas97rd[1]->Column(colnum).Value(t);
 
 			// no sum for ceded Run && MP Not Reinsured
 			}		
 		}
 	}		
 #endif
-
-#if defined(__VUL_LIAB_H_)
+}
+{
+#if defined(__VUL_LIAB_H_) && defined(__AA_COMP_COMP_H_)
 if (vul_mp_map.size())
 	{
-	VUL_LIAB *current_vul_element;
 	colnum = liab->sm_vul[0]->sm_vul_sfas97rd[0]->Column(colname).Number();	
 
 	if (colnum < 0)
@@ -13695,37 +11635,36 @@ if (vul_mp_map.size())
 		     mp_map_iter++)
 			{
 			mp = mp_map_iter->first;		
-			current_vul_element = liab->sm_vul[mp];
 			
-			if (t < current_vul_element->commencement_period
-				|| t > current_vul_element->maturity_period)
+			if (t < liab->sm_vul[mp]->commencement_period
+				|| t > liab->sm_vul[mp]->maturity_period)
 				continue;
 
 			// Skip new issues commencement period
-			if (current_vul_element->commencement_period >= 0
-				&& t == current_vul_element->commencement_period)
+			if (liab->sm_vul[mp]->commencement_period >= 0
+				&& t == liab->sm_vul[mp]->commencement_period)
 				continue;
 
-			if (t > current_vul_element->start_period
-				&& fabs(current_vul_element->units_inf(t - 1)) < rate_ratio_threshold)
+			if (t > liab->sm_vul[mp]->start_period
+				&& fabs(liab->sm_vul[mp]->units_inf(t - 1)) < rate_ratio_threshold)
 				continue;
 
 			if (!reins_flag) //Gross Run
-				total += current_vul_element->sm_vul_sfas97rd[0]->Column(colnum).Value(t);
+				total += liab->sm_vul[mp]->sm_vul_sfas97rd[0]->Column(colnum).Value(t);
 
-			else if (reins_flag && current_vul_element->reins_flag && current_vul_element->coins_flag) //Ceded Run && MP Reinsured
-				total += current_vul_element->sm_vul_sfas97rd[1]->Column(colnum).Value(t);
+			else if (reins_flag && liab->sm_vul[mp]->reins_flag && liab->sm_vul[mp]->coins_flag) //Ceded Run && MP Reinsured
+				total += liab->sm_vul[mp]->sm_vul_sfas97rd[1]->Column(colnum).Value(t);
 
 			// no sum for ceded Run && MP Not Reinsured
 			}		
 		}
 	}		
 #endif
-
-#if defined(__IUL_LIAB_H_)
+}
+{
+#if defined(__IUL_LIAB_H_) && defined(__AA_COMP_COMP_H_)
 if (iul_mp_map.size())
 	{
-	IUL_LIAB *current_iul_element;
 	colnum = liab->sm_iul[0]->sm_iul_sfas97rd[0]->Column(colname).Number();	
 
 	if (colnum < 0)
@@ -13739,37 +11678,36 @@ if (iul_mp_map.size())
 		     mp_map_iter++)
 			{
 			mp = mp_map_iter->first;		
-			current_iul_element = liab->sm_iul[mp];
 			
-			if (t < current_iul_element->commencement_period
-				|| t > current_iul_element->maturity_period)
+			if (t < liab->sm_iul[mp]->commencement_period
+				|| t > liab->sm_iul[mp]->maturity_period)
 				continue;
 
 			// Skip new issues commencement period
-			if (current_iul_element->commencement_period >= 0
-				&& t == current_iul_element->commencement_period)
+			if (liab->sm_iul[mp]->commencement_period >= 0
+				&& t == liab->sm_iul[mp]->commencement_period)
 				continue;
 
-			if (t > current_iul_element->start_period
-				&& fabs(current_iul_element->units_inf(t - 1)) < rate_ratio_threshold)
+			if (t > liab->sm_iul[mp]->start_period
+				&& fabs(liab->sm_iul[mp]->units_inf(t - 1)) < rate_ratio_threshold)
 				continue;
 
 			if (!reins_flag) //Gross Run
-				total += current_iul_element->sm_iul_sfas97rd[0]->Column(colnum).Value(t);
+				total += liab->sm_iul[mp]->sm_iul_sfas97rd[0]->Column(colnum).Value(t);
 
-			else if (reins_flag && current_iul_element->reins_flag && current_iul_element->coins_flag) //Ceded Run && MP Reinsured
-				total += current_iul_element->sm_iul_sfas97rd[1]->Column(colnum).Value(t);
+			else if (reins_flag && liab->sm_iul[mp]->reins_flag && liab->sm_iul[mp]->coins_flag) //Ceded Run && MP Reinsured
+				total += liab->sm_iul[mp]->sm_iul_sfas97rd[1]->Column(colnum).Value(t);
 
 			// no sum for ceded Run && MP Not Reinsured
 			}		
 		}
 	}		
 #endif
-
-#if defined(__VA_LIAB_H_)
+}
+{
+#if defined(__VA_LIAB_H_) && defined(__AA_COMP_COMP_H_)
 if (va_mp_map.size())
 	{
-	VA_LIAB *current_va_element;
 	colnum = liab->sm_va[0]->sm_va_sfas97rd[0]->Column(colname).Number();	
 
 	if (colnum < 0)
@@ -13783,37 +11721,36 @@ if (va_mp_map.size())
 		     mp_map_iter++)
 			{
 			mp = mp_map_iter->first;
-			current_va_element = liab->sm_va[mp];
 
-			if (t < current_va_element->commencement_period
-				|| t > current_va_element->maturity_period)
+			if (t < liab->sm_va[mp]->commencement_period
+				|| t > liab->sm_va[mp]->maturity_period)
 				continue;
 
 			// Skip new issue commencement period
-			if (current_va_element->elapsed_mths <= 0
-				&& t == current_va_element->commencement_period)
+			if (liab->sm_va[mp]->elapsed_mths <= 0
+				&& t == liab->sm_va[mp]->commencement_period)
 				continue;
 
-			if (t != current_va_element->commencement_period
-				&& fabs(current_va_element->policies_b(t)) < rate_ratio_threshold)
+			if (t != liab->sm_va[mp]->commencement_period
+				&& fabs(liab->sm_va[mp]->policies_b(t)) < rate_ratio_threshold)
 				continue;
 
 			if (!reins_flag) //Gross Run
-				total += current_va_element->sm_va_sfas97rd[0]->Column(colnum).Value(t);
+				total += liab->sm_va[mp]->sm_va_sfas97rd[0]->Column(colnum).Value(t);
 
-			else if (reins_flag && current_va_element->reins_flag) //Ceded Run && MP Reinsured
-				total += current_va_element->sm_va_sfas97rd[1]->Column(colnum).Value(t);
+			else if (reins_flag && liab->sm_va[mp]->reins_flag) //Ceded Run && MP Reinsured
+				total += liab->sm_va[mp]->sm_va_sfas97rd[1]->Column(colnum).Value(t);
 
 			// no sum for ceded Run && MP Not Reinsured
 			}	
 		}
 	}		
 #endif
-
-#if defined(__FA_LIAB_H_)
+}
+{
+#if defined(__FA_LIAB_H_) && defined(__AA_COMP_COMP_H_)
 if (fa_mp_map.size())
 	{
-	FA_LIAB *current_fa_element;
 	colnum = liab->sm_fa[0]->sm_fa_sfas97rd[0]->Column(colname).Number();	
 
 	if (colnum < 0)
@@ -13827,37 +11764,36 @@ if (fa_mp_map.size())
 		     mp_map_iter++)
 			{
 			mp = mp_map_iter->first;
-			current_fa_element = liab->sm_fa[mp];
 
-			if (t < current_fa_element->commencement_period
-				|| t > current_fa_element->maturity_period)
+			if (t < liab->sm_fa[mp]->commencement_period
+				|| t > liab->sm_fa[mp]->maturity_period)
 				continue;
 
 			// Skip new issue commencement period
-			if (current_fa_element->elapsed_mths <= 0
-				&& t == current_fa_element->commencement_period)
+			if (liab->sm_fa[mp]->elapsed_mths <= 0
+				&& t == liab->sm_fa[mp]->commencement_period)
 				continue;
 
-			if (t != current_fa_element->commencement_period
-				&& fabs(current_fa_element->policies_b(t)) < rate_ratio_threshold)
+			if (t != liab->sm_fa[mp]->commencement_period
+				&& fabs(liab->sm_fa[mp]->policies_b(t)) < rate_ratio_threshold)
 				continue;
 
 			if (!reins_flag) //Gross Run
-				total += current_fa_element->sm_fa_sfas97rd[0]->Column(colnum).Value(t);
+				total += liab->sm_fa[mp]->sm_fa_sfas97rd[0]->Column(colnum).Value(t);
 
-			else if (reins_flag && current_fa_element->reins_flag) //Ceded Run && MP Reinsured
-				total += current_fa_element->sm_fa_sfas97rd[1]->Column(colnum).Value(t);
+			else if (reins_flag && liab->sm_fa[mp]->reins_flag) //Ceded Run && MP Reinsured
+				total += liab->sm_fa[mp]->sm_fa_sfas97rd[1]->Column(colnum).Value(t);
 
 			// no sum for ceded Run && MP Not Reinsured
 			}	
 		}
 	}		
 #endif
-
-#if defined(__FIA_LIAB_H_)
+}
+{
+#if defined(__FIA_LIAB_H_) && defined(__AA_COMP_COMP_H_)
 if (fia_mp_map.size())
 	{
-	FIA_LIAB *current_fia_element;
 	colnum = liab->sm_fia[0]->sm_fia_sfas97rd[0]->Column(colname).Number();	
 
 	if (colnum < 0)
@@ -13871,44 +11807,77 @@ if (fia_mp_map.size())
 		     mp_map_iter++)
 			{
 			mp = mp_map_iter->first;
-			current_fia_element = liab->sm_fia[mp];
 
-			if (t < current_fia_element->commencement_period
-				|| t > current_fia_element->maturity_period)
+			if (t < liab->sm_fia[mp]->commencement_period
+				|| t > liab->sm_fia[mp]->maturity_period)
 				continue;
 
 			// Skip new issue commencement period
-			if (current_fia_element->elapsed_mths <= 0
-				&& t == current_fia_element->commencement_period)
+			if (liab->sm_fia[mp]->elapsed_mths <= 0
+				&& t == liab->sm_fia[mp]->commencement_period)
 				continue;
 
-			if (t != current_fia_element->commencement_period
-				&& fabs(current_fia_element->policies_b(t)) < rate_ratio_threshold)
+			if (t != liab->sm_fia[mp]->commencement_period
+				&& fabs(liab->sm_fia[mp]->policies_b(t)) < rate_ratio_threshold)
 				continue;
 
 			if (!reins_flag) //Gross Run
-				total += current_fia_element->sm_fia_sfas97rd[0]->Column(colnum).Value(t);
+				total += liab->sm_fia[mp]->sm_fia_sfas97rd[0]->Column(colnum).Value(t);
 
-			else if (reins_flag && current_fia_element->reins_flag) //Ceded Run && MP Reinsured
-				total += current_fia_element->sm_fia_sfas97rd[1]->Column(colnum).Value(t);
+			else if (reins_flag && liab->sm_fia[mp]->reins_flag) //Ceded Run && MP Reinsured
+				total += liab->sm_fia[mp]->sm_fia_sfas97rd[1]->Column(colnum).Value(t);
 
 			// no sum for ceded Run && MP Not Reinsured
 			}	
 		}
 	}		
 #endif
-
+}
+{
 //for EPL file
-#if defined(__EPL_LIAB_H_)
+#if defined(__EPL_LIAB_H_) && defined(__AA_COMP_COMP_H_)
 if (epl_mp_map.size())
 	{
-	EPL_LIAB *current_epl_element;
-
 	// In epl/liab, "sfas97rd_gross_" and "sfas97rd_ceded_" have been added to the column names
 	if (!reins_flag) 
-		colnum = liab->sm_epl[0]->Column("sfas97rd_gross_" + colname).Number();				
+		colname_epl = "sfas97rd_gross_" + colname;		
 	else 
-		colnum = liab->sm_epl[0]->Column("sfas97rd_ceded_" + colname).Number();		
+		colname_epl = "sfas97rd_ceded_" + colname;			
+	
+	total += sum_over_gaap_epl(colname_epl, t);
+	}		
+#endif
+}
+
+// include results from independent model points
+if (seg_element->seriatim_totals.size() > 0)
+	{
+	int cohort_col = getElementNumber(0); 
+	pair<xstring,seriatim_type> name_pair = make_pair(colname, prod_sfas97rd);
+	map <pair<xstring,seriatim_type>, SmartArray< SmartArray< SmartArray<double> > > >::iterator totals_it = seg_element->seriatim_totals.find(name_pair);
+
+	if(totals_it != seg_element->seriatim_totals.end())
+		total += totals_it->second[cohort_col][reins_flag][t];
+	}
+return total;
+}
+
+
+
+#line 1 "sum_over_gaap_epl.SFAS97RD_GAAP.for"                                                                                   
+double SFAS97RD_GAAP::sum_over_gaap_epl(const xstring & colname, const int t)
+{
+double total = 0.0;
+int mp = 0;
+int colnum = 0;
+map <int, long, less <int> >::iterator mp_map_iter;
+
+{
+//for EPL file
+#if defined(__EPL_LIAB_H_) && defined(__AA_COMP_COMP_H_)
+if (epl_mp_map.size())
+	{
+	colnum = liab->sm_epl[0]->Column(colname).Number();				
 
 	if (colnum < 0)
 		throw FatalError("Column not included in application. Please check column names passed into 'sum_over_gaap' "
@@ -13921,26 +11890,26 @@ if (epl_mp_map.size())
 		     mp_map_iter++)
 			{
 			mp = mp_map_iter->first;		
-			current_epl_element = liab->sm_epl[mp];
 			
-			if (t < current_epl_element->commencement_period
-				|| t > current_epl_element->maturity_period)
+			if (t < liab->sm_epl[mp]->commencement_period
+				|| t > liab->sm_epl[mp]->maturity_period)
 				continue;
 
-			total += current_epl_element->Column(colnum).Value(t);
+			total += liab->sm_epl[mp]->Column(colnum).Value(t);
 			}		
 		}
 	}		
 #endif
+}
 
 // include results from independent model points
-if (seg->seriatim_totals.size() > 0)
+if (seg_element->seriatim_totals.size() > 0)
 	{
 	int cohort_col = getElementNumber(0); 
 	pair<xstring,seriatim_type> name_pair = make_pair(colname, prod_sfas97rd);
-	seriatim_map::iterator totals_it = seg->seriatim_totals.find(name_pair);
+	map <pair<xstring,seriatim_type>, SmartArray< SmartArray< SmartArray<double> > > >::iterator totals_it = seg_element->seriatim_totals.find(name_pair);
 
-	if(totals_it != seg->seriatim_totals.end())
+	if(totals_it != seg_element->seriatim_totals.end())
 		total += totals_it->second[cohort_col][reins_flag][t];
 	}
 return total;
@@ -13986,122 +11955,90 @@ if (!sfas97rd_state_of_world_financial_output.is_open())
 	// Write header
 	sfas97rd_state_of_world_financial_output // 37 columns
 	<< "group" << ","           
-	<< "dac_acq_exp" << ","     
-	<< "dac_acq_exp_loss_rec" << "," 
-	<< "capzd_acq_exp_accum" << "," 
-	<< "capzd_acq_exp_accum_loss_rec_int_rate" << "," 
-	<< "dac_acq_exp_loss_rec_accum" << "," 
-	<< "dac_comm" << ","        
-	<< "dac_comm_loss_rec" << ","   
-	<< "capzd_comm_accum" << ","    
-	<< "capzd_comm_accum_loss_rec_int_rate" << ","    
-	<< "dac_comm_loss_rec_accum" << "," 
-	<< "dac_prem_bonus" << ","       
-	<< "dac_prem_bonus_loss_rec" << ","  
-	<< "capzd_prem_bonus_accum" << ","   
-	<< "capzd_prem_bonus_accum_loss_rec_int_rate" << ","   
-	<< "dac_prem_bonus_loss_rec_accum" << "," 
+	<< "dac_acq_exp" << ","    
+	<< "dac_acq_exp_sch" << ","  
+	<< "dac_comm" << ","     
+	<< "dac_comm_sch" << ","   
+	<< "dac_prem_bonus" << ","     
+	<< "dac_prem_bonus_sch" << ","    
 	<< "egp_accum" << ","         
-	<< "egp_accum_loss_rec_int_rate" << ","         
 	<< "sop031_assess_accum" << ","    
 	<< "sop031_gmdb_ben_accum" << ","    
-	<< "sop031_gmib_ben_accum" << ","    
-	<< "sop031_gmwb_ben_accum" << ","    
 	<< "sop031_pbr_accum" << ","       
 	<< "deferred_loads_accum" << ","   
-	<< "unearn_rev_liab" << ","        
-	<< "dac_reins_yrt_asset" << ","    
-	<< "reins_yrt_cost_accum" << ","   
+	<< "unearn_rev_liab" << ","   
+	<< "unearn_rev_liab_sch" << ","       
+	<< "dac_reins_yrt_asset" << ","  
+	<< "dac_reins_yrt_asset_sch" << ","   
 	<< "sop031_pbr_fund_val_accum" << ","  
 	<< "embed_deriv_val" << ","      
-	<< "sfas133_gmab_liab" << ","    
-	<< "sfas133_gmib_liab" << ","    
-	<< "sfas133_gmwb_liab" << ","    
+	<< "mrb_gmab_liab" << ","    
+	<< "mrb_gmib_liab" << ","    
+	<< "mrb_gmwb_liab" << ","   
+	<< "mrb_gmdb_liab" << ","   
 	<< "sop031_ulsg_ben_accum" << ","  
-	<< "sop031_gmdb_br" << ","       
-	<< "sop031_gmib_br" << ","       
-	<< "sop031_gmwb_br" << ","       
+	<< "sop031_gmdb_br" << ","             
 	<< "sop031_pbr_liab" << ","      
-	<< "sop031_ulsg_br" << endl;      
+	<< "sop031_ulsg_br" << ","  
+	<< "policies_inf_sch" << endl;    
 	}
 
+xstring group_name = get_base_group_name(group, true);
 double dac_acq_exp = this->dac_acq_exp(last_proj_period);
-double dac_acq_exp_loss_rec = this->dac_acq_exp_loss_rec(last_proj_period);
-double capzd_acq_exp_accum = this->capzd_acq_exp_accum(last_proj_period);
-double capzd_acq_exp_accum_loss_rec_int_rate = this->capzd_acq_exp_accum_loss_rec_int_rate(last_proj_period);
-double dac_acq_exp_loss_rec_accum = this->dac_acq_exp_loss_rec_accum(last_proj_period);
+double dac_acq_exp_sch = this->dac_acq_exp_sch(last_proj_period);
 double dac_comm = this->dac_comm(last_proj_period);
-double dac_comm_loss_rec = this->dac_comm_loss_rec(last_proj_period);
-double capzd_comm_accum = this->capzd_comm_accum(last_proj_period);
-double capzd_comm_accum_loss_rec_int_rate = this->capzd_comm_accum_loss_rec_int_rate(last_proj_period);
-double dac_comm_loss_rec_accum = this->dac_comm_loss_rec_accum(last_proj_period);
+double dac_comm_sch = this->dac_comm_sch(last_proj_period);
 double dac_prem_bonus = this->dac_prem_bonus(last_proj_period);
-double dac_prem_bonus_loss_res = this->dac_prem_bonus_loss_rec(last_proj_period);
-double capzd_prem_bonus_accum = this->capzd_prem_bonus_accum(last_proj_period);
-double capzd_prem_bonus_accum_loss_rec_int_rate = this->capzd_prem_bonus_accum_loss_rec_int_rate(last_proj_period);
-double dac_prem_bonus_loss_rec_accum = this->dac_prem_bonus_loss_rec_accum(last_proj_period);
+double dac_prem_bonus_sch = this->dac_prem_bonus_sch(last_proj_period);
 double egp_accum = this->egp_accum(last_proj_period);
-double egp_accum_loss_rec_int_rate = this->egp_accum_loss_rec_int_rate(last_proj_period);
 double sop031_assess_accum = this->sop031_assess_accum(last_proj_period);
 double sop031_gmdb_ben_accum = this->sop031_gmdb_ben_accum(last_proj_period);
-double sop031_gmib_ben_accum = this->sop031_gmib_ben_accum(last_proj_period);
-double sop031_gmwb_ben_accum = this->sop031_gmwb_ben_accum(last_proj_period);
 double sop031_pbr_accum = this->sop031_pbr_accum(last_proj_period);
 double deferred_loads_accum = this->deferred_loads_accum(last_proj_period);
 double unearn_rev_liab = this->unearn_rev_liab(last_proj_period);
+double unearn_rev_liab_sch = this->unearn_rev_liab_sch(last_proj_period);
 double dac_reins_yrt_asset = this->dac_reins_yrt_asset(last_proj_period);
-double reins_yrt_cost_accum = this->reins_yrt_cost_accum(last_proj_period);
+double dac_reins_yrt_asset_sch = this->dac_reins_yrt_asset_sch(last_proj_period);
 double sop031_pbr_fund_val_accum = this->sop031_pbr_fund_val_accum(last_proj_period);
 double embed_deriv_val = this->embed_deriv_val(last_proj_period);
-double sfas133_gmab_liab = this->sfas133_gmab_liab(last_proj_period); 
-double sfas133_gmib_liab = this->sfas133_gmib_liab(last_proj_period); 
-double sfas133_gmwb_liab = this->sfas133_gmwb_liab(last_proj_period); 
+double mrb_gmab_liab = this->mrb_gmab_liab(last_proj_period); 
+double mrb_gmib_liab = this->mrb_gmib_liab(last_proj_period); 
+double mrb_gmwb_liab = this->mrb_gmwb_liab(last_proj_period); 
+double mrb_gmdb_liab = this->mrb_gmdb_liab(last_proj_period); 
 double sop031_ulsg_ben_accum = this->sop031_ulsg_ben_accum(last_proj_period);
 double sop031_gmdb_br = this->sop031_gmdb_br(last_proj_period); 
-double sop031_gmib_br = this->sop031_gmib_br(last_proj_period); 
-double sop031_gmwb_br = this->sop031_gmwb_br(last_proj_period); 
 double sop031_pbr_liab = this->sop031_pbr_liab(last_proj_period); 
 double sop031_ulsg_br = this->sop031_ulsg_br(last_proj_period); 
+double policies_inf_sch = this->policies_inf_sch(last_proj_period); 
 
 sfas97rd_state_of_world_financial_output
-<< group << ","
+<< group_name << ","
 << dac_acq_exp << ","
-<< dac_acq_exp_loss_rec << ","
-<< capzd_acq_exp_accum << ","
-<< capzd_acq_exp_accum_loss_rec_int_rate << ","
-<< dac_acq_exp_loss_rec_accum << ","
+<< dac_acq_exp_sch << ","
 << dac_comm << ","
-<< dac_comm_loss_rec << ","
-<< capzd_comm_accum << ","
-<< capzd_comm_accum_loss_rec_int_rate << ","
-<< dac_comm_loss_rec_accum << ","
+<< dac_comm_sch << ","
 << dac_prem_bonus << ","
-<< dac_prem_bonus_loss_res << ","
-<< capzd_prem_bonus_accum << ","
-<< capzd_prem_bonus_accum_loss_rec_int_rate << ","
-<< dac_prem_bonus_loss_rec_accum << ","
+<< dac_prem_bonus_sch << ","
 << egp_accum << ","
-<< egp_accum_loss_rec_int_rate << ","
 << sop031_assess_accum << ","
 << sop031_gmdb_ben_accum << ","
-<< sop031_gmib_ben_accum << ","
-<< sop031_gmwb_ben_accum << ","
 << sop031_pbr_accum << ","
 << deferred_loads_accum << ","
 << unearn_rev_liab << ","
+<< unearn_rev_liab_sch << ","
 << dac_reins_yrt_asset << ","
-<< reins_yrt_cost_accum << ","
+<< dac_reins_yrt_asset_sch << ","
 << sop031_pbr_fund_val_accum << ","
 << embed_deriv_val << ","
-<< sfas133_gmab_liab << ","
-<< sfas133_gmib_liab << ","
-<< sfas133_gmwb_liab << ","
+<< mrb_gmab_liab << ","
+<< mrb_gmib_liab << ","
+<< mrb_gmwb_liab << ","
+<< mrb_gmdb_liab << ","
 << sop031_ulsg_ben_accum << ","
 << sop031_gmdb_br << ","
-<< sop031_gmib_br << ","
-<< sop031_gmwb_br << ","
 << sop031_pbr_liab << ","
-<< sop031_ulsg_br << endl;
+<< sop031_ulsg_br << ","
+<< policies_inf_sch << endl;
 
 return;
 }
@@ -14146,415 +12083,345 @@ const CashFlowCommonData SFAS97RD_GAAP::mCFStaticData_0[] =
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_acq_exp, 'B','Y', '3', 'P', (size_t)&modelOffset->acq_exp),
 	CashFlowCommonData(2, "agp", "sfas97rd_gaap_agp",  "agp",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_agp, 'E','N', '3', 'P', (size_t)&modelOffset->agp),
-	CashFlowCommonData(3, "amortzn_int_rate", "sfas97rd_gaap_amortzn_int_rate",  "amortzn_int_rate",  CashFlowCommonData::AVG,
+	CashFlowCommonData(3, "agp_history", "sfas97rd_gaap_agp_history",  "agp_history",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_agp_history, 'E','N', '3', 'P', (size_t)&modelOffset->agp_history),
+	CashFlowCommonData(4, "amortzn_int_rate", "sfas97rd_gaap_amortzn_int_rate",  "amortzn_int_rate",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_amortzn_int_rate, 'E','N', '3', 'P', (size_t)&modelOffset->amortzn_int_rate),
-	CashFlowCommonData(4, "cal_mth", "sfas97rd_gaap_cal_mth",  "cal_mth",  CashFlowCommonData::AVG,
+	CashFlowCommonData(5, "cal_mth", "sfas97rd_gaap_cal_mth",  "cal_mth",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_cal_mth, 'E','N', '3', 'C', (size_t)&modelOffset->cal_mth),
-	CashFlowCommonData(5, "cal_yr", "sfas97rd_gaap_cal_yr",  "cal_yr",  CashFlowCommonData::AVG,
+	CashFlowCommonData(6, "cal_yr", "sfas97rd_gaap_cal_yr",  "cal_yr",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_cal_yr, 'E','N', '3', 'C', (size_t)&modelOffset->cal_yr),
-	CashFlowCommonData(6, "cal_yr_relative", "sfas97rd_gaap_cal_yr_relative",  "cal_yr_relative",  CashFlowCommonData::AVG,
+	CashFlowCommonData(7, "cal_yr_relative", "sfas97rd_gaap_cal_yr_relative",  "cal_yr_relative",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_cal_yr_relative, 'E','N', '3', 'C', (size_t)&modelOffset->cal_yr_relative),
-	CashFlowCommonData(7, "cap_gain", "sfas97rd_gaap_cap_gain",  "cap_gain",  CashFlowCommonData::SUM,
+	CashFlowCommonData(8, "cap_gain", "sfas97rd_gaap_cap_gain",  "cap_gain",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_cap_gain, 'E','Y', '3', 'P', (size_t)&modelOffset->cap_gain),
-	CashFlowCommonData(8, "cap_gain_fund", "sfas97rd_gaap_cap_gain_fund",  "cap_gain_fund",  CashFlowCommonData::SUM,
+	CashFlowCommonData(9, "cap_gain_fund", "sfas97rd_gaap_cap_gain_fund",  "cap_gain_fund",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_cap_gain_fund, 'E','N', '3', 'P', (size_t)&modelOffset->cap_gain_fund),
-	CashFlowCommonData(9, "capzd_acq_exp", "sfas97rd_gaap_capzd_acq_exp",  "capzd_acq_exp",  CashFlowCommonData::SUM,
+	CashFlowCommonData(10, "capzd_acq_exp", "sfas97rd_gaap_capzd_acq_exp",  "capzd_acq_exp",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_capzd_acq_exp, 'B','Y', '3', 'P', (size_t)&modelOffset->capzd_acq_exp),
-	CashFlowCommonData(10, "capzd_acq_exp_accum", "sfas97rd_gaap_capzd_acq_exp_accum",  "capzd_acq_exp_accum",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_capzd_acq_exp_accum, 'E','N', '3', 'P', (size_t)&modelOffset->capzd_acq_exp_accum),
-	CashFlowCommonData(11, "capzd_acq_exp_accum_loss_rec_int_rate", "sfas97rd_gaap_capzd_acq_exp_accum_loss_rec_int_rate",  "capzd_acq_exp_accum_loss_rec_int_rate",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_capzd_acq_exp_accum_loss_rec_int_rate, 'E','N', '3', 'P', (size_t)&modelOffset->capzd_acq_exp_accum_loss_rec_int_rate),
-	CashFlowCommonData(12, "capzd_acq_exp_pv", "sfas97rd_gaap_capzd_acq_exp_pv",  "capzd_acq_exp_pv",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_capzd_acq_exp_pv, 'E','N', '3', 'P', (size_t)&modelOffset->capzd_acq_exp_pv),
-	CashFlowCommonData(13, "capzd_acq_exp_pv_loss_rec_int_rate", "sfas97rd_gaap_capzd_acq_exp_pv_loss_rec_int_rate",  "capzd_acq_exp_pv_loss_rec_int_rate",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_capzd_acq_exp_pv_loss_rec_int_rate, 'E','N', '3', 'P', (size_t)&modelOffset->capzd_acq_exp_pv_loss_rec_int_rate),
-	CashFlowCommonData(14, "capzd_comm_accum", "sfas97rd_gaap_capzd_comm_accum",  "capzd_comm_accum",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_capzd_comm_accum, 'E','N', '3', 'P', (size_t)&modelOffset->capzd_comm_accum),
-	CashFlowCommonData(15, "capzd_comm_accum_loss_rec_int_rate", "sfas97rd_gaap_capzd_comm_accum_loss_rec_int_rate",  "capzd_comm_accum_loss_rec_int_rate",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_capzd_comm_accum_loss_rec_int_rate, 'E','N', '3', 'P', (size_t)&modelOffset->capzd_comm_accum_loss_rec_int_rate),
-	CashFlowCommonData(16, "capzd_comm_bom", "sfas97rd_gaap_capzd_comm_bom",  "capzd_comm_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(11, "capzd_comm_bom", "sfas97rd_gaap_capzd_comm_bom",  "capzd_comm_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_capzd_comm_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->capzd_comm_bom),
-	CashFlowCommonData(17, "capzd_comm_chargeback", "sfas97rd_gaap_capzd_comm_chargeback",  "capzd_comm_chargeback",  CashFlowCommonData::SUM,
+	CashFlowCommonData(12, "capzd_comm_chargeback", "sfas97rd_gaap_capzd_comm_chargeback",  "capzd_comm_chargeback",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_capzd_comm_chargeback, 'E','N', '3', 'P', (size_t)&modelOffset->capzd_comm_chargeback),
-	CashFlowCommonData(18, "capzd_comm_eom", "sfas97rd_gaap_capzd_comm_eom",  "capzd_comm_eom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(13, "capzd_comm_eom", "sfas97rd_gaap_capzd_comm_eom",  "capzd_comm_eom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_capzd_comm_eom, 'E','Y', '3', 'P', (size_t)&modelOffset->capzd_comm_eom),
-	CashFlowCommonData(19, "capzd_comm_pv", "sfas97rd_gaap_capzd_comm_pv",  "capzd_comm_pv",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_capzd_comm_pv, 'E','N', '3', 'P', (size_t)&modelOffset->capzd_comm_pv),
-	CashFlowCommonData(20, "capzd_comm_pv_loss_rec_int_rate", "sfas97rd_gaap_capzd_comm_pv_loss_rec_int_rate",  "capzd_comm_pv_loss_rec_int_rate",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_capzd_comm_pv_loss_rec_int_rate, 'E','N', '3', 'P', (size_t)&modelOffset->capzd_comm_pv_loss_rec_int_rate),
-	CashFlowCommonData(21, "capzd_prem_bonus", "sfas97rd_gaap_capzd_prem_bonus",  "capzd_prem_bonus",  CashFlowCommonData::SUM,
+	CashFlowCommonData(14, "capzd_prem_bonus", "sfas97rd_gaap_capzd_prem_bonus",  "capzd_prem_bonus",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_capzd_prem_bonus, 'B','Y', '3', 'P', (size_t)&modelOffset->capzd_prem_bonus),
-	CashFlowCommonData(22, "capzd_prem_bonus_accum", "sfas97rd_gaap_capzd_prem_bonus_accum",  "capzd_prem_bonus_accum",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_capzd_prem_bonus_accum, 'E','N', '3', 'P', (size_t)&modelOffset->capzd_prem_bonus_accum),
-	CashFlowCommonData(23, "capzd_prem_bonus_accum_loss_rec_int_rate", "sfas97rd_gaap_capzd_prem_bonus_accum_loss_rec_int_rate",  "capzd_prem_bonus_accum_loss_rec_int_rate",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_capzd_prem_bonus_accum_loss_rec_int_rate, 'E','N', '3', 'P', (size_t)&modelOffset->capzd_prem_bonus_accum_loss_rec_int_rate),
-	CashFlowCommonData(24, "capzd_prem_bonus_pv", "sfas97rd_gaap_capzd_prem_bonus_pv",  "capzd_prem_bonus_pv",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_capzd_prem_bonus_pv, 'E','N', '3', 'P', (size_t)&modelOffset->capzd_prem_bonus_pv),
-	CashFlowCommonData(25, "capzd_prem_bonus_pv_loss_rec_int_rate", "sfas97rd_gaap_capzd_prem_bonus_pv_loss_rec_int_rate",  "capzd_prem_bonus_pv_loss_rec_int_rate",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_capzd_prem_bonus_pv_loss_rec_int_rate, 'E','N', '3', 'P', (size_t)&modelOffset->capzd_prem_bonus_pv_loss_rec_int_rate),
-	CashFlowCommonData(26, "capzd_reins_yrt_cost", "sfas97rd_gaap_capzd_reins_yrt_cost",  "capzd_reins_yrt_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(15, "capzd_reins_yrt_cost", "sfas97rd_gaap_capzd_reins_yrt_cost",  "capzd_reins_yrt_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_capzd_reins_yrt_cost, 'E','N', '3', 'P', (size_t)&modelOffset->capzd_reins_yrt_cost),
-	CashFlowCommonData(27, "cash_flow_bom", "sfas97rd_gaap_cash_flow_bom",  "cash_flow_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(16, "cash_flow_bom", "sfas97rd_gaap_cash_flow_bom",  "cash_flow_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_cash_flow_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->cash_flow_bom),
-	CashFlowCommonData(28, "cash_flow_int", "sfas97rd_gaap_cash_flow_int",  "cash_flow_int",  CashFlowCommonData::SUM,
+	CashFlowCommonData(17, "cash_flow_int", "sfas97rd_gaap_cash_flow_int",  "cash_flow_int",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_cash_flow_int, 'B','Y', '3', 'P', (size_t)&modelOffset->cash_flow_int),
-	CashFlowCommonData(29, "charges", "sfas97rd_gaap_charges",  "charges",  CashFlowCommonData::SUM,
+	CashFlowCommonData(18, "charges", "sfas97rd_gaap_charges",  "charges",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_charges, 'B','Y', '3', 'P', (size_t)&modelOffset->charges),
-	CashFlowCommonData(30, "comm_chargeback", "sfas97rd_gaap_comm_chargeback",  "comm_chargeback",  CashFlowCommonData::SUM,
+	CashFlowCommonData(19, "comm_chargeback", "sfas97rd_gaap_comm_chargeback",  "comm_chargeback",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_comm_chargeback, 'E','Y', '3', 'P', (size_t)&modelOffset->comm_chargeback),
-	CashFlowCommonData(31, "comm_excess_bom", "sfas97rd_gaap_comm_excess_bom",  "comm_excess_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(20, "comm_excess_bom", "sfas97rd_gaap_comm_excess_bom",  "comm_excess_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_comm_excess_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->comm_excess_bom),
-	CashFlowCommonData(32, "comm_excess_eom", "sfas97rd_gaap_comm_excess_eom",  "comm_excess_eom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(21, "comm_excess_eom", "sfas97rd_gaap_comm_excess_eom",  "comm_excess_eom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_comm_excess_eom, 'E','Y', '3', 'P', (size_t)&modelOffset->comm_excess_eom),
-	CashFlowCommonData(33, "comm_trail_bom", "sfas97rd_gaap_comm_trail_bom",  "comm_trail_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(22, "comm_trail_bom", "sfas97rd_gaap_comm_trail_bom",  "comm_trail_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_comm_trail_bom, 'B','Y', '3', 'P', (size_t)&modelOffset->comm_trail_bom),
-	CashFlowCommonData(34, "comm_trail_eom", "sfas97rd_gaap_comm_trail_eom",  "comm_trail_eom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(23, "comm_trail_eom", "sfas97rd_gaap_comm_trail_eom",  "comm_trail_eom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_comm_trail_eom, 'E','Y', '3', 'P', (size_t)&modelOffset->comm_trail_eom),
-	CashFlowCommonData(35, "credited_int", "sfas97rd_gaap_credited_int",  "credited_int",  CashFlowCommonData::SUM,
+	CashFlowCommonData(24, "credited_int", "sfas97rd_gaap_credited_int",  "credited_int",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_credited_int, 'E','Y', '3', 'C', (size_t)&modelOffset->credited_int),
-	CashFlowCommonData(36, "dac_acq_exp", "sfas97rd_gaap_dac_acq_exp",  "dac_acq_exp",  CashFlowCommonData::SUM,
+	CashFlowCommonData(25, "dac_acq_exp", "sfas97rd_gaap_dac_acq_exp",  "dac_acq_exp",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_dac_acq_exp, 'E','N', '3', 'P', (size_t)&modelOffset->dac_acq_exp),
-	CashFlowCommonData(37, "dac_acq_exp_amortzn", "sfas97rd_gaap_dac_acq_exp_amortzn",  "dac_acq_exp_amortzn",  CashFlowCommonData::SUM,
+	CashFlowCommonData(26, "dac_acq_exp_amortzn", "sfas97rd_gaap_dac_acq_exp_amortzn",  "dac_acq_exp_amortzn",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_dac_acq_exp_amortzn, 'E','N', '3', 'P', (size_t)&modelOffset->dac_acq_exp_amortzn),
-	CashFlowCommonData(38, "dac_acq_exp_incr", "sfas97rd_gaap_dac_acq_exp_incr",  "dac_acq_exp_incr",  CashFlowCommonData::SUM,
+	CashFlowCommonData(27, "dac_acq_exp_incr", "sfas97rd_gaap_dac_acq_exp_incr",  "dac_acq_exp_incr",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_dac_acq_exp_incr, 'E','Y', '3', 'P', (size_t)&modelOffset->dac_acq_exp_incr),
-	CashFlowCommonData(39, "dac_acq_exp_int", "sfas97rd_gaap_dac_acq_exp_int",  "dac_acq_exp_int",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_dac_acq_exp_int, 'E','N', '3', 'P', (size_t)&modelOffset->dac_acq_exp_int),
-	CashFlowCommonData(40, "dac_acq_exp_loss_rec", "sfas97rd_gaap_dac_acq_exp_loss_rec",  "dac_acq_exp_loss_rec",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_dac_acq_exp_loss_rec, 'E','Y', '3', 'P', (size_t)&modelOffset->dac_acq_exp_loss_rec),
-	CashFlowCommonData(41, "dac_acq_exp_loss_rec_accum", "sfas97rd_gaap_dac_acq_exp_loss_rec_accum",  "dac_acq_exp_loss_rec_accum",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_dac_acq_exp_loss_rec_accum, 'E','N', '3', 'P', (size_t)&modelOffset->dac_acq_exp_loss_rec_accum),
-	CashFlowCommonData(42, "dac_acq_exp_loss_rec_hist_accum", "sfas97rd_gaap_dac_acq_exp_loss_rec_hist_accum",  "dac_acq_exp_loss_rec_hist_accum",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_dac_acq_exp_loss_rec_hist_accum, 'E','N', '3', 'P', (size_t)&modelOffset->dac_acq_exp_loss_rec_hist_accum),
-	CashFlowCommonData(43, "dac_acq_exp_sch", "sfas97rd_gaap_dac_acq_exp_sch",  "dac_acq_exp_sch",  CashFlowCommonData::SUM,
+	CashFlowCommonData(28, "dac_acq_exp_sch", "sfas97rd_gaap_dac_acq_exp_sch",  "dac_acq_exp_sch",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_dac_acq_exp_sch, 'E','N', '3', 'P', (size_t)&modelOffset->dac_acq_exp_sch),
-	CashFlowCommonData(44, "dac_comm", "sfas97rd_gaap_dac_comm",  "dac_comm",  CashFlowCommonData::SUM,
+	CashFlowCommonData(29, "dac_comm", "sfas97rd_gaap_dac_comm",  "dac_comm",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_dac_comm, 'E','N', '3', 'P', (size_t)&modelOffset->dac_comm),
-	CashFlowCommonData(45, "dac_comm_amortzn", "sfas97rd_gaap_dac_comm_amortzn",  "dac_comm_amortzn",  CashFlowCommonData::SUM,
+	CashFlowCommonData(30, "dac_comm_amortzn", "sfas97rd_gaap_dac_comm_amortzn",  "dac_comm_amortzn",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_dac_comm_amortzn, 'E','N', '3', 'P', (size_t)&modelOffset->dac_comm_amortzn),
-	CashFlowCommonData(46, "dac_comm_incr", "sfas97rd_gaap_dac_comm_incr",  "dac_comm_incr",  CashFlowCommonData::SUM,
+	CashFlowCommonData(31, "dac_comm_incr", "sfas97rd_gaap_dac_comm_incr",  "dac_comm_incr",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_dac_comm_incr, 'E','Y', '3', 'P', (size_t)&modelOffset->dac_comm_incr),
-	CashFlowCommonData(47, "dac_comm_int", "sfas97rd_gaap_dac_comm_int",  "dac_comm_int",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_dac_comm_int, 'E','N', '3', 'P', (size_t)&modelOffset->dac_comm_int),
-	CashFlowCommonData(48, "dac_comm_loss_rec", "sfas97rd_gaap_dac_comm_loss_rec",  "dac_comm_loss_rec",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_dac_comm_loss_rec, 'E','Y', '3', 'P', (size_t)&modelOffset->dac_comm_loss_rec),
-	CashFlowCommonData(49, "dac_comm_loss_rec_accum", "sfas97rd_gaap_dac_comm_loss_rec_accum",  "dac_comm_loss_rec_accum",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_dac_comm_loss_rec_accum, 'E','N', '3', 'P', (size_t)&modelOffset->dac_comm_loss_rec_accum),
-	CashFlowCommonData(50, "dac_comm_loss_rec_hist_accum", "sfas97rd_gaap_dac_comm_loss_rec_hist_accum",  "dac_comm_loss_rec_hist_accum",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_dac_comm_loss_rec_hist_accum, 'E','N', '3', 'P', (size_t)&modelOffset->dac_comm_loss_rec_hist_accum),
-	CashFlowCommonData(51, "dac_comm_sch", "sfas97rd_gaap_dac_comm_sch",  "dac_comm_sch",  CashFlowCommonData::SUM,
+	CashFlowCommonData(32, "dac_comm_sch", "sfas97rd_gaap_dac_comm_sch",  "dac_comm_sch",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_dac_comm_sch, 'E','N', '3', 'P', (size_t)&modelOffset->dac_comm_sch),
-	CashFlowCommonData(52, "dac_incr", "sfas97rd_gaap_dac_incr",  "dac_incr",  CashFlowCommonData::SUM,
+	CashFlowCommonData(33, "dac_incr", "sfas97rd_gaap_dac_incr",  "dac_incr",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_dac_incr, 'E','Y', '3', 'P', (size_t)&modelOffset->dac_incr),
-	CashFlowCommonData(53, "dac_prem_bonus", "sfas97rd_gaap_dac_prem_bonus",  "dac_prem_bonus",  CashFlowCommonData::SUM,
+	CashFlowCommonData(34, "dac_prem_bonus", "sfas97rd_gaap_dac_prem_bonus",  "dac_prem_bonus",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_dac_prem_bonus, 'E','N', '3', 'P', (size_t)&modelOffset->dac_prem_bonus),
-	CashFlowCommonData(54, "dac_prem_bonus_amortzn", "sfas97rd_gaap_dac_prem_bonus_amortzn",  "dac_prem_bonus_amortzn",  CashFlowCommonData::SUM,
+	CashFlowCommonData(35, "dac_prem_bonus_amortzn", "sfas97rd_gaap_dac_prem_bonus_amortzn",  "dac_prem_bonus_amortzn",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_dac_prem_bonus_amortzn, 'E','N', '3', 'P', (size_t)&modelOffset->dac_prem_bonus_amortzn),
-	CashFlowCommonData(55, "dac_prem_bonus_incr", "sfas97rd_gaap_dac_prem_bonus_incr",  "dac_prem_bonus_incr",  CashFlowCommonData::SUM,
+	CashFlowCommonData(36, "dac_prem_bonus_incr", "sfas97rd_gaap_dac_prem_bonus_incr",  "dac_prem_bonus_incr",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_dac_prem_bonus_incr, 'E','Y', '3', 'P', (size_t)&modelOffset->dac_prem_bonus_incr),
-	CashFlowCommonData(56, "dac_prem_bonus_int", "sfas97rd_gaap_dac_prem_bonus_int",  "dac_prem_bonus_int",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_dac_prem_bonus_int, 'E','N', '3', 'P', (size_t)&modelOffset->dac_prem_bonus_int),
-	CashFlowCommonData(57, "dac_prem_bonus_loss_rec", "sfas97rd_gaap_dac_prem_bonus_loss_rec",  "dac_prem_bonus_loss_rec",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_dac_prem_bonus_loss_rec, 'E','Y', '3', 'P', (size_t)&modelOffset->dac_prem_bonus_loss_rec),
-	CashFlowCommonData(58, "dac_prem_bonus_loss_rec_accum", "sfas97rd_gaap_dac_prem_bonus_loss_rec_accum",  "dac_prem_bonus_loss_rec_accum",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_dac_prem_bonus_loss_rec_accum, 'E','N', '3', 'P', (size_t)&modelOffset->dac_prem_bonus_loss_rec_accum),
-	CashFlowCommonData(59, "dac_prem_bonus_loss_rec_hist_accum", "sfas97rd_gaap_dac_prem_bonus_loss_rec_hist_accum",  "dac_prem_bonus_loss_rec_hist_accum",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_dac_prem_bonus_loss_rec_hist_accum, 'E','N', '3', 'P', (size_t)&modelOffset->dac_prem_bonus_loss_rec_hist_accum),
-	CashFlowCommonData(60, "dac_prem_bonus_sch", "sfas97rd_gaap_dac_prem_bonus_sch",  "dac_prem_bonus_sch",  CashFlowCommonData::SUM,
+	CashFlowCommonData(37, "dac_prem_bonus_sch", "sfas97rd_gaap_dac_prem_bonus_sch",  "dac_prem_bonus_sch",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_dac_prem_bonus_sch, 'E','N', '3', 'P', (size_t)&modelOffset->dac_prem_bonus_sch),
-	CashFlowCommonData(61, "dac_reins_yrt_asset", "sfas97rd_gaap_dac_reins_yrt_asset",  "dac_reins_yrt_asset",  CashFlowCommonData::SUM,
+	CashFlowCommonData(38, "dac_reins_yrt_asset", "sfas97rd_gaap_dac_reins_yrt_asset",  "dac_reins_yrt_asset",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_dac_reins_yrt_asset, 'E','N', '3', 'P', (size_t)&modelOffset->dac_reins_yrt_asset),
-	CashFlowCommonData(62, "dac_reins_yrt_asset_amortzn", "sfas97rd_gaap_dac_reins_yrt_asset_amortzn",  "dac_reins_yrt_asset_amortzn",  CashFlowCommonData::SUM,
+	CashFlowCommonData(39, "dac_reins_yrt_asset_amortzn", "sfas97rd_gaap_dac_reins_yrt_asset_amortzn",  "dac_reins_yrt_asset_amortzn",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_dac_reins_yrt_asset_amortzn, 'E','N', '3', 'P', (size_t)&modelOffset->dac_reins_yrt_asset_amortzn),
-	CashFlowCommonData(63, "dac_reins_yrt_asset_incr", "sfas97rd_gaap_dac_reins_yrt_asset_incr",  "dac_reins_yrt_asset_incr",  CashFlowCommonData::SUM,
+	CashFlowCommonData(40, "dac_reins_yrt_asset_incr", "sfas97rd_gaap_dac_reins_yrt_asset_incr",  "dac_reins_yrt_asset_incr",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_dac_reins_yrt_asset_incr, 'E','Y', '3', 'P', (size_t)&modelOffset->dac_reins_yrt_asset_incr),
-	CashFlowCommonData(64, "dac_reins_yrt_asset_int", "sfas97rd_gaap_dac_reins_yrt_asset_int",  "dac_reins_yrt_asset_int",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_dac_reins_yrt_asset_int, 'E','N', '3', 'P', (size_t)&modelOffset->dac_reins_yrt_asset_int),
-	CashFlowCommonData(65, "dac_reins_yrt_asset_sch", "sfas97rd_gaap_dac_reins_yrt_asset_sch",  "dac_reins_yrt_asset_sch",  CashFlowCommonData::SUM,
+	CashFlowCommonData(41, "dac_reins_yrt_asset_sch", "sfas97rd_gaap_dac_reins_yrt_asset_sch",  "dac_reins_yrt_asset_sch",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_dac_reins_yrt_asset_sch, 'E','N', '3', 'P', (size_t)&modelOffset->dac_reins_yrt_asset_sch),
-	CashFlowCommonData(66, "date", "sfas97rd_gaap_date",  "date",  CashFlowCommonData::SUM,
+	CashFlowCommonData(42, "date", "sfas97rd_gaap_date",  "date",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_date, 'E','N', '3', 'P', (size_t)&modelOffset->date),
-	CashFlowCommonData(67, "deferred_loads", "sfas97rd_gaap_deferred_loads",  "deferred_loads",  CashFlowCommonData::SUM,
+	CashFlowCommonData(43, "deferred_loads", "sfas97rd_gaap_deferred_loads",  "deferred_loads",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_deferred_loads, 'E','N', '3', 'P', (size_t)&modelOffset->deferred_loads),
-	CashFlowCommonData(68, "deferred_loads_accum", "sfas97rd_gaap_deferred_loads_accum",  "deferred_loads_accum",  CashFlowCommonData::SUM,
+	CashFlowCommonData(44, "deferred_loads_accum", "sfas97rd_gaap_deferred_loads_accum",  "deferred_loads_accum",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_deferred_loads_accum, 'E','N', '3', 'P', (size_t)&modelOffset->deferred_loads_accum),
-	CashFlowCommonData(69, "deferred_loads_pv", "sfas97rd_gaap_deferred_loads_pv",  "deferred_loads_pv",  CashFlowCommonData::SUM,
+	CashFlowCommonData(45, "deferred_loads_history", "sfas97rd_gaap_deferred_loads_history",  "deferred_loads_history",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_deferred_loads_history, 'E','N', '3', 'P', (size_t)&modelOffset->deferred_loads_history),
+	CashFlowCommonData(46, "deferred_loads_pv", "sfas97rd_gaap_deferred_loads_pv",  "deferred_loads_pv",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_deferred_loads_pv, 'E','N', '3', 'P', (size_t)&modelOffset->deferred_loads_pv),
-	CashFlowCommonData(70, "dth_claim_cost", "sfas97rd_gaap_dth_claim_cost",  "dth_claim_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(47, "dth_claim_cost", "sfas97rd_gaap_dth_claim_cost",  "dth_claim_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_dth_claim_cost, 'E','Y', '3', 'P', (size_t)&modelOffset->dth_claim_cost),
-	CashFlowCommonData(71, "egp", "sfas97rd_gaap_egp",  "egp",  CashFlowCommonData::SUM,
+	CashFlowCommonData(48, "egp", "sfas97rd_gaap_egp",  "egp",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_egp, 'E','N', '3', 'P', (size_t)&modelOffset->egp),
-	CashFlowCommonData(72, "egp_accum", "sfas97rd_gaap_egp_accum",  "egp_accum",  CashFlowCommonData::SUM,
+	CashFlowCommonData(49, "egp_accum", "sfas97rd_gaap_egp_accum",  "egp_accum",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_egp_accum, 'E','N', '3', 'P', (size_t)&modelOffset->egp_accum),
-	CashFlowCommonData(73, "egp_accum_loss_rec_int_rate", "sfas97rd_gaap_egp_accum_loss_rec_int_rate",  "egp_accum_loss_rec_int_rate",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_egp_accum_loss_rec_int_rate, 'E','N', '3', 'P', (size_t)&modelOffset->egp_accum_loss_rec_int_rate),
-	CashFlowCommonData(74, "egp_gain_exp", "sfas97rd_gaap_egp_gain_exp",  "egp_gain_exp",  CashFlowCommonData::SUM,
+	CashFlowCommonData(50, "egp_gain_exp", "sfas97rd_gaap_egp_gain_exp",  "egp_gain_exp",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_egp_gain_exp, 'E','N', '3', 'P', (size_t)&modelOffset->egp_gain_exp),
-	CashFlowCommonData(75, "egp_gain_inv", "sfas97rd_gaap_egp_gain_inv",  "egp_gain_inv",  CashFlowCommonData::SUM,
+	CashFlowCommonData(51, "egp_gain_inv", "sfas97rd_gaap_egp_gain_inv",  "egp_gain_inv",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_egp_gain_inv, 'E','N', '3', 'P', (size_t)&modelOffset->egp_gain_inv),
-	CashFlowCommonData(76, "egp_gain_mort", "sfas97rd_gaap_egp_gain_mort",  "egp_gain_mort",  CashFlowCommonData::SUM,
+	CashFlowCommonData(52, "egp_gain_mort", "sfas97rd_gaap_egp_gain_mort",  "egp_gain_mort",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_egp_gain_mort, 'E','N', '3', 'P', (size_t)&modelOffset->egp_gain_mort),
-	CashFlowCommonData(77, "egp_gain_persist_bon_ref", "sfas97rd_gaap_egp_gain_persist_bon_ref",  "egp_gain_persist_bon_ref",  CashFlowCommonData::SUM,
+	CashFlowCommonData(53, "egp_gain_persist_bon_ref", "sfas97rd_gaap_egp_gain_persist_bon_ref",  "egp_gain_persist_bon_ref",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_egp_gain_persist_bon_ref, 'E','Y', '3', 'C', (size_t)&modelOffset->egp_gain_persist_bon_ref),
-	CashFlowCommonData(78, "egp_gain_surr", "sfas97rd_gaap_egp_gain_surr",  "egp_gain_surr",  CashFlowCommonData::SUM,
+	CashFlowCommonData(54, "egp_gain_surr", "sfas97rd_gaap_egp_gain_surr",  "egp_gain_surr",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_egp_gain_surr, 'E','N', '3', 'P', (size_t)&modelOffset->egp_gain_surr),
-	CashFlowCommonData(79, "egp_pv", "sfas97rd_gaap_egp_pv",  "egp_pv",  CashFlowCommonData::SUM,
+	CashFlowCommonData(55, "egp_pv", "sfas97rd_gaap_egp_pv",  "egp_pv",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_egp_pv, 'E','N', '3', 'P', (size_t)&modelOffset->egp_pv),
-	CashFlowCommonData(80, "egp_pv_loss_rec_int_rate", "sfas97rd_gaap_egp_pv_loss_rec_int_rate",  "egp_pv_loss_rec_int_rate",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_egp_pv_loss_rec_int_rate, 'E','N', '3', 'P', (size_t)&modelOffset->egp_pv_loss_rec_int_rate),
-	CashFlowCommonData(81, "egp_sop031_assess_accum", "sfas97rd_gaap_egp_sop031_assess_accum",  "egp_sop031_assess_accum",  CashFlowCommonData::SUM,
+	CashFlowCommonData(56, "egp_sop031_assess_accum", "sfas97rd_gaap_egp_sop031_assess_accum",  "egp_sop031_assess_accum",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_egp_sop031_assess_accum, 'E','N', '3', 'P', (size_t)&modelOffset->egp_sop031_assess_accum),
-	CashFlowCommonData(82, "egp_sop031_gmdb_ben_accum", "sfas97rd_gaap_egp_sop031_gmdb_ben_accum",  "egp_sop031_gmdb_ben_accum",  CashFlowCommonData::SUM,
+	CashFlowCommonData(57, "egp_sop031_gmdb_ben_accum", "sfas97rd_gaap_egp_sop031_gmdb_ben_accum",  "egp_sop031_gmdb_ben_accum",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_egp_sop031_gmdb_ben_accum, 'E','N', '3', 'P', (size_t)&modelOffset->egp_sop031_gmdb_ben_accum),
-	CashFlowCommonData(83, "egp_sop031_gmdb_liab", "sfas97rd_gaap_egp_sop031_gmdb_liab",  "egp_sop031_gmdb_liab",  CashFlowCommonData::SUM,
+	CashFlowCommonData(58, "egp_sop031_gmdb_liab", "sfas97rd_gaap_egp_sop031_gmdb_liab",  "egp_sop031_gmdb_liab",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_egp_sop031_gmdb_liab, 'E','N', '3', 'P', (size_t)&modelOffset->egp_sop031_gmdb_liab),
-	CashFlowCommonData(84, "egp_sop031_gmib_ben_accum", "sfas97rd_gaap_egp_sop031_gmib_ben_accum",  "egp_sop031_gmib_ben_accum",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_egp_sop031_gmib_ben_accum, 'E','N', '3', 'P', (size_t)&modelOffset->egp_sop031_gmib_ben_accum),
-	CashFlowCommonData(85, "egp_sop031_gmib_liab", "sfas97rd_gaap_egp_sop031_gmib_liab",  "egp_sop031_gmib_liab",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_egp_sop031_gmib_liab, 'E','N', '3', 'P', (size_t)&modelOffset->egp_sop031_gmib_liab),
-	CashFlowCommonData(86, "egp_sop031_gmwb_ben_accum", "sfas97rd_gaap_egp_sop031_gmwb_ben_accum",  "egp_sop031_gmwb_ben_accum",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_egp_sop031_gmwb_ben_accum, 'E','N', '3', 'P', (size_t)&modelOffset->egp_sop031_gmwb_ben_accum),
-	CashFlowCommonData(87, "egp_sop031_gmwb_liab", "sfas97rd_gaap_egp_sop031_gmwb_liab",  "egp_sop031_gmwb_liab",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_egp_sop031_gmwb_liab, 'E','N', '3', 'P', (size_t)&modelOffset->egp_sop031_gmwb_liab),
-	CashFlowCommonData(88, "egp_sop031_res_incr", "sfas97rd_gaap_egp_sop031_res_incr",  "egp_sop031_res_incr",  CashFlowCommonData::SUM,
+	CashFlowCommonData(59, "egp_sop031_res_incr", "sfas97rd_gaap_egp_sop031_res_incr",  "egp_sop031_res_incr",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_egp_sop031_res_incr, 'E','N', '3', 'P', (size_t)&modelOffset->egp_sop031_res_incr),
-	CashFlowCommonData(89, "egp_sop031_ulsg_ben_accum", "sfas97rd_gaap_egp_sop031_ulsg_ben_accum",  "egp_sop031_ulsg_ben_accum",  CashFlowCommonData::SUM,
+	CashFlowCommonData(60, "egp_sop031_ulsg_ben_accum", "sfas97rd_gaap_egp_sop031_ulsg_ben_accum",  "egp_sop031_ulsg_ben_accum",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_egp_sop031_ulsg_ben_accum, 'E','N', '3', 'P', (size_t)&modelOffset->egp_sop031_ulsg_ben_accum),
-	CashFlowCommonData(90, "egp_sop031_ulsg_liab", "sfas97rd_gaap_egp_sop031_ulsg_liab",  "egp_sop031_ulsg_liab",  CashFlowCommonData::SUM,
+	CashFlowCommonData(61, "egp_sop031_ulsg_liab", "sfas97rd_gaap_egp_sop031_ulsg_liab",  "egp_sop031_ulsg_liab",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_egp_sop031_ulsg_liab, 'E','N', '3', 'P', (size_t)&modelOffset->egp_sop031_ulsg_liab),
-	CashFlowCommonData(91, "embed_deriv_cash_flow", "sfas97rd_gaap_embed_deriv_cash_flow",  "embed_deriv_cash_flow",  CashFlowCommonData::SUM,
+	CashFlowCommonData(62, "embed_deriv_cash_flow", "sfas97rd_gaap_embed_deriv_cash_flow",  "embed_deriv_cash_flow",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_embed_deriv_cash_flow, 'E','Y', '3', 'P', (size_t)&modelOffset->embed_deriv_cash_flow),
-	CashFlowCommonData(92, "embed_deriv_cash_flow_pv", "sfas97rd_gaap_embed_deriv_cash_flow_pv",  "embed_deriv_cash_flow_pv",  CashFlowCommonData::SUM,
+	CashFlowCommonData(63, "embed_deriv_cash_flow_pv", "sfas97rd_gaap_embed_deriv_cash_flow_pv",  "embed_deriv_cash_flow_pv",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_embed_deriv_cash_flow_pv, 'E','Y', '3', 'P', (size_t)&modelOffset->embed_deriv_cash_flow_pv),
-	CashFlowCommonData(93, "embed_deriv_val", "sfas97rd_gaap_embed_deriv_val",  "embed_deriv_val",  CashFlowCommonData::SUM,
+	CashFlowCommonData(64, "embed_deriv_val", "sfas97rd_gaap_embed_deriv_val",  "embed_deriv_val",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_embed_deriv_val, 'E','Y', '3', 'P', (size_t)&modelOffset->embed_deriv_val),
-	CashFlowCommonData(94, "finalize", "sfas97rd_gaap_finalize",  "finalize",  CashFlowCommonData::AVG,
+	CashFlowCommonData(65, "finalize", "sfas97rd_gaap_finalize",  "finalize",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_finalize, 'E','N', '3', 'N', (size_t)&modelOffset->finalize),
-	CashFlowCommonData(95, "fund_val", "sfas97rd_gaap_fund_val",  "fund_val",  CashFlowCommonData::SUM,
+	CashFlowCommonData(66, "fund_val", "sfas97rd_gaap_fund_val",  "fund_val",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_fund_val, 'E','N', '3', 'P', (size_t)&modelOffset->fund_val),
-	CashFlowCommonData(96, "fund_val_bef_int", "sfas97rd_gaap_fund_val_bef_int",  "fund_val_bef_int",  CashFlowCommonData::SUM,
+	CashFlowCommonData(67, "fund_val_bef_int", "sfas97rd_gaap_fund_val_bef_int",  "fund_val_bef_int",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_fund_val_bef_int, 'E','N', '3', 'P', (size_t)&modelOffset->fund_val_bef_int),
-	CashFlowCommonData(97, "fund_val_fixed", "sfas97rd_gaap_fund_val_fixed",  "fund_val_fixed",  CashFlowCommonData::SUM,
+	CashFlowCommonData(68, "fund_val_fixed", "sfas97rd_gaap_fund_val_fixed",  "fund_val_fixed",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_fund_val_fixed, 'E','N', '3', 'P', (size_t)&modelOffset->fund_val_fixed),
-	CashFlowCommonData(98, "fund_val_sa", "sfas97rd_gaap_fund_val_sa",  "fund_val_sa",  CashFlowCommonData::SUM,
+	CashFlowCommonData(69, "fund_val_sa", "sfas97rd_gaap_fund_val_sa",  "fund_val_sa",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_fund_val_sa, 'E','N', '3', 'P', (size_t)&modelOffset->fund_val_sa),
-	CashFlowCommonData(99, "gaap_amortzn_int_rate", "sfas97rd_gaap_gaap_amortzn_int_rate",  "gaap_amortzn_int_rate",  CashFlowCommonData::AVG,
+	CashFlowCommonData(70, "gaap_amortzn_int_rate", "sfas97rd_gaap_gaap_amortzn_int_rate",  "gaap_amortzn_int_rate",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_gaap_amortzn_int_rate, 'E','N', '3', 'P', (size_t)&modelOffset->gaap_amortzn_int_rate),
-	CashFlowCommonData(100, "gmab_ben", "sfas97rd_gaap_gmab_ben",  "gmab_ben",  CashFlowCommonData::SUM,
+	CashFlowCommonData(71, "gmab_ben", "sfas97rd_gaap_gmab_ben",  "gmab_ben",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_gmab_ben, 'E','N', '3', 'P', (size_t)&modelOffset->gmab_ben),
-	CashFlowCommonData(101, "gmdb_ben", "sfas97rd_gaap_gmdb_ben",  "gmdb_ben",  CashFlowCommonData::SUM,
+	CashFlowCommonData(72, "gmdb_ben", "sfas97rd_gaap_gmdb_ben",  "gmdb_ben",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_gmdb_ben, 'E','N', '3', 'P', (size_t)&modelOffset->gmdb_ben),
-	CashFlowCommonData(102, "gmib_ben", "sfas97rd_gaap_gmib_ben",  "gmib_ben",  CashFlowCommonData::SUM,
+	CashFlowCommonData(73, "gmib_ben", "sfas97rd_gaap_gmib_ben",  "gmib_ben",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_gmib_ben, 'E','N', '3', 'P', (size_t)&modelOffset->gmib_ben),
-	CashFlowCommonData(103, "gmwb_ben", "sfas97rd_gaap_gmwb_ben",  "gmwb_ben",  CashFlowCommonData::SUM,
+	CashFlowCommonData(74, "gmwb_ben", "sfas97rd_gaap_gmwb_ben",  "gmwb_ben",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_gmwb_ben, 'E','N', '3', 'P', (size_t)&modelOffset->gmwb_ben),
-	CashFlowCommonData(104, "hedge_cash_flow", "sfas97rd_gaap_hedge_cash_flow",  "hedge_cash_flow",  CashFlowCommonData::SUM,
+	CashFlowCommonData(75, "hedge_cash_flow", "sfas97rd_gaap_hedge_cash_flow",  "hedge_cash_flow",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_hedge_cash_flow, 'E','Y', '3', 'P', (size_t)&modelOffset->hedge_cash_flow),
-	CashFlowCommonData(105, "hedge_cost", "sfas97rd_gaap_hedge_cost",  "hedge_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(76, "hedge_cost", "sfas97rd_gaap_hedge_cost",  "hedge_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_hedge_cost, 'E','Y', '3', 'P', (size_t)&modelOffset->hedge_cost),
-	CashFlowCommonData(106, "hedge_mkt_val", "sfas97rd_gaap_hedge_mkt_val",  "hedge_mkt_val",  CashFlowCommonData::SUM,
+	CashFlowCommonData(77, "hedge_mkt_val", "sfas97rd_gaap_hedge_mkt_val",  "hedge_mkt_val",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_hedge_mkt_val, 'E','N', '3', 'P', (size_t)&modelOffset->hedge_mkt_val),
-	CashFlowCommonData(107, "hedge_mkt_val_incr", "sfas97rd_gaap_hedge_mkt_val_incr",  "hedge_mkt_val_incr",  CashFlowCommonData::SUM,
+	CashFlowCommonData(78, "hedge_mkt_val_incr", "sfas97rd_gaap_hedge_mkt_val_incr",  "hedge_mkt_val_incr",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_hedge_mkt_val_incr, 'E','Y', '3', 'P', (size_t)&modelOffset->hedge_mkt_val_incr),
-	CashFlowCommonData(108, "host_contract_cred_int", "sfas97rd_gaap_host_contract_cred_int",  "host_contract_cred_int",  CashFlowCommonData::SUM,
+	CashFlowCommonData(79, "host_contract_cred_int", "sfas97rd_gaap_host_contract_cred_int",  "host_contract_cred_int",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_host_contract_cred_int, 'E','Y', '3', 'P', (size_t)&modelOffset->host_contract_cred_int),
-	CashFlowCommonData(109, "host_contract_val", "sfas97rd_gaap_host_contract_val",  "host_contract_val",  CashFlowCommonData::SUM,
+	CashFlowCommonData(80, "host_contract_val", "sfas97rd_gaap_host_contract_val",  "host_contract_val",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_host_contract_val, 'E','Y', '3', 'P', (size_t)&modelOffset->host_contract_val),
-	CashFlowCommonData(110, "host_contract_val_bef", "sfas97rd_gaap_host_contract_val_bef",  "host_contract_val_bef",  CashFlowCommonData::SUM,
+	CashFlowCommonData(81, "host_contract_val_bef", "sfas97rd_gaap_host_contract_val_bef",  "host_contract_val_bef",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_host_contract_val_bef, 'E','Y', '3', 'P', (size_t)&modelOffset->host_contract_val_bef),
-	CashFlowCommonData(111, "initialize", "sfas97rd_gaap_initialize",  "initialize",  CashFlowCommonData::SUM,
+	CashFlowCommonData(82, "initialize", "sfas97rd_gaap_initialize",  "initialize",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_initialize, 'E','N', '3', 'N', (size_t)&modelOffset->initialize),
-	CashFlowCommonData(112, "inv_inc", "sfas97rd_gaap_inv_inc",  "inv_inc",  CashFlowCommonData::SUM,
+	CashFlowCommonData(83, "inv_inc", "sfas97rd_gaap_inv_inc",  "inv_inc",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_inv_inc, 'E','Y', '3', 'P', (size_t)&modelOffset->inv_inc),
-	CashFlowCommonData(113, "inv_inc_fund", "sfas97rd_gaap_inv_inc_fund",  "inv_inc_fund",  CashFlowCommonData::SUM,
+	CashFlowCommonData(84, "inv_inc_fund", "sfas97rd_gaap_inv_inc_fund",  "inv_inc_fund",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_inv_inc_fund, 'E','N', '3', 'P', (size_t)&modelOffset->inv_inc_fund),
-	CashFlowCommonData(114, "k_capzd_acq_exp", "sfas97rd_gaap_k_capzd_acq_exp",  "k_capzd_acq_exp",  CashFlowCommonData::SUM,
+	CashFlowCommonData(85, "k_capzd_acq_exp", "sfas97rd_gaap_k_capzd_acq_exp",  "k_capzd_acq_exp",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_k_capzd_acq_exp, 'E','N', '3', 'P', (size_t)&modelOffset->k_capzd_acq_exp),
-	CashFlowCommonData(115, "k_capzd_acq_exp_sch", "sfas97rd_gaap_k_capzd_acq_exp_sch",  "k_capzd_acq_exp_sch",  CashFlowCommonData::SUM,
+	CashFlowCommonData(86, "k_capzd_acq_exp_sch", "sfas97rd_gaap_k_capzd_acq_exp_sch",  "k_capzd_acq_exp_sch",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_k_capzd_acq_exp_sch, 'E','N', '3', 'P', (size_t)&modelOffset->k_capzd_acq_exp_sch),
-	CashFlowCommonData(116, "k_capzd_comm", "sfas97rd_gaap_k_capzd_comm",  "k_capzd_comm",  CashFlowCommonData::SUM,
+	CashFlowCommonData(87, "k_capzd_comm", "sfas97rd_gaap_k_capzd_comm",  "k_capzd_comm",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_k_capzd_comm, 'E','N', '3', 'P', (size_t)&modelOffset->k_capzd_comm),
-	CashFlowCommonData(117, "k_capzd_comm_sch", "sfas97rd_gaap_k_capzd_comm_sch",  "k_capzd_comm_sch",  CashFlowCommonData::SUM,
+	CashFlowCommonData(88, "k_capzd_comm_sch", "sfas97rd_gaap_k_capzd_comm_sch",  "k_capzd_comm_sch",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_k_capzd_comm_sch, 'E','N', '3', 'P', (size_t)&modelOffset->k_capzd_comm_sch),
-	CashFlowCommonData(118, "k_capzd_prem_bonus", "sfas97rd_gaap_k_capzd_prem_bonus",  "k_capzd_prem_bonus",  CashFlowCommonData::SUM,
+	CashFlowCommonData(89, "k_capzd_prem_bonus", "sfas97rd_gaap_k_capzd_prem_bonus",  "k_capzd_prem_bonus",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_k_capzd_prem_bonus, 'E','N', '3', 'P', (size_t)&modelOffset->k_capzd_prem_bonus),
-	CashFlowCommonData(119, "k_capzd_prem_bonus_sch", "sfas97rd_gaap_k_capzd_prem_bonus_sch",  "k_capzd_prem_bonus_sch",  CashFlowCommonData::SUM,
+	CashFlowCommonData(90, "k_capzd_prem_bonus_sch", "sfas97rd_gaap_k_capzd_prem_bonus_sch",  "k_capzd_prem_bonus_sch",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_k_capzd_prem_bonus_sch, 'E','N', '3', 'P', (size_t)&modelOffset->k_capzd_prem_bonus_sch),
-	CashFlowCommonData(120, "k_reins_yrt_cost", "sfas97rd_gaap_k_reins_yrt_cost",  "k_reins_yrt_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(91, "k_reins_yrt_cost", "sfas97rd_gaap_k_reins_yrt_cost",  "k_reins_yrt_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_k_reins_yrt_cost, 'E','N', '3', 'P', (size_t)&modelOffset->k_reins_yrt_cost),
-	CashFlowCommonData(121, "k_reins_yrt_cost_sch", "sfas97rd_gaap_k_reins_yrt_cost_sch",  "k_reins_yrt_cost_sch",  CashFlowCommonData::SUM,
+	CashFlowCommonData(92, "k_reins_yrt_cost_sch", "sfas97rd_gaap_k_reins_yrt_cost_sch",  "k_reins_yrt_cost_sch",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_k_reins_yrt_cost_sch, 'E','N', '3', 'P', (size_t)&modelOffset->k_reins_yrt_cost_sch),
-	CashFlowCommonData(122, "k_sop031_gmdb_ben_br", "sfas97rd_gaap_k_sop031_gmdb_ben_br",  "k_sop031_gmdb_ben_br",  CashFlowCommonData::SUM,
+	CashFlowCommonData(93, "k_sop031_gmdb_ben_br", "sfas97rd_gaap_k_sop031_gmdb_ben_br",  "k_sop031_gmdb_ben_br",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_k_sop031_gmdb_ben_br, 'E','N', '3', 'P', (size_t)&modelOffset->k_sop031_gmdb_ben_br),
-	CashFlowCommonData(123, "k_sop031_gmdb_ben_br_sch", "sfas97rd_gaap_k_sop031_gmdb_ben_br_sch",  "k_sop031_gmdb_ben_br_sch",  CashFlowCommonData::SUM,
+	CashFlowCommonData(94, "k_sop031_gmdb_ben_br_sch", "sfas97rd_gaap_k_sop031_gmdb_ben_br_sch",  "k_sop031_gmdb_ben_br_sch",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_k_sop031_gmdb_ben_br_sch, 'E','N', '3', 'P', (size_t)&modelOffset->k_sop031_gmdb_ben_br_sch),
-	CashFlowCommonData(124, "k_sop031_pbr", "sfas97rd_gaap_k_sop031_pbr",  "k_sop031_pbr",  CashFlowCommonData::SUM,
+	CashFlowCommonData(95, "k_sop031_pbr", "sfas97rd_gaap_k_sop031_pbr",  "k_sop031_pbr",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_k_sop031_pbr, 'E','N', '3', 'P', (size_t)&modelOffset->k_sop031_pbr),
-	CashFlowCommonData(125, "k_sop031_pbr_sch", "sfas97rd_gaap_k_sop031_pbr_sch",  "k_sop031_pbr_sch",  CashFlowCommonData::SUM,
+	CashFlowCommonData(96, "k_sop031_pbr_sch", "sfas97rd_gaap_k_sop031_pbr_sch",  "k_sop031_pbr_sch",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_k_sop031_pbr_sch, 'E','N', '3', 'P', (size_t)&modelOffset->k_sop031_pbr_sch),
-	CashFlowCommonData(126, "k_sop031_ulsg_ben_br", "sfas97rd_gaap_k_sop031_ulsg_ben_br",  "k_sop031_ulsg_ben_br",  CashFlowCommonData::SUM,
+	CashFlowCommonData(97, "k_sop031_ulsg_ben_br", "sfas97rd_gaap_k_sop031_ulsg_ben_br",  "k_sop031_ulsg_ben_br",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_k_sop031_ulsg_ben_br, 'E','N', '3', 'P', (size_t)&modelOffset->k_sop031_ulsg_ben_br),
-	CashFlowCommonData(127, "k_sop031_ulsg_ben_br_sch", "sfas97rd_gaap_k_sop031_ulsg_ben_br_sch",  "k_sop031_ulsg_ben_br_sch",  CashFlowCommonData::SUM,
+	CashFlowCommonData(98, "k_sop031_ulsg_ben_br_sch", "sfas97rd_gaap_k_sop031_ulsg_ben_br_sch",  "k_sop031_ulsg_ben_br_sch",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_k_sop031_ulsg_ben_br_sch, 'E','N', '3', 'P', (size_t)&modelOffset->k_sop031_ulsg_ben_br_sch),
-	CashFlowCommonData(128, "k_sop031_unearn_rev_liab", "sfas97rd_gaap_k_sop031_unearn_rev_liab",  "k_sop031_unearn_rev_liab",  CashFlowCommonData::SUM,
+	CashFlowCommonData(99, "k_sop031_unearn_rev_liab", "sfas97rd_gaap_k_sop031_unearn_rev_liab",  "k_sop031_unearn_rev_liab",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_k_sop031_unearn_rev_liab, 'E','N', '3', 'P', (size_t)&modelOffset->k_sop031_unearn_rev_liab),
-	CashFlowCommonData(129, "k_sop031_unearn_rev_liab_sch", "sfas97rd_gaap_k_sop031_unearn_rev_liab_sch",  "k_sop031_unearn_rev_liab_sch",  CashFlowCommonData::SUM,
+	CashFlowCommonData(100, "k_sop031_unearn_rev_liab_sch", "sfas97rd_gaap_k_sop031_unearn_rev_liab_sch",  "k_sop031_unearn_rev_liab_sch",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_k_sop031_unearn_rev_liab_sch, 'E','N', '3', 'P', (size_t)&modelOffset->k_sop031_unearn_rev_liab_sch),
-	CashFlowCommonData(130, "k_unearn_rev_liab", "sfas97rd_gaap_k_unearn_rev_liab",  "k_unearn_rev_liab",  CashFlowCommonData::SUM,
+	CashFlowCommonData(101, "k_unearn_rev_liab", "sfas97rd_gaap_k_unearn_rev_liab",  "k_unearn_rev_liab",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_k_unearn_rev_liab, 'E','N', '3', 'P', (size_t)&modelOffset->k_unearn_rev_liab),
-	CashFlowCommonData(131, "k_unearn_rev_liab_sch", "sfas97rd_gaap_k_unearn_rev_liab_sch",  "k_unearn_rev_liab_sch",  CashFlowCommonData::SUM,
+	CashFlowCommonData(102, "k_unearn_rev_liab_sch", "sfas97rd_gaap_k_unearn_rev_liab_sch",  "k_unearn_rev_liab_sch",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_k_unearn_rev_liab_sch, 'E','N', '3', 'P', (size_t)&modelOffset->k_unearn_rev_liab_sch),
-	CashFlowCommonData(132, "liab_net", "sfas97rd_gaap_liab_net",  "liab_net",  CashFlowCommonData::SUM,
+	CashFlowCommonData(103, "liab_net", "sfas97rd_gaap_liab_net",  "liab_net",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_liab_net, 'E','Y', '3', 'P', (size_t)&modelOffset->liab_net),
-	CashFlowCommonData(133, "loads", "sfas97rd_gaap_loads",  "loads",  CashFlowCommonData::SUM,
+	CashFlowCommonData(104, "loads", "sfas97rd_gaap_loads",  "loads",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_loads, 'B','Y', '3', 'P', (size_t)&modelOffset->loads),
-	CashFlowCommonData(134, "loc_cost", "sfas97rd_gaap_loc_cost",  "loc_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(105, "loc_cost", "sfas97rd_gaap_loc_cost",  "loc_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_loc_cost, 'E','Y', '3', 'P', (size_t)&modelOffset->loc_cost),
-	CashFlowCommonData(135, "loss_rec_amortzn_int_rate", "sfas97rd_gaap_loss_rec_amortzn_int_rate",  "loss_rec_amortzn_int_rate",  CashFlowCommonData::AVG,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_loss_rec_amortzn_int_rate, 'E','N', '3', 'P', (size_t)&modelOffset->loss_rec_amortzn_int_rate),
-	CashFlowCommonData(136, "maint_exp_bom", "sfas97rd_gaap_maint_exp_bom",  "maint_exp_bom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(106, "maint_exp_bom", "sfas97rd_gaap_maint_exp_bom",  "maint_exp_bom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_maint_exp_bom, 'B','Y', '3', 'C', (size_t)&modelOffset->maint_exp_bom),
-	CashFlowCommonData(137, "maint_exp_eom", "sfas97rd_gaap_maint_exp_eom",  "maint_exp_eom",  CashFlowCommonData::SUM,
+	CashFlowCommonData(107, "maint_exp_eom", "sfas97rd_gaap_maint_exp_eom",  "maint_exp_eom",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_maint_exp_eom, 'E','Y', '3', 'P', (size_t)&modelOffset->maint_exp_eom),
-	CashFlowCommonData(138, "modco_liab", "sfas97rd_gaap_modco_liab",  "modco_liab",  CashFlowCommonData::SUM,
+	CashFlowCommonData(108, "modco_liab", "sfas97rd_gaap_modco_liab",  "modco_liab",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_modco_liab, 'E','N', '3', 'C', (size_t)&modelOffset->modco_liab),
-	CashFlowCommonData(139, "modco_liab_incr", "sfas97rd_gaap_modco_liab_incr",  "modco_liab_incr",  CashFlowCommonData::SUM,
+	CashFlowCommonData(109, "modco_liab_incr", "sfas97rd_gaap_modco_liab_incr",  "modco_liab_incr",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_modco_liab_incr, 'E','N', '3', 'P', (size_t)&modelOffset->modco_liab_incr),
-	CashFlowCommonData(140, "modco_res_adj", "sfas97rd_gaap_modco_res_adj",  "modco_res_adj",  CashFlowCommonData::SUM,
+	CashFlowCommonData(110, "modco_res_adj", "sfas97rd_gaap_modco_res_adj",  "modco_res_adj",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_modco_res_adj, 'E','Y', '3', 'C', (size_t)&modelOffset->modco_res_adj),
-	CashFlowCommonData(141, "persist_bon_ref", "sfas97rd_gaap_persist_bon_ref",  "persist_bon_ref",  CashFlowCommonData::SUM,
+	CashFlowCommonData(111, "mrb_gmab_liab", "sfas97rd_gaap_mrb_gmab_liab",  "mrb_gmab_liab",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_mrb_gmab_liab, 'E','N', '3', 'P', (size_t)&modelOffset->mrb_gmab_liab),
+	CashFlowCommonData(112, "mrb_gmdb_liab", "sfas97rd_gaap_mrb_gmdb_liab",  "mrb_gmdb_liab",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_mrb_gmdb_liab, 'E','N', '3', 'P', (size_t)&modelOffset->mrb_gmdb_liab),
+	CashFlowCommonData(113, "mrb_gmib_liab", "sfas97rd_gaap_mrb_gmib_liab",  "mrb_gmib_liab",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_mrb_gmib_liab, 'E','N', '3', 'P', (size_t)&modelOffset->mrb_gmib_liab),
+	CashFlowCommonData(114, "mrb_gmwb_liab", "sfas97rd_gaap_mrb_gmwb_liab",  "mrb_gmwb_liab",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_mrb_gmwb_liab, 'E','N', '3', 'P', (size_t)&modelOffset->mrb_gmwb_liab),
+	CashFlowCommonData(115, "mrb_liab", "sfas97rd_gaap_mrb_liab",  "mrb_liab",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_mrb_liab, 'E','N', '3', 'P', (size_t)&modelOffset->mrb_liab),
+	CashFlowCommonData(116, "mrb_liab_incr", "sfas97rd_gaap_mrb_liab_incr",  "mrb_liab_incr",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_mrb_liab_incr, 'E','Y', '3', 'P', (size_t)&modelOffset->mrb_liab_incr),
+	CashFlowCommonData(117, "persist_bon_ref", "sfas97rd_gaap_persist_bon_ref",  "persist_bon_ref",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_persist_bon_ref, 'E','N', '3', 'P', (size_t)&modelOffset->persist_bon_ref),
-	CashFlowCommonData(142, "pol_loan", "sfas97rd_gaap_pol_loan",  "pol_loan",  CashFlowCommonData::SUM,
+	CashFlowCommonData(118, "pol_loan", "sfas97rd_gaap_pol_loan",  "pol_loan",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_pol_loan, 'E','Y', '3', 'P', (size_t)&modelOffset->pol_loan),
-	CashFlowCommonData(143, "pol_loan_inc", "sfas97rd_gaap_pol_loan_inc",  "pol_loan_inc",  CashFlowCommonData::SUM,
+	CashFlowCommonData(119, "pol_loan_inc", "sfas97rd_gaap_pol_loan_inc",  "pol_loan_inc",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_pol_loan_inc, 'E','Y', '3', 'P', (size_t)&modelOffset->pol_loan_inc),
-	CashFlowCommonData(144, "policies_b", "sfas97rd_gaap_policies_b",  "policies_b",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_policies_b, 'B','N', '3', 'C', (size_t)&modelOffset->policies_b),
-	CashFlowCommonData(145, "prem_bonus", "sfas97rd_gaap_prem_bonus",  "prem_bonus",  CashFlowCommonData::SUM,
+	CashFlowCommonData(120, "policies_inf", "sfas97rd_gaap_policies_inf",  "policies_inf",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_policies_inf, 'B','N', '3', 'C', (size_t)&modelOffset->policies_inf),
+	CashFlowCommonData(121, "policies_inf_sch", "sfas97rd_gaap_policies_inf_sch",  "policies_inf_sch",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_policies_inf_sch, 'B','N', '3', 'C', (size_t)&modelOffset->policies_inf_sch),
+	CashFlowCommonData(122, "policies_inf_sum", "sfas97rd_gaap_policies_inf_sum",  "policies_inf_sum",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_policies_inf_sum, 'B','N', '3', 'C', (size_t)&modelOffset->policies_inf_sum),
+	CashFlowCommonData(123, "prem_bonus", "sfas97rd_gaap_prem_bonus",  "prem_bonus",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_prem_bonus, 'B','Y', '3', 'P', (size_t)&modelOffset->prem_bonus),
-	CashFlowCommonData(146, "prem_tax", "sfas97rd_gaap_prem_tax",  "prem_tax",  CashFlowCommonData::SUM,
+	CashFlowCommonData(124, "prem_tax", "sfas97rd_gaap_prem_tax",  "prem_tax",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_prem_tax, 'B','Y', '3', 'P', (size_t)&modelOffset->prem_tax),
-	CashFlowCommonData(147, "refund", "sfas97rd_gaap_refund",  "refund",  CashFlowCommonData::SUM,
+	CashFlowCommonData(125, "refund", "sfas97rd_gaap_refund",  "refund",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_refund, 'E','Y', '3', 'C', (size_t)&modelOffset->refund),
-	CashFlowCommonData(148, "reins_yrt_cost", "sfas97rd_gaap_reins_yrt_cost",  "reins_yrt_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(126, "reins_yrt_cost", "sfas97rd_gaap_reins_yrt_cost",  "reins_yrt_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_reins_yrt_cost, 'E','N', '3', 'P', (size_t)&modelOffset->reins_yrt_cost),
-	CashFlowCommonData(149, "reins_yrt_cost_accum", "sfas97rd_gaap_reins_yrt_cost_accum",  "reins_yrt_cost_accum",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_reins_yrt_cost_accum, 'E','N', '3', 'P', (size_t)&modelOffset->reins_yrt_cost_accum),
-	CashFlowCommonData(150, "reins_yrt_cost_pv", "sfas97rd_gaap_reins_yrt_cost_pv",  "reins_yrt_cost_pv",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_reins_yrt_cost_pv, 'E','N', '3', 'P', (size_t)&modelOffset->reins_yrt_cost_pv),
-	CashFlowCommonData(151, "rider_charges", "sfas97rd_gaap_rider_charges",  "rider_charges",  CashFlowCommonData::SUM,
+	CashFlowCommonData(127, "rider_charges", "sfas97rd_gaap_rider_charges",  "rider_charges",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_rider_charges, 'B','Y', '3', 'P', (size_t)&modelOffset->rider_charges),
-	CashFlowCommonData(152, "sfas133_fia_iul_liab", "sfas97rd_gaap_sfas133_fia_iul_liab",  "sfas133_fia_iul_liab",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sfas133_fia_iul_liab, 'E','N', '3', 'P', (size_t)&modelOffset->sfas133_fia_iul_liab),
-	CashFlowCommonData(153, "sfas133_gmab_liab", "sfas97rd_gaap_sfas133_gmab_liab",  "sfas133_gmab_liab",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sfas133_gmab_liab, 'E','N', '3', 'P', (size_t)&modelOffset->sfas133_gmab_liab),
-	CashFlowCommonData(154, "sfas133_gmib_liab", "sfas97rd_gaap_sfas133_gmib_liab",  "sfas133_gmib_liab",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sfas133_gmib_liab, 'E','N', '3', 'P', (size_t)&modelOffset->sfas133_gmib_liab),
-	CashFlowCommonData(155, "sfas133_gmwb_liab", "sfas97rd_gaap_sfas133_gmwb_liab",  "sfas133_gmwb_liab",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sfas133_gmwb_liab, 'E','N', '3', 'P', (size_t)&modelOffset->sfas133_gmwb_liab),
-	CashFlowCommonData(156, "sfas133_liab", "sfas97rd_gaap_sfas133_liab",  "sfas133_liab",  CashFlowCommonData::SUM,
+	CashFlowCommonData(128, "sfas133_liab", "sfas97rd_gaap_sfas133_liab",  "sfas133_liab",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sfas133_liab, 'E','N', '3', 'P', (size_t)&modelOffset->sfas133_liab),
-	CashFlowCommonData(157, "sfas133_liab_incr", "sfas97rd_gaap_sfas133_liab_incr",  "sfas133_liab_incr",  CashFlowCommonData::SUM,
+	CashFlowCommonData(129, "sfas133_liab_incr", "sfas97rd_gaap_sfas133_liab_incr",  "sfas133_liab_incr",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sfas133_liab_incr, 'E','Y', '3', 'P', (size_t)&modelOffset->sfas133_liab_incr),
-	CashFlowCommonData(158, "sop031_addl_liab", "sfas97rd_gaap_sop031_addl_liab",  "sop031_addl_liab",  CashFlowCommonData::SUM,
+	CashFlowCommonData(130, "sop031_addl_liab", "sfas97rd_gaap_sop031_addl_liab",  "sop031_addl_liab",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_addl_liab, 'E','N', '3', 'P', (size_t)&modelOffset->sop031_addl_liab),
-	CashFlowCommonData(159, "sop031_addl_liab_incr", "sfas97rd_gaap_sop031_addl_liab_incr",  "sop031_addl_liab_incr",  CashFlowCommonData::SUM,
+	CashFlowCommonData(131, "sop031_addl_liab_incr", "sfas97rd_gaap_sop031_addl_liab_incr",  "sop031_addl_liab_incr",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_addl_liab_incr, 'E','Y', '3', 'P', (size_t)&modelOffset->sop031_addl_liab_incr),
-	CashFlowCommonData(160, "sop031_assess", "sfas97rd_gaap_sop031_assess",  "sop031_assess",  CashFlowCommonData::SUM,
+	CashFlowCommonData(132, "sop031_assess", "sfas97rd_gaap_sop031_assess",  "sop031_assess",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_assess, 'E','N', '3', 'P', (size_t)&modelOffset->sop031_assess),
-	CashFlowCommonData(161, "sop031_assess_accum", "sfas97rd_gaap_sop031_assess_accum",  "sop031_assess_accum",  CashFlowCommonData::SUM,
+	CashFlowCommonData(133, "sop031_assess_accum", "sfas97rd_gaap_sop031_assess_accum",  "sop031_assess_accum",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_assess_accum, 'E','N', '3', 'P', (size_t)&modelOffset->sop031_assess_accum),
-	CashFlowCommonData(162, "sop031_assess_pv", "sfas97rd_gaap_sop031_assess_pv",  "sop031_assess_pv",  CashFlowCommonData::SUM,
+	CashFlowCommonData(134, "sop031_assess_history", "sfas97rd_gaap_sop031_assess_history",  "sop031_assess_history",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_assess_history, 'E','N', '3', 'P', (size_t)&modelOffset->sop031_assess_history),
+	CashFlowCommonData(135, "sop031_assess_pv", "sfas97rd_gaap_sop031_assess_pv",  "sop031_assess_pv",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_assess_pv, 'E','N', '3', 'P', (size_t)&modelOffset->sop031_assess_pv),
-	CashFlowCommonData(163, "sop031_egp", "sfas97rd_gaap_sop031_egp",  "sop031_egp",  CashFlowCommonData::SUM,
+	CashFlowCommonData(136, "sop031_egp", "sfas97rd_gaap_sop031_egp",  "sop031_egp",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_egp, 'E','N', '3', 'P', (size_t)&modelOffset->sop031_egp),
-	CashFlowCommonData(164, "sop031_egp_accum", "sfas97rd_gaap_sop031_egp_accum",  "sop031_egp_accum",  CashFlowCommonData::SUM,
+	CashFlowCommonData(137, "sop031_egp_accum", "sfas97rd_gaap_sop031_egp_accum",  "sop031_egp_accum",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_egp_accum, 'E','N', '3', 'P', (size_t)&modelOffset->sop031_egp_accum),
-	CashFlowCommonData(165, "sop031_egp_pv", "sfas97rd_gaap_sop031_egp_pv",  "sop031_egp_pv",  CashFlowCommonData::SUM,
+	CashFlowCommonData(138, "sop031_egp_pv", "sfas97rd_gaap_sop031_egp_pv",  "sop031_egp_pv",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_egp_pv, 'E','N', '3', 'P', (size_t)&modelOffset->sop031_egp_pv),
-	CashFlowCommonData(166, "sop031_gmdb_ben_accum", "sfas97rd_gaap_sop031_gmdb_ben_accum",  "sop031_gmdb_ben_accum",  CashFlowCommonData::SUM,
+	CashFlowCommonData(139, "sop031_gmdb_ben_accum", "sfas97rd_gaap_sop031_gmdb_ben_accum",  "sop031_gmdb_ben_accum",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_gmdb_ben_accum, 'E','N', '3', 'P', (size_t)&modelOffset->sop031_gmdb_ben_accum),
-	CashFlowCommonData(167, "sop031_gmdb_ben_pv", "sfas97rd_gaap_sop031_gmdb_ben_pv",  "sop031_gmdb_ben_pv",  CashFlowCommonData::SUM,
+	CashFlowCommonData(140, "sop031_gmdb_ben_pv", "sfas97rd_gaap_sop031_gmdb_ben_pv",  "sop031_gmdb_ben_pv",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_gmdb_ben_pv, 'E','N', '3', 'P', (size_t)&modelOffset->sop031_gmdb_ben_pv),
-	CashFlowCommonData(168, "sop031_gmdb_br", "sfas97rd_gaap_sop031_gmdb_br",  "sop031_gmdb_br",  CashFlowCommonData::SUM,
+	CashFlowCommonData(141, "sop031_gmdb_benefits_history", "sfas97rd_gaap_sop031_gmdb_benefits_history",  "sop031_gmdb_benefits_history",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_gmdb_benefits_history, 'E','N', '3', 'P', (size_t)&modelOffset->sop031_gmdb_benefits_history),
+	CashFlowCommonData(142, "sop031_gmdb_br", "sfas97rd_gaap_sop031_gmdb_br",  "sop031_gmdb_br",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_gmdb_br, 'E','N', '3', 'P', (size_t)&modelOffset->sop031_gmdb_br),
-	CashFlowCommonData(169, "sop031_gmdb_br_sch", "sfas97rd_gaap_sop031_gmdb_br_sch",  "sop031_gmdb_br_sch",  CashFlowCommonData::SUM,
+	CashFlowCommonData(143, "sop031_gmdb_br_sch", "sfas97rd_gaap_sop031_gmdb_br_sch",  "sop031_gmdb_br_sch",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_gmdb_br_sch, 'E','N', '3', 'P', (size_t)&modelOffset->sop031_gmdb_br_sch),
-	CashFlowCommonData(170, "sop031_gmdb_liab", "sfas97rd_gaap_sop031_gmdb_liab",  "sop031_gmdb_liab",  CashFlowCommonData::SUM,
+	CashFlowCommonData(144, "sop031_gmdb_liab", "sfas97rd_gaap_sop031_gmdb_liab",  "sop031_gmdb_liab",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_gmdb_liab, 'E','N', '3', 'P', (size_t)&modelOffset->sop031_gmdb_liab),
-	CashFlowCommonData(171, "sop031_gmib_ben_accum", "sfas97rd_gaap_sop031_gmib_ben_accum",  "sop031_gmib_ben_accum",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_gmib_ben_accum, 'E','N', '3', 'P', (size_t)&modelOffset->sop031_gmib_ben_accum),
-	CashFlowCommonData(172, "sop031_gmib_ben_pv", "sfas97rd_gaap_sop031_gmib_ben_pv",  "sop031_gmib_ben_pv",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_gmib_ben_pv, 'E','N', '3', 'P', (size_t)&modelOffset->sop031_gmib_ben_pv),
-	CashFlowCommonData(173, "sop031_gmib_br", "sfas97rd_gaap_sop031_gmib_br",  "sop031_gmib_br",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_gmib_br, 'E','N', '3', 'P', (size_t)&modelOffset->sop031_gmib_br),
-	CashFlowCommonData(174, "sop031_gmib_br_sch", "sfas97rd_gaap_sop031_gmib_br_sch",  "sop031_gmib_br_sch",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_gmib_br_sch, 'E','N', '3', 'P', (size_t)&modelOffset->sop031_gmib_br_sch),
-	CashFlowCommonData(175, "sop031_gmib_liab", "sfas97rd_gaap_sop031_gmib_liab",  "sop031_gmib_liab",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_gmib_liab, 'E','N', '3', 'P', (size_t)&modelOffset->sop031_gmib_liab),
-	CashFlowCommonData(176, "sop031_gmwb_ben_accum", "sfas97rd_gaap_sop031_gmwb_ben_accum",  "sop031_gmwb_ben_accum",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_gmwb_ben_accum, 'E','N', '3', 'P', (size_t)&modelOffset->sop031_gmwb_ben_accum),
-	CashFlowCommonData(177, "sop031_gmwb_ben_pv", "sfas97rd_gaap_sop031_gmwb_ben_pv",  "sop031_gmwb_ben_pv",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_gmwb_ben_pv, 'E','N', '3', 'P', (size_t)&modelOffset->sop031_gmwb_ben_pv),
-	CashFlowCommonData(178, "sop031_gmwb_br", "sfas97rd_gaap_sop031_gmwb_br",  "sop031_gmwb_br",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_gmwb_br, 'E','N', '3', 'P', (size_t)&modelOffset->sop031_gmwb_br),
-	CashFlowCommonData(179, "sop031_gmwb_br_sch", "sfas97rd_gaap_sop031_gmwb_br_sch",  "sop031_gmwb_br_sch",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_gmwb_br_sch, 'E','N', '3', 'P', (size_t)&modelOffset->sop031_gmwb_br_sch),
-	CashFlowCommonData(180, "sop031_gmwb_liab", "sfas97rd_gaap_sop031_gmwb_liab",  "sop031_gmwb_liab",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_gmwb_liab, 'E','N', '3', 'P', (size_t)&modelOffset->sop031_gmwb_liab),
-	CashFlowCommonData(181, "sop031_pbr", "sfas97rd_gaap_sop031_pbr",  "sop031_pbr",  CashFlowCommonData::SUM,
+	CashFlowCommonData(145, "sop031_pbr", "sfas97rd_gaap_sop031_pbr",  "sop031_pbr",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_pbr, 'E','N', '3', 'P', (size_t)&modelOffset->sop031_pbr),
-	CashFlowCommonData(182, "sop031_pbr_accum", "sfas97rd_gaap_sop031_pbr_accum",  "sop031_pbr_accum",  CashFlowCommonData::SUM,
+	CashFlowCommonData(146, "sop031_pbr_accum", "sfas97rd_gaap_sop031_pbr_accum",  "sop031_pbr_accum",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_pbr_accum, 'E','N', '3', 'P', (size_t)&modelOffset->sop031_pbr_accum),
-	CashFlowCommonData(183, "sop031_pbr_fund_val", "sfas97rd_gaap_sop031_pbr_fund_val",  "sop031_pbr_fund_val",  CashFlowCommonData::SUM,
+	CashFlowCommonData(147, "sop031_pbr_benefits_history", "sfas97rd_gaap_sop031_pbr_benefits_history",  "sop031_pbr_benefits_history",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_pbr_benefits_history, 'E','N', '3', 'P', (size_t)&modelOffset->sop031_pbr_benefits_history),
+	CashFlowCommonData(148, "sop031_pbr_fund_val", "sfas97rd_gaap_sop031_pbr_fund_val",  "sop031_pbr_fund_val",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_pbr_fund_val, 'E','N', '3', 'P', (size_t)&modelOffset->sop031_pbr_fund_val),
-	CashFlowCommonData(184, "sop031_pbr_fund_val_accum", "sfas97rd_gaap_sop031_pbr_fund_val_accum",  "sop031_pbr_fund_val_accum",  CashFlowCommonData::SUM,
+	CashFlowCommonData(149, "sop031_pbr_fund_val_accum", "sfas97rd_gaap_sop031_pbr_fund_val_accum",  "sop031_pbr_fund_val_accum",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_pbr_fund_val_accum, 'E','N', '3', 'P', (size_t)&modelOffset->sop031_pbr_fund_val_accum),
-	CashFlowCommonData(185, "sop031_pbr_fund_val_pv", "sfas97rd_gaap_sop031_pbr_fund_val_pv",  "sop031_pbr_fund_val_pv",  CashFlowCommonData::SUM,
+	CashFlowCommonData(150, "sop031_pbr_fund_val_history", "sfas97rd_gaap_sop031_pbr_fund_val_history",  "sop031_pbr_fund_val_history",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_pbr_fund_val_history, 'E','N', '3', 'P', (size_t)&modelOffset->sop031_pbr_fund_val_history),
+	CashFlowCommonData(151, "sop031_pbr_fund_val_pv", "sfas97rd_gaap_sop031_pbr_fund_val_pv",  "sop031_pbr_fund_val_pv",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_pbr_fund_val_pv, 'E','N', '3', 'P', (size_t)&modelOffset->sop031_pbr_fund_val_pv),
-	CashFlowCommonData(186, "sop031_pbr_liab", "sfas97rd_gaap_sop031_pbr_liab",  "sop031_pbr_liab",  CashFlowCommonData::SUM,
+	CashFlowCommonData(152, "sop031_pbr_liab", "sfas97rd_gaap_sop031_pbr_liab",  "sop031_pbr_liab",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_pbr_liab, 'E','N', '3', 'P', (size_t)&modelOffset->sop031_pbr_liab),
-	CashFlowCommonData(187, "sop031_pbr_liab_amortzn", "sfas97rd_gaap_sop031_pbr_liab_amortzn",  "sop031_pbr_liab_amortzn",  CashFlowCommonData::SUM,
+	CashFlowCommonData(153, "sop031_pbr_liab_amortzn", "sfas97rd_gaap_sop031_pbr_liab_amortzn",  "sop031_pbr_liab_amortzn",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_pbr_liab_amortzn, 'E','N', '3', 'P', (size_t)&modelOffset->sop031_pbr_liab_amortzn),
-	CashFlowCommonData(188, "sop031_pbr_liab_int", "sfas97rd_gaap_sop031_pbr_liab_int",  "sop031_pbr_liab_int",  CashFlowCommonData::SUM,
+	CashFlowCommonData(154, "sop031_pbr_liab_int", "sfas97rd_gaap_sop031_pbr_liab_int",  "sop031_pbr_liab_int",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_pbr_liab_int, 'E','N', '3', 'P', (size_t)&modelOffset->sop031_pbr_liab_int),
-	CashFlowCommonData(189, "sop031_pbr_liab_sch", "sfas97rd_gaap_sop031_pbr_liab_sch",  "sop031_pbr_liab_sch",  CashFlowCommonData::SUM,
+	CashFlowCommonData(155, "sop031_pbr_liab_sch", "sfas97rd_gaap_sop031_pbr_liab_sch",  "sop031_pbr_liab_sch",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_pbr_liab_sch, 'E','N', '3', 'P', (size_t)&modelOffset->sop031_pbr_liab_sch),
-	CashFlowCommonData(190, "sop031_pbr_pv", "sfas97rd_gaap_sop031_pbr_pv",  "sop031_pbr_pv",  CashFlowCommonData::SUM,
+	CashFlowCommonData(156, "sop031_pbr_pv", "sfas97rd_gaap_sop031_pbr_pv",  "sop031_pbr_pv",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_pbr_pv, 'E','N', '3', 'P', (size_t)&modelOffset->sop031_pbr_pv),
-	CashFlowCommonData(191, "sop031_pbr_units_inf", "sfas97rd_gaap_sop031_pbr_units_inf",  "sop031_pbr_units_inf",  CashFlowCommonData::SUM,
+	CashFlowCommonData(157, "sop031_pbr_units_inf", "sfas97rd_gaap_sop031_pbr_units_inf",  "sop031_pbr_units_inf",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_pbr_units_inf, 'E','N', '3', 'P', (size_t)&modelOffset->sop031_pbr_units_inf),
-	CashFlowCommonData(192, "sop031_ulsg_ben_accum", "sfas97rd_gaap_sop031_ulsg_ben_accum",  "sop031_ulsg_ben_accum",  CashFlowCommonData::SUM,
+	CashFlowCommonData(158, "sop031_sg_benefits_history", "sfas97rd_gaap_sop031_sg_benefits_history",  "sop031_sg_benefits_history",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_sg_benefits_history, 'E','N', '3', 'P', (size_t)&modelOffset->sop031_sg_benefits_history),
+	CashFlowCommonData(159, "sop031_ulsg_ben_accum", "sfas97rd_gaap_sop031_ulsg_ben_accum",  "sop031_ulsg_ben_accum",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_ulsg_ben_accum, 'E','N', '3', 'P', (size_t)&modelOffset->sop031_ulsg_ben_accum),
-	CashFlowCommonData(193, "sop031_ulsg_ben_pv", "sfas97rd_gaap_sop031_ulsg_ben_pv",  "sop031_ulsg_ben_pv",  CashFlowCommonData::SUM,
+	CashFlowCommonData(160, "sop031_ulsg_ben_pv", "sfas97rd_gaap_sop031_ulsg_ben_pv",  "sop031_ulsg_ben_pv",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_ulsg_ben_pv, 'E','N', '3', 'P', (size_t)&modelOffset->sop031_ulsg_ben_pv),
-	CashFlowCommonData(194, "sop031_ulsg_br", "sfas97rd_gaap_sop031_ulsg_br",  "sop031_ulsg_br",  CashFlowCommonData::SUM,
+	CashFlowCommonData(161, "sop031_ulsg_br", "sfas97rd_gaap_sop031_ulsg_br",  "sop031_ulsg_br",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_ulsg_br, 'E','N', '3', 'P', (size_t)&modelOffset->sop031_ulsg_br),
-	CashFlowCommonData(195, "sop031_ulsg_br_sch", "sfas97rd_gaap_sop031_ulsg_br_sch",  "sop031_ulsg_br_sch",  CashFlowCommonData::SUM,
+	CashFlowCommonData(162, "sop031_ulsg_br_sch", "sfas97rd_gaap_sop031_ulsg_br_sch",  "sop031_ulsg_br_sch",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_ulsg_br_sch, 'E','N', '3', 'P', (size_t)&modelOffset->sop031_ulsg_br_sch),
-	CashFlowCommonData(196, "sop031_ulsg_liab", "sfas97rd_gaap_sop031_ulsg_liab",  "sop031_ulsg_liab",  CashFlowCommonData::SUM,
+	CashFlowCommonData(163, "sop031_ulsg_liab", "sfas97rd_gaap_sop031_ulsg_liab",  "sop031_ulsg_liab",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_ulsg_liab, 'E','N', '3', 'P', (size_t)&modelOffset->sop031_ulsg_liab),
-	CashFlowCommonData(197, "sop031_unearn_rev_liab_incr", "sfas97rd_gaap_sop031_unearn_rev_liab_incr",  "sop031_unearn_rev_liab_incr",  CashFlowCommonData::SUM,
+	CashFlowCommonData(164, "sop031_unearn_rev_liab_incr", "sfas97rd_gaap_sop031_unearn_rev_liab_incr",  "sop031_unearn_rev_liab_incr",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_unearn_rev_liab_incr, 'E','N', '3', 'P', (size_t)&modelOffset->sop031_unearn_rev_liab_incr),
-	CashFlowCommonData(198, "startup", "sfas97rd_gaap_startup",  "startup",  CashFlowCommonData::SUM,
+	CashFlowCommonData(165, "startup", "sfas97rd_gaap_startup",  "startup",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::virtual_startup, 'E','N', '3', 'N', (size_t)&modelOffset->startup),
-	CashFlowCommonData(199, "stat_res_rider", "sfas97rd_gaap_stat_res_rider",  "stat_res_rider",  CashFlowCommonData::SUM,
+	CashFlowCommonData(166, "stat_res_rider", "sfas97rd_gaap_stat_res_rider",  "stat_res_rider",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_stat_res_rider, 'E','N', '3', 'P', (size_t)&modelOffset->stat_res_rider),
-	CashFlowCommonData(200, "ulsg_ben", "sfas97rd_gaap_ulsg_ben",  "ulsg_ben",  CashFlowCommonData::SUM,
+	CashFlowCommonData(167, "ulsg_ben", "sfas97rd_gaap_ulsg_ben",  "ulsg_ben",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_ulsg_ben, 'E','N', '3', 'P', (size_t)&modelOffset->ulsg_ben),
-	CashFlowCommonData(201, "unearn_rev_liab", "sfas97rd_gaap_unearn_rev_liab",  "unearn_rev_liab",  CashFlowCommonData::SUM,
+	CashFlowCommonData(168, "unearn_rev_liab", "sfas97rd_gaap_unearn_rev_liab",  "unearn_rev_liab",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_unearn_rev_liab, 'E','N', '3', 'P', (size_t)&modelOffset->unearn_rev_liab),
-	CashFlowCommonData(202, "unearn_rev_liab_accum", "sfas97rd_gaap_unearn_rev_liab_accum",  "unearn_rev_liab_accum",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_unearn_rev_liab_accum, 'E','N', '3', 'P', (size_t)&modelOffset->unearn_rev_liab_accum),
-	CashFlowCommonData(203, "unearn_rev_liab_amortzn", "sfas97rd_gaap_unearn_rev_liab_amortzn",  "unearn_rev_liab_amortzn",  CashFlowCommonData::SUM,
+	CashFlowCommonData(169, "unearn_rev_liab_amortzn", "sfas97rd_gaap_unearn_rev_liab_amortzn",  "unearn_rev_liab_amortzn",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_unearn_rev_liab_amortzn, 'E','N', '3', 'P', (size_t)&modelOffset->unearn_rev_liab_amortzn),
-	CashFlowCommonData(204, "unearn_rev_liab_incr", "sfas97rd_gaap_unearn_rev_liab_incr",  "unearn_rev_liab_incr",  CashFlowCommonData::SUM,
+	CashFlowCommonData(170, "unearn_rev_liab_incr", "sfas97rd_gaap_unearn_rev_liab_incr",  "unearn_rev_liab_incr",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_unearn_rev_liab_incr, 'E','Y', '3', 'P', (size_t)&modelOffset->unearn_rev_liab_incr),
-	CashFlowCommonData(205, "unearn_rev_liab_int", "sfas97rd_gaap_unearn_rev_liab_int",  "unearn_rev_liab_int",  CashFlowCommonData::SUM,
-                     (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_unearn_rev_liab_int, 'E','N', '3', 'P', (size_t)&modelOffset->unearn_rev_liab_int),
-	CashFlowCommonData(206, "unearn_rev_liab_released", "sfas97rd_gaap_unearn_rev_liab_released",  "unearn_rev_liab_released",  CashFlowCommonData::SUM,
+	CashFlowCommonData(171, "unearn_rev_liab_released", "sfas97rd_gaap_unearn_rev_liab_released",  "unearn_rev_liab_released",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_unearn_rev_liab_released, 'E','Y', '3', 'P', (size_t)&modelOffset->unearn_rev_liab_released),
-	CashFlowCommonData(207, "unearn_rev_liab_sch", "sfas97rd_gaap_unearn_rev_liab_sch",  "unearn_rev_liab_sch",  CashFlowCommonData::SUM,
+	CashFlowCommonData(172, "unearn_rev_liab_sch", "sfas97rd_gaap_unearn_rev_liab_sch",  "unearn_rev_liab_sch",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_unearn_rev_liab_sch, 'E','N', '3', 'P', (size_t)&modelOffset->unearn_rev_liab_sch)
 };
 const CashFlowCommonData* SFAS97RD_GAAP::mCFStaticData[] = {
@@ -14731,41 +12598,6 @@ const CashFlowCommonData* SFAS97RD_GAAP::mCFStaticData[] = {
 	&SFAS97RD_GAAP::mCFStaticData_0[170],
 	&SFAS97RD_GAAP::mCFStaticData_0[171],
 	&SFAS97RD_GAAP::mCFStaticData_0[172],
-	&SFAS97RD_GAAP::mCFStaticData_0[173],
-	&SFAS97RD_GAAP::mCFStaticData_0[174],
-	&SFAS97RD_GAAP::mCFStaticData_0[175],
-	&SFAS97RD_GAAP::mCFStaticData_0[176],
-	&SFAS97RD_GAAP::mCFStaticData_0[177],
-	&SFAS97RD_GAAP::mCFStaticData_0[178],
-	&SFAS97RD_GAAP::mCFStaticData_0[179],
-	&SFAS97RD_GAAP::mCFStaticData_0[180],
-	&SFAS97RD_GAAP::mCFStaticData_0[181],
-	&SFAS97RD_GAAP::mCFStaticData_0[182],
-	&SFAS97RD_GAAP::mCFStaticData_0[183],
-	&SFAS97RD_GAAP::mCFStaticData_0[184],
-	&SFAS97RD_GAAP::mCFStaticData_0[185],
-	&SFAS97RD_GAAP::mCFStaticData_0[186],
-	&SFAS97RD_GAAP::mCFStaticData_0[187],
-	&SFAS97RD_GAAP::mCFStaticData_0[188],
-	&SFAS97RD_GAAP::mCFStaticData_0[189],
-	&SFAS97RD_GAAP::mCFStaticData_0[190],
-	&SFAS97RD_GAAP::mCFStaticData_0[191],
-	&SFAS97RD_GAAP::mCFStaticData_0[192],
-	&SFAS97RD_GAAP::mCFStaticData_0[193],
-	&SFAS97RD_GAAP::mCFStaticData_0[194],
-	&SFAS97RD_GAAP::mCFStaticData_0[195],
-	&SFAS97RD_GAAP::mCFStaticData_0[196],
-	&SFAS97RD_GAAP::mCFStaticData_0[197],
-	&SFAS97RD_GAAP::mCFStaticData_0[198],
-	&SFAS97RD_GAAP::mCFStaticData_0[199],
-	&SFAS97RD_GAAP::mCFStaticData_0[200],
-	&SFAS97RD_GAAP::mCFStaticData_0[201],
-	&SFAS97RD_GAAP::mCFStaticData_0[202],
-	&SFAS97RD_GAAP::mCFStaticData_0[203],
-	&SFAS97RD_GAAP::mCFStaticData_0[204],
-	&SFAS97RD_GAAP::mCFStaticData_0[205],
-	&SFAS97RD_GAAP::mCFStaticData_0[206],
-	&SFAS97RD_GAAP::mCFStaticData_0[207],
 	nullptr};
 //const CashFlowCommonData END@2
 
@@ -14781,45 +12613,13 @@ namespace {
 	};
 	const EnumList cohort_reins_defnEnumList(2, cohort_reins_defnChoicePairs);
 
-	// EnumList for gmib_ceded_defn                                                                                       
-	const ChoicePair gmib_ceded_defnChoicePairs[] = {
+	// EnumList for model_name                                                                                       
+	const ChoicePair model_nameChoicePairs[] = {
 		ChoicePair(StrEnum::UNDEFINED, StrEnum::undefinedString)
-		,ChoicePair(StrEnum::SOP031, "SOP031")
-		,ChoicePair(StrEnum::SFAS133, "SFAS133")
+		,ChoicePair(StrEnum::SFAS97RD, "sfas97rd")
+		,ChoicePair(StrEnum::FIA_SFAS97RD, "fia_sfas97rd")
 	};
-	const EnumList gmib_ceded_defnEnumList(2, gmib_ceded_defnChoicePairs);
-
-	// EnumList for gmib_gross_defn                                                                                       
-	const ChoicePair gmib_gross_defnChoicePairs[] = {
-		ChoicePair(StrEnum::UNDEFINED, StrEnum::undefinedString)
-		,ChoicePair(StrEnum::SOP031, "SOP031")
-		,ChoicePair(StrEnum::SFAS133, "SFAS133")
-	};
-	const EnumList gmib_gross_defnEnumList(2, gmib_gross_defnChoicePairs);
-
-	// EnumList for gmwb_ceded_defn                                                                                       
-	const ChoicePair gmwb_ceded_defnChoicePairs[] = {
-		ChoicePair(StrEnum::UNDEFINED, StrEnum::undefinedString)
-		,ChoicePair(StrEnum::SOP031, "SOP031")
-		,ChoicePair(StrEnum::SFAS133, "SFAS133")
-	};
-	const EnumList gmwb_ceded_defnEnumList(2, gmwb_ceded_defnChoicePairs);
-
-	// EnumList for gmwb_gross_defn                                                                                       
-	const ChoicePair gmwb_gross_defnChoicePairs[] = {
-		ChoicePair(StrEnum::UNDEFINED, StrEnum::undefinedString)
-		,ChoicePair(StrEnum::SOP031, "SOP031")
-		,ChoicePair(StrEnum::SFAS133, "SFAS133")
-	};
-	const EnumList gmwb_gross_defnEnumList(2, gmwb_gross_defnChoicePairs);
-
-	// EnumList for loss_recognition_defn                                                                                       
-	const ChoicePair loss_recognition_defnChoicePairs[] = {
-		ChoicePair(StrEnum::UNDEFINED, StrEnum::undefinedString)
-		,ChoicePair(StrEnum::NO, "No")
-		,ChoicePair(StrEnum::YES, "Yes")
-	};
-	const EnumList loss_recognition_defnEnumList(2, loss_recognition_defnChoicePairs);
+	const EnumList model_nameEnumList(2, model_nameChoicePairs);
 
 	// EnumList for sop031_ul_vul_iul_defn                                                                                       
 	const ChoicePair sop031_ul_vul_iul_defnChoicePairs[] = {
@@ -14871,127 +12671,89 @@ TableMgr<VariantTable> SFAS97RD_GAAP::mgr_;
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
 	Descriptor(3, Attribute::DOUBLE,	"cohort_history_agp", Descriptor::NOT_INDEXED, (size_t)&modelOffset->cohort_history_agp,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(4, Attribute::DOUBLE,	"cohort_history_capzd_acq_exp", Descriptor::NOT_INDEXED, (size_t)&modelOffset->cohort_history_capzd_acq_exp,
+	Descriptor(4, Attribute::DOUBLE,	"cohort_history_dac_acq_exp", Descriptor::NOT_INDEXED, (size_t)&modelOffset->cohort_history_dac_acq_exp,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(5, Attribute::DOUBLE,	"cohort_history_capzd_comm_bom", Descriptor::NOT_INDEXED, (size_t)&modelOffset->cohort_history_capzd_comm_bom,
+	Descriptor(5, Attribute::DOUBLE,	"cohort_history_dac_comm", Descriptor::NOT_INDEXED, (size_t)&modelOffset->cohort_history_dac_comm,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(6, Attribute::DOUBLE,	"cohort_history_capzd_comm_eom", Descriptor::NOT_INDEXED, (size_t)&modelOffset->cohort_history_capzd_comm_eom,
+	Descriptor(6, Attribute::DOUBLE,	"cohort_history_dac_prem_bonus", Descriptor::NOT_INDEXED, (size_t)&modelOffset->cohort_history_dac_prem_bonus,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(7, Attribute::DOUBLE,	"cohort_history_capzd_prem_bonus", Descriptor::NOT_INDEXED, (size_t)&modelOffset->cohort_history_capzd_prem_bonus,
+	Descriptor(7, Attribute::DOUBLE,	"cohort_history_dac_reins_yrt_asset", Descriptor::NOT_INDEXED, (size_t)&modelOffset->cohort_history_dac_reins_yrt_asset,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(8, Attribute::DOUBLE,	"cohort_history_dac_acq_exp_loss", Descriptor::NOT_INDEXED, (size_t)&modelOffset->cohort_history_dac_acq_exp_loss,
+	Descriptor(8, Attribute::DOUBLE,	"cohort_history_deferred_load", Descriptor::NOT_INDEXED, (size_t)&modelOffset->cohort_history_deferred_load,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(9, Attribute::DOUBLE,	"cohort_history_dac_comm_loss", Descriptor::NOT_INDEXED, (size_t)&modelOffset->cohort_history_dac_comm_loss,
+	Descriptor(9, Attribute::DOUBLE,	"cohort_history_sop031_assess", Descriptor::NOT_INDEXED, (size_t)&modelOffset->cohort_history_sop031_assess,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(10, Attribute::DOUBLE,	"cohort_history_dac_prem_bonus_loss", Descriptor::NOT_INDEXED, (size_t)&modelOffset->cohort_history_dac_prem_bonus_loss,
+	Descriptor(10, Attribute::DOUBLE,	"cohort_history_sop031_gmdb_benefits", Descriptor::NOT_INDEXED, (size_t)&modelOffset->cohort_history_sop031_gmdb_benefits,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(11, Attribute::DOUBLE,	"cohort_history_deferred_load", Descriptor::NOT_INDEXED, (size_t)&modelOffset->cohort_history_deferred_load,
+	Descriptor(11, Attribute::DOUBLE,	"cohort_history_sop031_pbr_benefits", Descriptor::NOT_INDEXED, (size_t)&modelOffset->cohort_history_sop031_pbr_benefits,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(12, Attribute::DOUBLE,	"cohort_history_reins_yrt_cost", Descriptor::NOT_INDEXED, (size_t)&modelOffset->cohort_history_reins_yrt_cost,
+	Descriptor(12, Attribute::DOUBLE,	"cohort_history_sop031_pbr_fund_val", Descriptor::NOT_INDEXED, (size_t)&modelOffset->cohort_history_sop031_pbr_fund_val,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(13, Attribute::DOUBLE,	"cohort_history_sop031_assess", Descriptor::NOT_INDEXED, (size_t)&modelOffset->cohort_history_sop031_assess,
+	Descriptor(13, Attribute::DOUBLE,	"cohort_history_sop031_sg_benefits", Descriptor::NOT_INDEXED, (size_t)&modelOffset->cohort_history_sop031_sg_benefits,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(14, Attribute::DOUBLE,	"cohort_history_sop031_gmdb_benefits", Descriptor::NOT_INDEXED, (size_t)&modelOffset->cohort_history_sop031_gmdb_benefits,
+	Descriptor(14, Attribute::DOUBLE,	"cohort_history_unearn_rev_liab", Descriptor::NOT_INDEXED, (size_t)&modelOffset->cohort_history_unearn_rev_liab,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(15, Attribute::DOUBLE,	"cohort_history_sop031_gmib_benefits", Descriptor::NOT_INDEXED, (size_t)&modelOffset->cohort_history_sop031_gmib_benefits,
+	Descriptor(15, Attribute::STRING,	"cohort_id", -1, (size_t)&modelOffset->cohort_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(16, Attribute::DOUBLE,	"cohort_history_sop031_gmwb_benefits", Descriptor::NOT_INDEXED, (size_t)&modelOffset->cohort_history_sop031_gmwb_benefits,
+	Descriptor(16, Attribute::STRING,	"cohort_issue_yrs", -1, (size_t)&modelOffset->cohort_issue_yrs,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(17, Attribute::DOUBLE,	"cohort_history_sop031_pbr_benefits", Descriptor::NOT_INDEXED, (size_t)&modelOffset->cohort_history_sop031_pbr_benefits,
+	Descriptor(17, Attribute::STRING,	"cohort_plan_codes", -1, (size_t)&modelOffset->cohort_plan_codes,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(18, Attribute::DOUBLE,	"cohort_history_sop031_pbr_fund_val", Descriptor::NOT_INDEXED, (size_t)&modelOffset->cohort_history_sop031_pbr_fund_val,
-				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(19, Attribute::DOUBLE,	"cohort_history_sop031_sg_benefits", Descriptor::NOT_INDEXED, (size_t)&modelOffset->cohort_history_sop031_sg_benefits,
-				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(20, Attribute::DOUBLE,	"cohort_history_unearn_rev_liab", Descriptor::NOT_INDEXED, (size_t)&modelOffset->cohort_history_unearn_rev_liab,
-				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(21, Attribute::STRING,	"cohort_id", -1, (size_t)&modelOffset->cohort_id,
-				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(22, Attribute::STRING,	"cohort_issue_yrs", -1, (size_t)&modelOffset->cohort_issue_yrs,
-				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(23, Attribute::DOUBLE,	"cohort_loss_recognition_int_rate_ceded", Descriptor::NOT_INDEXED, (size_t)&modelOffset->cohort_loss_recognition_int_rate_ceded,
-				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(24, Attribute::DOUBLE,	"cohort_loss_recognition_int_rate_gross", Descriptor::NOT_INDEXED, (size_t)&modelOffset->cohort_loss_recognition_int_rate_gross,
-				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(25, Attribute::STRING,	"cohort_plan_codes", -1, (size_t)&modelOffset->cohort_plan_codes,
-				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(26, Attribute::STR_ENUM,	"cohort_reins_defn", -1, (size_t)&modelOffset->cohort_reins_defn,
+	Descriptor(18, Attribute::STR_ENUM,	"cohort_reins_defn", -1, (size_t)&modelOffset->cohort_reins_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &cohort_reins_defnEnumList, Feature(true)),
-	Descriptor(27, Attribute::INT,	"cohort_yr", -1, (size_t)&modelOffset->cohort_yr,
+	Descriptor(19, Attribute::INT,	"cohort_yr", -1, (size_t)&modelOffset->cohort_yr,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(28, Attribute::INT,	"date_lookup_gen2", -1, (size_t)&modelOffset->date_lookup_gen2,
+	Descriptor(20, Attribute::INT,	"comm_py_lookup", -1, (size_t)&modelOffset->comm_py_lookup,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(29, Attribute::DOUBLE,	"fia_gaap_int_rate", Descriptor::NOT_INDEXED, (size_t)&modelOffset->fia_gaap_int_rate,
+	Descriptor(21, Attribute::DOUBLE,	"fia_gaap_int_rate", Descriptor::NOT_INDEXED, (size_t)&modelOffset->fia_gaap_int_rate,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(30, Attribute::STR_ENUM,	"gmib_ceded_defn", -1, (size_t)&modelOffset->gmib_ceded_defn,
-				Descriptor::NOT_SHARED, false, false, (size_t)0, &gmib_ceded_defnEnumList, Feature(true)),
-	Descriptor(31, Attribute::STR_ENUM,	"gmib_gross_defn", -1, (size_t)&modelOffset->gmib_gross_defn,
-				Descriptor::NOT_SHARED, false, false, (size_t)0, &gmib_gross_defnEnumList, Feature(true)),
-	Descriptor(32, Attribute::STR_ENUM,	"gmwb_ceded_defn", -1, (size_t)&modelOffset->gmwb_ceded_defn,
-				Descriptor::NOT_SHARED, false, false, (size_t)0, &gmwb_ceded_defnEnumList, Feature(true)),
-	Descriptor(33, Attribute::STR_ENUM,	"gmwb_gross_defn", -1, (size_t)&modelOffset->gmwb_gross_defn,
-				Descriptor::NOT_SHARED, false, false, (size_t)0, &gmwb_gross_defnEnumList, Feature(true)),
-	Descriptor(34, Attribute::STR_ENUM,	"loss_recognition_defn", -1, (size_t)&modelOffset->loss_recognition_defn,
-				Descriptor::NOT_SHARED, false, false, (size_t)0, &loss_recognition_defnEnumList, Feature(true)),
-	Descriptor(35, Attribute::STRING,	"proj_date", -1, (size_t)&modelOffset->proj_date,
+	Descriptor(22, Attribute::STR_ENUM,	"model_name", -1, (size_t)&modelOffset->model_name,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, &model_nameEnumList, Feature(true)),
+	Descriptor(23, Attribute::STRING,	"proj_date", -1, (size_t)&modelOffset->proj_date,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(36, Attribute::STRING,	"seg_id", -1, (size_t)&modelOffset->seg_id,
+	Descriptor(24, Attribute::STRING,	"seg_id", -1, (size_t)&modelOffset->seg_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(37, Attribute::STRING,	"sfas97rd_results", -1, (size_t)&modelOffset->sfas97rd_results,
+	Descriptor(25, Attribute::STRING,	"sfas97rd_results", -1, (size_t)&modelOffset->sfas97rd_results,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(38, Attribute::STRING,	"sop031_results", -1, (size_t)&modelOffset->sop031_results,
+	Descriptor(26, Attribute::STRING,	"sop031_results", -1, (size_t)&modelOffset->sop031_results,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(39, Attribute::STR_ENUM,	"sop031_ul_vul_iul_defn", -1, (size_t)&modelOffset->sop031_ul_vul_iul_defn,
+	Descriptor(27, Attribute::STR_ENUM,	"sop031_ul_vul_iul_defn", -1, (size_t)&modelOffset->sop031_ul_vul_iul_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &sop031_ul_vul_iul_defnEnumList, Feature(true)),
-	Descriptor(40, Attribute::INT,	"msnumelement", -1, (size_t)&modelOffset->msnumelement,
+	Descriptor(28, Attribute::INT,	"msnumelement", -1, (size_t)&modelOffset->msnumelement,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(41, Attribute::SCALAR_INT,	"amortzn_period", -1, (size_t)&modelOffset->amortzn_period,
+	Descriptor(29, Attribute::SCALAR_INT,	"amortzn_period", -1, (size_t)&modelOffset->amortzn_period,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_amortzn_period)),
-	Descriptor(42, Attribute::SCALAR_INT,	"comm_pct_fund_ult_index", -1, (size_t)&modelOffset->comm_pct_fund_ult_index,
+	Descriptor(30, Attribute::SCALAR_INT,	"comm_pct_fund_ult_index", -1, (size_t)&modelOffset->comm_pct_fund_ult_index,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_comm_pct_fund_ult_index)),
-	Descriptor(43, Attribute::SCALAR_INT,	"final_period", -1, (size_t)&modelOffset->final_period,
+	Descriptor(31, Attribute::SCALAR_INT,	"final_period", -1, (size_t)&modelOffset->final_period,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_final_period)),
-	Descriptor(44, Attribute::SCALAR_DOUBLE,	"gaap_int_rate", -1, (size_t)&modelOffset->gaap_int_rate,
+	Descriptor(32, Attribute::SCALAR_DOUBLE,	"gaap_int_rate", -1, (size_t)&modelOffset->gaap_int_rate,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((dF)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_gaap_int_rate)),
-	Descriptor(45, Attribute::SCALAR_DOUBLE,	"gaap_int_rate_mthly", -1, (size_t)&modelOffset->gaap_int_rate_mthly,
+	Descriptor(33, Attribute::SCALAR_DOUBLE,	"gaap_int_rate_mthly", -1, (size_t)&modelOffset->gaap_int_rate_mthly,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((dF)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_gaap_int_rate_mthly)),
-	Descriptor(46, Attribute::SCALAR_INT,	"gmib_defn", -1, (size_t)&modelOffset->gmib_defn,
-				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_gmib_defn)),
-	Descriptor(47, Attribute::SCALAR_INT,	"gmib_sop031_flag", -1, (size_t)&modelOffset->gmib_sop031_flag,
-				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_gmib_sop031_flag)),
-	Descriptor(48, Attribute::SCALAR_INT,	"gmwb_defn", -1, (size_t)&modelOffset->gmwb_defn,
-				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_gmwb_defn)),
-	Descriptor(49, Attribute::SCALAR_INT,	"gmwb_sop031_flag", -1, (size_t)&modelOffset->gmwb_sop031_flag,
-				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_gmwb_sop031_flag)),
-	Descriptor(50, Attribute::SCALAR_DOUBLE,	"hedge_alloc_factor", -1, (size_t)&modelOffset->hedge_alloc_factor,
+	Descriptor(34, Attribute::SCALAR_DOUBLE,	"hedge_alloc_factor", -1, (size_t)&modelOffset->hedge_alloc_factor,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((dF)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_hedge_alloc_factor)),
-	Descriptor(51, Attribute::SCALAR_DOUBLE,	"host_accrual_rate", -1, (size_t)&modelOffset->host_accrual_rate,
+	Descriptor(35, Attribute::SCALAR_DOUBLE,	"host_accrual_rate", -1, (size_t)&modelOffset->host_accrual_rate,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((dF)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_host_accrual_rate)),
-	Descriptor(52, Attribute::SCALAR_DOUBLE,	"loss_rec_int_rate", -1, (size_t)&modelOffset->loss_rec_int_rate,
-				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((dF)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_loss_rec_int_rate)),
-	Descriptor(53, Attribute::SCALAR_DOUBLE,	"loss_rec_int_rate_mthly", -1, (size_t)&modelOffset->loss_rec_int_rate_mthly,
-				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((dF)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_loss_rec_int_rate_mthly)),
-	Descriptor(54, Attribute::SCALAR_INT,	"loss_recognition_flag", -1, (size_t)&modelOffset->loss_recognition_flag,
-				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_loss_recognition_flag)),
-	Descriptor(55, Attribute::SCALAR_INT,	"pbr_final_period", -1, (size_t)&modelOffset->pbr_final_period,
+	Descriptor(36, Attribute::SCALAR_INT,	"pbr_final_period", -1, (size_t)&modelOffset->pbr_final_period,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_pbr_final_period)),
-	Descriptor(56, Attribute::SCALAR_INT,	"prem_term_period", -1, (size_t)&modelOffset->prem_term_period,
+	Descriptor(37, Attribute::SCALAR_INT,	"prem_term_period", -1, (size_t)&modelOffset->prem_term_period,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_prem_term_period)),
-	Descriptor(57, Attribute::SCALAR_STRING,	"proj_date_adj", -1, (size_t)&modelOffset->proj_date_adj,
+	Descriptor(38, Attribute::SCALAR_STRING,	"proj_date_adj", -1, (size_t)&modelOffset->proj_date_adj,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((sF)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_proj_date_adj)),
-	Descriptor(58, Attribute::SCALAR_INT,	"proj_start_date", -1, (size_t)&modelOffset->proj_start_date,
+	Descriptor(39, Attribute::SCALAR_INT,	"proj_start_date", -1, (size_t)&modelOffset->proj_start_date,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_proj_start_date)),
-	Descriptor(59, Attribute::SCALAR_INT,	"proj_start_mth", -1, (size_t)&modelOffset->proj_start_mth,
+	Descriptor(40, Attribute::SCALAR_INT,	"proj_start_mth", -1, (size_t)&modelOffset->proj_start_mth,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_proj_start_mth)),
-	Descriptor(60, Attribute::SCALAR_INT,	"proj_start_yr", -1, (size_t)&modelOffset->proj_start_yr,
+	Descriptor(41, Attribute::SCALAR_INT,	"proj_start_yr", -1, (size_t)&modelOffset->proj_start_yr,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_proj_start_yr)),
-	Descriptor(61, Attribute::SCALAR_INT,	"reins_flag", -1, (size_t)&modelOffset->reins_flag,
+	Descriptor(42, Attribute::SCALAR_INT,	"reins_flag", -1, (size_t)&modelOffset->reins_flag,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_reins_flag)),
-	Descriptor(62, Attribute::SCALAR_INT,	"sop031_flag", -1, (size_t)&modelOffset->sop031_flag,
+	Descriptor(43, Attribute::SCALAR_INT,	"sop031_flag", -1, (size_t)&modelOffset->sop031_flag,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_sop031_flag)),
-	Descriptor(63, Attribute::SCALAR_INT,	"start_period", -1, (size_t)&modelOffset->start_period,
+	Descriptor(44, Attribute::SCALAR_INT,	"start_period", -1, (size_t)&modelOffset->start_period,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_start_period)),
-	Descriptor(64, Attribute::SCALAR_STRING,	"state_of_world_financial_file_path", -1, (size_t)&modelOffset->state_of_world_financial_file_path,
+	Descriptor(45, Attribute::SCALAR_STRING,	"state_of_world_financial_file_path", -1, (size_t)&modelOffset->state_of_world_financial_file_path,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((sF)&SFAS97RD_GAAP_UDF::sfas97rd_gaap_state_of_world_financial_file_path)),
 	};
 
@@ -15042,27 +12804,8 @@ TableMgr<VariantTable> SFAS97RD_GAAP::mgr_;
 	&SFAS97RD_GAAP::descriptor_0[43],
 	&SFAS97RD_GAAP::descriptor_0[44],
 	&SFAS97RD_GAAP::descriptor_0[45],
-	&SFAS97RD_GAAP::descriptor_0[46],
-	&SFAS97RD_GAAP::descriptor_0[47],
-	&SFAS97RD_GAAP::descriptor_0[48],
-	&SFAS97RD_GAAP::descriptor_0[49],
-	&SFAS97RD_GAAP::descriptor_0[50],
-	&SFAS97RD_GAAP::descriptor_0[51],
-	&SFAS97RD_GAAP::descriptor_0[52],
-	&SFAS97RD_GAAP::descriptor_0[53],
-	&SFAS97RD_GAAP::descriptor_0[54],
-	&SFAS97RD_GAAP::descriptor_0[55],
-	&SFAS97RD_GAAP::descriptor_0[56],
-	&SFAS97RD_GAAP::descriptor_0[57],
-	&SFAS97RD_GAAP::descriptor_0[58],
-	&SFAS97RD_GAAP::descriptor_0[59],
-	&SFAS97RD_GAAP::descriptor_0[60],
-	&SFAS97RD_GAAP::descriptor_0[61],
-	&SFAS97RD_GAAP::descriptor_0[62],
-	&SFAS97RD_GAAP::descriptor_0[63],
-	&SFAS97RD_GAAP::descriptor_0[64],
 	nullptr};
-	const size_t SFAS97RD_GAAP::sDescriptorCount = 65;
+	const size_t SFAS97RD_GAAP::sDescriptorCount = 46;
 
 //factory
 SFAS97RD_GAAP* SFAS97RD_GAAP::makeThis(int isSubmodel, ModelClass* owner, SFAS97RD_GAAP* peer, 
@@ -15173,15 +12916,10 @@ typedef xstring (SFAS97RD_GAAP_UDF::*sPFs) (xstring);
 
 // constructor if this model class is the base class of another model class
 SFAS97RD_GAAP::SFAS97RD_GAAP(int columnCount, Descriptor* mocd[], Product* persObj) : ModelClass(columnCount, mocd, persObj), Variable(*this)
-  , sm_bond_is(0)
-  , sm_bond_pv(0)
-  , sm_bond_ym(0)
-  , sm_mtg_is(0)
-  , sm_mtg_pv(0)
-  , sm_mtg_ym(0)
 
+	, adco(company_asset_adco)
+	, asset(company_asset)
 	, fia(company_liab_fia)
-	, fia_automation(company_liab_fia_fia_automation)
 	, fia_rates(company_liab_fia_fia_rates)
 	, fia_sfas97rd(company_liab_fia_fia_sfas97rd)
 	, liab(company_liab)
@@ -15202,16 +12940,11 @@ SFAS97RD_GAAP::SFAS97RD_GAAP(int columnCount, Descriptor* mocd[], Product* persO
 //constructor begincolumn
 SFAS97RD_GAAP::SFAS97RD_GAAP(const xstring &modelClassName,
 		int isSm, ModelClass *owner, ModelClass *peer, int mainRebase,
-		const char *name, ModelClass* arrayPersistentObj) : ModelClass(207, SFAS97RD_GAAP::descriptorTable, arrayPersistentObj), Variable(*this)
-  , sm_bond_is(0)
-  , sm_bond_pv(0)
-  , sm_bond_ym(0)
-  , sm_mtg_is(0)
-  , sm_mtg_pv(0)
-  , sm_mtg_ym(0)
+		const char *name, ModelClass* arrayPersistentObj) : ModelClass(172, SFAS97RD_GAAP::descriptorTable, arrayPersistentObj), Variable(*this)
 
+	, adco(company_asset_adco)
+	, asset(company_asset)
 	, fia(company_liab_fia)
-	, fia_automation(company_liab_fia_fia_automation)
 	, fia_rates(company_liab_fia_fia_rates)
 	, fia_sfas97rd(company_liab_fia_fia_sfas97rd)
 	, liab(company_liab)
@@ -15243,17 +12976,20 @@ SFAS97RD_GAAP::SFAS97RD_GAAP(const xstring &modelClassName,
        isMainModel = !isSm;
 		modelName = name;
 
-#ifdef __CREATE_COMP_COMP_CLASS_
+#ifdef __CREATE_AA_COMP_COMP_CLASS_
        company = 0;
+#endif
+#ifdef __CREATE_ASSET_ASSET_CLASS_
+       company_asset = 0;
+#endif
+#ifdef __CREATE_ADCO_ASSET_CLASS_
+       company_asset_adco = 0;
 #endif
 #ifdef __CREATE_LIAB_LIAB_CLASS_
        company_liab = 0;
 #endif
 #ifdef __CREATE_FIA_LIAB_CLASS_
        company_liab_fia = 0;
-#endif
-#ifdef __CREATE_AUTOMATION_CLASS_
-       company_liab_fia_fia_automation = 0;
 #endif
 #ifdef __CREATE_RATES_ECONOMY_CLASS_
        company_liab_fia_fia_rates = 0;
@@ -15286,7 +13022,7 @@ SFAS97RD_GAAP::SFAS97RD_GAAP(const xstring &modelClassName,
 
 	setSlidingSpace();
 
-	for (int cf_no = 1; cf_no <= 207; cf_no++)
+	for (int cf_no = 1; cf_no <= 172; cf_no++)
 #ifdef CF_MEMORY
 		setPtr_col(cf_no, 0);
 #else
@@ -15327,17 +13063,20 @@ SFAS97RD_GAAP::SFAS97RD_GAAP(const xstring &modelClassName,
 
  void SFAS97RD_GAAP::copy_names() {
 
-#ifdef __CREATE_COMP_COMP_CLASS_
-		company = (COMP_COMP*)(findUnique("company"));
+#ifdef __CREATE_AA_COMP_COMP_CLASS_
+		company = (AA_COMP_COMP*)(findUnique("company"));
+#endif
+#ifdef __CREATE_ASSET_ASSET_CLASS_
+		company_asset = (ASSET_ASSET*)(findUnique("company|asset"));
+#endif
+#ifdef __CREATE_ADCO_ASSET_CLASS_
+		company_asset_adco = (ADCO_ASSET*)(findUnique("company|asset|adco"));
 #endif
 #ifdef __CREATE_LIAB_LIAB_CLASS_
 		company_liab = (LIAB_LIAB*)(findUnique("company|liab"));
 #endif
 #ifdef __CREATE_FIA_LIAB_CLASS_
 		company_liab_fia = (FIA_LIAB*)(findUnique("company|liab|fia"));
-#endif
-#ifdef __CREATE_AUTOMATION_CLASS_
-		company_liab_fia_fia_automation = (AUTOMATION*)(findUnique("company|liab|fia|fia_automation"));
 #endif
 #ifdef __CREATE_RATES_ECONOMY_CLASS_
 		company_liab_fia_fia_rates = (RATES_ECONOMY*)(findUnique("company|liab|fia|fia_rates"));
@@ -15564,12 +13303,6 @@ SFAS97RD_GAAP_persistent_object::SFAS97RD_GAAP_persistent_object(const xstring &
 			SFAS97RD_GAAP(modelClassName, isSm, owner, peer, mainRebase, name, arrayPersistentObj), 
 			mReadArray(true),
 			pfl(0)
-	, sm_bond_is(SFAS97RD_GAAP::sm_bond_is)
-	, sm_bond_pv(SFAS97RD_GAAP::sm_bond_pv)
-	, sm_bond_ym(SFAS97RD_GAAP::sm_bond_ym)
-	, sm_mtg_is(SFAS97RD_GAAP::sm_mtg_is)
-	, sm_mtg_pv(SFAS97RD_GAAP::sm_mtg_pv)
-	, sm_mtg_ym(SFAS97RD_GAAP::sm_mtg_ym)
 
 	{
 
@@ -15649,7 +13382,7 @@ void SFAS97RD_GAAP::after_startup(int decrement) {
 //ms_BeforeStartup END@2
 
 HVector<ModelClass::ddfStruct> SFAS97RD_GAAP::ddfVector;
-BitArray SFAS97RD_GAAP::dataVariables(65);
+BitArray SFAS97RD_GAAP::dataVariables(46);
 bool SFAS97RD_GAAP::hasBeenWritten = false;
 
 

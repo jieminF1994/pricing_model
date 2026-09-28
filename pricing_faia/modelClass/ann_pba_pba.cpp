@@ -1,13 +1,12 @@
 ﻿
 //MODELCLASS BEGIN
+//MODELCLASS aa_comp_comp
 //MODELCLASS adco_asset
 //MODELCLASS ann_pba_pba
 //MODELCLASS asset_asset
-//MODELCLASS automation
 //MODELCLASS a_subport_asset
 //MODELCLASS bond_asset
 //MODELCLASS bond_cf_asset
-//MODELCLASS comp_comp
 //MODELCLASS eio_asset
 //MODELCLASS epa_asset
 //MODELCLASS epl_liab
@@ -15,16 +14,14 @@
 //MODELCLASS fiacarvm_liab
 //MODELCLASS fia_liab
 //MODELCLASS hdg_grp_comp
-//MODELCLASS intex_asset
 //MODELCLASS invstrat_asset
 //MODELCLASS liab_liab
+//MODELCLASS mrb_gaap
 //MODELCLASS mtg_asset
 //MODELCLASS mtg_cf_asset
 //MODELCLASS rates_economy
 //MODELCLASS seg_comp
-//MODELCLASS sfas133_gaap
 //MODELCLASS sfas97rd_gaap
-//MODELCLASS util_rafm
 //MODELCLASS END
 
 #if defined(MICROSOFT)
@@ -75,13 +72,12 @@ extern MemCount gMem;
 extern MY_DLL Parmfile *p;
 #include "column2.h"
 #include "ModelClass\ann_pba_pba_udf.h"
+#include "ModelClass\aa_comp_comp.h"
 #include "ModelClass\adco_asset.h"
 #include "ModelClass\asset_asset.h"
-#include "ModelClass\automation.h"
 #include "ModelClass\a_subport_asset.h"
 #include "ModelClass\bond_asset.h"
 #include "ModelClass\bond_cf_asset.h"
-#include "ModelClass\comp_comp.h"
 #include "ModelClass\eio_asset.h"
 #include "ModelClass\epa_asset.h"
 #include "ModelClass\epl_liab.h"
@@ -89,16 +85,14 @@ extern MY_DLL Parmfile *p;
 #include "ModelClass\fiacarvm_liab.h"
 #include "ModelClass\fia_liab.h"
 #include "ModelClass\hdg_grp_comp.h"
-#include "ModelClass\intex_asset.h"
 #include "ModelClass\invstrat_asset.h"
 #include "ModelClass\liab_liab.h"
+#include "ModelClass\mrb_gaap.h"
 #include "ModelClass\mtg_asset.h"
 #include "ModelClass\mtg_cf_asset.h"
 #include "ModelClass\rates_economy.h"
 #include "ModelClass\seg_comp.h"
-#include "ModelClass\sfas133_gaap.h"
 #include "ModelClass\sfas97rd_gaap.h"
-#include "ModelClass\util_rafm.h"
 #pragma optimize( "gs", on )
 
 #include "generatedCppHeader.h"
@@ -109,7 +103,7 @@ extern MY_DLL Parmfile *p;
 //Redundant includes only for snip test:
 //iomanip included for "setprecision()"
 #include <iomanip>
-#include <strstream> //WTW - Gen2
+#include <strstream>
 typedef vector<vector<string>> sowfinput;
 typedef vector<string> sowfcols;
 typedef map <xstring, long, less <xstring> > sowfmap;
@@ -120,7 +114,9 @@ typedef vector<vector<string>> deptaskinput;
 typedef vector<string> deptaskcols;
 typedef map <xstring, long, less <xstring> > deptaskmap;
 typedef deptaskmap::iterator deptaskmapiter;
-//extern MY_DLL strstream log_screen; //WTW - Gen2 - MY_DLL is not supported
+const int pv = 0;
+const int is = 1;
+const int ym = 2;
 const int EFFECTIVE_RATE = 0;
 const int EFFECTIVE_ANNUAL = 1;
 const int NOMINAL_SEMIANNUAL = 2;
@@ -138,9 +134,8 @@ const double LEAST_ANNUAL_GROWTH_RATE = -0.9999;
 const double LEAST_BOND_EQUIVALENT_RATE = 0.0001;
 const double SPOT_SHIFT_FOR_EFFECTIVE_DURATION_CALCULATION = 0.0001;
 const double ONE_MILLION = 1000000.0;
-//WTW - Gen2 - Move Extern definitions to rates header
-//const double MINIMUM_MONTHLY_YIELD_RATIO = -0.9; // annual yield = (1.0-0.9)^12 = 1.0e-12
-//const double MAXIMUM_MONTHLY_YIELD_RATIO	 = 999999999.0; // annual yield = (1.0+999999999.0)^12 = 1.0e+120
+const double MINIMUM_MONTHLY_YIELD_RATIO = -0.9; // annual yield = (1.0-0.9)^12 = 1.0e-12
+const double MAXIMUM_MONTHLY_YIELD_RATIO	 = 999999999.0; // annual yield = (1.0+999999999.0)^12 = 1.0e+120
 const int DECIMALS_TO_ROUND = 6;
 const int ROUND_NEGATIVE_TOZERO = 0;
 const int ROUND_NEAR = 1;
@@ -154,11 +149,10 @@ const int SUM_OVER_NEGATIVE = -101;
 const int TIER = -98;
 const int ANY_GROUP = -99;
 const bool DO_NOT_ISSUE_WARNINGS = false;
-//WTW - Gen2 - Move Extern definitions to rates header
-//const int CALL_CODE = 1; 
-//const int PUT_CODE = 2; 
-//const int CONTINUOUS_PAYOUT_CODE = 3;
-//const int FUTURES_CODE = 4;
+const int CALL_CODE = 1;
+const int PUT_CODE = 2;
+const int CONTINUOUS_PAYOUT_CODE = 3;
+const int FUTURES_CODE = 4;
 // Model point type
 const int NEW_PURCH = 0;
 const int INIT_MP = 1;
@@ -208,11 +202,13 @@ const int HEDGE_CASH_FLOW = 0;
 const int HEDGE_MKT_VAL = 1;
 const int HEDGE_ARRAY_SIZE = 2;
 // global calculation flags
-//extern bool pricing_flag;//WTW - Gen2 - Move Extern definitions to rates header
+extern bool pricing_flag;
 extern bool factors_flag;
 extern bool nb_flag;
 extern bool alm_flag;
 extern bool tcm_flag;
+extern bool pba_disc_rate_flag;
+extern int pba_segment_size;
 extern bool avr_flag;
 extern bool imr_flag;
 extern bool gaap_flag;
@@ -220,17 +216,12 @@ extern bool tgt_cap_flag;
 extern bool stoch_flag;
 extern bool valn_flag;
 extern bool time_step_flag;
-extern bool sfas133_valn_flag;
+extern bool mrb_valn_flag;
 extern bool sop031_valn_flag;
 extern bool sfas97rd_valn_flag;
-extern bool sfas97lp_valn_flag;
-extern bool sfas97lp_gpr_valn_flag;
 extern bool sfas91_valn_flag;
-extern bool sfas60_valn_flag;
-extern bool sfas60_gpr_valn_flag;
+extern bool gaap_ldti_valn_flag;
 extern bool sfas120_nlp_valn_flag;
-extern bool sfas120_valn_flag;
-extern bool sfas120_gpr_valn_flag;
 extern bool loc_gpr_valn_flag;
 extern bool pba_valn_flag;
 extern bool pba_scen_amt_valn_flag;
@@ -239,6 +230,7 @@ extern bool res_scen_amt_valn_flag;
 extern bool res_det_res_valn_flag;
 extern bool res_ag38_8d_valn_flag;
 extern bool std_scen_valn_flag;
+extern bool std_scen_prescribed_assump_flag;
 extern bool rbc_std_scen_valn_flag;
 extern bool rbc_std_scen_step2_valn_flag;
 extern bool res_std_scen_valn_flag;
@@ -261,33 +253,32 @@ extern double aggregate_amount_threshold;
 extern double model_point_amount_threshold;
 extern double rate_ratio_threshold;
 extern vector<string> valn_periods;
+
 // utility functions - elaborated in rates/economy externs
-//WTW - Gen2 - Move Extern definitions to rates header
-/*extern double round_result(int rounding, int negative, double x, int n);
+extern double round_result(int rounding, int negative, double x, int n);
 extern double factorial(int n);
 extern int n_choose_k(int n, int k);
 extern xstring check_date_format(const xstring &date);
+extern int month_from_day_number(int nSerialDate);
+extern int year_from_day_number(int nSerialDate);
+extern int day_from_day_number(int nSerialDate);
+extern int month_number_from_date(int year, int month); 
+extern int day_number_from_date(int nYear, int nMonth, int nDay);
 extern int get_mth_from_date(const xstring &date);
 extern int get_yr_from_date(const xstring &date);
 extern int get_day_from_date(const xstring &date);
-extern int month_from_day_number(int nSerialDate);//WTW - Gen2 - add new formula to replace unsupported MonthFromDayNumber() function
-extern int year_from_day_number(int nSerialDate);//WTW - Gen2 - add new formula to replace unsupported YearFromDayNumber() function
-extern int day_from_day_number(int nSerialDate);//WTW - Gen2 - add new formula to replace unsupported DayFromDayNumber() function
-extern int month_number_from_date(int year, int month); //WTW - Gen2 - add new formula to replace unsupported MonthNumberFromDate() function
-extern int day_number_from_date(int nYear, int nMonth, int nDay); //WTW - Gen2 - add new formula to replace unsupported DayNumberFromDate() function
 extern int get_end_of_mth_day(int yr, int mth);
 extern xstring add_mths_to_date(const xstring &date, int mths);
 extern int get_mth_from_adj_date(const xstring &date, int mths);
 extern double convert_rate_basis(double orig_rate, double orig_rate_basis, double new_rate_basis);
 extern double convert_decrem_rate_basis(double orig_rate, double orig_rate_basis, double new_rate_basis);
-extern long int determine_tbl_size(int sNumberOfDims, ...);
 extern xstring get_file_name(const xstring &source_file);
 extern xstring get_file_path(const xstring &source_file);
-extern xstring get_base_group_name(const xstring &tag, bool seriatim_flag = false);
+extern xstring get_base_group_name(const xstring &tag, bool split_flag = false);
 extern xstring get_string_of_date(double date);
 extern xstring get_string_of_enum_val(StrEnum::EnumValue type);
 extern int date_diff(xstring first_date, xstring second_date);
-extern int number_of_decimals(double xxx, int digits);//WTW - Gen2 - replace preprocessor #define with formula
+extern int number_of_decimals(double xxx,int digits);
 extern xstring write_string(double value, int string_length, int significant_digits);
 extern xstring write_array_to_string(SmartArray <double> value_array, int low, int high);
 extern void read_from_string(xstring temp_string, SmartArray <double> &temp_array);
@@ -308,25 +299,8 @@ extern double bs_opt_val_continuous_highest_gain(int call_or_put, double current
 extern double bs_opt_val_highest_gain(int call_or_put, double current_price, double observed_max, double observed_min, double strike_price, double length_of_sampling_period, int sampling_freq, double yrs_to_expiry, double risk_free_rate, double init_div_yld, double index_vol, int scen_int_freq, int scen_index_freq);
 extern double bs_opt_val_mthly_sum_cap(int crediting_mths, int known_index_vals, double sum_capped_amts,  double mthly_cap_rate, double yrs_to_expiry, double risk_free_rate, double init_div_yld, double index_vol, int scen_int_freq, int scen_index_freq);
 extern double cumul_bivariate_normal_distribn(double x, double y, double rho);
-extern double cumul_normal_distribn(double x);*/
+extern double cumul_normal_distribn(double x);
 
-// RAFM SQLite
-#ifndef _RAFMSQLITE_H_
-#define _RAFMSQLITE_H_
-
-#include <string>
-#include <vector>
-
-using namespace std;
-
-// 20210614 STW: upgrade to RAFM 2.9
-/*
-extern void openDatabase(string dbPath);
-extern void closeDatabase();
-extern string readCsvFile(string csvPath);
-extern void executeQuery(string sql, vector<string>& columns, vector<vector<string>>& results);
-*/
-#endif
 #endif
 extern int trace_wanted;
 
@@ -336,9 +310,7 @@ extern MY_DLL int last_model_period;
 extern MY_DLL Message_handler *eh;
 
 deptaskinput ann_pba_scen_amt_valn_input;
-deptaskcols ann_pba_scen_amt_valn_input_cols;
-deptaskmap ann_pba_scen_amt_valn_input_pos;
-deptaskmapiter ann_pba_scen_amt_valn_input_pos_iter;
+ofstream ann_pba_scen_amt_valn_output;
 const int SCEN_AMT = 0;
 const int TAX_AVG_RATIO = 1;
 
@@ -353,7 +325,6 @@ extern const int& last_proj_task_loop;
 extern const int& proj_task_loop_num;
 extern const int& num_of_proj_task_loops;
 
-extern MY_DLL2 int use_overlay_code;
 extern MY_DLL int trace_level_wanted;
 extern MY_DLL int trace_level;
 extern MY_DLL bool bEmitTurboDebugger;
@@ -385,28 +356,30 @@ double ANN_PBA_PBA_UDF::ann_pba_pba_asset_yld_mthly(int t) {
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (this == ann_pba)
-	return (pow(1.0 + seg->asset_yld_inv(t), 1.0 / 12.0) - 1.0);
+if (model_name == ANN_PBA)
+	return (pow(1.0 + seg_element->asset_yld_inv(t), 1.0 / 12.0) - 1.0);
 
+{
 #if defined(__FA_LIAB_H_)
-if (this == fa_ann_pba)
+if (model_name == FA_ANN_PBA)
 	return (pow(1.0 + fa->asset_yld(t), 1.0 / 12.0) - 1.0);
-#endif	
-
+#endif
+}
+{
 #if defined(__FIA_LIAB_H_)
-if (this == fia_ann_pba)
+if (model_name == FIA_ANN_PBA)
 	return (pow(1.0 + fia->asset_yld_inv(t), 1.0 / 12.0) - 1.0);
 #endif	
-	
+}
+{
 #if defined(__PA_LIAB_H_)
-if (this == pa_ann_pba)
+if (model_name == PA_ANN_PBA)
 	return (pow(1.0 + pa->asset_yld(t), 1.0 / 12.0) - 1.0);
 #endif	
-	
+}
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -425,19 +398,48 @@ double ANN_PBA_PBA_UDF::ann_pba_pba_assets_accum(int t) {
 if (t < start_period || t > final_period)
 	return NO_AVG;
 
+return assets_accum_inv(t)
+	   + hedge_mkt_val(t);
+
+}
+
+//@@ END
+
+//@@ START - assets_accum_inv
+// Accumulated Assets Invested                                                                                             
+// Column:ASSETS_ACCUM_INV
+//========================================================
+double ANN_PBA_PBA_UDF::ann_pba_pba_assets_accum_inv(int t) {
+//^^^
+
+
+
+//^^^
+
+#line 1 "assets_accum_inv.ANN_PBA_PBA.for"
+if (t < start_period || t > final_period)
+	return NO_AVG;
+
 double starting_assets = 0.0;
 
-if (this == ann_pba)
+if (init_assets_defn == CASH_VALUE) //otherwise, these values come from financial SOW (ie prior stat res)
+	{
+	init_assets = cash_val(start_period);
+	init_asset_pct = 1.0;
+	}
+
+if (model_name == ANN_PBA)
 	{
 	if (alm_flag)
-		return hedge_mkt_val(t)
-		       + (seg->cash(t)
-			       + seg->borrowing(t)
-		    	   + seg->bk_val(t)
-		      	   + seg->accr_int(t)
-		           - seg->imr(t)
+		return cash_from_hedge(t)
+				+ (seg_element->cash(t)
+				   + seg_element->interim_cash(t)
+			       + seg_element->borrowing(t)
+		    	   + seg_element->bk_val_inv(t)
+		      	   + seg_element->accr_int(t)
+		           - seg_element->imr(t)
 				     * pimr_adj_factor(t))
-		         * reins_adj;
+		       * reins_adj;
 
 	if (nb_flag && valn_period == 0)
 		{
@@ -447,9 +449,10 @@ if (this == ann_pba)
 		if (t == start_period + 1)
 			{
 			starting_assets 
-			= init_assets 
-			  * init_asset_pct
-			  * reins_adj;
+			= cash_from_hedge(t)
+			  + init_assets 
+			    * init_asset_pct
+			    * reins_adj;
 
 			return starting_assets
 	        	   + cash_flow(t)
@@ -463,11 +466,12 @@ if (this == ann_pba)
 		}
 
 	if (t == start_period)
-		return init_assets 
-			   * init_asset_pct
-			   * reins_adj;
+		return cash_from_hedge(t)
+			   + init_assets 
+			     * init_asset_pct
+			     * reins_adj;
 
-	return assets_accum(t - 1)
+	return assets_accum_inv(t - 1)
     	   + cash_flow(t)
            + hedge_cash_flow(t)
     	   + cash_flow_int(t)
@@ -487,7 +491,8 @@ if (pricing_flag && valn_period == 0)
 		return init_assets 
 		       * init_asset_pct
 		       * reins_adj
-		       + cash_flow(t)
+		       + cash_from_hedge(t)
+			   + cash_flow(t)
 		       + hedge_cash_flow(t)
 		       + cash_flow_int(t)
 	           + inv_inc(t)
@@ -495,11 +500,12 @@ if (pricing_flag && valn_period == 0)
 	}
 
 if (t == start_period)	
-	return init_assets
-	       * init_asset_pct
-	       * reins_adj;
+	return cash_from_hedge(t)
+		   + init_assets
+	         * init_asset_pct
+	         * reins_adj;
 
-return assets_accum(t - 1) 
+return assets_accum_inv(t - 1) 
        + cash_flow(t) 
        + hedge_cash_flow(t)
        + cash_flow_int(t)
@@ -507,7 +513,6 @@ return assets_accum(t - 1)
        - tax(t);
 
 }
-
 
 //@@ END
 
@@ -518,7 +523,7 @@ return assets_accum(t - 1)
 double ANN_PBA_PBA_UDF::ann_pba_pba_cal_mth(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(3,"cal_mth",t);
+	return rebase_value(4,"cal_mth",t);
 }
 
 
@@ -534,7 +539,6 @@ return proj_start_mth + t - 1
 
 }
 
-
 //@@ END
 
 //@@ START - cal_yr
@@ -544,7 +548,7 @@ return proj_start_mth + t - 1
 double ANN_PBA_PBA_UDF::ann_pba_pba_cal_yr(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(4,"cal_yr",t);
+	return rebase_value(5,"cal_yr",t);
 }
 
 
@@ -559,7 +563,6 @@ return proj_start_yr + cal_yr_relative(t) - 1;
 
 }
 
-
 //@@ END
 
 //@@ START - cal_yr_relative
@@ -569,7 +572,7 @@ return proj_start_yr + cal_yr_relative(t) - 1;
 double ANN_PBA_PBA_UDF::ann_pba_pba_cal_yr_relative(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(5,"cal_yr_relative",t);
+	return rebase_value(6,"cal_yr_relative",t);
 }
 
 
@@ -580,7 +583,6 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 return 1 + floor((proj_start_mth + t - 2) / 12.0);
 
 }
-
 
 //@@ END
 
@@ -599,11 +601,10 @@ double ANN_PBA_PBA_UDF::ann_pba_pba_cap_gain(int t) {
 if (!alm_flag || t <= start_period || t > final_period)
 	return NO_AVG;
 
-return seg->cap_gain(t)
+return seg_element->cap_gain(t)
        * reins_adj;
 
 }
-
 
 //@@ END
 
@@ -627,7 +628,6 @@ return direct_cash_flow(t)
 
 }
 
-
 //@@ END
 
 //@@ START - cash_flow_int
@@ -637,7 +637,7 @@ return direct_cash_flow(t)
 double ANN_PBA_PBA_UDF::ann_pba_pba_cash_flow_int(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(8,"cash_flow_int",t);
+	return rebase_value(9,"cash_flow_int",t);
 }
 
 
@@ -653,7 +653,6 @@ return direct_cash_flow_int(t)
 
 }
 
-
 //@@ END
 
 //@@ START - cash_flow_rate_mthly
@@ -663,7 +662,7 @@ return direct_cash_flow_int(t)
 double ANN_PBA_PBA_UDF::ann_pba_pba_cash_flow_rate_mthly(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(9,"cash_flow_rate_mthly",t);
+	return rebase_value(10,"cash_flow_rate_mthly",t);
 }
 
 
@@ -674,13 +673,130 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (this == ann_pba)
-	return seg->cash_flow_rate_mthly(t);
+if (model_name == ANN_PBA)
+	return seg_element->cash_flow_rate_mthly(t);
 
 return asset_yld_mthly(t);
 
 }
 
+//@@ END
+
+//@@ START - cash_from_hedge
+// Cash From Hedge                                                                                             
+// Column:CASH_FROM_HEDGE
+//========================================================
+double ANN_PBA_PBA_UDF::ann_pba_pba_cash_from_hedge(int t) {
+//^^^
+
+
+
+//^^^
+
+#line 1 "cash_from_hedge.ANN_PBA_PBA.for"
+if (t < start_period || t > final_period
+	|| hedging_defn == UNHEDGED || hedging_cash_flow_defn != EXISTING) 
+	return 0.0;
+
+if (model_name == ANN_PBA)
+	{
+	if (alm_flag)
+		{
+		if (t == start_period)
+			return hedge_mkt_val_array[start_period];
+		else
+			return cash_from_hedge(t - 1) 
+				   + cash_from_hedge_int(t);
+		}
+
+	if (nb_flag && valn_period == 0)
+		{
+		if (t == start_period)
+			return NO_AVG;
+
+		if (t == start_period + 1)
+			return hedge_mkt_val_array[start_period + 1];
+
+		return 0.0;
+		}
+
+	if (t == start_period)
+		return hedge_mkt_val_array[start_period];
+}
+
+// ann_pba_pba pricing calculations
+if (pricing_flag && valn_period == 0)
+	{
+	if (t == start_period)
+		return NO_AVG;
+		
+	if (t == start_period + 1)
+		return hedge_mkt_val_array[start_period + 1];	
+	}
+
+if (t == start_period)	
+	return hedge_mkt_val_array[start_period];
+
+return 0.0;
+
+}
+
+//@@ END
+
+//@@ START - cash_from_hedge_int
+// Cash From Hedge Interest                                                                                             
+// Column:CASH_FROM_HEDGE_INT
+//========================================================
+double ANN_PBA_PBA_UDF::ann_pba_pba_cash_from_hedge_int(int t) {
+//^^^
+
+
+
+//^^^
+
+#line 1 "cash_from_hedge_int.ANN_PBA_PBA.for"
+if (!alm_flag || t <= start_period || t > final_period
+	|| hedging_defn == UNHEDGED || hedging_cash_flow_defn != EXISTING) 
+	return 0.0;
+
+return cash_from_hedge(t - 1) 
+	   * (pow(1.0 + seg_element->cash_rate(t), 1.0 / 12.0) - 1.0);
+
+}
+
+//@@ END
+
+//@@ START - cash_val
+// Cash Value                                                                                             
+// Column:CASH_VAL
+//========================================================
+double ANN_PBA_PBA_UDF::ann_pba_pba_cash_val(int t) {
+//^^^
+
+
+
+//^^^
+
+#line 1 "cash_val.ANN_PBA_PBA.for"
+if (t < start_period || t > final_period)
+	return NO_AVG;
+
+if (model_name == ANN_PBA)
+	return seg_element->cash_val(t);
+
+#if defined(__FIA_LIAB_H_)
+if (model_name == FIA_ANN_PBA)
+	return fia->cash_val(t); 
+#endif
+
+#if defined(__FA_LIAB_H_)
+if (model_name == FA_ANN_PBA)
+	return fa->cash_val(t); 
+#endif
+
+return 0.0;
+
+}
 
 //@@ END
 
@@ -704,11 +820,10 @@ int year = cal_yr(t);
 int month = cal_mth(t);
 int day = 1;
 
-//return DayNumberFromDate(year, month, day);
-return day_number_from_date(year, month, day);//WTW - Gen2 - DayNumberFromDate() unsupported function
+return day_number_from_date(year, month, day);
+
 
 }
-
 
 //@@ END
 
@@ -729,7 +844,7 @@ if (t < start_period || t > final_period)
 
 if (t == start_period)
 	return (working_res(t) - reins_res(t))
-	        - (assets_accum(t) + hedge_mkt_val(t));
+	        - assets_accum(t);
 
 // force calls for reporting
 assets_accum(t);
@@ -740,7 +855,6 @@ return def_accum(t - 1)
        + hedge_cost(t);
 
 }
-
 
 //@@ END
 
@@ -763,7 +877,6 @@ return cap_gain(t) + reins_cap_gain(t);
 
 }
 
-
 //@@ END
 
 //@@ START - direct_cash_flow
@@ -781,32 +894,34 @@ double ANN_PBA_PBA_UDF::ann_pba_pba_direct_cash_flow(int t) {
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (this == ann_pba)
-	return seg->direct_cash_flow_bom(t) 
-		   + seg->direct_cash_flow_eom(t);
+if (model_name == ANN_PBA)
+	return seg_element->direct_cash_flow_bom(t) 
+		   + seg_element->direct_cash_flow_eom(t);
 
+{
 #if defined(__FA_LIAB_H_)	
-if (this == fa_ann_pba)
+if (model_name == FA_ANN_PBA)
 	return fa->direct_cash_flow_bom(t) 
     	   + fa->direct_cash_flow_eom(t);
 #endif
-
+}
+{
 #if defined(__FIA_LIAB_H_)	
-if (this == fia_ann_pba)
+if (model_name == FIA_ANN_PBA)
 	return fia->direct_cash_flow_bom(t) 
     	   + fia->direct_cash_flow_eom(t);
 #endif
-
+}
+{
 #if defined(__PA_LIAB_H_)	
-if (this == pa_ann_pba)
+if (model_name == PA_ANN_PBA)
 	return pa->direct_cash_flow_bom(t) 
     	   + pa->direct_cash_flow_eom(t);
 #endif
-	
+}	
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -817,7 +932,7 @@ return NO_AVG;
 double ANN_PBA_PBA_UDF::ann_pba_pba_direct_cash_flow_int(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(14,"direct_cash_flow_int",t);
+	return rebase_value(18,"direct_cash_flow_int",t);
 }
 
 
@@ -828,32 +943,35 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (this == ann_pba)
-	return seg->direct_cash_flow_bom(t) 
+if (model_name == ANN_PBA)
+	return seg_element->direct_cash_flow_bom(t) 
 	       * cash_flow_rate_mthly(t);
 
+{
 #if defined(__FA_LIAB_H_)	
-if (this == fa_ann_pba)
+if (model_name == FA_ANN_PBA)
 	return fa->direct_cash_flow_bom(t)
 	       * cash_flow_rate_mthly(t);
 #endif
-
+}
+{
 #if defined(__FIA_LIAB_H_)	
-if (this == fia_ann_pba)
+if (model_name == FIA_ANN_PBA)
 	return fia->direct_cash_flow_bom(t)
 	       * cash_flow_rate_mthly(t);
 #endif
-
+}
+{
 #if defined(__PA_LIAB_H_)	
-if (this == pa_ann_pba)
+if (model_name == PA_ANN_PBA)
 	return pa->direct_cash_flow_bom(t)
 	       * cash_flow_rate_mthly(t);
 #endif
-	
+}
+
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -864,7 +982,7 @@ return NO_AVG;
 double ANN_PBA_PBA_UDF::ann_pba_pba_direct_imr_incr(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(15,"direct_imr_incr",t);
+	return rebase_value(19,"direct_imr_incr",t);
 }
 
 
@@ -878,7 +996,6 @@ if (!alm_flag || !imr_flag || t <= start_period || t > final_period)
 return imr_incr(t) + reins_imr_incr(t);
 
 }
-
 
 //@@ END
 
@@ -900,7 +1017,6 @@ if (t <= start_period || t > final_period)
 return inv_inc(t) + reins_inv_inc(t);
 
 }
-
 
 //@@ END
 
@@ -929,7 +1045,6 @@ return direct_cash_flow(t)
 
 }
 
-
 //@@ END
 
 //@@ START - direct_res_incr
@@ -951,7 +1066,6 @@ return working_res(t) - working_res(t - 1);
 
 }
 
-
 //@@ END
 
 //@@ START - direct_tax
@@ -972,7 +1086,6 @@ if (t <= start_period || t > final_period)
 return tax(t);
 
 }
-
 
 //@@ END
 
@@ -999,7 +1112,6 @@ return disc_rate_accum(t - 1)
 
 }
 
-
 //@@ END
 
 //@@ START - disc_rate_mthly
@@ -1020,46 +1132,22 @@ if (!pba_scen_amt_valn_flag && !res_det_res_valn_flag)
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (rbc_scen_amt_valn_flag)
-	{
-	double tax_rate = 0.0;
-	
-	if (this == ann_pba)
-		tax_rate = company->tax_rate;
-	#if defined (__FA_LIAB_H_)
-	else
-		tax_rate = fa->tax_rate;
-	#endif
-	#if defined (__FIA_LIAB_H_)
-	else
-		tax_rate = fia->tax_rate;
-	#endif
-	#if defined (__PA_LIAB_H_)
-	else
-		tax_rate = pa->tax_rate;
-	#endif
-				
-	double one_yr_scen_rate
-	= rates->get_int_rate(t, "Govt", GET_YIELD_RATE, 1.0, 0, EFFECTIVE_ANNUAL, NO_SHIFT,0)//AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ 
-	  * disc_rate_mult_fixed
-	  * (1.0 - tax_rate);
+double disc_rate = 0.0;
 
-	return pow(1.0 + one_yr_scen_rate, 1.0 / 12.0);
+if (pba_disc_rate_flag)
+	{
+	int pba_segment = seg_element->getElementNumber() + company->sm_seg.size() - pba_segment_size;
+	disc_rate = company->sm_seg[pba_segment]->asset_yld_less_dflt_inv(t);
 	}
 
-if (res_scen_amt_valn_flag)
-	{
-	double one_yr_scen_rate
-	= rates->get_int_rate(t, "Govt", GET_YIELD_RATE, 1.0, 0, EFFECTIVE_ANNUAL, NO_SHIFT,0) //AIG - ADD PARAMETER FOR PORTFOLIO SPRD ADJ
-	  * disc_rate_mult_fixed;
+else
+	disc_rate
+	= rates_ptr->get_int_rate(t, "Govt", GET_YIELD_RATE, 1.0, 0, EFFECTIVE_ANNUAL, NO_SHIFT) 
+		* disc_rate_mult_fixed;	
 	
-	return pow(1.0 + one_yr_scen_rate, 1.0 / 12.0);
-	}
-	
-return NO_AVG;
+return pow(1.0 + disc_rate, 1.0 / 12.0);
 
 }
-
 
 //@@ END
 
@@ -1078,16 +1166,15 @@ double ANN_PBA_PBA_UDF::ann_pba_pba_eff_cap_gains_rate(int t) {
 if (!alm_flag || t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (fabs(seg->inv_asset(t - 1)) < rate_ratio_threshold)
+if (fabs(seg_element->inv_asset(t - 1)) < rate_ratio_threshold)
 	return NO_AVG;
 
 double cap_gain_rate 
-= (seg->cap_gain(t) - imr_incr(t)) / seg->inv_asset(t - 1);
+= (seg_element->cap_gain(t) - imr_incr(t)) / seg_element->inv_asset(t - 1);
 	
 return max(cap_gain_rate, USLIB_MINIMUM_YIELD);
 
 }
-
 
 //@@ END
 
@@ -1103,13 +1190,31 @@ double ANN_PBA_PBA_UDF::ann_pba_pba_hedge_cash_flow(int t) {
 //^^^
 
 #line 1 "hedge_cash_flow.ANN_PBA_PBA.for"
-if (hedging_defn == UNHEDGED || t <= start_period || t > final_period)
+if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-return hedge_cash_flow_array[t];
+double hedge_cf = 0.0;
 
+if (hedging_defn == UNHEDGED || hedging_cash_flow_defn == EXISTING)
+	hedge_cf = 0.0;
+else
+	hedge_cf = hedge_cash_flow_array[t];
+
+if (model_name == ANN_PBA)
+	return seg_element->hedge_cash_flow(t) //INDEX HEDGING ONLY
+		   + hedge_cf; //FULL PRODUCT HEDGE
+
+{
+#if defined(__FIA_LIAB_H_)
+if (model_name == FIA_ANN_PBA)
+	return fia->hedge_cash_flow(t) //INDEX HEDGING ONLY
+		   + hedge_cf; //FULL PRODUCT HEDGE
+#endif	
 }
 
+return NO_AVG;
+
+}
 
 //@@ END
 
@@ -1133,7 +1238,6 @@ return - (hedge_cash_flow(t)
 
 }
 
-
 //@@ END
 
 //@@ START - hedge_mkt_val
@@ -1148,13 +1252,31 @@ double ANN_PBA_PBA_UDF::ann_pba_pba_hedge_mkt_val(int t) {
 //^^^
 
 #line 1 "hedge_mkt_val.ANN_PBA_PBA.for"
-if (hedging_defn == UNHEDGED || t < start_period || t > final_period)
+if (t < start_period || t > final_period)
 	return NO_AVG;
 
-return hedge_mkt_val_array[t];
+double hedge_mv = 0.0;
 
+if (hedging_defn == UNHEDGED || hedging_cash_flow_defn == EXISTING)
+	hedge_mv = 0.0;
+else
+	hedge_mv = hedge_mkt_val_array[t];
+
+if (model_name == ANN_PBA)
+	return seg_element->hedge_mkt_val(t) //INDEX HEDGING ONLY
+		   + hedge_mv; //FULL PRODUCT HEDGE
+
+{
+#if defined(__FIA_LIAB_H_)
+if (model_name == FIA_ANN_PBA)
+	return fia->hedge_mkt_val(t) //INDEX HEDGING ONLY
+		   + hedge_mv; //FULL PRODUCT HEDGE
+#endif	
 }
 
+return NO_AVG;
+
+}
 
 //@@ END
 
@@ -1176,7 +1298,6 @@ if (t <= start_period || t > final_period)
 return hedge_mkt_val(t) - hedge_mkt_val(t - 1);
 
 }
-
 
 //@@ END
 
@@ -1202,7 +1323,6 @@ return 0.0;
 
 }
 
-
 //@@ END
 
 //@@ START - imr
@@ -1212,7 +1332,7 @@ return 0.0;
 double ANN_PBA_PBA_UDF::ann_pba_pba_imr(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(28,"imr",t);
+	return rebase_value(32,"imr",t);
 }
 
 
@@ -1223,12 +1343,11 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 if (!alm_flag || !imr_flag || t < start_period || t > final_period)
 	return NO_AVG;
 
-return seg->imr(t) 
+return seg_element->imr(t) 
        * pimr_adj_factor(t)
        * reins_adj;
 
 }
-
 
 //@@ END
 
@@ -1239,7 +1358,7 @@ return seg->imr(t)
 double ANN_PBA_PBA_UDF::ann_pba_pba_imr_incr(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(29,"imr_incr",t);
+	return rebase_value(33,"imr_incr",t);
 }
 
 
@@ -1253,7 +1372,6 @@ if (!alm_flag || !imr_flag || t <= start_period || t > final_period)
 return imr(t) - imr(t - 1);
 
 }
-
 
 //@@ END
 
@@ -1273,7 +1391,6 @@ return 0.0;
 
 }
 
-
 //@@ END
 
 //@@ START - inv_inc
@@ -1292,13 +1409,12 @@ if (t <= start_period || t > final_period)
 	return NO_AVG;
 
 if (alm_flag)
-	return seg->inv_inc_on_invested_assets(t)
-	       * reins_adj;
+	return seg_element->inv_inc_on_invested_assets(t) * reins_adj
+		   + cash_from_hedge_int(t);
 
-return assets_accum(t - 1) * asset_yld_mthly(t);
+return assets_accum_inv(t - 1) * asset_yld_mthly(t);
 
 }
-
 
 //@@ END
 
@@ -1309,7 +1425,7 @@ return assets_accum(t - 1) * asset_yld_mthly(t);
 double ANN_PBA_PBA_UDF::ann_pba_pba_pimr_adj_factor(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(32,"pimr_adj_factor",t);
+	return rebase_value(36,"pimr_adj_factor",t);
 }
 
 
@@ -1323,7 +1439,6 @@ if (!alm_flag || tax_flag)
 return 1.0 / (1.0 - company->tax_rate_cap_gain);
 
 }
-
 
 //@@ END
 
@@ -1342,11 +1457,10 @@ double ANN_PBA_PBA_UDF::ann_pba_pba_realzd_cap_gain(int t) {
 if (!alm_flag || t <= start_period || t > final_period)
 	return NO_AVG;
 
-return seg->realzd_cap_gain(t)
+return seg_element->realzd_cap_gain(t)
        * reins_adj;
 
 }
-
 
 //@@ END
 
@@ -1365,11 +1479,10 @@ double ANN_PBA_PBA_UDF::ann_pba_pba_realzd_cap_gain_bef_sale(int t) {
 if (!alm_flag || t <= start_period || t > final_period)
 	return NO_AVG;
 
-return seg->realzd_cap_gain_bef_sale(t)
+return seg_element->realzd_cap_gain_bef_sale(t)
        * reins_adj;
 
 }
-
 
 //@@ END
 
@@ -1393,7 +1506,6 @@ return reins_res(t - 1)
 
 }
 
-
 //@@ END
 
 //@@ START - reins_cash_flow
@@ -1411,32 +1523,35 @@ double ANN_PBA_PBA_UDF::ann_pba_pba_reins_cash_flow(int t) {
 if (!reins_flag || t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (this == ann_pba)
-	return seg->reins_cash_flow_bom(t) 
-    	   + seg->reins_cash_flow_eom(t);
+if (model_name == ANN_PBA)
+	return seg_element->reins_cash_flow_bom(t) 
+    	   + seg_element->reins_cash_flow_eom(t);
 
+{
 #if defined(__FA_LIAB_H_)	
-if (this == fa_ann_pba)
+if (model_name == FA_ANN_PBA)
 	return fa->reins_cash_flow_bom(t)
 		   + fa->reins_cash_flow_eom(t);
 #endif
-
+}
+{
 #if defined(__FIA_LIAB_H_)	
-if (this == fia_ann_pba)
+if (model_name == FIA_ANN_PBA)
 	return fia->reins_cash_flow_bom(t)
 		   + fia->reins_cash_flow_eom(t);
 #endif
-
+}
+{
 #if defined(__PA_LIAB_H_)	
-if (this == pa_ann_pba)
+if (model_name == PA_ANN_PBA)
 	return pa->reins_cash_flow_bom(t)
 		   + pa->reins_cash_flow_eom(t);
 #endif
-		
+}
+
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -1447,7 +1562,7 @@ return NO_AVG;
 double ANN_PBA_PBA_UDF::ann_pba_pba_reins_cash_flow_int(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(37,"reins_cash_flow_int",t);
+	return rebase_value(41,"reins_cash_flow_int",t);
 }
 
 
@@ -1458,32 +1573,35 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 if (!reins_flag || t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (this == ann_pba)
-	return seg->reins_cash_flow_bom(t)
+if (model_name == ANN_PBA)
+	return seg_element->reins_cash_flow_bom(t)
 		   * cash_flow_rate_mthly(t);
 
+{
 #if defined(__FA_LIAB_H_)		
-if (this == fa_ann_pba)
+if (model_name == FA_ANN_PBA)
 	return fa->reins_cash_flow_bom(t)
 	       * cash_flow_rate_mthly(t);
 #endif
-	
+}
+{
 #if defined(__FIA_LIAB_H_)		
-if (this == fia_ann_pba)
+if (model_name == FIA_ANN_PBA)
 	return fia->reins_cash_flow_bom(t)
 	       * cash_flow_rate_mthly(t);
 #endif
-	
+}
+{
 #if defined(__PA_LIAB_H_)		
-if (this == pa_ann_pba)
+if (model_name == PA_ANN_PBA)
 	return pa->reins_cash_flow_bom(t)
 	       * cash_flow_rate_mthly(t);
 #endif
+}
 
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -1511,7 +1629,6 @@ return reins_cash_flow(t)
 
 }
 
-
 //@@ END
 
 //@@ START - reins_imr_incr
@@ -1521,7 +1638,7 @@ return reins_cash_flow(t)
 double ANN_PBA_PBA_UDF::ann_pba_pba_reins_imr_incr(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(39,"reins_imr_incr",t);
+	return rebase_value(43,"reins_imr_incr",t);
 }
 
 
@@ -1540,7 +1657,6 @@ return imr_incr(t)
        / assets_accum(t - 1);
 
 }
-
 
 //@@ END
 
@@ -1563,7 +1679,6 @@ return reins_res(t - 1) * asset_yld_mthly(t);
 
 }
 
-
 //@@ END
 
 //@@ START - reins_res
@@ -1581,7 +1696,7 @@ double ANN_PBA_PBA_UDF::ann_pba_pba_reins_res(int t) {
 if (!reins_flag || t < start_period || t > final_period)
 	return NO_AVG;
 
-if (this == ann_pba)
+if (model_name == ANN_PBA)
 	{
 	if (working_res_defn == ZERO)
 		return 0.0;
@@ -1593,7 +1708,6 @@ return working_res(t)
        * reins_pct;
 
 }
-
 
 //@@ END
 
@@ -1617,7 +1731,6 @@ return reins_res(t)
 
 }
 
-
 //@@ END
 
 //@@ START - reins_tax_res
@@ -1635,32 +1748,34 @@ double ANN_PBA_PBA_UDF::ann_pba_pba_reins_tax_res(int t) {
 if (!tax_flag || !reins_flag || t < start_period || t > final_period)
 	return NO_AVG;
 
-if (tax_defn_stoch_cap == USE_WORKING_RESERVE)
+if (tax_defn_stoch_cap == USE_WORKING_RESERVE)//VM22 - TAX RES = 0
 	return reins_res(t);
 	
 // if (tax_defn_stoch_cap == CALCULATE_TAX_RESERVE)
-if (this == ann_pba)
-	return seg->reins_tax_res_mp(t);
+if (model_name == ANN_PBA)
+	return seg_element->reins_tax_res_mp(t);
 
+{
 #if defined(__FA_LIAB_H_)
-if (this == fa_ann_pba)
+if (model_name == FA_ANN_PBA)
 	return fa->reins_tax_res_mp(t);	
 #endif
-
+}
+{
 #if defined(__FIA_LIAB_H_)
-if (this == fia_ann_pba)
+if (model_name == FIA_ANN_PBA)
 	return fia->reins_tax_res_mp(t);	
 #endif
-
+}
+{
 #if defined(__PA_LIAB_H_)
-if (this == pa_ann_pba)
+if (model_name == PA_ANN_PBA)
 	return pa->reins_tax_res_mp(t);	
 #endif
-
+}
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -1671,7 +1786,7 @@ return NO_AVG;
 double ANN_PBA_PBA_UDF::ann_pba_pba_reins_tax_res_incr(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(44,"reins_tax_res_incr",t);
+	return rebase_value(48,"reins_tax_res_incr",t);
 }
 
 
@@ -1686,7 +1801,6 @@ return reins_tax_res(t)
 	   - reins_tax_res(t - 1);
 
 }
-
 
 //@@ END
 
@@ -1711,11 +1825,14 @@ if (hedging_defn == HEDGED)
 for (int tt = 0; tt <= final_period; tt++)
 	def_accum(tt);
 
+if (nb_flag && valn_period == 0 && t == start_period)//VM22 NB Valuation - First month Cashflows purchases new assets
+	return scen_greatest_pv(start_period + 1)
+		   + assets_accum(start_period + 1);
+
 return scen_greatest_pv(start_period)
        + starting_assets(start_period);
 
 }
-
 
 //@@ END
 
@@ -1734,7 +1851,34 @@ double ANN_PBA_PBA_UDF::ann_pba_pba_scen_greatest_pv(int t) {
 if (t < start_period || t > final_period)
 	return NO_AVG;
 
-if (t == final_period)
+double policies_inf_local = 0.0;
+
+if (model_name == ANN_PBA)
+	policies_inf_local = seg_element->policies_inf(t);
+else
+	{
+		{
+		#if defined(__FA_LIAB_H_)
+		if (model_name == FA_ANN_PBA)
+			policies_inf_local = fa->policies_inf(t);
+		#endif
+		}
+		{
+		#if defined(__FIA_LIAB_H_)
+		if (model_name == FIA_ANN_PBA)
+			policies_inf_local = fia->policies_inf(t);
+		#endif	
+		}
+		{
+		#if defined(__PA_LIAB_H_)
+		if (model_name == PA_ANN_PBA)
+			policies_inf_local = pa->policies_inf(t);
+		#endif	
+		}
+	}
+
+if (t == final_period
+	|| policies_inf_local < aggregate_amount_threshold) //VM22 accumulated deficiencies are locked in once no policies remain 
 	{
 	scen_greatest_pv_period = t;
 	
@@ -1761,7 +1905,6 @@ return scen_greatest_pv;
 
 }
 
-
 //@@ END
 
 //@@ START - starting_assets
@@ -1779,31 +1922,34 @@ double ANN_PBA_PBA_UDF::ann_pba_pba_starting_assets(int t) {
 if (t != start_period)
 	return NO_AVG;
 
-if (this == ann_pba)
+if (model_name == ANN_PBA)
 	{
 	if (alm_flag)
 		return hedge_mkt_val(t)
-           	   + (seg->cash(t) 
-                  + seg->borrowing(t) 
-	              + seg->bk_val(t) 
-    	          + seg->accr_int(t)
-        	      - seg->imr(t)
+			   + cash_from_hedge(t)
+           	   + (seg_element->cash(t)
+				  + seg_element->interim_cash(t) 
+                  + seg_element->borrowing(t) 
+	              + seg_element->bk_val_inv(t) 
+    	          + seg_element->accr_int(t)
+        	      - seg_element->imr(t)
 				    * pimr_adj_factor(t))
                 * reins_adj;
 
 	return hedge_mkt_val(t)
+		   + cash_from_hedge(t)
     	   + init_assets 
              * init_asset_pct
              * reins_adj;
 	}
 
 return hedge_mkt_val(t)
+	   + cash_from_hedge(t)
        + init_assets 
          * init_asset_pct
          * reins_adj;
 
 }
-
 
 //@@ END
 
@@ -1819,22 +1965,32 @@ double ANN_PBA_PBA_UDF::virtual_startup(int t) {
 //^^^
 
 #line 1 "startup.ANN_PBA_PBA.for"
+#if 0 // START_HEADER
+	#define __ANN_PBA_PBA_H_
+#endif // END_HEADER
+
 #if 0 // START_EXTERNS
 deptaskinput ann_pba_scen_amt_valn_input;
-deptaskcols ann_pba_scen_amt_valn_input_cols;
-deptaskmap ann_pba_scen_amt_valn_input_pos;
-deptaskmapiter ann_pba_scen_amt_valn_input_pos_iter;
+ofstream ann_pba_scen_amt_valn_output;
 const int SCEN_AMT = 0;
 const int TAX_AVG_RATIO = 1;
 #endif // END_EXTERNS
 
 #if 0 // START_CLASS
-//typedef map <int, long, less <int> > mpmap; //Gen2 - 9/6/2024 - comment out typedef
 int scen_greatest_pv_period;
 double init_assets;
 double init_asset_pct;
 SmartArray <double> hedge_cash_flow_array;
 SmartArray <double> hedge_mkt_val_array;
+
+#if defined(__AA_COMP_COMP_H_)
+RATES_ECONOMY /*modelobject_name: RATES*/ *rates_ptr;
+#else
+RATES_ECONOMY /*modelobject_name: FIA_RATES*/ *rates_ptr;
+#endif
+
+SEG_COMP * seg_element;
+
 #endif // END_CLASS
 
 #if 0 // START_CONSTRUCTOR
@@ -1844,17 +2000,15 @@ scen_greatest_pv_period = -1;
 #endif // END_CONSTRUCTOR
 
 #if 0 // START_TERMINATOR
+ann_pba_scen_amt_valn_output.close();
 #endif // END_TERMINATOR
 
 // Set hidden variables equal to input variables
-//res_cap_calc_defn = xstring(res_cap_calc_defn_input);
-//reins_defn = xstring(reins_defn_input);
-//hedging_defn = xstring(hedging_defn_input);
 
-//WTW - Gen2 - removed xstring casting
 res_cap_calc_defn = res_cap_calc_defn_input;
 reins_defn = reins_defn_input;
 hedging_defn = hedging_defn_input;
+tax_defn_stoch_cap = tax_defn_stoch_cap_input; //Gen2 workaround
 
 // Initialize class variables equal to input variables
 init_assets = init_assets_input;
@@ -1863,34 +2017,39 @@ init_asset_pct = init_asset_pct_input;
 if (valn_flag)
 	scen_greatest_pv_period = last_proj_period;
 
+{
 #if defined(__FA_LIAB_H_)
-if (this == fa_ann_pba)
+if (model_name == FA_ANN_PBA)
 	{
 	t_low = min(0, start_period);	 
-	t_high = fa->maturity_period;
+	t_high = max(0, fa->maturity_period);
 	}
 #endif
-
+}
+{
 #if defined(__FIA_LIAB_H_)
-if (this == fia_ann_pba)
+if (model_name == FIA_ANN_PBA)
 	{
 	t_low = min(0, start_period);	 
-	t_high = fia->maturity_period;
+	t_high = max(0, fia->maturity_period);
 	}
 #endif
-
+}
+{
 #if defined(__PA_LIAB_H_)
-if (this == pa_ann_pba)
+if (model_name == PA_ANN_PBA)
 	{
 	t_low = min(0, start_period);	 
-	t_high = pa->maturity_period;
+	t_high = max(0, pa->maturity_period);
 	}
 #endif
-		
+}
+	
+gen2_declarations;
+
 return 0.0;
 
 }
-
 
 //@@ END
 
@@ -1909,12 +2068,9 @@ double ANN_PBA_PBA_UDF::ann_pba_pba_stoch_amt(int t) {
 if (t != start_period)
 	return NO_AVG;	
 
-//SmartArray <SmartArray <double> > scen_amt_array;
-vector <vector <double> > scen_amt_array;//WTW - Gen2
+SmartArray <SmartArray <double> > scen_amt_array;
 
 xstring file_name = xstring(replaceWildcards(valn_results_scen_amt));
-
-static int proj_task_loops = -1;
 
 // Only read the file if the file name has changed since the last read
 static xstring file_name_read = "NONE";
@@ -1924,103 +2080,24 @@ if (eq(file_name, file_name_read))
 
 if (read_file)
 	{
-	ann_pba_scen_amt_valn_input_cols.clear();
 	ann_pba_scen_amt_valn_input.clear();
-
 	file_name_read = file_name;
 
-	//string database_name = working_directory() + "ann_pba_stoch_amt.db";
-	xstring database_name = working_directory() + "ann_pba_stoch_amt.db";
-	openDatabase(database_name.getStdStr());//WTW - Gen2 - add ".getStdStr()"
-	string table_name = readCsvFile(file_name.getStdStr());
+	OutputFileReader ofr;
+	ann_pba_scen_amt_valn_input = ofr.readFile(file_name.getStdStr(), {"task_loop", "group", "period", "working_res", "reins_res", "scen_amt", "tax_adj_ratio"});
 
-	// Determine the number of projection task loops in valuation result file
-	xstring sql = (xstring)"SELECT DISTINCT _task_loop AS vloop, "
-	              + (xstring)"CAST(_period AS INTEGER) AS vperiod"
-	              + " FROM '"
-	              + table_name
-	              + (xstring)"' WHERE vperiod == 0 "
-				  + (xstring)"AND _time NOT LIKE 'PV%' AND _time NOT LIKE 'IRR%'";
-
-	deptaskinput proj_task_loop_results;
-	deptaskcols proj_task_loop_cols;
-
-	executeQuery(sql.getStdStr(), proj_task_loop_cols, proj_task_loop_results);
-
-	if (!proj_task_loop_cols.size())
+	if (!ann_pba_scen_amt_valn_input.size())
 		{
 		throw FatalError("Could not read scenario amount valuation file: " 
 			              + file_name + " "
 			              + "Please check your data.");
-		}
-
-	proj_task_loops = proj_task_loop_results.size();
-
-	// Retrieve valuation results
-	sql = (xstring)"SELECT TRIM(_group) AS vgroup, "
-	       + (xstring)"CAST(_period AS INTEGER) AS vperiod, _working_res, _reins_res, _scen_amt, _tax_adj_ratio"
-	       + (xstring)" FROM '" 
-	       + table_name 
-		   + (xstring)"' WHERE vperiod == 0 "
-		   + (xstring)"AND _time NOT LIKE 'PV%' AND _time NOT LIKE 'IRR%'"
-		   + (xstring)" ORDER BY vgroup";
-
-	executeQuery(sql.getStdStr(), ann_pba_scen_amt_valn_input_cols, ann_pba_scen_amt_valn_input);
-	closeDatabase();
-	remove(database_name.c_str());
-
-	if (!ann_pba_scen_amt_valn_input_cols.size())
-		{
-		throw FatalError("Could not read scenario amount valuation file: " 
-			              + file_name + " "
-			              + "Please check your data.");
-		}
-
-	// Create map of group start positions, group is column 0 of query results
-	ann_pba_scen_amt_valn_input_pos[xstring(ann_pba_scen_amt_valn_input[0][0])] = 0;
-
-	for (int row = 1; row < ann_pba_scen_amt_valn_input.size(); row++)
-		{
-		if (!eq(ann_pba_scen_amt_valn_input[row][0], ann_pba_scen_amt_valn_input[row - 1][0]))
-			ann_pba_scen_amt_valn_input_pos[ann_pba_scen_amt_valn_input[row][0]] = row;
 		}
 	}
 
 xstring group_name = "";
 
-#if defined(__FA_LIAB_H_)
-if (fa->isMainModel && pricing_flag)
-	group_name = fa->mp_id
-	             + "|"
-	             + res_cap_calc_defn 
-	             + "|" 
-    	         + reins_defn
-			     + "|" 
-			     + hedging_defn;
-else
-#endif
-#if defined(__FIA_LIAB_H_)
-if (fia->isMainModel && pricing_flag)
-	group_name = fia->mp_id
-	             + "|"
-	             + res_cap_calc_defn 
-	             + "|" 
-    	         + reins_defn
-			     + "|" 
-			     + hedging_defn;
-else
-#endif
-#if defined(__PA_LIAB_H_)
-if (pa->isMainModel && pricing_flag)
-	group_name = pa->mp_id
-	             + "|"
-	             + res_cap_calc_defn 
-	             + "|" 
-    	         + reins_defn
-			     + "|" 
-			     + hedging_defn;
-else
-#endif
+if (model_name == ANN_PBA ||
+	(model_name != ANN_PBA && !pricing_flag))
 	group_name = seg_id
 				 + "|"
 				 + res_cap_calc_defn
@@ -2028,39 +2105,67 @@ else
     	         + reins_defn
 			     + "|" 
 			     + hedging_defn;
+else
+	{
+	{
+	#if defined(__FA_LIAB_H_)
+	if (model_name == FA_ANN_PBA && pricing_flag)
+		group_name = fa->mp_id
+					 + "|"
+					 + res_cap_calc_defn 
+					 + "|" 
+    				 + reins_defn
+					 + "|" 
+					 + hedging_defn;
+	#endif
+	}
+	{
+	#if defined(__FIA_LIAB_H_)
+	if (model_name == FIA_ANN_PBA && pricing_flag)
+		group_name = fia->mp_id
+					 + "|"
+					 + res_cap_calc_defn 
+					 + "|" 
+    				 + reins_defn
+					 + "|" 
+					 + hedging_defn;
+	#endif
+	}
+	{
+	#if defined(__PA_LIAB_H_)
+	if (model_name == PA_ANN_PBA && pricing_flag)
+		group_name = pa->mp_id
+					 + "|"
+					 + res_cap_calc_defn 
+					 + "|" 
+    				 + reins_defn
+					 + "|" 
+					 + hedging_defn;
+	#endif
+	}
+	}
 
 if (hedging_defn == HEDGED)
 	group_name = group_name + "|" + hedging_cash_flow_defn;
 
-if (proj_task_loops == 0)
-	return NO_AVG;
-
 double init_working_res = 0.0;
 double init_reins_res = 0.0;
 scen_amt_array.resize(2);
-scen_amt_array[0].resize(proj_task_loops);
-scen_amt_array[1].resize(proj_task_loops);
 
-// Find group start position
-int ann_pba_scen_amt_valn_input_row = 0;
-if ((ann_pba_scen_amt_valn_input_pos_iter 
-     = ann_pba_scen_amt_valn_input_pos.find(group_name)) != ann_pba_scen_amt_valn_input_pos.end())
-	ann_pba_scen_amt_valn_input_row = ann_pba_scen_amt_valn_input_pos_iter->second;
-
-int proj_task_loop = 0;
-for (int row = ann_pba_scen_amt_valn_input_row; row < ann_pba_scen_amt_valn_input_row + proj_task_loops; row++)
+for (int row = 0; row < ann_pba_scen_amt_valn_input.size(); row++)
 	{
-	proj_task_loop++;
+	if (!eq(ann_pba_scen_amt_valn_input[row][1], group_name))
+		continue;
+	
+	if (!eq(ann_pba_scen_amt_valn_input[row][2], "0"))
+		continue;
 
-	// Only need to get working reserve and reinsurance reserve one time
-	if (row == ann_pba_scen_amt_valn_input_row)
-		{
-		init_working_res = atof(ann_pba_scen_amt_valn_input[row][2].c_str()); 
-		init_reins_res = atof(ann_pba_scen_amt_valn_input[row][3].c_str()); 
-		}
+	// Only need to get working reserve one time
+	init_working_res = atof(ann_pba_scen_amt_valn_input[row][3].c_str()); 
+	init_reins_res = atof(ann_pba_scen_amt_valn_input[row][4].c_str());
 
-	scen_amt_array[SCEN_AMT][proj_task_loop - 1] = atof(ann_pba_scen_amt_valn_input[row][4].c_str());
-	scen_amt_array[TAX_AVG_RATIO][proj_task_loop - 1] = atof(ann_pba_scen_amt_valn_input[row][5].c_str());
+	scen_amt_array[SCEN_AMT].push_back(atof(ann_pba_scen_amt_valn_input[row][5].c_str()));
+	scen_amt_array[TAX_AVG_RATIO].push_back(atof(ann_pba_scen_amt_valn_input[row][6].c_str()));
 	}
 
 double cte_amt = 0.0;
@@ -2072,40 +2177,50 @@ cte_calc(scen_amt_array, cte_pct, cte_amt, tax_avg_ratio);
 
 double tax_res_adj = 0.0;
 
-if (res_cap_calc_defn == CAPITAL && tax_defn_stoch_cap == USE_WORKING_RESERVE)
+//VM22 - capital uses same stochastic distribution as reserves, tax res = 0
+/*if (res_cap_calc_defn == CAPITAL && tax_defn_stoch_cap == USE_WORKING_RESERVE)
 	{ // Adjust working reserve and tax reserve to be on consistent/requested basis
 	double tax_rate = 0.0;
 
-	if (this == ann_pba)
+	if (model_name == ANN_PBA)
 		{
 		tax_rate = company->tax_rate;
-		init_tax_res = seg->tax_res(t);
-		reins_tax_res = seg->reins_tax_res(t);
+		init_tax_res = seg_element->tax_res(t);
+		reins_tax_res = seg_element->reins_tax_res(t);
 		}
-	#if defined(__FA_LIAB_H_)
-	else if (this == fa_ann_pba)
+	else
 		{
-		tax_rate = fa->tax_rate;
-		init_tax_res = fa->tax_res(t);
-		reins_tax_res = fa->reins_tax_res(t);
-		}
-	#endif
-	#if defined(__FIA_LIAB_H_)
-	else if (this == fia_ann_pba)
 		{
-		tax_rate = fia->tax_rate;
-		init_tax_res = fia->tax_res(t);
-		reins_tax_res = fia->reins_tax_res(t);
+		#if defined(__FA_LIAB_H_)
+		if (model_name == FA_ANN_PBA)
+			{
+			tax_rate = fa->tax_rate;
+			init_tax_res = fa->tax_res(t);
+			reins_tax_res = fa->reins_tax_res(t);
+			}
+		#endif
 		}
-	#endif
-	#if defined(__PA_LIAB_H_)
-	else if (this == pa_ann_pba)
 		{
-		tax_rate = pa->tax_rate;
-		init_tax_res = pa->tax_res(t);
-		reins_tax_res = pa->reins_tax_res(t);
+		#if defined(__FIA_LIAB_H_)
+		if (model_name == FIA_ANN_PBA)
+			{
+			tax_rate = fia->tax_rate;
+			init_tax_res = fia->tax_res(t);
+			reins_tax_res = fia->reins_tax_res(t);
+			}
+		#endif
 		}
-	#endif
+		{
+		#if defined(__PA_LIAB_H_)
+		if (model_name == PA_ANN_PBA)
+			{
+			tax_rate = pa->tax_rate;
+			init_tax_res = pa->tax_res(t);
+			reins_tax_res = pa->reins_tax_res(t);
+			}
+		#endif
+		}
+		}
 
 	if (reins_defn == GROSS)
 		tax_res_adj 
@@ -2119,11 +2234,10 @@ if (res_cap_calc_defn == CAPITAL && tax_defn_stoch_cap == USE_WORKING_RESERVE)
 		  * tax_rate 
 		  * (1.0 - tax_avg_ratio);
 	}
-
+*/
 return cte_amt + tax_res_adj;
 
 }
-
 
 //@@ END
 
@@ -2149,7 +2263,6 @@ return tax_ytd(t) - tax_ytd(t - 1);
 
 }
 
-
 //@@ END
 
 //@@ START - tax_adj_ratio
@@ -2169,16 +2282,17 @@ if (!tax_flag || t < start_period || t > final_period)
 
 if (t == scen_greatest_pv_period)
 	{
-	if (this == ann_pba)
+	if (model_name == ANN_PBA)
 		{
-		if (fabs(seg->sum_over_liabilities("policies_b", 1))
+		if (fabs(seg_element->sum_over_liabilities("policies_b", 1))
 		    < rate_ratio_threshold)
 			return 0.0;
 					
-		return seg->sum_over_liabilities("policies_inf", t) 
-				/ seg->sum_over_liabilities("policies_b", 1);
+		return seg_element->sum_over_liabilities("policies_inf", t) 
+				/ seg_element->sum_over_liabilities("policies_b", 1);
 		}
 
+	{
 	#if defined(__FA_LIAB_H_)
 	if (fabs(fa->policies_b(1)) < rate_ratio_threshold)
 		return 0.0;
@@ -2186,7 +2300,8 @@ if (t == scen_greatest_pv_period)
 	return fa->policies_inf(t)
 	       / fa->policies_b(1);
 	#endif
-
+	}
+	{
 	#if defined(__FIA_LIAB_H_)
 	if (fabs(fia->policies_b(1)) < rate_ratio_threshold)
 		return 0.0;
@@ -2194,7 +2309,8 @@ if (t == scen_greatest_pv_period)
 	return fia->policies_inf(t)
 	       / fia->policies_b(1);
 	#endif
-
+	}
+	{
 	#if defined(__PA_LIAB_H_)
 	if (fabs(pa->policies_b(1)) < rate_ratio_threshold)
 		return 0.0;
@@ -2203,11 +2319,11 @@ if (t == scen_greatest_pv_period)
 	       / pa->policies_b(1);
 	#endif
 	}
+	}
 	
 return tax_adj_ratio(t + 1);
 
 }
-
 
 //@@ END
 
@@ -2218,7 +2334,7 @@ return tax_adj_ratio(t + 1);
 double ANN_PBA_PBA_UDF::ann_pba_pba_tax_capzd_prem(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(52,"tax_capzd_prem",t);
+	return rebase_value(56,"tax_capzd_prem",t);
 }
 
 
@@ -2229,28 +2345,30 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (this == ann_pba)
-	return seg->tax_capzd_prem(t);
+if (model_name == ANN_PBA)
+	return seg_element->tax_capzd_prem(t);
 	
+{
 #if defined(__FA_LIAB_H_)
-if (this == fa_ann_pba)
+if (model_name == FA_ANN_PBA)
 	return fa->tax_capzd_prem(t);
 #endif
-
+}
+{
 #if defined(__FIA_LIAB_H_)
-if (this == fia_ann_pba)
+if (model_name == FIA_ANN_PBA)
 	return fia->tax_capzd_prem(t);
 #endif
-
+}
+{
 #if defined(__PA_LIAB_H_)
-if (this == pa_ann_pba)
+if (model_name == PA_ANN_PBA)
 	return pa->tax_capzd_prem(t);
 #endif
-
+}
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -2261,7 +2379,7 @@ return NO_AVG;
 double ANN_PBA_PBA_UDF::ann_pba_pba_tax_capzd_prem_amortzn(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(53,"tax_capzd_prem_amortzn",t);
+	return rebase_value(57,"tax_capzd_prem_amortzn",t);
 }
 
 
@@ -2272,8 +2390,8 @@ if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
 if (!tax_flag || t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (this == ann_pba)
-	return seg->tax_capzd_prem_amortzn(t);
+if (model_name == ANN_PBA)
+	return seg_element->tax_capzd_prem_amortzn(t);
 
 int proj_mth_adj = get_mth_from_date(proj_date);
 int proj_start_mth_adj = proj_mth_adj == 12 ? 1: proj_mth_adj + 1;
@@ -2289,29 +2407,32 @@ if (tax_capzd_prem_amortzn_yrs > 0)
 	  / (2.0 * tax_capzd_prem_amortzn_yrs);
 
 // Amounts capitalized during the projection are amortized using the temporary table schedule
+{
 #if defined(__FA_LIAB_H_)
-if (this == fa_ann_pba)
+if (model_name == FA_ANN_PBA)
 	from_capzd_aft_proj_date 
 	= fa->tax_capzd_prem_amortzn_sched(t, cal_yr_relative_adj) / 12.0;
 #endif
-
+}
+{
 #if defined(__FIA_LIAB_H_)
-if (this == fia_ann_pba)
+if (model_name == FIA_ANN_PBA)
 	from_capzd_aft_proj_date 
 	= fia->tax_capzd_prem_amortzn_sched(t, cal_yr_relative_adj) / 12.0;
 #endif
-
+}
+{
 #if defined(__PA_LIAB_H_)
-if (this == pa_ann_pba)
+if (model_name == PA_ANN_PBA)
 	from_capzd_aft_proj_date 
 	= pa->tax_capzd_prem_amortzn_sched(t, cal_yr_relative_adj) / 12.0;
 #endif
+}
 
 return from_current_capzd
        + from_capzd_aft_proj_date;
 
 }
-
 
 //@@ END
 
@@ -2330,7 +2451,7 @@ double ANN_PBA_PBA_UDF::ann_pba_pba_tax_cash_flow(int t) {
 if (!alm_flag || t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (!seg->pba_tax_flag && !tax_flag)
+if (!seg_element->pba_tax_flag && !tax_flag)
 	return 0.0;
 
 if (t % 12 == 1)
@@ -2339,7 +2460,6 @@ if (t % 12 == 1)
 return tax_ytd(t) - tax_ytd(t - 1);
 
 }
-
 
 //@@ END
 
@@ -2358,7 +2478,7 @@ double ANN_PBA_PBA_UDF::ann_pba_pba_tax_cash_flow_bef_sale(int t) {
 if (!alm_flag || t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (!seg->pba_tax_flag && !tax_flag)
+if (!seg_element->pba_tax_flag && !tax_flag)
 	return 0.0;
 
 if (t % 12 == 1)
@@ -2367,7 +2487,6 @@ if (t % 12 == 1)
 return tax_ytd_bef_sale(t) - tax_ytd(t - 1);
 
 }
-
 
 //@@ END
 
@@ -2386,32 +2505,34 @@ double ANN_PBA_PBA_UDF::ann_pba_pba_tax_res(int t) {
 if (!tax_flag || t < start_period || t > final_period)
 	return NO_AVG;
 
-if (tax_defn_stoch_cap == USE_WORKING_RESERVE)
+if (tax_defn_stoch_cap == USE_WORKING_RESERVE)//VM22 - TAX RES = 0
 	return working_res(t);
 	
 // if (tax_defn_stoch_cap == CALCULATE_TAX_RESERVE)
-if (this == ann_pba)
-	return seg->tax_res_mp(t);
+if (model_name == ANN_PBA)
+	return seg_element->tax_res_mp(t);
 
+{
 #if defined(__FA_LIAB_H_)
-if (this == fa_ann_pba)
+if (model_name == FA_ANN_PBA)
 	return fa->tax_res_mp(t);	
-#endif	
-
+#endif
+}
+{
 #if defined(__FIA_LIAB_H_)
-if (this == fia_ann_pba)
+if (model_name == FIA_ANN_PBA)
 	return fia->tax_res_mp(t);	
 #endif	
-
+}
+{
 #if defined(__PA_LIAB_H_)
-if (this == pa_ann_pba)
+if (model_name == PA_ANN_PBA)
 	return pa->tax_res_mp(t);	
 #endif	
-
+}
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -2422,7 +2543,7 @@ return NO_AVG;
 double ANN_PBA_PBA_UDF::ann_pba_pba_tax_res_incr(int t) {
 //^^^
 if ( isRebaseClone && sm_peer_model  && t <= rebase_period ){
-	return rebase_value(57,"tax_res_incr",t);
+	return rebase_value(61,"tax_res_incr",t);
 }
 
 
@@ -2437,7 +2558,6 @@ return tax_res(t)
 	   - tax_res(t - 1);
 
 }
-
 
 //@@ END
 
@@ -2456,28 +2576,31 @@ double ANN_PBA_PBA_UDF::ann_pba_pba_tax_ytd(int t) {
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (this == ann_pba)
+if (model_name == ANN_PBA)
 	return taxable_inc_ytd(t) * company->tax_rate;
 
+{
 #if defined(__FA_LIAB_H_)
-if (this == fa_ann_pba)	
+if (model_name == FA_ANN_PBA)	
 	return taxable_inc_ytd(t) * fa->tax_rate;
-#endif	
-
+#endif
+}
+{
 #if defined(__FIA_LIAB_H_)
-if (this == fia_ann_pba)	
+if (model_name == FIA_ANN_PBA)	
 	return taxable_inc_ytd(t) * fia->tax_rate;
 #endif	
-
+}
+{
 #if defined(__PA_LIAB_H_)
-if (this == pa_ann_pba)	
+if (model_name == PA_ANN_PBA)	
 	return taxable_inc_ytd(t) * pa->tax_rate;
 #endif	
-	
+}
+
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -2496,32 +2619,35 @@ double ANN_PBA_PBA_UDF::ann_pba_pba_tax_ytd_bef_sale(int t) {
 if (t <= start_period || t > final_period)
 	return NO_AVG;
 
-if (this == ann_pba)
+if (model_name == ANN_PBA)
 	return taxable_inc_ytd_bef_sale(t) 
            * company->tax_rate;
 
+{
 #if defined(__FA_LIAB_H_)
-if (this == fa_ann_pba)	
+if (model_name == FA_ANN_PBA)	
 	return taxable_inc_ytd_bef_sale(t) 
 	       * fa->tax_rate;
 #endif
-
+}
+{
 #if defined(__FIA_LIAB_H_)
-if (this == fia_ann_pba)	
+if (model_name == FIA_ANN_PBA)	
 	return taxable_inc_ytd_bef_sale(t) 
 	       * fia->tax_rate;
 #endif
-
+}
+{
 #if defined(__PA_LIAB_H_)
-if (this == pa_ann_pba)	
+if (model_name == PA_ANN_PBA)	
 	return taxable_inc_ytd_bef_sale(t) 
 	       * pa->tax_rate;
 #endif
-	
+}
+
 return NO_AVG;
 
 }
-
 
 //@@ END
 
@@ -2552,7 +2678,6 @@ return cash_flow(t)
 
 }
 
-
 //@@ END
 
 //@@ START - taxable_inc_bef_sale
@@ -2582,7 +2707,6 @@ return cash_flow(t)
 
 }
 
-
 //@@ END
 
 //@@ START - taxable_inc_ytd
@@ -2607,7 +2731,6 @@ return taxable_inc_ytd(t - 1)
 	   + taxable_inc(t);
 
 }
-
 
 //@@ END
 
@@ -2634,7 +2757,6 @@ return taxable_inc_ytd(t - 1)
 
 }
 
-
 //@@ END
 
 //@@ START - working_res
@@ -2652,7 +2774,7 @@ double ANN_PBA_PBA_UDF::ann_pba_pba_working_res(int t) {
 if (t < start_period || t > final_period)
 	return NO_AVG;
 
-if (this == ann_pba)
+if (model_name == ANN_PBA)
 	{
 	if (working_res_defn == ZERO)
 		return 0.0;
@@ -2661,7 +2783,7 @@ if (this == ann_pba)
 	}
 
 #if defined(__FA_LIAB_H_)	
-if (this == fa_ann_pba)
+if (model_name == FA_ANN_PBA)
 	{
 	if (pricing_flag && working_res_defn == ZERO)
 		return 0.0;
@@ -2669,9 +2791,9 @@ if (this == fa_ann_pba)
 	return fa->cash_val(t);
 	}
 #endif
-
+{
 #if defined(__FIA_LIAB_H_)	
-if (this == fia_ann_pba)
+if (model_name == FIA_ANN_PBA)
 	{
 	if (pricing_flag && working_res_defn == ZERO)
 		return 0.0;
@@ -2679,11 +2801,10 @@ if (this == fia_ann_pba)
 	return fia->cash_val(t);
 	}
 #endif
-
+}
 return 0.0;
 
 }
-
 
 //@@ END
 
@@ -2706,7 +2827,6 @@ return 0.0;
 
 }
 
-
 //@@ END
 
 //@@ START - disc_rate_mult_fixed
@@ -2723,7 +2843,6 @@ return 1.05;
 
 }
 
-
 //@@ END
 
 //@@ START - final_period
@@ -2735,25 +2854,28 @@ int ANN_PBA_PBA_UDF::ann_pba_pba_final_period() {
 
 
 #line 1 "final_period.ANN_PBA_PBA.for"
+{
 #if defined(__FA_LIAB_H_)
-if (this == fa_ann_pba)
+if (model_name == FA_ANN_PBA)
 	return min(fa->maturity_period, last_proj_period);
 #endif	
-
-#if defined(__FIA_LIAB_H_)
-if (this == fia_ann_pba)
+}
+{
+#ifdef __FIA_LIAB_H_
+if (model_name == FIA_ANN_PBA)
 	return min(fia->maturity_period, last_proj_period);
 #endif	
-	
+}
+{
 #if defined(__PA_LIAB_H_)
-if (this == pa_ann_pba)
+if (model_name == PA_ANN_PBA)
 	return min(pa->maturity_period, last_proj_period);
 #endif	
-	
+}
+
 return last_proj_period;
 
 }
-
 
 //@@ END
 
@@ -2790,7 +2912,6 @@ return 0;
 
 }
 
-
 //@@ END
 
 //@@ START - hedging_output_file_best_estimate
@@ -2802,16 +2923,9 @@ xstring ANN_PBA_PBA_UDF::ann_pba_pba_hedging_output_file_best_estimate() {
 
 
 #line 1 "hedging_output_file_best_estimate.ANN_PBA_PBA.for"
-if (pba_code == STOCH_RES)
-	return hedging_output_file_best_estimate_stoch_res;
-
-if (pba_code == STOCH_CAP)
-	return hedging_output_file_best_estimate_stoch_cap;
-
-return "NONE";
+return hedging_output_file_best_estimate_stoch;
 
 }
-
 
 //@@ END
 
@@ -2824,16 +2938,9 @@ xstring ANN_PBA_PBA_UDF::ann_pba_pba_hedging_output_file_existing_hedges() {
 
 
 #line 1 "hedging_output_file_existing_hedges.ANN_PBA_PBA.for"
-if (pba_code == STOCH_RES)
-	return hedging_output_file_existing_hedges_stoch_res;
-
-if (pba_code == STOCH_CAP)
-	return hedging_output_file_existing_hedges_stoch_cap;
-
-return "NONE";
+return hedging_output_file_existing_hedges_stoch;
 
 }
-
 
 //@@ END
 
@@ -2846,16 +2953,9 @@ double ANN_PBA_PBA_UDF::ann_pba_pba_hedging_stat_scale_factor_max() {
 
 
 #line 1 "hedging_stat_scale_factor_max.ANN_PBA_PBA.for"
-if (pba_code == STOCH_RES)
-	return hedging_stat_scale_factor_max_stoch_res;
-
-if (pba_code == STOCH_CAP)
-	return hedging_stat_scale_factor_max_stoch_cap;
-
-return 1.0;
+return hedging_stat_scale_factor_max_stoch;
 
 }
-
 
 //@@ END
 
@@ -2872,7 +2972,6 @@ return add_mths_to_date(proj_date, valn_period);
 
 }
 
-
 //@@ END
 
 //@@ START - proj_start_date
@@ -2884,10 +2983,9 @@ int ANN_PBA_PBA_UDF::ann_pba_pba_proj_start_date() {
 
 
 #line 1 "proj_start_date.ANN_PBA_PBA.for"
-return MonthNumberFromDate(proj_start_yr, proj_start_mth);
+return day_number_from_date(proj_start_yr, proj_start_mth, 1);
 
 }
-
 
 //@@ END
 
@@ -2909,7 +3007,6 @@ return proj_mth + 1;
 
 }
 
-
 //@@ END
 
 //@@ START - proj_start_yr
@@ -2930,7 +3027,6 @@ return get_yr_from_date(proj_date_adj);
 
 }
 
-
 //@@ END
 
 //@@ START - reins_adj
@@ -2950,7 +3046,6 @@ return 1.0 / (1.0 - reins_pct);
 
 }
 
-
 //@@ END
 
 //@@ START - reins_flag
@@ -2965,40 +3060,42 @@ int ANN_PBA_PBA_UDF::ann_pba_pba_reins_flag() {
 if (reins_defn == GROSS)
 	return 0;
 	
-if (this == ann_pba)
+if (model_name == ANN_PBA)
 	{
-	if (seg->reins_flag)
+	if (seg_element->reins_flag)
 		return 1;
 	}					
 
+{
 #if defined(__FA_LIAB_H_)
-if (this == fa_ann_pba)
+if (model_name == FA_ANN_PBA)
 	{
 	if (fa->reins_flag)
 		return 1;
 	}
 #endif
-
+}
+{
 #if defined(__FIA_LIAB_H_)
-if (this == fia_ann_pba)
+if (model_name == FIA_ANN_PBA)
 	{
 	if (fia->reins_flag)
 		return 1;
 	}
 #endif
-
+}
+{
 #if defined(__PA_LIAB_H_)
-if (this == pa_ann_pba)
+if (model_name == PA_ANN_PBA)
 	{
 	if (pa->reins_flag)
 		return 1;
 	}
 #endif
-
+}
 return 0;
 
 }
-
 
 //@@ END
 
@@ -3014,55 +3111,61 @@ double ANN_PBA_PBA_UDF::ann_pba_pba_reins_pct() {
 double num = 0.0;
 double denom = 0.0;
 	
-if (this == ann_pba)
+if (model_name == ANN_PBA)
+	{
 	{
 	#if defined(__FA_LIAB_H_)
-	num = seg->sum_over_liabilities("reins_dth_ben_inf", 0);
-	denom = seg->sum_over_liabilities("dth_ben_inf", 0);
+	num = seg_element->sum_over_liabilities("reins_dth_ben_inf", 0);
+	denom = seg_element->sum_over_liabilities("dth_ben_inf", 0);
 	#endif
-
+	}
+	{
 	#if defined(__FIA_LIAB_H_)
-	num = seg->sum_over_liabilities("reins_dth_ben_inf", 0);
-	denom = seg->sum_over_liabilities("dth_ben_inf", 0);
+	num = seg_element->sum_over_liabilities("reins_dth_ben_inf", 0);
+	denom = seg_element->sum_over_liabilities("dth_ben_inf", 0);
 	#endif
-
+	}
+	{
 	#if defined(__PA_LIAB_H_)
-	num = seg->sum_over_liabilities("reins_dth_ben_inf", 0);
-	denom = seg->sum_over_liabilities("dth_ben_inf", 0);
+	num = seg_element->sum_over_liabilities("reins_dth_ben_inf", 0);
+	denom = seg_element->sum_over_liabilities("dth_ben_inf", 0);
 	#endif
+	}
 
 	if (denom > 0.0)
 		return num / denom;
 	}					
 
+{
 #if defined (__FA_LIAB_H_)
-if (this == fa_ann_pba)
+if (model_name == FA_ANN_PBA)
 	{
 	if (fa->reins_flag)
 		return fa->reins_pct;
 	}
 #endif
-
+}
+{
 #if defined (__FIA_LIAB_H_)
-if (this == fia_ann_pba)
+if (model_name == FIA_ANN_PBA)
 	{
 	if (fia->reins_flag)
 		return fia->reins_pct;
 	}
 #endif
-
+}
+{
 #if defined (__PA_LIAB_H_)
-if (this == pa_ann_pba)
+if (model_name == PA_ANN_PBA)
 	{
 	if (pa->reins_flag)
 		return pa->reins_pct;
 	}
 #endif
-
+}
 return 0;
 
 }
-
 
 //@@ END
 
@@ -3079,7 +3182,6 @@ return 0;
 
 }
 
-
 //@@ END
 
 //@@ START - tax_capzd_prem_amortzn_yrs
@@ -3091,28 +3193,31 @@ int ANN_PBA_PBA_UDF::ann_pba_pba_tax_capzd_prem_amortzn_yrs() {
 
 
 #line 1 "tax_capzd_prem_amortzn_yrs.ANN_PBA_PBA.for"
-if (this == ann_pba)
-	return seg->tax_capzd_prem_amortzn_yrs;
-	
-#if defined(__FA_LIAB_H_)
-if (this == fa_ann_pba)
-	return fa->tax_capzd_prem_amortzn_yrs;
-#endif	
+if (model_name == ANN_PBA)
+	return seg_element->tax_capzd_prem_amortzn_yrs;
 
+{	
+#if defined(__FA_LIAB_H_)
+if (model_name == FA_ANN_PBA)
+	return fa->tax_capzd_prem_amortzn_yrs;
+#endif
+}
+{
 #if defined(__FIA_LIAB_H_)
-if (this == fia_ann_pba)
+if (model_name == FIA_ANN_PBA)
 	return fia->tax_capzd_prem_amortzn_yrs;
 #endif	
-
+}
+{
 #if defined(__PA_LIAB_H_)
-if (this == pa_ann_pba)
+if (model_name == PA_ANN_PBA)
 	return pa->tax_capzd_prem_amortzn_yrs;
 #endif
+}
 
 return 10;
 
 }
-
 
 //@@ END
 
@@ -3125,35 +3230,10 @@ int ANN_PBA_PBA_UDF::ann_pba_pba_tax_flag() {
 
 
 #line 1 "tax_flag.ANN_PBA_PBA.for"
-if (pba_code == STOCH_RES)
-	return 0;
-	
-return 1;
+//VM22 - capital uses same distribution as reserve
+return 0;
 
 }
-
-
-//@@ END
-
-//@@ START - valn_results_scen_amt
-// Valuation Results Scenario Amounts                                                                                             
-// Calculated Variable:VALN_RESULTS_SCEN_AMT
-//========================================================
-xstring ANN_PBA_PBA_UDF::ann_pba_pba_valn_results_scen_amt() {
-//^^^
-
-
-#line 1 "valn_results_scen_amt.ANN_PBA_PBA.for"
-if (pba_code == STOCH_RES)
-	return valn_results_stoch_res;
-
-if (pba_code == STOCH_CAP)
-	return valn_results_stoch_cap;
-	
-return "NONE";
-
-}
-
 
 //@@ END
 
@@ -3166,16 +3246,10 @@ int ANN_PBA_PBA_UDF::ann_pba_pba_working_res_defn() {
 
 
 #line 1 "working_res_defn.ANN_PBA_PBA.for"
-if (pba_code == STOCH_RES)
-	return ZERO;
-
-if (pba_code == STOCH_CAP)
-	return CASH_VALUE;
-
+//VM22 - capital uses same distribution as reserve
 return ZERO;
 
 }
-
 
 //@@ END
 
@@ -3190,7 +3264,6 @@ if (hedge_cash_flow_array.size() < final_period + 1)
 	}
 
 xstring hedge_file;
-deptaskcols hedging_input_cols;
 deptaskinput hedging_input;
 
 if (hedging_cash_flow_defn == BEST_ESTIMATE)
@@ -3198,21 +3271,10 @@ if (hedging_cash_flow_defn == BEST_ESTIMATE)
 else // hedging_cash_flow_defn == EXISTING
 	hedge_file = replaceWildcards(xstring(hedging_output_file_existing_hedges));	
 
-//string database_name = working_directory() + "ann_pba_get_hedge_items.db";//WTW - Gen2 - add ".getStdStr()"
-xstring database_name = working_directory() + "ann_pba_get_hedge_items.db";//WTW - Gen2 - add ".getStdStr()"
-openDatabase(database_name.getStdStr());//WTW - Gen2 - add ".getStdStr()"
-string table_name = readCsvFile(hedge_file.getStdStr());
+OutputFileReader ofr;
+hedging_input = ofr.readFile(hedge_file.getStdStr(), {"fund_val", "cash_flow", "mkt_val", "task_loop", "period"});
 
-// Retrieve valuation results
-xstring sql = (xstring)"SELECT _fund_val, _cash_flow, _mkt_val FROM '"
-	          + table_name
-	          + (xstring)"' WHERE _task_loop == " + proj_task_loop_num;
-
-executeQuery(sql.getStdStr(), hedging_input_cols, hedging_input);
-closeDatabase();
-remove(database_name.c_str());
-
-if (!hedging_input_cols.size())
+if (!hedging_input.size())
 	{
 	throw FatalError("Could not read hedge valuation file: " 
 		              + hedge_file + " "
@@ -3223,39 +3285,53 @@ double scale_factor = 0.0;
 double scale_factor_previous = 0.0;
 double hedge_cash_flow_cumul = 0.0;
 
-for (int i = 0; i <= final_period; i++)
+for (int row = 0; row < hedging_input.size(); row++)
 	{
-	double fund_val_hedge = atof(hedging_input[i][0].c_str());
-	double fund_val = 0.0;
+	if (atof(hedging_input[row][3].c_str()) != proj_task_loop_num)
+		continue;
+	
+	if (!eq(hedging_input[row][4], "0"))
+		continue;
 
-	if (this == ann_pba)
-		fund_val = seg->sum_over_liabilities("fund_val_fixed", i);
-	#if defined(__FA_LIAB_H_)
-	else if (this == fa_ann_pba)
-		fund_val = fa->fund_val_fixed(i);
-	#endif
-	#if defined(__FIA_LIAB_H_)
-	else if (this == fia_ann_pba)
-		fund_val = fia->fund_val_fixed(i);
-	#endif
-
-	if (fund_val_hedge < model_point_amount_threshold)
-		scale_factor = 0.0;
-	else
-		scale_factor
-		= fund_val / fund_val_hedge;
-		
-	scale_factor = min(scale_factor, hedging_stat_scale_factor_max);
-
-	if (i == 0)
-		hedge_mkt_val_array[i] = atof(hedging_input[i][2].c_str()) * scale_factor;
-	else
+	for (int i = 0; i <= final_period; i++)
 		{
-		hedge_cash_flow_array[i] = atof(hedging_input[i][1].c_str()) * scale_factor_previous;
-		hedge_mkt_val_array[i] = atof(hedging_input[i][2].c_str()) * scale_factor;
-		}
+		double fund_val_hedge = atof(hedging_input[row + i][0].c_str());
+		double fund_val = 0.0;
 
-	scale_factor_previous = scale_factor;
+		if (model_name == ANN_PBA)
+			fund_val = seg_element->sum_over_liabilities("fund_val_fixed", i);
+		else
+			{
+			#if defined(__FA_LIAB_H_)
+			if (model_name == FA_ANN_PBA)
+				fund_val = fa->fund_val_fixed(i);
+			#endif
+			{
+			#if defined(__FIA_LIAB_H_)
+			if (model_name == FIA_ANN_PBA)
+				fund_val = fia->fund_val_fixed(i);
+			#endif
+			}
+			}
+
+		if (fund_val_hedge < model_point_amount_threshold)
+			scale_factor = 0.0;
+		else
+			scale_factor
+			= fund_val / fund_val_hedge;
+		
+		scale_factor = min(scale_factor, hedging_stat_scale_factor_max);
+
+		if (i == 0)
+			hedge_mkt_val_array[i] = atof(hedging_input[row + i][2].c_str()) * scale_factor;
+		else
+			{
+			hedge_cash_flow_array[i] = atof(hedging_input[row + i][1].c_str()) * scale_factor_previous;
+			hedge_mkt_val_array[i] = atof(hedging_input[row + i][2].c_str()) * scale_factor;
+			}
+
+		scale_factor_previous = scale_factor;
+		}
 	}
 
 return;
@@ -3264,151 +3340,128 @@ return;
 
 
 #line 1 "sum_over_pba.ANN_PBA_PBA.for"                                                                                   
-double ANN_PBA_PBA::sum_over_pba(const xstring &colname, int t)
+double ANN_PBA_PBA::sum_over_pba(const xstring &/* CiProxyFormula */colname, const int /* CiProxyTime */ t)
 { 
 double total = 0.0;
 int mp = 0;
 int colnum = 0;
-map <int, long, less <int> >::iterator mp_map_iter;//Gen2 - 9/6/2024 - replace mpmap with full definition
+xstring colname_pba = "";
+map <int, long, less <int> >::iterator mp_map_iter;
 
-#if defined(__FA_LIAB_H_)
-if (seg->fa_mp_map.size())
+{
+#if defined(__FA_LIAB_H_) && defined(__AA_COMP_COMP_H_)
+if (seg_element->fa_mp_map.size())
 	{
-	FA_LIAB *current_fa_element;
 	colnum = liab->sm_fa[0]->sm_fa_ann_pba[0]->Column(colname).Number();
 	
 	if (colnum >= 0)
 		{ 
-		for (mp_map_iter = seg->fa_mp_map.begin();
-		     mp_map_iter != seg->fa_mp_map.end();
-		     mp_map_iter++)
+		for (mp_map_iter = seg_element->fa_mp_map.begin();
+				mp_map_iter != seg_element->fa_mp_map.end();
+				mp_map_iter++)
 			{
 			mp = mp_map_iter->first;
-			current_fa_element = liab->sm_fa[mp];
 
-			if (t < current_fa_element->commencement_period
-				|| t > current_fa_element->maturity_period)
+			if (t < liab->sm_fa[mp]->commencement_period
+				|| t > liab->sm_fa[mp]->maturity_period)
 				continue;
 
 			// Skip new issue commencement period
-			if (current_fa_element->elapsed_mths <= 0
-				&& t == current_fa_element->commencement_period)
+			if (liab->sm_fa[mp]->elapsed_mths <= 0
+				&& t == liab->sm_fa[mp]->commencement_period)
 				continue;
 
-			if (t != current_fa_element->commencement_period
-				&& fabs(current_fa_element->policies_b(t)) < rate_ratio_threshold)
+			if (t != liab->sm_fa[mp]->commencement_period
+				&& fabs(liab->sm_fa[mp]->policies_b(t)) < rate_ratio_threshold)
 				continue;
 
-			total += current_fa_element->sm_fa_ann_pba[0]->Column(colnum).Value(t);
+			total += liab->sm_fa[mp]->sm_fa_ann_pba[0]->Column(colnum).Value(t);
 			}
 		}
 	}
 #endif
-
-#if defined(__FIA_LIAB_H_)
-if (seg->fia_mp_map.size())
+}
+{
+#if defined(__FIA_LIAB_H_) && defined(__AA_COMP_COMP_H_)
+if (seg_element->fia_mp_map.size())
 	{
-	FIA_LIAB *current_fia_element;
 	colnum = liab->sm_fia[0]->sm_fia_ann_pba[0]->Column(colname).Number();
 	
 	if (colnum >= 0)
 		{ 
-		for (mp_map_iter = seg->fia_mp_map.begin();
-		     mp_map_iter != seg->fia_mp_map.end();
-		     mp_map_iter++)
+		for (mp_map_iter = seg_element->fia_mp_map.begin();
+				mp_map_iter != seg_element->fia_mp_map.end();
+				mp_map_iter++)
 			{
 			mp = mp_map_iter->first;
-			current_fia_element = liab->sm_fia[mp];
 
-			if (t < current_fia_element->commencement_period
-				|| t > current_fia_element->maturity_period)
+			if (t < liab->sm_fia[mp]->commencement_period
+				|| t > liab->sm_fia[mp]->maturity_period)
 				continue;
 
 			// Skip new issue commencement period
-			if (current_fia_element->elapsed_mths <= 0
-				&& t == current_fia_element->commencement_period)
+			if (liab->sm_fia[mp]->elapsed_mths <= 0
+				&& t == liab->sm_fia[mp]->commencement_period)
 				continue;
 
-			if (t != current_fia_element->commencement_period
-				&& fabs(current_fia_element->policies_b(t)) < rate_ratio_threshold)
+			if (t != liab->sm_fia[mp]->commencement_period
+				&& fabs(liab->sm_fia[mp]->policies_b(t)) < rate_ratio_threshold)
 				continue;
 
-			total += current_fia_element->sm_fia_ann_pba[0]->Column(colnum).Value(t);
+			total += liab->sm_fia[mp]->sm_fia_ann_pba[0]->Column(colnum).Value(t);
 			}
 		}
 	}
 #endif
-
-#if defined(__PA_LIAB_H_)
-if (seg->pa_mp_map.size())
+}
+{
+#if defined(__PA_LIAB_H_) && defined(__AA_COMP_COMP_H_)
+if (seg_element->pa_mp_map.size())
 	{
-	PA_LIAB *current_pa_element;
 	colnum = liab->sm_pa[0]->sm_pa_ann_pba[0]->Column(colname).Number();
 	
 	if (colnum >= 0)
 		{ 
-		for (mp_map_iter = seg->pa_mp_map.begin();
-		     mp_map_iter != seg->pa_mp_map.end();
-		     mp_map_iter++)
+		for (mp_map_iter = seg_element->pa_mp_map.begin();
+				mp_map_iter != seg_element->pa_mp_map.end();
+				mp_map_iter++)
 			{
 			mp = mp_map_iter->first;
-			current_pa_element = liab->sm_pa[mp];
 
-			if (t < current_pa_element->commencement_period
-				|| t > current_pa_element->maturity_period)
+			if (t < liab->sm_pa[mp]->commencement_period
+				|| t > liab->sm_pa[mp]->maturity_period)
 				continue;
 
 			// Skip new issue commencement period
-			if (current_pa_element->elapsed_mths <= 0
-				&& t == current_pa_element->commencement_period)
+			if (liab->sm_pa[mp]->elapsed_mths <= 0
+				&& t == liab->sm_pa[mp]->commencement_period)
 				continue;
 
-			if (t != current_pa_element->commencement_period
-				&& fabs(current_pa_element->policies_b(t)) < rate_ratio_threshold)
+			if (t != liab->sm_pa[mp]->commencement_period
+				&& fabs(liab->sm_pa[mp]->policies_b(t)) < rate_ratio_threshold)
 				continue;
 
-			total += current_pa_element->sm_pa_ann_pba[0]->Column(colnum).Value(t);
+			total += liab->sm_pa[mp]->sm_pa_ann_pba[0]->Column(colnum).Value(t);
 			}
 		}
 	}
 #endif
-
+}
 //for EPL file
-#if defined(__EPL_LIAB_H_)
-if (seg->epl_mp_map.size())
-	{
-	EPL_LIAB *current_epl_element;
-	colnum = liab->sm_epl[0]->Column("ann_pba_" + colname).Number();
-	
-	if (colnum < 0)
-		throw FatalError("Column not included in application. Please check column names passed into 'sum_over_pba' "
-		                 "function of ann_pba/pba model class.");
-		
-	if (colnum >= 0)
-		{ 
-		for (mp_map_iter = seg->epl_mp_map.begin();
-		     mp_map_iter != seg->epl_mp_map.end();
-		     mp_map_iter++)
-			{
-			mp = mp_map_iter->first;
-			current_epl_element = liab->sm_epl[mp];
-
-			if (t < current_epl_element->commencement_period
-				|| t > current_epl_element->maturity_period)
-				continue;
-
-			total += current_epl_element->Column(colnum).Value(t);
-			}
-		}
+#if defined(__EPL_LIAB_H_) && defined(__AA_COMP_COMP_H_)
+if (seg_element->epl_mp_map.size())
+	{	
+	colname_pba = "ann_pba_" + colname;
+	total += sum_over_pba_epl(colname_pba, t);
 	}
 #endif
 
-if (seg->seriatim_totals.size() > 0)
+if (seg_element->seriatim_totals.size() > 0)
 	{
 	pair<xstring,seriatim_type> name_pair = make_pair(colname, prod_ann_pba);
-	seriatim_map::iterator totals_it = seg->seriatim_totals.find(name_pair);
+	map <pair<xstring,seriatim_type>, SmartArray< SmartArray< SmartArray<double> > > >::iterator totals_it = seg_element->seriatim_totals.find(name_pair);
 
-	if (totals_it != seg->seriatim_totals.end())
+	if (totals_it != seg_element->seriatim_totals.end())
 		total += totals_it->second[0][reins_flag][t];
 	}	
 
@@ -3416,6 +3469,112 @@ return total;
 }
 
 
+
+#line 1 "sum_over_pba_epl.ANN_PBA_PBA.for"                                                                                   
+double ANN_PBA_PBA::sum_over_pba_epl(const xstring & colname, const int t)
+{
+double total = 0.0;
+int mp = 0;
+int colnum = 0;
+map <int, long, less <int> >::iterator mp_map_iter;
+
+{
+//for EPL file
+#if defined(__EPL_LIAB_H_) && defined(__AA_COMP_COMP_H_)
+if (seg_element->epl_mp_map.size())
+	{
+	colnum = liab->sm_epl[0]->Column(colname).Number();				
+
+	if (colnum < 0)
+		throw FatalError("Column not included in application. Please check column names passed into 'sum_over_pba' "
+		                 "function of ann_pba/pba model class.");
+	
+	if (colnum >= 0)
+		{ 
+		for (mp_map_iter = seg_element->epl_mp_map.begin();
+			 mp_map_iter != seg_element->epl_mp_map.end();
+			 mp_map_iter++)
+			{
+			mp = mp_map_iter->first;
+
+			if (t < liab->sm_epl[mp]->commencement_period
+				|| t > liab->sm_epl[mp]->maturity_period)
+				continue;
+
+			total += liab->sm_epl[mp]->Column(colnum).Value(t);
+			}
+		}
+	}		
+#endif
+}
+
+// include results from independent model points
+if (seg_element->seriatim_totals.size() > 0)
+	{
+	int cohort_col = getElementNumber(0); 
+	pair<xstring,seriatim_type> name_pair = make_pair(colname, prod_sfas97rd);
+	map <pair<xstring,seriatim_type>, SmartArray< SmartArray< SmartArray<double> > > >::iterator totals_it = seg_element->seriatim_totals.find(name_pair);
+
+	if(totals_it != seg_element->seriatim_totals.end())
+		total += totals_it->second[cohort_col][reins_flag][t];
+	}
+return total;
+}
+
+
+
+#line 1 "write_valuation_output.ANN_PBA_PBA.for"                                                                                   
+void ANN_PBA_PBA::write_valuation_output(xstring group_name)
+{
+// Create file_name
+xstring valuation_results_file = xstring(replaceWildcards(valn_results_scen_amt));
+
+// Open state of world file and write header
+if (!ann_pba_scen_amt_valn_output.is_open())
+	{
+	ann_pba_scen_amt_valn_output.setf(ios::fixed);
+	ann_pba_scen_amt_valn_output.precision(12);
+
+	ann_pba_scen_amt_valn_output.open(valuation_results_file);
+
+	// Write header
+	if (overall_is_first_proj_task_loop)
+		ann_pba_scen_amt_valn_output // 7 columns
+		<< "task_loop" << ","            
+		<< "group" << ","              
+		<< "period" << ","               
+		<< "working_res" << ","  
+		<< "reins_res" << ","               
+		<< "scen_amt" << ","            
+		<< "tax_adj_ratio" << endl;          
+	}
+
+//For auditing purposes, create a FOR loop here to output all periods
+ann_pba_scen_amt_valn_output
+<< proj_task_loop_num << ","
+<< group_name << ","
+<< 0 << ","
+<< working_res(0) << ","
+<< reins_res(0) << ","
+<< scen_amt(0) << ","
+<< tax_adj_ratio(0) << endl;
+
+return;
+}
+
+
+
+void ANN_PBA_PBA::Terminator()
+{
+
+ann_pba_scen_amt_valn_output.close();
+
+}
+
+FunctionPtr ANN_PBA_PBA::RegisterTerminatorOnce = []() {
+    ::PushTerminator(Terminator);
+    RegisterTerminatorOnce = NoOp;
+};
 
 	static ANN_PBA_PBA_UDF *modelOffset		= 0;
 
@@ -3443,129 +3602,137 @@ const CashFlowCommonData ANN_PBA_PBA::mCFStaticData_0[] =
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_asset_yld_mthly, 'E','N', '3', 'P', (size_t)&modelOffset->asset_yld_mthly),
 	CashFlowCommonData(2, "assets_accum", "ann_pba_pba_assets_accum",  "assets_accum",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_assets_accum, 'E','N', '3', 'P', (size_t)&modelOffset->assets_accum),
-	CashFlowCommonData(3, "cal_mth", "ann_pba_pba_cal_mth",  "cal_mth",  CashFlowCommonData::AVG,
+	CashFlowCommonData(3, "assets_accum_inv", "ann_pba_pba_assets_accum_inv",  "assets_accum_inv",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_assets_accum_inv, 'E','N', '3', 'P', (size_t)&modelOffset->assets_accum_inv),
+	CashFlowCommonData(4, "cal_mth", "ann_pba_pba_cal_mth",  "cal_mth",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_cal_mth, 'E','N', '3', 'C', (size_t)&modelOffset->cal_mth),
-	CashFlowCommonData(4, "cal_yr", "ann_pba_pba_cal_yr",  "cal_yr",  CashFlowCommonData::AVG,
+	CashFlowCommonData(5, "cal_yr", "ann_pba_pba_cal_yr",  "cal_yr",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_cal_yr, 'E','N', '3', 'C', (size_t)&modelOffset->cal_yr),
-	CashFlowCommonData(5, "cal_yr_relative", "ann_pba_pba_cal_yr_relative",  "cal_yr_relative",  CashFlowCommonData::AVG,
+	CashFlowCommonData(6, "cal_yr_relative", "ann_pba_pba_cal_yr_relative",  "cal_yr_relative",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_cal_yr_relative, 'E','N', '3', 'C', (size_t)&modelOffset->cal_yr_relative),
-	CashFlowCommonData(6, "cap_gain", "ann_pba_pba_cap_gain",  "cap_gain",  CashFlowCommonData::SUM,
+	CashFlowCommonData(7, "cap_gain", "ann_pba_pba_cap_gain",  "cap_gain",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_cap_gain, 'E','Y', '3', 'P', (size_t)&modelOffset->cap_gain),
-	CashFlowCommonData(7, "cash_flow", "ann_pba_pba_cash_flow",  "cash_flow",  CashFlowCommonData::SUM,
+	CashFlowCommonData(8, "cash_flow", "ann_pba_pba_cash_flow",  "cash_flow",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_cash_flow, 'E','Y', '3', 'P', (size_t)&modelOffset->cash_flow),
-	CashFlowCommonData(8, "cash_flow_int", "ann_pba_pba_cash_flow_int",  "cash_flow_int",  CashFlowCommonData::SUM,
+	CashFlowCommonData(9, "cash_flow_int", "ann_pba_pba_cash_flow_int",  "cash_flow_int",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_cash_flow_int, 'E','Y', '3', 'C', (size_t)&modelOffset->cash_flow_int),
-	CashFlowCommonData(9, "cash_flow_rate_mthly", "ann_pba_pba_cash_flow_rate_mthly",  "cash_flow_rate_mthly",  CashFlowCommonData::SUM,
+	CashFlowCommonData(10, "cash_flow_rate_mthly", "ann_pba_pba_cash_flow_rate_mthly",  "cash_flow_rate_mthly",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_cash_flow_rate_mthly, 'E','N', '3', 'C', (size_t)&modelOffset->cash_flow_rate_mthly),
-	CashFlowCommonData(10, "date", "ann_pba_pba_date",  "date",  CashFlowCommonData::SUM,
+	CashFlowCommonData(11, "cash_from_hedge", "ann_pba_pba_cash_from_hedge",  "cash_from_hedge",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_cash_from_hedge, 'E','Y', '3', 'P', (size_t)&modelOffset->cash_from_hedge),
+	CashFlowCommonData(12, "cash_from_hedge_int", "ann_pba_pba_cash_from_hedge_int",  "cash_from_hedge_int",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_cash_from_hedge_int, 'E','Y', '3', 'P', (size_t)&modelOffset->cash_from_hedge_int),
+	CashFlowCommonData(13, "cash_val", "ann_pba_pba_cash_val",  "cash_val",  CashFlowCommonData::SUM,
+                     (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_cash_val, 'E','Y', '3', 'P', (size_t)&modelOffset->cash_val),
+	CashFlowCommonData(14, "date", "ann_pba_pba_date",  "date",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_date, 'E','N', '3', 'P', (size_t)&modelOffset->date),
-	CashFlowCommonData(11, "def_accum", "ann_pba_pba_def_accum",  "def_accum",  CashFlowCommonData::SUM,
+	CashFlowCommonData(15, "def_accum", "ann_pba_pba_def_accum",  "def_accum",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_def_accum, 'E','N', '3', 'P', (size_t)&modelOffset->def_accum),
-	CashFlowCommonData(12, "direct_cap_gain", "ann_pba_pba_direct_cap_gain",  "direct_cap_gain",  CashFlowCommonData::SUM,
+	CashFlowCommonData(16, "direct_cap_gain", "ann_pba_pba_direct_cap_gain",  "direct_cap_gain",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_direct_cap_gain, 'E','Y', '3', 'P', (size_t)&modelOffset->direct_cap_gain),
-	CashFlowCommonData(13, "direct_cash_flow", "ann_pba_pba_direct_cash_flow",  "direct_cash_flow",  CashFlowCommonData::SUM,
+	CashFlowCommonData(17, "direct_cash_flow", "ann_pba_pba_direct_cash_flow",  "direct_cash_flow",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_direct_cash_flow, 'E','Y', '3', 'P', (size_t)&modelOffset->direct_cash_flow),
-	CashFlowCommonData(14, "direct_cash_flow_int", "ann_pba_pba_direct_cash_flow_int",  "direct_cash_flow_int",  CashFlowCommonData::SUM,
+	CashFlowCommonData(18, "direct_cash_flow_int", "ann_pba_pba_direct_cash_flow_int",  "direct_cash_flow_int",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_direct_cash_flow_int, 'E','Y', '3', 'C', (size_t)&modelOffset->direct_cash_flow_int),
-	CashFlowCommonData(15, "direct_imr_incr", "ann_pba_pba_direct_imr_incr",  "direct_imr_incr",  CashFlowCommonData::SUM,
+	CashFlowCommonData(19, "direct_imr_incr", "ann_pba_pba_direct_imr_incr",  "direct_imr_incr",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_direct_imr_incr, 'E','Y', '3', 'C', (size_t)&modelOffset->direct_imr_incr),
-	CashFlowCommonData(16, "direct_inv_inc", "ann_pba_pba_direct_inv_inc",  "direct_inv_inc",  CashFlowCommonData::SUM,
+	CashFlowCommonData(20, "direct_inv_inc", "ann_pba_pba_direct_inv_inc",  "direct_inv_inc",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_direct_inv_inc, 'E','Y', '3', 'P', (size_t)&modelOffset->direct_inv_inc),
-	CashFlowCommonData(17, "direct_prof", "ann_pba_pba_direct_prof",  "direct_prof",  CashFlowCommonData::SUM,
+	CashFlowCommonData(21, "direct_prof", "ann_pba_pba_direct_prof",  "direct_prof",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_direct_prof, 'E','Y', '3', 'P', (size_t)&modelOffset->direct_prof),
-	CashFlowCommonData(18, "direct_res_incr", "ann_pba_pba_direct_res_incr",  "direct_res_incr",  CashFlowCommonData::SUM,
+	CashFlowCommonData(22, "direct_res_incr", "ann_pba_pba_direct_res_incr",  "direct_res_incr",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_direct_res_incr, 'E','Y', '3', 'P', (size_t)&modelOffset->direct_res_incr),
-	CashFlowCommonData(19, "direct_tax", "ann_pba_pba_direct_tax",  "direct_tax",  CashFlowCommonData::SUM,
+	CashFlowCommonData(23, "direct_tax", "ann_pba_pba_direct_tax",  "direct_tax",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_direct_tax, 'E','Y', '3', 'P', (size_t)&modelOffset->direct_tax),
-	CashFlowCommonData(20, "disc_rate_accum", "ann_pba_pba_disc_rate_accum",  "disc_rate_accum",  CashFlowCommonData::AVG,
+	CashFlowCommonData(24, "disc_rate_accum", "ann_pba_pba_disc_rate_accum",  "disc_rate_accum",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_disc_rate_accum, 'E','N', '3', 'P', (size_t)&modelOffset->disc_rate_accum),
-	CashFlowCommonData(21, "disc_rate_mthly", "ann_pba_pba_disc_rate_mthly",  "disc_rate_mthly",  CashFlowCommonData::AVG,
+	CashFlowCommonData(25, "disc_rate_mthly", "ann_pba_pba_disc_rate_mthly",  "disc_rate_mthly",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_disc_rate_mthly, 'E','N', '3', 'P', (size_t)&modelOffset->disc_rate_mthly),
-	CashFlowCommonData(22, "eff_cap_gains_rate", "ann_pba_pba_eff_cap_gains_rate",  "eff_cap_gains_rate",  CashFlowCommonData::SUM,
+	CashFlowCommonData(26, "eff_cap_gains_rate", "ann_pba_pba_eff_cap_gains_rate",  "eff_cap_gains_rate",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_eff_cap_gains_rate, 'E','N', '3', 'P', (size_t)&modelOffset->eff_cap_gains_rate),
-	CashFlowCommonData(23, "hedge_cash_flow", "ann_pba_pba_hedge_cash_flow",  "hedge_cash_flow",  CashFlowCommonData::SUM,
+	CashFlowCommonData(27, "hedge_cash_flow", "ann_pba_pba_hedge_cash_flow",  "hedge_cash_flow",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_hedge_cash_flow, 'E','Y', '3', 'P', (size_t)&modelOffset->hedge_cash_flow),
-	CashFlowCommonData(24, "hedge_cost", "ann_pba_pba_hedge_cost",  "hedge_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(28, "hedge_cost", "ann_pba_pba_hedge_cost",  "hedge_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_hedge_cost, 'E','Y', '3', 'P', (size_t)&modelOffset->hedge_cost),
-	CashFlowCommonData(25, "hedge_mkt_val", "ann_pba_pba_hedge_mkt_val",  "hedge_mkt_val",  CashFlowCommonData::SUM,
+	CashFlowCommonData(29, "hedge_mkt_val", "ann_pba_pba_hedge_mkt_val",  "hedge_mkt_val",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_hedge_mkt_val, 'E','N', '3', 'P', (size_t)&modelOffset->hedge_mkt_val),
-	CashFlowCommonData(26, "hedge_mkt_val_incr", "ann_pba_pba_hedge_mkt_val_incr",  "hedge_mkt_val_incr",  CashFlowCommonData::SUM,
+	CashFlowCommonData(30, "hedge_mkt_val_incr", "ann_pba_pba_hedge_mkt_val_incr",  "hedge_mkt_val_incr",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_hedge_mkt_val_incr, 'E','Y', '3', 'P', (size_t)&modelOffset->hedge_mkt_val_incr),
-	CashFlowCommonData(27, "hedging_e_factor", "ann_pba_pba_hedging_e_factor",  "hedging_e_factor",  CashFlowCommonData::SUM,
+	CashFlowCommonData(31, "hedging_e_factor", "ann_pba_pba_hedging_e_factor",  "hedging_e_factor",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_hedging_e_factor, 'E','Y', '3', 'P', (size_t)&modelOffset->hedging_e_factor),
-	CashFlowCommonData(28, "imr", "ann_pba_pba_imr",  "imr",  CashFlowCommonData::SUM,
+	CashFlowCommonData(32, "imr", "ann_pba_pba_imr",  "imr",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_imr, 'E','N', '3', 'C', (size_t)&modelOffset->imr),
-	CashFlowCommonData(29, "imr_incr", "ann_pba_pba_imr_incr",  "imr_incr",  CashFlowCommonData::SUM,
+	CashFlowCommonData(33, "imr_incr", "ann_pba_pba_imr_incr",  "imr_incr",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_imr_incr, 'E','Y', '3', 'C', (size_t)&modelOffset->imr_incr),
-	CashFlowCommonData(30, "initialize", "ann_pba_pba_initialize",  "initialize",  CashFlowCommonData::SUM,
+	CashFlowCommonData(34, "initialize", "ann_pba_pba_initialize",  "initialize",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_initialize, 'E','N', '3', 'N', (size_t)&modelOffset->initialize),
-	CashFlowCommonData(31, "inv_inc", "ann_pba_pba_inv_inc",  "inv_inc",  CashFlowCommonData::SUM,
+	CashFlowCommonData(35, "inv_inc", "ann_pba_pba_inv_inc",  "inv_inc",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_inv_inc, 'E','Y', '3', 'P', (size_t)&modelOffset->inv_inc),
-	CashFlowCommonData(32, "pimr_adj_factor", "ann_pba_pba_pimr_adj_factor",  "pimr_adj_factor",  CashFlowCommonData::SUM,
+	CashFlowCommonData(36, "pimr_adj_factor", "ann_pba_pba_pimr_adj_factor",  "pimr_adj_factor",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_pimr_adj_factor, 'E','N', '3', 'C', (size_t)&modelOffset->pimr_adj_factor),
-	CashFlowCommonData(33, "realzd_cap_gain", "ann_pba_pba_realzd_cap_gain",  "realzd_cap_gain",  CashFlowCommonData::SUM,
+	CashFlowCommonData(37, "realzd_cap_gain", "ann_pba_pba_realzd_cap_gain",  "realzd_cap_gain",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_realzd_cap_gain, 'E','Y', '3', 'P', (size_t)&modelOffset->realzd_cap_gain),
-	CashFlowCommonData(34, "realzd_cap_gain_bef_sale", "ann_pba_pba_realzd_cap_gain_bef_sale",  "realzd_cap_gain_bef_sale",  CashFlowCommonData::SUM,
+	CashFlowCommonData(38, "realzd_cap_gain_bef_sale", "ann_pba_pba_realzd_cap_gain_bef_sale",  "realzd_cap_gain_bef_sale",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_realzd_cap_gain_bef_sale, 'E','Y', '3', 'P', (size_t)&modelOffset->realzd_cap_gain_bef_sale),
-	CashFlowCommonData(35, "reins_cap_gain", "ann_pba_pba_reins_cap_gain",  "reins_cap_gain",  CashFlowCommonData::SUM,
+	CashFlowCommonData(39, "reins_cap_gain", "ann_pba_pba_reins_cap_gain",  "reins_cap_gain",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_reins_cap_gain, 'E','Y', '3', 'P', (size_t)&modelOffset->reins_cap_gain),
-	CashFlowCommonData(36, "reins_cash_flow", "ann_pba_pba_reins_cash_flow",  "reins_cash_flow",  CashFlowCommonData::SUM,
+	CashFlowCommonData(40, "reins_cash_flow", "ann_pba_pba_reins_cash_flow",  "reins_cash_flow",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_reins_cash_flow, 'E','Y', '3', 'P', (size_t)&modelOffset->reins_cash_flow),
-	CashFlowCommonData(37, "reins_cash_flow_int", "ann_pba_pba_reins_cash_flow_int",  "reins_cash_flow_int",  CashFlowCommonData::SUM,
+	CashFlowCommonData(41, "reins_cash_flow_int", "ann_pba_pba_reins_cash_flow_int",  "reins_cash_flow_int",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_reins_cash_flow_int, 'E','Y', '3', 'C', (size_t)&modelOffset->reins_cash_flow_int),
-	CashFlowCommonData(38, "reins_cost", "ann_pba_pba_reins_cost",  "reins_cost",  CashFlowCommonData::SUM,
+	CashFlowCommonData(42, "reins_cost", "ann_pba_pba_reins_cost",  "reins_cost",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_reins_cost, 'E','Y', '3', 'P', (size_t)&modelOffset->reins_cost),
-	CashFlowCommonData(39, "reins_imr_incr", "ann_pba_pba_reins_imr_incr",  "reins_imr_incr",  CashFlowCommonData::SUM,
+	CashFlowCommonData(43, "reins_imr_incr", "ann_pba_pba_reins_imr_incr",  "reins_imr_incr",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_reins_imr_incr, 'E','Y', '3', 'C', (size_t)&modelOffset->reins_imr_incr),
-	CashFlowCommonData(40, "reins_inv_inc", "ann_pba_pba_reins_inv_inc",  "reins_inv_inc",  CashFlowCommonData::SUM,
+	CashFlowCommonData(44, "reins_inv_inc", "ann_pba_pba_reins_inv_inc",  "reins_inv_inc",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_reins_inv_inc, 'E','Y', '3', 'P', (size_t)&modelOffset->reins_inv_inc),
-	CashFlowCommonData(41, "reins_res", "ann_pba_pba_reins_res",  "reins_res",  CashFlowCommonData::SUM,
+	CashFlowCommonData(45, "reins_res", "ann_pba_pba_reins_res",  "reins_res",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_reins_res, 'E','N', '3', 'P', (size_t)&modelOffset->reins_res),
-	CashFlowCommonData(42, "reins_res_incr", "ann_pba_pba_reins_res_incr",  "reins_res_incr",  CashFlowCommonData::SUM,
+	CashFlowCommonData(46, "reins_res_incr", "ann_pba_pba_reins_res_incr",  "reins_res_incr",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_reins_res_incr, 'E','Y', '3', 'P', (size_t)&modelOffset->reins_res_incr),
-	CashFlowCommonData(43, "reins_tax_res", "ann_pba_pba_reins_tax_res",  "reins_tax_res",  CashFlowCommonData::SUM,
+	CashFlowCommonData(47, "reins_tax_res", "ann_pba_pba_reins_tax_res",  "reins_tax_res",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_reins_tax_res, 'E','N', '3', 'P', (size_t)&modelOffset->reins_tax_res),
-	CashFlowCommonData(44, "reins_tax_res_incr", "ann_pba_pba_reins_tax_res_incr",  "reins_tax_res_incr",  CashFlowCommonData::SUM,
+	CashFlowCommonData(48, "reins_tax_res_incr", "ann_pba_pba_reins_tax_res_incr",  "reins_tax_res_incr",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_reins_tax_res_incr, 'E','Y', '3', 'C', (size_t)&modelOffset->reins_tax_res_incr),
-	CashFlowCommonData(45, "scen_amt", "ann_pba_pba_scen_amt",  "scen_amt",  CashFlowCommonData::SUM,
+	CashFlowCommonData(49, "scen_amt", "ann_pba_pba_scen_amt",  "scen_amt",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_scen_amt, 'E','N', '3', 'P', (size_t)&modelOffset->scen_amt),
-	CashFlowCommonData(46, "scen_greatest_pv", "ann_pba_pba_scen_greatest_pv",  "scen_greatest_pv",  CashFlowCommonData::SUM,
+	CashFlowCommonData(50, "scen_greatest_pv", "ann_pba_pba_scen_greatest_pv",  "scen_greatest_pv",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_scen_greatest_pv, 'E','N', '3', 'P', (size_t)&modelOffset->scen_greatest_pv),
-	CashFlowCommonData(47, "starting_assets", "ann_pba_pba_starting_assets",  "starting_assets",  CashFlowCommonData::SUM,
+	CashFlowCommonData(51, "starting_assets", "ann_pba_pba_starting_assets",  "starting_assets",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_starting_assets, 'E','N', '3', 'P', (size_t)&modelOffset->starting_assets),
-	CashFlowCommonData(48, "startup", "ann_pba_pba_startup",  "startup",  CashFlowCommonData::SUM,
+	CashFlowCommonData(52, "startup", "ann_pba_pba_startup",  "startup",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::virtual_startup, 'E','N', '3', 'N', (size_t)&modelOffset->startup),
-	CashFlowCommonData(49, "stoch_amt", "ann_pba_pba_stoch_amt",  "stoch_amt",  CashFlowCommonData::SUM,
+	CashFlowCommonData(53, "stoch_amt", "ann_pba_pba_stoch_amt",  "stoch_amt",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_stoch_amt, 'E','N', '3', 'P', (size_t)&modelOffset->stoch_amt),
-	CashFlowCommonData(50, "tax", "ann_pba_pba_tax",  "tax",  CashFlowCommonData::SUM,
+	CashFlowCommonData(54, "tax", "ann_pba_pba_tax",  "tax",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_tax, 'E','Y', '3', 'P', (size_t)&modelOffset->tax),
-	CashFlowCommonData(51, "tax_adj_ratio", "ann_pba_pba_tax_adj_ratio",  "tax_adj_ratio",  CashFlowCommonData::AVG,
+	CashFlowCommonData(55, "tax_adj_ratio", "ann_pba_pba_tax_adj_ratio",  "tax_adj_ratio",  CashFlowCommonData::AVG,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_tax_adj_ratio, 'E','N', '3', 'P', (size_t)&modelOffset->tax_adj_ratio),
-	CashFlowCommonData(52, "tax_capzd_prem", "ann_pba_pba_tax_capzd_prem",  "tax_capzd_prem",  CashFlowCommonData::SUM,
+	CashFlowCommonData(56, "tax_capzd_prem", "ann_pba_pba_tax_capzd_prem",  "tax_capzd_prem",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_tax_capzd_prem, 'E','Y', '3', 'C', (size_t)&modelOffset->tax_capzd_prem),
-	CashFlowCommonData(53, "tax_capzd_prem_amortzn", "ann_pba_pba_tax_capzd_prem_amortzn",  "tax_capzd_prem_amortzn",  CashFlowCommonData::SUM,
+	CashFlowCommonData(57, "tax_capzd_prem_amortzn", "ann_pba_pba_tax_capzd_prem_amortzn",  "tax_capzd_prem_amortzn",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_tax_capzd_prem_amortzn, 'E','Y', '3', 'C', (size_t)&modelOffset->tax_capzd_prem_amortzn),
-	CashFlowCommonData(54, "tax_cash_flow", "ann_pba_pba_tax_cash_flow",  "tax_cash_flow",  CashFlowCommonData::SUM,
+	CashFlowCommonData(58, "tax_cash_flow", "ann_pba_pba_tax_cash_flow",  "tax_cash_flow",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_tax_cash_flow, 'E','Y', '3', 'P', (size_t)&modelOffset->tax_cash_flow),
-	CashFlowCommonData(55, "tax_cash_flow_bef_sale", "ann_pba_pba_tax_cash_flow_bef_sale",  "tax_cash_flow_bef_sale",  CashFlowCommonData::SUM,
+	CashFlowCommonData(59, "tax_cash_flow_bef_sale", "ann_pba_pba_tax_cash_flow_bef_sale",  "tax_cash_flow_bef_sale",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_tax_cash_flow_bef_sale, 'E','Y', '3', 'P', (size_t)&modelOffset->tax_cash_flow_bef_sale),
-	CashFlowCommonData(56, "tax_res", "ann_pba_pba_tax_res",  "tax_res",  CashFlowCommonData::SUM,
+	CashFlowCommonData(60, "tax_res", "ann_pba_pba_tax_res",  "tax_res",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_tax_res, 'E','N', '3', 'P', (size_t)&modelOffset->tax_res),
-	CashFlowCommonData(57, "tax_res_incr", "ann_pba_pba_tax_res_incr",  "tax_res_incr",  CashFlowCommonData::SUM,
+	CashFlowCommonData(61, "tax_res_incr", "ann_pba_pba_tax_res_incr",  "tax_res_incr",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_tax_res_incr, 'E','Y', '3', 'C', (size_t)&modelOffset->tax_res_incr),
-	CashFlowCommonData(58, "tax_ytd", "ann_pba_pba_tax_ytd",  "tax_ytd",  CashFlowCommonData::SUM,
+	CashFlowCommonData(62, "tax_ytd", "ann_pba_pba_tax_ytd",  "tax_ytd",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_tax_ytd, 'E','N', '3', 'P', (size_t)&modelOffset->tax_ytd),
-	CashFlowCommonData(59, "tax_ytd_bef_sale", "ann_pba_pba_tax_ytd_bef_sale",  "tax_ytd_bef_sale",  CashFlowCommonData::SUM,
+	CashFlowCommonData(63, "tax_ytd_bef_sale", "ann_pba_pba_tax_ytd_bef_sale",  "tax_ytd_bef_sale",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_tax_ytd_bef_sale, 'E','N', '3', 'P', (size_t)&modelOffset->tax_ytd_bef_sale),
-	CashFlowCommonData(60, "taxable_inc", "ann_pba_pba_taxable_inc",  "taxable_inc",  CashFlowCommonData::SUM,
+	CashFlowCommonData(64, "taxable_inc", "ann_pba_pba_taxable_inc",  "taxable_inc",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_taxable_inc, 'E','Y', '3', 'P', (size_t)&modelOffset->taxable_inc),
-	CashFlowCommonData(61, "taxable_inc_bef_sale", "ann_pba_pba_taxable_inc_bef_sale",  "taxable_inc_bef_sale",  CashFlowCommonData::SUM,
+	CashFlowCommonData(65, "taxable_inc_bef_sale", "ann_pba_pba_taxable_inc_bef_sale",  "taxable_inc_bef_sale",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_taxable_inc_bef_sale, 'E','Y', '3', 'P', (size_t)&modelOffset->taxable_inc_bef_sale),
-	CashFlowCommonData(62, "taxable_inc_ytd", "ann_pba_pba_taxable_inc_ytd",  "taxable_inc_ytd",  CashFlowCommonData::SUM,
+	CashFlowCommonData(66, "taxable_inc_ytd", "ann_pba_pba_taxable_inc_ytd",  "taxable_inc_ytd",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_taxable_inc_ytd, 'E','N', '3', 'P', (size_t)&modelOffset->taxable_inc_ytd),
-	CashFlowCommonData(63, "taxable_inc_ytd_bef_sale", "ann_pba_pba_taxable_inc_ytd_bef_sale",  "taxable_inc_ytd_bef_sale",  CashFlowCommonData::SUM,
+	CashFlowCommonData(67, "taxable_inc_ytd_bef_sale", "ann_pba_pba_taxable_inc_ytd_bef_sale",  "taxable_inc_ytd_bef_sale",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_taxable_inc_ytd_bef_sale, 'E','N', '3', 'P', (size_t)&modelOffset->taxable_inc_ytd_bef_sale),
-	CashFlowCommonData(64, "working_res", "ann_pba_pba_working_res",  "working_res",  CashFlowCommonData::SUM,
+	CashFlowCommonData(68, "working_res", "ann_pba_pba_working_res",  "working_res",  CashFlowCommonData::SUM,
                      (dPFi)(dPXi)&ANN_PBA_PBA_UDF::ann_pba_pba_working_res, 'E','N', '3', 'P', (size_t)&modelOffset->working_res)
 };
 const CashFlowCommonData* ANN_PBA_PBA::mCFStaticData[] = {
@@ -3634,12 +3801,24 @@ const CashFlowCommonData* ANN_PBA_PBA::mCFStaticData[] = {
 	&ANN_PBA_PBA::mCFStaticData_0[62],
 	&ANN_PBA_PBA::mCFStaticData_0[63],
 	&ANN_PBA_PBA::mCFStaticData_0[64],
+	&ANN_PBA_PBA::mCFStaticData_0[65],
+	&ANN_PBA_PBA::mCFStaticData_0[66],
+	&ANN_PBA_PBA::mCFStaticData_0[67],
+	&ANN_PBA_PBA::mCFStaticData_0[68],
 	nullptr};
 //const CashFlowCommonData END@2
 
 // all the StringEnumLists will be generated here
 namespace {
 	typedef EnumList::ChoicePair ChoicePair;
+
+	// EnumList for gen2_declarations                                                                                       
+	const ChoicePair gen2_declarationsChoicePairs[] = {
+		ChoicePair(StrEnum::UNDEFINED, StrEnum::undefinedString)
+		,ChoicePair(StrEnum::ZERO, "Zero")
+		,ChoicePair(StrEnum::CASH_VALUE, "Cash Value")
+	};
+	const EnumList gen2_declarationsEnumList(2, gen2_declarationsChoicePairs);
 
 	// EnumList for hedging_cash_flow_defn                                                                                       
 	const ChoicePair hedging_cash_flow_defnChoicePairs[] = {
@@ -3666,6 +3845,22 @@ namespace {
 		,ChoicePair(StrEnum::BOTH, "Both")
 	};
 	const EnumList hedging_defn_inputEnumList(3, hedging_defn_inputChoicePairs);
+
+	// EnumList for init_assets_defn                                                                                       
+	const ChoicePair init_assets_defnChoicePairs[] = {
+		ChoicePair(StrEnum::UNDEFINED, StrEnum::undefinedString)
+		,ChoicePair(StrEnum::CASH_VALUE, "Cash Value")
+		,ChoicePair(StrEnum::PRIOR_STAT_RESERVE, "Prior Stat Reserve")
+	};
+	const EnumList init_assets_defnEnumList(2, init_assets_defnChoicePairs);
+
+	// EnumList for model_name                                                                                       
+	const ChoicePair model_nameChoicePairs[] = {
+		ChoicePair(StrEnum::UNDEFINED, StrEnum::undefinedString)
+		,ChoicePair(StrEnum::ANN_PBA, "ann_pba")
+		,ChoicePair(StrEnum::FIA_ANN_PBA, "fia_ann_pba")
+	};
+	const EnumList model_nameEnumList(2, model_nameChoicePairs);
 
 	// EnumList for pba_code                                                                                       
 	const ChoicePair pba_codeChoicePairs[] = {
@@ -3725,9 +3920,16 @@ namespace {
 	const ChoicePair tax_defn_stoch_capChoicePairs[] = {
 		ChoicePair(StrEnum::UNDEFINED, StrEnum::undefinedString)
 		,ChoicePair(StrEnum::USE_WORKING_RESERVE, "Use Working Reserve")
+	};
+	const EnumList tax_defn_stoch_capEnumList(1, tax_defn_stoch_capChoicePairs);
+
+	// EnumList for tax_defn_stoch_cap_input                                                                                       
+	const ChoicePair tax_defn_stoch_cap_inputChoicePairs[] = {
+		ChoicePair(StrEnum::UNDEFINED, StrEnum::undefinedString)
+		,ChoicePair(StrEnum::USE_WORKING_RESERVE, "Use Working Reserve")
 		,ChoicePair(StrEnum::CALCULATE_TAX_RESERVE, "Calculate Tax Reserve")
 	};
-	const EnumList tax_defn_stoch_capEnumList(2, tax_defn_stoch_capChoicePairs);
+	const EnumList tax_defn_stoch_cap_inputEnumList(2, tax_defn_stoch_cap_inputChoicePairs);
 
 	// EnumList for working_res_defn_input                                                                                       
 	const ChoicePair working_res_defn_inputChoicePairs[] = {
@@ -3771,97 +3973,109 @@ void ANN_PBA_PBA::createAllShare() {
 TableMgr<VariantTable> ANN_PBA_PBA::mgr_;
 
 	Attribute::Descriptor ANN_PBA_PBA::descriptor_0[] = {
-	Descriptor(0, Attribute::DOUBLE,	"cte_pct_stoch_cap", Descriptor::NOT_INDEXED, (size_t)&modelOffset->cte_pct_stoch_cap,
+	Descriptor(0, Attribute::STRING,	"category_id", -1, (size_t)&modelOffset->category_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(1, Attribute::STR_ENUM,	"hedging_cash_flow_defn", -1, (size_t)&modelOffset->hedging_cash_flow_defn,
+	Descriptor(1, Attribute::DOUBLE,	"cte_pct_stoch_cap", Descriptor::NOT_INDEXED, (size_t)&modelOffset->cte_pct_stoch_cap,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
+	Descriptor(2, Attribute::DOUBLE,	"dflt_max_net_sprd_adj_factor", Descriptor::NOT_INDEXED, (size_t)&modelOffset->dflt_max_net_sprd_adj_factor,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
+	Descriptor(3, Attribute::DOUBLE,	"dflt_sprd_related_factor", Descriptor::NOT_INDEXED, (size_t)&modelOffset->dflt_sprd_related_factor,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
+	Descriptor(4, Attribute::STRING,	"existing_asset_lookup", -1, (size_t)&modelOffset->existing_asset_lookup,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
+	Descriptor(5, Attribute::STR_ENUM,	"gen2_declarations", -1, (size_t)&modelOffset->gen2_declarations,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, &gen2_declarationsEnumList, Feature(true)),
+	Descriptor(6, Attribute::DOUBLE,	"hedge_payoff_margin", Descriptor::NOT_INDEXED, (size_t)&modelOffset->hedge_payoff_margin,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
+	Descriptor(7, Attribute::STR_ENUM,	"hedging_cash_flow_defn", -1, (size_t)&modelOffset->hedging_cash_flow_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &hedging_cash_flow_defnEnumList, Feature(true)),
-	Descriptor(2, Attribute::STR_ENUM,	"hedging_defn", -1, (size_t)&modelOffset->hedging_defn,
+	Descriptor(8, Attribute::STR_ENUM,	"hedging_defn", -1, (size_t)&modelOffset->hedging_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &hedging_defnEnumList, Feature(true)),
-	Descriptor(3, Attribute::STR_ENUM,	"hedging_defn_input", -1, (size_t)&modelOffset->hedging_defn_input,
+	Descriptor(9, Attribute::STR_ENUM,	"hedging_defn_input", -1, (size_t)&modelOffset->hedging_defn_input,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &hedging_defn_inputEnumList, Feature(true)),
-	Descriptor(4, Attribute::DOUBLE,	"hedging_e_factor_stoch_cap", Descriptor::NOT_INDEXED, (size_t)&modelOffset->hedging_e_factor_stoch_cap,
+	Descriptor(10, Attribute::DOUBLE,	"hedging_e_factor_stoch_cap", Descriptor::NOT_INDEXED, (size_t)&modelOffset->hedging_e_factor_stoch_cap,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(5, Attribute::DOUBLE,	"hedging_e_factor_stoch_res", Descriptor::NOT_INDEXED, (size_t)&modelOffset->hedging_e_factor_stoch_res,
+	Descriptor(11, Attribute::DOUBLE,	"hedging_e_factor_stoch_res", Descriptor::NOT_INDEXED, (size_t)&modelOffset->hedging_e_factor_stoch_res,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(6, Attribute::STRING,	"hedging_output_file_best_estimate_stoch_cap", -1, (size_t)&modelOffset->hedging_output_file_best_estimate_stoch_cap,
+	Descriptor(12, Attribute::STRING,	"hedging_output_file_best_estimate_stoch", -1, (size_t)&modelOffset->hedging_output_file_best_estimate_stoch,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(7, Attribute::STRING,	"hedging_output_file_best_estimate_stoch_res", -1, (size_t)&modelOffset->hedging_output_file_best_estimate_stoch_res,
+	Descriptor(13, Attribute::STRING,	"hedging_output_file_existing_hedges_stoch", -1, (size_t)&modelOffset->hedging_output_file_existing_hedges_stoch,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(8, Attribute::STRING,	"hedging_output_file_existing_hedges_stoch_cap", -1, (size_t)&modelOffset->hedging_output_file_existing_hedges_stoch_cap,
+	Descriptor(14, Attribute::DOUBLE,	"hedging_stat_scale_factor_max_stoch", Descriptor::NOT_INDEXED, (size_t)&modelOffset->hedging_stat_scale_factor_max_stoch,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(9, Attribute::STRING,	"hedging_output_file_existing_hedges_stoch_res", -1, (size_t)&modelOffset->hedging_output_file_existing_hedges_stoch_res,
+	Descriptor(15, Attribute::DOUBLE,	"init_asset_pct_input", Descriptor::NOT_INDEXED, (size_t)&modelOffset->init_asset_pct_input,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(10, Attribute::DOUBLE,	"hedging_stat_scale_factor_max_stoch_cap", Descriptor::NOT_INDEXED, (size_t)&modelOffset->hedging_stat_scale_factor_max_stoch_cap,
+	Descriptor(16, Attribute::STR_ENUM,	"init_assets_defn", -1, (size_t)&modelOffset->init_assets_defn,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, &init_assets_defnEnumList, Feature(true)),
+	Descriptor(17, Attribute::DOUBLE,	"init_assets_input", Descriptor::NOT_INDEXED, (size_t)&modelOffset->init_assets_input,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(11, Attribute::DOUBLE,	"hedging_stat_scale_factor_max_stoch_res", Descriptor::NOT_INDEXED, (size_t)&modelOffset->hedging_stat_scale_factor_max_stoch_res,
-				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(12, Attribute::DOUBLE,	"init_asset_pct_input", Descriptor::NOT_INDEXED, (size_t)&modelOffset->init_asset_pct_input,
-				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(13, Attribute::DOUBLE,	"init_assets_input", Descriptor::NOT_INDEXED, (size_t)&modelOffset->init_assets_input,
-				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(14, Attribute::STR_ENUM,	"pba_code", -1, (size_t)&modelOffset->pba_code,
+	Descriptor(18, Attribute::STR_ENUM,	"model_name", -1, (size_t)&modelOffset->model_name,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, &model_nameEnumList, Feature(true)),
+	Descriptor(19, Attribute::STR_ENUM,	"pba_code", -1, (size_t)&modelOffset->pba_code,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &pba_codeEnumList, Feature(true)),
-	Descriptor(15, Attribute::STRING,	"proj_date", -1, (size_t)&modelOffset->proj_date,
+	Descriptor(20, Attribute::STRING,	"proj_date", -1, (size_t)&modelOffset->proj_date,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(16, Attribute::STR_ENUM,	"reins_defn", -1, (size_t)&modelOffset->reins_defn,
+	Descriptor(21, Attribute::STR_ENUM,	"reins_defn", -1, (size_t)&modelOffset->reins_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &reins_defnEnumList, Feature(true)),
-	Descriptor(17, Attribute::STR_ENUM,	"reins_defn_input", -1, (size_t)&modelOffset->reins_defn_input,
+	Descriptor(22, Attribute::STR_ENUM,	"reins_defn_input", -1, (size_t)&modelOffset->reins_defn_input,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &reins_defn_inputEnumList, Feature(true)),
-	Descriptor(18, Attribute::STR_ENUM,	"reins_gross_up_defn", -1, (size_t)&modelOffset->reins_gross_up_defn,
+	Descriptor(23, Attribute::STR_ENUM,	"reins_gross_up_defn", -1, (size_t)&modelOffset->reins_gross_up_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &reins_gross_up_defnEnumList, Feature(true)),
-	Descriptor(19, Attribute::STR_ENUM,	"res_cap_calc_defn", -1, (size_t)&modelOffset->res_cap_calc_defn,
+	Descriptor(24, Attribute::STR_ENUM,	"res_cap_calc_defn", -1, (size_t)&modelOffset->res_cap_calc_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &res_cap_calc_defnEnumList, Feature(true)),
-	Descriptor(20, Attribute::STR_ENUM,	"res_cap_calc_defn_input", -1, (size_t)&modelOffset->res_cap_calc_defn_input,
+	Descriptor(25, Attribute::STR_ENUM,	"res_cap_calc_defn_input", -1, (size_t)&modelOffset->res_cap_calc_defn_input,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &res_cap_calc_defn_inputEnumList, Feature(true)),
-	Descriptor(21, Attribute::STRING,	"seg_id", -1, (size_t)&modelOffset->seg_id,
+	Descriptor(26, Attribute::STRING,	"seg_id", -1, (size_t)&modelOffset->seg_id,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(22, Attribute::STR_ENUM,	"tax_defn_stoch_cap", -1, (size_t)&modelOffset->tax_defn_stoch_cap,
+	Descriptor(27, Attribute::STRING,	"seg_id_lookup", -1, (size_t)&modelOffset->seg_id_lookup,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
+	Descriptor(28, Attribute::STR_ENUM,	"tax_defn_stoch_cap", -1, (size_t)&modelOffset->tax_defn_stoch_cap,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &tax_defn_stoch_capEnumList, Feature(true)),
-	Descriptor(23, Attribute::STRING,	"valn_results_stoch_cap", -1, (size_t)&modelOffset->valn_results_stoch_cap,
+	Descriptor(29, Attribute::STR_ENUM,	"tax_defn_stoch_cap_input", -1, (size_t)&modelOffset->tax_defn_stoch_cap_input,
+				Descriptor::NOT_SHARED, false, false, (size_t)0, &tax_defn_stoch_cap_inputEnumList, Feature(true)),
+	Descriptor(30, Attribute::STRING,	"valn_results_scen_amt", -1, (size_t)&modelOffset->valn_results_scen_amt,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(24, Attribute::STRING,	"valn_results_stoch_res", -1, (size_t)&modelOffset->valn_results_stoch_res,
+	Descriptor(31, Attribute::DOUBLE,	"wal_lookup", Descriptor::NOT_INDEXED, (size_t)&modelOffset->wal_lookup,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(25, Attribute::STR_ENUM,	"working_res_defn_input", -1, (size_t)&modelOffset->working_res_defn_input,
+	Descriptor(32, Attribute::STR_ENUM,	"working_res_defn_input", -1, (size_t)&modelOffset->working_res_defn_input,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, &working_res_defn_inputEnumList, Feature(true)),
-	Descriptor(26, Attribute::INT,	"msnumelement", -1, (size_t)&modelOffset->msnumelement,
+	Descriptor(33, Attribute::INT,	"msnumelement", -1, (size_t)&modelOffset->msnumelement,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature()),
-	Descriptor(27, Attribute::SCALAR_DOUBLE,	"cte_pct", -1, (size_t)&modelOffset->cte_pct,
+	Descriptor(34, Attribute::SCALAR_DOUBLE,	"cte_pct", -1, (size_t)&modelOffset->cte_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((dF)&ANN_PBA_PBA_UDF::ann_pba_pba_cte_pct)),
-	Descriptor(28, Attribute::SCALAR_DOUBLE,	"disc_rate_mult_fixed", -1, (size_t)&modelOffset->disc_rate_mult_fixed,
+	Descriptor(35, Attribute::SCALAR_DOUBLE,	"disc_rate_mult_fixed", -1, (size_t)&modelOffset->disc_rate_mult_fixed,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((dF)&ANN_PBA_PBA_UDF::ann_pba_pba_disc_rate_mult_fixed)),
-	Descriptor(29, Attribute::SCALAR_INT,	"final_period", -1, (size_t)&modelOffset->final_period,
+	Descriptor(36, Attribute::SCALAR_INT,	"final_period", -1, (size_t)&modelOffset->final_period,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&ANN_PBA_PBA_UDF::ann_pba_pba_final_period)),
-	Descriptor(30, Attribute::SCALAR_INT,	"hedging_flag", -1, (size_t)&modelOffset->hedging_flag,
+	Descriptor(37, Attribute::SCALAR_INT,	"hedging_flag", -1, (size_t)&modelOffset->hedging_flag,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&ANN_PBA_PBA_UDF::ann_pba_pba_hedging_flag)),
-	Descriptor(31, Attribute::SCALAR_STRING,	"hedging_output_file_best_estimate", -1, (size_t)&modelOffset->hedging_output_file_best_estimate,
+	Descriptor(38, Attribute::SCALAR_STRING,	"hedging_output_file_best_estimate", -1, (size_t)&modelOffset->hedging_output_file_best_estimate,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((sF)&ANN_PBA_PBA_UDF::ann_pba_pba_hedging_output_file_best_estimate)),
-	Descriptor(32, Attribute::SCALAR_STRING,	"hedging_output_file_existing_hedges", -1, (size_t)&modelOffset->hedging_output_file_existing_hedges,
+	Descriptor(39, Attribute::SCALAR_STRING,	"hedging_output_file_existing_hedges", -1, (size_t)&modelOffset->hedging_output_file_existing_hedges,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((sF)&ANN_PBA_PBA_UDF::ann_pba_pba_hedging_output_file_existing_hedges)),
-	Descriptor(33, Attribute::SCALAR_DOUBLE,	"hedging_stat_scale_factor_max", -1, (size_t)&modelOffset->hedging_stat_scale_factor_max,
+	Descriptor(40, Attribute::SCALAR_DOUBLE,	"hedging_stat_scale_factor_max", -1, (size_t)&modelOffset->hedging_stat_scale_factor_max,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((dF)&ANN_PBA_PBA_UDF::ann_pba_pba_hedging_stat_scale_factor_max)),
-	Descriptor(34, Attribute::SCALAR_STRING,	"proj_date_adj", -1, (size_t)&modelOffset->proj_date_adj,
+	Descriptor(41, Attribute::SCALAR_STRING,	"proj_date_adj", -1, (size_t)&modelOffset->proj_date_adj,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((sF)&ANN_PBA_PBA_UDF::ann_pba_pba_proj_date_adj)),
-	Descriptor(35, Attribute::SCALAR_INT,	"proj_start_date", -1, (size_t)&modelOffset->proj_start_date,
+	Descriptor(42, Attribute::SCALAR_INT,	"proj_start_date", -1, (size_t)&modelOffset->proj_start_date,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&ANN_PBA_PBA_UDF::ann_pba_pba_proj_start_date)),
-	Descriptor(36, Attribute::SCALAR_INT,	"proj_start_mth", -1, (size_t)&modelOffset->proj_start_mth,
+	Descriptor(43, Attribute::SCALAR_INT,	"proj_start_mth", -1, (size_t)&modelOffset->proj_start_mth,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&ANN_PBA_PBA_UDF::ann_pba_pba_proj_start_mth)),
-	Descriptor(37, Attribute::SCALAR_INT,	"proj_start_yr", -1, (size_t)&modelOffset->proj_start_yr,
+	Descriptor(44, Attribute::SCALAR_INT,	"proj_start_yr", -1, (size_t)&modelOffset->proj_start_yr,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&ANN_PBA_PBA_UDF::ann_pba_pba_proj_start_yr)),
-	Descriptor(38, Attribute::SCALAR_DOUBLE,	"reins_adj", -1, (size_t)&modelOffset->reins_adj,
+	Descriptor(45, Attribute::SCALAR_DOUBLE,	"reins_adj", -1, (size_t)&modelOffset->reins_adj,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((dF)&ANN_PBA_PBA_UDF::ann_pba_pba_reins_adj)),
-	Descriptor(39, Attribute::SCALAR_INT,	"reins_flag", -1, (size_t)&modelOffset->reins_flag,
+	Descriptor(46, Attribute::SCALAR_INT,	"reins_flag", -1, (size_t)&modelOffset->reins_flag,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&ANN_PBA_PBA_UDF::ann_pba_pba_reins_flag)),
-	Descriptor(40, Attribute::SCALAR_DOUBLE,	"reins_pct", -1, (size_t)&modelOffset->reins_pct,
+	Descriptor(47, Attribute::SCALAR_DOUBLE,	"reins_pct", -1, (size_t)&modelOffset->reins_pct,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((dF)&ANN_PBA_PBA_UDF::ann_pba_pba_reins_pct)),
-	Descriptor(41, Attribute::SCALAR_INT,	"start_period", -1, (size_t)&modelOffset->start_period,
+	Descriptor(48, Attribute::SCALAR_INT,	"start_period", -1, (size_t)&modelOffset->start_period,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&ANN_PBA_PBA_UDF::ann_pba_pba_start_period)),
-	Descriptor(42, Attribute::SCALAR_INT,	"tax_capzd_prem_amortzn_yrs", -1, (size_t)&modelOffset->tax_capzd_prem_amortzn_yrs,
+	Descriptor(49, Attribute::SCALAR_INT,	"tax_capzd_prem_amortzn_yrs", -1, (size_t)&modelOffset->tax_capzd_prem_amortzn_yrs,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&ANN_PBA_PBA_UDF::ann_pba_pba_tax_capzd_prem_amortzn_yrs)),
-	Descriptor(43, Attribute::SCALAR_INT,	"tax_flag", -1, (size_t)&modelOffset->tax_flag,
+	Descriptor(50, Attribute::SCALAR_INT,	"tax_flag", -1, (size_t)&modelOffset->tax_flag,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&ANN_PBA_PBA_UDF::ann_pba_pba_tax_flag)),
-	Descriptor(44, Attribute::SCALAR_STRING,	"valn_results_scen_amt", -1, (size_t)&modelOffset->valn_results_scen_amt,
-				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((sF)&ANN_PBA_PBA_UDF::ann_pba_pba_valn_results_scen_amt)),
-	Descriptor(45, Attribute::SCALAR_INT,	"working_res_defn", -1, (size_t)&modelOffset->working_res_defn,
+	Descriptor(51, Attribute::SCALAR_INT,	"working_res_defn", -1, (size_t)&modelOffset->working_res_defn,
 				Descriptor::NOT_SHARED, false, false, (size_t)0, 0, Feature((iF)&ANN_PBA_PBA_UDF::ann_pba_pba_working_res_defn)),
 	};
 
@@ -3912,8 +4126,14 @@ TableMgr<VariantTable> ANN_PBA_PBA::mgr_;
 	&ANN_PBA_PBA::descriptor_0[43],
 	&ANN_PBA_PBA::descriptor_0[44],
 	&ANN_PBA_PBA::descriptor_0[45],
+	&ANN_PBA_PBA::descriptor_0[46],
+	&ANN_PBA_PBA::descriptor_0[47],
+	&ANN_PBA_PBA::descriptor_0[48],
+	&ANN_PBA_PBA::descriptor_0[49],
+	&ANN_PBA_PBA::descriptor_0[50],
+	&ANN_PBA_PBA::descriptor_0[51],
 	nullptr};
-	const size_t ANN_PBA_PBA::sDescriptorCount = 46;
+	const size_t ANN_PBA_PBA::sDescriptorCount = 52;
 
 //factory
 ANN_PBA_PBA* ANN_PBA_PBA::makeThis(int isSubmodel, ModelClass* owner, ANN_PBA_PBA* peer, 
@@ -4024,18 +4244,12 @@ typedef xstring (ANN_PBA_PBA_UDF::*sPFs) (xstring);
 
 // constructor if this model class is the base class of another model class
 ANN_PBA_PBA::ANN_PBA_PBA(int columnCount, Descriptor* mocd[], Product* persObj) : ModelClass(columnCount, mocd, persObj), Variable(*this)
-  , sm_bond_is(0)
-  , sm_bond_pv(0)
-  , sm_bond_ym(0)
-  , sm_mtg_is(0)
-  , sm_mtg_pv(0)
-  , sm_mtg_ym(0)
 
+	, adco(company_asset_adco)
 	, ann_pba(company_seg_ann_pba)
 	, asset(company_asset)
 	, fia(company_liab_fia)
 	, fia_ann_pba(company_liab_fia_fia_ann_pba)
-	, fia_automation(company_liab_fia_fia_automation)
 	, fia_rates(company_liab_fia_fia_rates)
 	, liab(company_liab)
 	, rates(company_rates)
@@ -4044,6 +4258,7 @@ ANN_PBA_PBA::ANN_PBA_PBA(int columnCount, Descriptor* mocd[], Product* persObj) 
 	gProxyInitialiser = 0;
 	gColumnInitialiser = 0;
 
+	RegisterTerminatorOnce();
 	typedef double (ModelClass::*dPFi2) (int, int);
 	typedef double (ANN_PBA_PBA_UDF::*dPXi2) (int, int);
 	dPXi2 temp2;
@@ -4053,19 +4268,13 @@ ANN_PBA_PBA::ANN_PBA_PBA(int columnCount, Descriptor* mocd[], Product* persObj) 
 //constructor begincolumn
 ANN_PBA_PBA::ANN_PBA_PBA(const xstring &modelClassName,
 		int isSm, ModelClass *owner, ModelClass *peer, int mainRebase,
-		const char *name, ModelClass* arrayPersistentObj) : ModelClass(64, ANN_PBA_PBA::descriptorTable, arrayPersistentObj), Variable(*this)
-  , sm_bond_is(0)
-  , sm_bond_pv(0)
-  , sm_bond_ym(0)
-  , sm_mtg_is(0)
-  , sm_mtg_pv(0)
-  , sm_mtg_ym(0)
+		const char *name, ModelClass* arrayPersistentObj) : ModelClass(68, ANN_PBA_PBA::descriptorTable, arrayPersistentObj), Variable(*this)
 
+	, adco(company_asset_adco)
 	, ann_pba(company_seg_ann_pba)
 	, asset(company_asset)
 	, fia(company_liab_fia)
 	, fia_ann_pba(company_liab_fia_fia_ann_pba)
-	, fia_automation(company_liab_fia_fia_automation)
 	, fia_rates(company_liab_fia_fia_rates)
 	, liab(company_liab)
 	, rates(company_rates)
@@ -4073,6 +4282,7 @@ ANN_PBA_PBA::ANN_PBA_PBA(const xstring &modelClassName,
  // Tables...
  // Generic Tables ...
 {
+	RegisterTerminatorOnce();
 
 #ifdef MICROSOFT
 #pragma warning(pop)
@@ -4094,11 +4304,14 @@ ANN_PBA_PBA::ANN_PBA_PBA(const xstring &modelClassName,
        isMainModel = !isSm;
 		modelName = name;
 
-#ifdef __CREATE_COMP_COMP_CLASS_
+#ifdef __CREATE_AA_COMP_COMP_CLASS_
        company = 0;
 #endif
 #ifdef __CREATE_ASSET_ASSET_CLASS_
        company_asset = 0;
+#endif
+#ifdef __CREATE_ADCO_ASSET_CLASS_
+       company_asset_adco = 0;
 #endif
 #ifdef __CREATE_LIAB_LIAB_CLASS_
        company_liab = 0;
@@ -4108,9 +4321,6 @@ ANN_PBA_PBA::ANN_PBA_PBA(const xstring &modelClassName,
 #endif
 #ifdef __CREATE_ANN_PBA_PBA_CLASS_
        company_liab_fia_fia_ann_pba = 0;
-#endif
-#ifdef __CREATE_AUTOMATION_CLASS_
-       company_liab_fia_fia_automation = 0;
 #endif
 #ifdef __CREATE_RATES_ECONOMY_CLASS_
        company_liab_fia_fia_rates = 0;
@@ -4140,7 +4350,7 @@ ANN_PBA_PBA::ANN_PBA_PBA(const xstring &modelClassName,
 
 	setSlidingSpace();
 
-	for (int cf_no = 1; cf_no <= 64; cf_no++)
+	for (int cf_no = 1; cf_no <= 68; cf_no++)
 #ifdef CF_MEMORY
 		setPtr_col(cf_no, 0);
 #else
@@ -4181,11 +4391,14 @@ ANN_PBA_PBA::ANN_PBA_PBA(const xstring &modelClassName,
 
  void ANN_PBA_PBA::copy_names() {
 
-#ifdef __CREATE_COMP_COMP_CLASS_
-		company = (COMP_COMP*)(findUnique("company"));
+#ifdef __CREATE_AA_COMP_COMP_CLASS_
+		company = (AA_COMP_COMP*)(findUnique("company"));
 #endif
 #ifdef __CREATE_ASSET_ASSET_CLASS_
 		company_asset = (ASSET_ASSET*)(findUnique("company|asset"));
+#endif
+#ifdef __CREATE_ADCO_ASSET_CLASS_
+		company_asset_adco = (ADCO_ASSET*)(findUnique("company|asset|adco"));
 #endif
 #ifdef __CREATE_LIAB_LIAB_CLASS_
 		company_liab = (LIAB_LIAB*)(findUnique("company|liab"));
@@ -4195,9 +4408,6 @@ ANN_PBA_PBA::ANN_PBA_PBA(const xstring &modelClassName,
 #endif
 #ifdef __CREATE_ANN_PBA_PBA_CLASS_
 		company_liab_fia_fia_ann_pba = (ANN_PBA_PBA*)(findUnique("company|liab|fia|fia_ann_pba"));
-#endif
-#ifdef __CREATE_AUTOMATION_CLASS_
-		company_liab_fia_fia_automation = (AUTOMATION*)(findUnique("company|liab|fia|fia_automation"));
 #endif
 #ifdef __CREATE_RATES_ECONOMY_CLASS_
 		company_liab_fia_fia_rates = (RATES_ECONOMY*)(findUnique("company|liab|fia|fia_rates"));
@@ -4421,12 +4631,6 @@ ANN_PBA_PBA_persistent_object::ANN_PBA_PBA_persistent_object(const xstring &mode
 			ANN_PBA_PBA(modelClassName, isSm, owner, peer, mainRebase, name, arrayPersistentObj), 
 			mReadArray(true),
 			pfl(0)
-	, sm_bond_is(ANN_PBA_PBA::sm_bond_is)
-	, sm_bond_pv(ANN_PBA_PBA::sm_bond_pv)
-	, sm_bond_ym(ANN_PBA_PBA::sm_bond_ym)
-	, sm_mtg_is(ANN_PBA_PBA::sm_mtg_is)
-	, sm_mtg_pv(ANN_PBA_PBA::sm_mtg_pv)
-	, sm_mtg_ym(ANN_PBA_PBA::sm_mtg_ym)
 
 	{
 
@@ -4506,7 +4710,7 @@ void ANN_PBA_PBA::after_startup(int decrement) {
 //ms_BeforeStartup END@2
 
 HVector<ModelClass::ddfStruct> ANN_PBA_PBA::ddfVector;
-BitArray ANN_PBA_PBA::dataVariables(46);
+BitArray ANN_PBA_PBA::dataVariables(52);
 bool ANN_PBA_PBA::hasBeenWritten = false;
 
 

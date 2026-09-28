@@ -2,42 +2,7 @@
 #define __FIA_LIAB_H_
 #pragma warning ( disable : 4819 )
 
-//#include "rates_economy.h" //WTW - Gen2
-
-// 20191015 MTC - PV benefit ITM refactor
-// 20191112 MTC - Changed maps to vectors for optimization
-
-// 20181217 MTC - Refactored cubic spline
-#ifndef CUBIC_SPLINE_AIG//WTW - Gen2
-struct cubic_spline_params_aig
-{
-	cubic_spline_params_aig(): initialized(false),
-						       n(0),
-							   h(vector<double>()),
-							   alpha(vector<double>()),
-							   l(vector<double>()),
-							   mu(vector<double>()),
-							   z(vector<double>()),
-							   c(vector<double>()),
-							   b(vector<double>()),
-							   d(vector<double>()) {}
-	bool initialized;
-	int n;
-	vector<double> h;
-	vector<double> alpha;
-	vector<double> l;
-	vector<double> mu;
-	vector<double> z;
-	vector<double> c;
-	vector<double> b;
-	vector<double> d;
-};
-
-const cubic_spline_params_aig default_cubic_spline_params_aig = cubic_spline_params_aig();
-// 20181217 MTC END
-#define CUBIC_SPLINE_AIG//WTW - Gen2
-#endif//WTW - Gen2
-
+#define __FIA_LIAB_H_
 
 #include <math.h>
 #include "xstring.h"
@@ -97,7 +62,6 @@ extern MY_DLL ofstream log_strm;
 #include "StringProxy.h"			// ... contains String Proxies
 #include "StringEnumProxy.h"		// ... contains StringEnum Proxies
 #include "NumProxyNonMembers.h"		// ... min, max
-#include "StringedProxyNonMembers.h"		// ... concatenation for StringEnum
 #include "ArrayProxy.h"			// ... contains Array Proxies
 #include "ScalarProxy.h"			// ... contains Scalar Proxies
 #include "ModelGroupProxy.h"
@@ -107,6 +71,11 @@ extern MY_DLL ofstream log_strm;
 
 
 using namespace StrEnum;
+
+#ifdef __CREATE_AA_COMP_COMP_CLASS_
+class AA_COMP_COMP;
+class AA_COMP_COMP_persistent_object;
+#endif
 
 #ifdef __CREATE_ADCO_ASSET_CLASS_
 class ADCO_ASSET;
@@ -124,11 +93,6 @@ class ASSET_ASSET;
 class ASSET_ASSET_persistent_object;
 #endif
 
-#ifdef __CREATE_AUTOMATION_CLASS_
-class AUTOMATION;
-class AUTOMATION_persistent_object;
-#endif
-
 #ifdef __CREATE_A_SUBPORT_ASSET_CLASS_
 class A_SUBPORT_ASSET;
 class A_SUBPORT_ASSET_persistent_object;
@@ -141,22 +105,21 @@ typedef TMultiDComp<_2D_A_SUBPORT_ASSET, A_SUBPORT_ASSET_persistent_object> _3D_
 class BOND_ASSET;
 class BOND_ASSET_persistent_object;
 typedef TComp<BOND_ASSET, BOND_ASSET_persistent_object> _1D_BOND_ASSET;
+typedef TMultiDComp<_1D_BOND_ASSET, BOND_ASSET_persistent_object> _2D_BOND_ASSET;
 #endif
 
 #ifdef __CREATE_BOND_CF_ASSET_CLASS_
 class BOND_CF_ASSET;
 class BOND_CF_ASSET_persistent_object;
-#endif
-
-#ifdef __CREATE_COMP_COMP_CLASS_
-class COMP_COMP;
-class COMP_COMP_persistent_object;
+typedef TComp<BOND_CF_ASSET, BOND_CF_ASSET_persistent_object> _1D_BOND_CF_ASSET;
+typedef TMultiDComp<_1D_BOND_CF_ASSET, BOND_CF_ASSET_persistent_object> _2D_BOND_CF_ASSET;
 #endif
 
 #ifdef __CREATE_EIO_ASSET_CLASS_
 class EIO_ASSET;
 class EIO_ASSET_persistent_object;
 typedef TComp<EIO_ASSET, EIO_ASSET_persistent_object> _1D_EIO_ASSET;
+typedef TMultiDComp<_1D_EIO_ASSET, EIO_ASSET_persistent_object> _2D_EIO_ASSET;
 #endif
 
 #ifdef __CREATE_EPA_ASSET_CLASS_
@@ -181,6 +144,7 @@ typedef TComp<FIAAFUND_LIAB, FIAAFUND_LIAB_persistent_object> _1D_FIAAFUND_LIAB;
 class FIACARVM_LIAB;
 class FIACARVM_LIAB_persistent_object;
 typedef TComp<FIACARVM_LIAB, FIACARVM_LIAB_persistent_object> _1D_FIACARVM_LIAB;
+typedef TMultiDComp<_1D_FIACARVM_LIAB, FIACARVM_LIAB_persistent_object> _2D_FIACARVM_LIAB;
 #endif
 
 #ifdef __CREATE_FIA_LIAB_CLASS_
@@ -196,11 +160,6 @@ typedef TComp<HDG_GRP_COMP, HDG_GRP_COMP_persistent_object> _1D_HDG_GRP_COMP;
 typedef TMultiDComp<_1D_HDG_GRP_COMP, HDG_GRP_COMP_persistent_object> _2D_HDG_GRP_COMP;
 #endif
 
-#ifdef __CREATE_INTEX_ASSET_CLASS_
-class INTEX_ASSET;
-class INTEX_ASSET_persistent_object;
-#endif
-
 #ifdef __CREATE_INVSTRAT_ASSET_CLASS_
 class INVSTRAT_ASSET;
 class INVSTRAT_ASSET_persistent_object;
@@ -212,15 +171,24 @@ class LIAB_LIAB;
 class LIAB_LIAB_persistent_object;
 #endif
 
+#ifdef __CREATE_MRB_GAAP_CLASS_
+class MRB_GAAP;
+class MRB_GAAP_persistent_object;
+typedef TComp<MRB_GAAP, MRB_GAAP_persistent_object> _1D_MRB_GAAP;
+#endif
+
 #ifdef __CREATE_MTG_ASSET_CLASS_
 class MTG_ASSET;
 class MTG_ASSET_persistent_object;
 typedef TComp<MTG_ASSET, MTG_ASSET_persistent_object> _1D_MTG_ASSET;
+typedef TMultiDComp<_1D_MTG_ASSET, MTG_ASSET_persistent_object> _2D_MTG_ASSET;
 #endif
 
 #ifdef __CREATE_MTG_CF_ASSET_CLASS_
 class MTG_CF_ASSET;
 class MTG_CF_ASSET_persistent_object;
+typedef TComp<MTG_CF_ASSET, MTG_CF_ASSET_persistent_object> _1D_MTG_CF_ASSET;
+typedef TMultiDComp<_1D_MTG_CF_ASSET, MTG_CF_ASSET_persistent_object> _2D_MTG_CF_ASSET;
 #endif
 
 #ifdef __CREATE_RATES_ECONOMY_CLASS_
@@ -234,12 +202,6 @@ class SEG_COMP_persistent_object;
 typedef TComp<SEG_COMP, SEG_COMP_persistent_object> _1D_SEG_COMP;
 #endif
 
-#ifdef __CREATE_SFAS133_GAAP_CLASS_
-class SFAS133_GAAP;
-class SFAS133_GAAP_persistent_object;
-typedef TComp<SFAS133_GAAP, SFAS133_GAAP_persistent_object> _1D_SFAS133_GAAP;
-#endif
-
 #ifdef __CREATE_SFAS97RD_GAAP_CLASS_
 class SFAS97RD_GAAP;
 class SFAS97RD_GAAP_persistent_object;
@@ -247,18 +209,12 @@ typedef TComp<SFAS97RD_GAAP, SFAS97RD_GAAP_persistent_object> _1D_SFAS97RD_GAAP;
 typedef TMultiDComp<_1D_SFAS97RD_GAAP, SFAS97RD_GAAP_persistent_object> _2D_SFAS97RD_GAAP;
 #endif
 
-#ifdef __CREATE_UTIL_RAFM_CLASS_
-class UTIL_RAFM;
-class UTIL_RAFM_persistent_object;
-#endif
-
 
 #include "ModelClass\fiacarvm_liab.h"
 #include "ModelClass\fiaafund_liab.h"
 #include "ModelClass\ann_pba_pba.h"
-#include "ModelClass\automation.h"
+#include "ModelClass\mrb_gaap.h"
 #include "ModelClass\rates_economy.h"
-#include "ModelClass\sfas133_gaap.h"
 #include "ModelClass\sfas97rd_gaap.h"
 
 namespace FIA_LIAB_NS {
@@ -278,7 +234,6 @@ protected:
 static const CashFlowCommonData* mCFStaticData[];
   static const CashFlowCommonData mCFStaticData_0[]; 
   static const CashFlowCommonData mCFStaticData_256[]; 
-  static const CashFlowCommonData mCFStaticData_512[]; 
   static Table::TableMgr<VariantTable> mgr_;
 
 public :
@@ -316,13 +271,11 @@ int index2_element;
 int index3_element;
 int index4_element;
 // competitor rate map
-//typedef map <xstring, double, less<xstring> > crmap;//Gen2 - 9/6/2024 - comment out typedef
-map <xstring, double, less<xstring> > comp_rates_map;//Gen2 - 9/6/2024 - replace crmap with full definition
+map <xstring, double, less<xstring> > comp_rates_map;
 // discount rate vector
 vector<string> disc_rates;
 vector<string> gaap_cohorts_sfas97rd;
-//SmartArray <double> init_tax_capzd_prem_amortzn_sched;
-vector <double> init_tax_capzd_prem_amortzn_sched;//WTW - Gen2
+SmartArray <double> init_tax_capzd_prem_amortzn_sched;
 double init_tax_bk_prof_ytd;
 double init_tax_tgt_cap_ytd;
 double init_taxable_inc_bk_prof_ytd;
@@ -352,11 +305,22 @@ double init_gaap_inc_aft_tax_ytd;
 double init_gaap_req_cap;
 int carvm_annuitzn_tests_number;
 int gmwb_exercise_point;
+int gmwb_exercise_point_test_cnt;
+vector<string> gmwb_exercise_points_input;
 xstring stat_audit_detail_rpt_id;
 xstring tax_audit_detail_rpt_id;
 
-const size_t NUM_UNIFORM_STREAMS_AIG = 4;
-vector< vector <double>> uniform_rands_arr_aig;
+vector< vector <double>> uniform_rands_arr_crbg;
+
+SEG_COMP *seg_element;
+#if defined(__AA_COMP_COMP_H_)
+RATES_ECONOMY /*modelobject_name: RATES*/ *rates_ptr;
+#else
+RATES_ECONOMY /*modelobject_name: FIA_RATES*/ *rates_ptr;
+#endif
+
+vector <string> carvm_stat_annuitzn_tests_input;
+vector <string> carvm_tax_annuitzn_tests_input;
 
 
 	void init_(){
@@ -403,11 +367,9 @@ init_gaap_inc_aft_tax_ytd = 0.0;
 init_gaap_req_cap = 0.0;
 carvm_annuitzn_tests_number = 0;
 gmwb_exercise_point = 0;
+gmwb_exercise_point_test_cnt = 0;
 stat_audit_detail_rpt_id = "";
 tax_audit_detail_rpt_id = "";
-
-// 20190913 MTC - Removed spousal_cont_adj flag
-
 
 		bIsInit = true;
 	}
@@ -423,8 +385,12 @@ tax_audit_detail_rpt_id = "";
 	ANN_PBA_PBA	*company_seg_ann_pba;
 	ANN_PBA_PBA	*&ann_pba;
 #endif
-#ifdef __CREATE_COMP_COMP_CLASS_
-	COMP_COMP	*company;
+#ifdef __CREATE_ASSET_ASSET_CLASS_
+	ASSET_ASSET	*company_asset;
+	ASSET_ASSET	*&asset;
+#endif
+#ifdef __CREATE_AA_COMP_COMP_CLASS_
+	AA_COMP_COMP	*company;
 #endif
 #ifdef __CREATE_FIA_LIAB_CLASS_
 	FIA_LIAB	*company_liab_fia;
@@ -438,10 +404,6 @@ tax_audit_detail_rpt_id = "";
 	ANN_PBA_PBA	*company_liab_fia_fia_ann_pba;
 	ANN_PBA_PBA	*&fia_ann_pba;
 #endif
-#ifdef __CREATE_AUTOMATION_CLASS_
-	AUTOMATION	*company_liab_fia_fia_automation;
-	AUTOMATION	*&fia_automation;
-#endif
 #ifdef __CREATE_FIACARVM_LIAB_CLASS_
 	FIACARVM_LIAB	*company_liab_fia_carvm_stat;
 	FIACARVM_LIAB	*&fia_carvm_stat;
@@ -450,6 +412,10 @@ tax_audit_detail_rpt_id = "";
 	FIACARVM_LIAB	*company_liab_fia_carvm_tax;
 	FIACARVM_LIAB	*&fia_carvm_tax;
 #endif
+#ifdef __CREATE_MRB_GAAP_CLASS_
+	MRB_GAAP	*company_liab_fia_fia_mrb;
+	MRB_GAAP	*&fia_mrb;
+#endif
 #ifdef __CREATE_RATES_ECONOMY_CLASS_
 	RATES_ECONOMY	*company_liab_fia_fia_rates;
 	RATES_ECONOMY	*&fia_rates;
@@ -457,10 +423,6 @@ tax_audit_detail_rpt_id = "";
 #ifdef __CREATE_SFAS97RD_GAAP_CLASS_
 	SFAS97RD_GAAP	*company_liab_fia_fia_sfas97rd;
 	SFAS97RD_GAAP	*&fia_sfas97rd;
-#endif
-#ifdef __CREATE_INTEX_ASSET_CLASS_
-	INTEX_ASSET	*company_asset_intex;
-	INTEX_ASSET	*&intex;
 #endif
 #ifdef __CREATE_LIAB_LIAB_CLASS_
 	LIAB_LIAB	*company_liab;
@@ -474,41 +436,30 @@ tax_audit_detail_rpt_id = "";
 	SEG_COMP	*company_seg;
 	SEG_COMP	*&seg;
 #endif
+#ifdef __CREATE_SFAS97RD_GAAP_CLASS_
+	SFAS97RD_GAAP	*company_seg_sfas97rd;
+	SFAS97RD_GAAP	*&sfas97rd;
+#endif
  // Column Definition Begins
  	ColumnAccessor < mCFStaticData_0 > acq_exp;
- 	ColumnAccessor < mCFStaticData_0 > acq_exp_pv_cf_disc_rate_1;
- 	ColumnAccessor < mCFStaticData_0 > acq_exp_pv_cf_disc_rate_aig_curve_ic_uel_aig;
- 	ColumnAccessor < mCFStaticData_0 > acq_exp_pv_cf_disc_rate_aig_curve_no_uel_aig;
- 	ColumnAccessor < mCFStaticData_0 > acq_exp_pv_cf_disc_rate_aig_curve_uel_aig;
  	ColumnAccessor < mCFStaticData_0 > admin_fee;
  	ColumnAccessor < mCFStaticData_0 > age_last;
  	ColumnAccessor < mCFStaticData_0 > ann_benefits_eom;
- 	ColumnAccessor < mCFStaticData_0 > ann_benefits_eom_pv_cf_disc_rate_1;
- 	ColumnAccessor < mCFStaticData_0 > ann_benefits_eom_pv_cf_disc_rate_aig_curve_ic_uel_aig;
- 	ColumnAccessor < mCFStaticData_0 > ann_benefits_eom_pv_cf_disc_rate_aig_curve_no_uel_aig;
- 	ColumnAccessor < mCFStaticData_0 > ann_benefits_eom_pv_cf_disc_rate_aig_curve_uel_aig;
  	ColumnAccessor < mCFStaticData_0 > ann_claims_gmwb;
- 	ColumnAccessor < mCFStaticData_0 > ann_claims_gmwb_bef_maturity_aig;
- 	ColumnAccessor < mCFStaticData_0 > ann_claims_gmwb_pv_cf_disc_rate_1;
- 	ColumnAccessor < mCFStaticData_0 > ann_claims_gmwb_pv_cf_disc_rate_aig_curve_ic_uel_aig;
- 	ColumnAccessor < mCFStaticData_0 > ann_claims_gmwb_pv_cf_disc_rate_aig_curve_no_uel_aig;
- 	ColumnAccessor < mCFStaticData_0 > ann_claims_gmwb_pv_cf_disc_rate_aig_curve_uel_aig;
- 	ColumnAccessor < mCFStaticData_0 > annuitzn_count_aig;
- 	ColumnAccessor < mCFStaticData_0 > annuitzn_count_aig_pv_cf_disc_rate_1;
- 	ColumnAccessor < mCFStaticData_0 > annuitzn_count_aig_pv_cf_disc_rate_aig_curve_ic_uel_aig;
- 	ColumnAccessor < mCFStaticData_0 > annuitzn_count_aig_pv_cf_disc_rate_aig_curve_no_uel_aig;
- 	ColumnAccessor < mCFStaticData_0 > annuitzn_count_aig_pv_cf_disc_rate_aig_curve_uel_aig;
+ 	ColumnAccessor < mCFStaticData_0 > ann_gmwb_cash_flow_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > ann_gmwb_claim_yr_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > ann_gmwb_pip_pct_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > ann_gmwb_wdl_grossed_up_crbg;
  	ColumnAccessor < mCFStaticData_0 > annuitzn_rate;
  	ColumnAccessor < mCFStaticData_0 > annuitzn_rate_mthly;
  	ColumnAccessor < mCFStaticData_0 > asset_yld;
+ 	ColumnAccessor < mCFStaticData_0 > asset_yld_fa_rate_setting_crbg;
  	ColumnAccessor < mCFStaticData_0 > asset_yld_inv;
- 	ColumnAccessor < mCFStaticData_0 > asset_yld_inv_adj_aig;
+ 	ColumnAccessor < mCFStaticData_0 > asset_yld_inv_adj_crbg;
  	ColumnAccessor < mCFStaticData_0 > asset_yld_less_dflt;
  	ColumnAccessor < mCFStaticData_0 > asset_yld_less_dflt_inv;
  	ColumnAccessor < mCFStaticData_0 > attained_age;
- 	ColumnAccessor < mCFStaticData_0 > attained_age_female_aig;
- 	ColumnAccessor < mCFStaticData_0 > attained_age_male_aig;
- 	ColumnAccessor < mCFStaticData_0 > avg_coupon_rt_aig;
+ 	ColumnAccessor < mCFStaticData_0 > avg_coupon_rt_crbg;
  	ColumnAccessor < mCFStaticData_0 > bef_tax_yld;
  	ColumnAccessor < mCFStaticData_0 > bk_prof_aft_tax;
  	ColumnAccessor < mCFStaticData_0 > bk_prof_aft_tax_for_pv;
@@ -521,49 +472,27 @@ tax_audit_detail_rpt_id = "";
  	ColumnAccessor < mCFStaticData_0 > bk_prof_bef_tax_ytd;
  	ColumnAccessor < mCFStaticData_0 > bk_prof_by_source_bef_tax;
  	ColumnAccessor < mCFStaticData_0 > cal_mth;
- 	ColumnAccessor < mCFStaticData_0 > cal_quarter_aig;
  	ColumnAccessor < mCFStaticData_0 > cal_yr;
  	ColumnAccessor < mCFStaticData_0 > cal_yr_relative;
- 	ColumnAccessor < mCFStaticData_0 > cash_flow_pct_aig;
  	ColumnAccessor < mCFStaticData_0 > cash_val;
  	ColumnAccessor < mCFStaticData_0 > cash_val_bef;
- 	ColumnAccessor < mCFStaticData_0 > cash_val_no_mva_aig;
- 	ColumnAccessor < mCFStaticData_0 > cash_val_pv_cf_disc_rate_1;
- 	ColumnAccessor < mCFStaticData_0 > cash_val_pv_cf_disc_rate_aig_curve_ic_uel_aig;
- 	ColumnAccessor < mCFStaticData_0 > cash_val_pv_cf_disc_rate_aig_curve_no_uel_aig;
- 	ColumnAccessor < mCFStaticData_0 > cash_val_pv_cf_disc_rate_aig_curve_uel_aig;
+ 	ColumnAccessor < mCFStaticData_0 > cash_val_wo_mva;
  	ColumnAccessor < mCFStaticData_0 > comm_bom;
- 	ColumnAccessor < mCFStaticData_0 > comm_bom_pv_cf_disc_rate_1;
- 	ColumnAccessor < mCFStaticData_0 > comm_bom_pv_cf_disc_rate_aig_curve_ic_uel_aig;
- 	ColumnAccessor < mCFStaticData_0 > comm_bom_pv_cf_disc_rate_aig_curve_no_uel_aig;
- 	ColumnAccessor < mCFStaticData_0 > comm_bom_pv_cf_disc_rate_aig_curve_uel_aig;
  	ColumnAccessor < mCFStaticData_0 > comm_chargeback;
- 	ColumnAccessor < mCFStaticData_0 > comm_chargeback_pv_cf_disc_rate_1;
- 	ColumnAccessor < mCFStaticData_0 > comm_chargeback_pv_cf_disc_rate_aig_curve_ic_uel_aig;
- 	ColumnAccessor < mCFStaticData_0 > comm_chargeback_pv_cf_disc_rate_aig_curve_no_uel_aig;
- 	ColumnAccessor < mCFStaticData_0 > comm_chargeback_pv_cf_disc_rate_aig_curve_uel_aig;
  	ColumnAccessor < mCFStaticData_0 > comm_eom;
  	ColumnAccessor < mCFStaticData_0 > comm_fund_based;
  	ColumnAccessor < mCFStaticData_0 > comm_prem_based;
  	ColumnAccessor < mCFStaticData_0 > comm_subject_to_chargeback;
  	ColumnAccessor < mCFStaticData_0 > comm_subject_to_chargeback_e;
- 	ColumnAccessor < mCFStaticData_0 > comp_lookup_aig_gen2;
  	ColumnAccessor < mCFStaticData_0 > contract_val;
  	ColumnAccessor < mCFStaticData_0 > contract_val_bef;
- 	ColumnAccessor < mCFStaticData_0 > covered_person_status_col_e_bef_aig;
+ 	ColumnAccessor < mCFStaticData_0 > covered_person_status_crbg;
  	ColumnAccessor < mCFStaticData_0 > credited_int;
  	ColumnAccessor < mCFStaticData_0 > credited_int_comp_numer;
- 	ColumnAccessor < mCFStaticData_0 > credited_int_pv_cf_disc_rate_1;
- 	ColumnAccessor < mCFStaticData_0 > credited_int_pv_cf_disc_rate_aig_curve_ic_uel_aig;
- 	ColumnAccessor < mCFStaticData_0 > credited_int_pv_cf_disc_rate_aig_curve_no_uel_aig;
- 	ColumnAccessor < mCFStaticData_0 > credited_int_pv_cf_disc_rate_aig_curve_uel_aig;
- 	ColumnAccessor < mCFStaticData_0 > crediting_asset_yld_sprd_aig;
- 	ColumnAccessor < mCFStaticData_0 > crediting_cap_spr_fix_tri_index0_aig;
- 	ColumnAccessor < mCFStaticData_0 > crediting_part_rate_base_index0_aig;
- 	ColumnAccessor < mCFStaticData_0 > crediting_part_rate_index0_aig;
  	ColumnAccessor < mCFStaticData_0 > crediting_rate;
+ 	ColumnAccessor < mCFStaticData_0 > crediting_rate_cumul_crbg;
  	ColumnAccessor < mCFStaticData_0 > crediting_rate_fix;
- 	ColumnAccessor < mCFStaticData_0 > crediting_rate_partial_e_bef_aig;
+ 	ColumnAccessor < mCFStaticData_0 > crediting_rate_partial_crbg;
  	ColumnAccessor < mCFStaticData_0 > date;
  	ColumnAccessor < mCFStaticData_0 > direct_cash_flow_bom;
  	ColumnAccessor < mCFStaticData_0 > direct_cash_flow_eom;
@@ -571,102 +500,55 @@ tax_audit_detail_rpt_id = "";
  	ColumnAccessor < mCFStaticData_0 > disc_rate_1;
  	ColumnAccessor < mCFStaticData_0 > disc_rate_2;
  	ColumnAccessor < mCFStaticData_0 > disc_rate_3;
- 	ColumnAccessor < mCFStaticData_0 > disc_rate_aig_curve_ic_uel_aig;
- 	ColumnAccessor < mCFStaticData_0 > disc_rate_aig_curve_no_uel_aig;
- 	ColumnAccessor < mCFStaticData_0 > disc_rate_aig_curve_uel_aig;
  	ColumnAccessor < mCFStaticData_0 > disc_rate_port_yld;
  	ColumnAccessor < mCFStaticData_0 > disc_rate_port_yld_defn_val;
- 	ColumnAccessor < mCFStaticData_0 > disc_rate_risk_free_aig;
- 	ColumnAccessor < mCFStaticData_0 > disc_rate_sprd_uel_col_aig;
+ 	ColumnAccessor < mCFStaticData_0 > disc_rate_rf_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > disc_rate_rf_sprd_ic_uel_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > disc_rate_rf_sprd_no_uel_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > disc_rate_rf_sprd_uel_crbg;
  	ColumnAccessor < mCFStaticData_0 > distrib_earnings;
  	ColumnAccessor < mCFStaticData_0 > distrib_earnings_irr;
  	ColumnAccessor < mCFStaticData_0 > dth_ben_inf;
  	ColumnAccessor < mCFStaticData_0 > dth_ben_inf_bef;
- 	ColumnAccessor < mCFStaticData_0 > dth_ben_naar_bef_aig;
  	ColumnAccessor < mCFStaticData_0 > dth_benefits;
- 	ColumnAccessor < mCFStaticData_0 > dth_benefits_pv_cf_disc_rate_1;
- 	ColumnAccessor < mCFStaticData_0 > dth_benefits_pv_cf_disc_rate_aig_curve_ic_uel_aig;
- 	ColumnAccessor < mCFStaticData_0 > dth_benefits_pv_cf_disc_rate_aig_curve_no_uel_aig;
- 	ColumnAccessor < mCFStaticData_0 > dth_benefits_pv_cf_disc_rate_aig_curve_uel_aig;
  	ColumnAccessor < mCFStaticData_0 > dth_claim_rate_mthly;
- 	ColumnAccessor < mCFStaticData_0 > dth_claim_rate_mthly_blended_experience_aig;
- 	ColumnAccessor < mCFStaticData_0 > dth_claim_rate_mthly_experience_aig;
- 	ColumnAccessor < mCFStaticData_0 > dth_claim_rate_mthly_female_confinement_non_confined_aig;
- 	ColumnAccessor < mCFStaticData_0 > dth_claim_rate_mthly_female_experience_aig;
- 	ColumnAccessor < mCFStaticData_0 > dth_claim_rate_mthly_female_gmwb_aig;
- 	ColumnAccessor < mCFStaticData_0 > dth_claim_rate_mthly_last_survivor_experience_aig;
- 	ColumnAccessor < mCFStaticData_0 > dth_claim_rate_mthly_last_survivor_gmwb_aig;
- 	ColumnAccessor < mCFStaticData_0 > dth_claim_rate_mthly_last_survivor_spousal_2019_aig;
- 	ColumnAccessor < mCFStaticData_0 > dth_claim_rate_mthly_male_confinement_non_confined_aig;
- 	ColumnAccessor < mCFStaticData_0 > dth_claim_rate_mthly_male_experience_aig;
- 	ColumnAccessor < mCFStaticData_0 > dth_claim_rate_mthly_male_gmwb_aig;
- 	ColumnAccessor < mCFStaticData_0 > dth_count_aig;
- 	ColumnAccessor < mCFStaticData_0 > dth_count_aig_pv_cf_disc_rate_1;
- 	ColumnAccessor < mCFStaticData_0 > dth_count_aig_pv_cf_disc_rate_aig_curve_ic_uel_aig;
- 	ColumnAccessor < mCFStaticData_0 > dth_count_aig_pv_cf_disc_rate_aig_curve_no_uel_aig;
- 	ColumnAccessor < mCFStaticData_0 > dth_count_aig_pv_cf_disc_rate_aig_curve_uel_aig;
+ 	ColumnAccessor < mCFStaticData_0 > dth_rate_female_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > dth_rate_male_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > dth_rate_mthly_blended_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > dth_rate_mthly_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > dth_rate_mthly_female_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > dth_rate_mthly_last_survivor_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > dth_rate_mthly_male_crbg;
  	ColumnAccessor < mCFStaticData_0 > earnings_accum;
- 	ColumnAccessor < mCFStaticData_0 > enhanced_income_benefit_cumul_yrs_aig;
- 	ColumnAccessor < mCFStaticData_0 > enhanced_income_benefit_eligibility_flag_aig;
- 	ColumnAccessor < mCFStaticData_0 > enhanced_income_benefit_exercise_flag_aig;
- 	ColumnAccessor < mCFStaticData_0 > enhanced_income_benefit_indirect_exercise_flag_aig;
- 	ColumnAccessor < mCFStaticData_0 > enhanced_income_confinement_mth_female_e_aig;
- 	ColumnAccessor < mCFStaticData_0 > enhanced_income_confinement_mth_male_e_aig;
- 	ColumnAccessor < mCFStaticData_0 > enhanced_income_confinement_state_b_aig;
- 	ColumnAccessor < mCFStaticData_0 > enhanced_income_confinement_state_female_b_aig;
- 	ColumnAccessor < mCFStaticData_0 > enhanced_income_confinement_state_male_b_aig;
- 	ColumnAccessor < mCFStaticData_0 > enhanced_income_rand_female_aig;
- 	ColumnAccessor < mCFStaticData_0 > enhanced_income_rand_male_aig;
- 	ColumnAccessor < mCFStaticData_0 > enhanced_income_utilization_rand_aig;
+ 	ColumnAccessor < mCFStaticData_0 > enh_inc_confined_mth_female_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > enh_inc_confined_mth_male_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > enh_inc_confined_status_aggr_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > enh_inc_confined_status_female_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > enh_inc_confined_status_male_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > enh_inc_eligibility_flag_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > enh_inc_exercise_cumul_yrs_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > enh_inc_exercise_flag_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > enh_inc_indirect_exercise_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > enh_inc_rand_exercise_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > enh_inc_rand_female_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > enh_inc_rand_male_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > eprs_sfc_ben_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > eprs_sfc_ben_gross_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > eprs_strat_fee_partial_bef_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > eprs_strat_fee_partial_e_crbg;
  	ColumnAccessor < mCFStaticData_0 > finalize;
  	ColumnAccessor < mCFStaticData_0 > fund_released_ann;
- 	ColumnAccessor < mCFStaticData_0 > fund_released_ann_pv_cf_disc_rate_1;
- 	ColumnAccessor < mCFStaticData_0 > fund_released_ann_pv_cf_disc_rate_aig_curve_ic_uel_aig;
- 	ColumnAccessor < mCFStaticData_0 > fund_released_ann_pv_cf_disc_rate_aig_curve_no_uel_aig;
- 	ColumnAccessor < mCFStaticData_0 > fund_released_ann_pv_cf_disc_rate_aig_curve_uel_aig;
  	ColumnAccessor < mCFStaticData_0 > fund_released_dth;
- 	ColumnAccessor < mCFStaticData_0 > fund_released_dth_pv_cf_disc_rate_1;
- 	ColumnAccessor < mCFStaticData_0 > fund_released_dth_pv_cf_disc_rate_aig_curve_ic_uel_aig;
- 	ColumnAccessor < mCFStaticData_0 > fund_released_dth_pv_cf_disc_rate_aig_curve_no_uel_aig;
- 	ColumnAccessor < mCFStaticData_0 > fund_released_dth_pv_cf_disc_rate_aig_curve_uel_aig;
  	ColumnAccessor < mCFStaticData_0 > fund_released_maturity;
- 	ColumnAccessor < mCFStaticData_0 > fund_released_maturity_pv_cf_disc_rate_1;
- 	ColumnAccessor < mCFStaticData_0 > fund_released_maturity_pv_cf_disc_rate_aig_curve_ic_uel_aig;
- 	ColumnAccessor < mCFStaticData_0 > fund_released_maturity_pv_cf_disc_rate_aig_curve_no_uel_aig;
- 	ColumnAccessor < mCFStaticData_0 > fund_released_maturity_pv_cf_disc_rate_aig_curve_uel_aig;
  	ColumnAccessor < mCFStaticData_0 > fund_released_surr;
- 	ColumnAccessor < mCFStaticData_0 > fund_released_surr_pv_cf_disc_rate_1;
- 	ColumnAccessor < mCFStaticData_0 > fund_released_surr_pv_cf_disc_rate_aig_curve_ic_uel_aig;
- 	ColumnAccessor < mCFStaticData_0 > fund_released_surr_pv_cf_disc_rate_aig_curve_no_uel_aig;
- 	ColumnAccessor < mCFStaticData_0 > fund_released_surr_pv_cf_disc_rate_aig_curve_uel_aig;
  	ColumnAccessor < mCFStaticData_0 > fund_released_withdrl;
- 	ColumnAccessor < mCFStaticData_0 > fund_released_withdrl_pv_cf_disc_rate_1;
- 	ColumnAccessor < mCFStaticData_0 > fund_released_withdrl_pv_cf_disc_rate_aig_curve_ic_uel_aig;
- 	ColumnAccessor < mCFStaticData_0 > fund_released_withdrl_pv_cf_disc_rate_aig_curve_no_uel_aig;
- 	ColumnAccessor < mCFStaticData_0 > fund_released_withdrl_pv_cf_disc_rate_aig_curve_uel_aig;
  	ColumnAccessor < mCFStaticData_0 > fund_val_b;
  	ColumnAccessor < mCFStaticData_0 > fund_val_b_bef;
- 	ColumnAccessor < mCFStaticData_0 > fund_val_b_bef_pv_cf_disc_rate_1;
- 	ColumnAccessor < mCFStaticData_0 > fund_val_b_bef_pv_cf_disc_rate_aig_curve_ic_uel_aig;
- 	ColumnAccessor < mCFStaticData_0 > fund_val_b_bef_pv_cf_disc_rate_aig_curve_no_uel_aig;
- 	ColumnAccessor < mCFStaticData_0 > fund_val_b_bef_pv_cf_disc_rate_aig_curve_uel_aig;
- 	ColumnAccessor < mCFStaticData_0 > fund_val_b_pv_cf_disc_rate_1;
- 	ColumnAccessor < mCFStaticData_0 > fund_val_b_pv_cf_disc_rate_aig_curve_ic_uel_aig;
- 	ColumnAccessor < mCFStaticData_0 > fund_val_b_pv_cf_disc_rate_aig_curve_no_uel_aig;
- 	ColumnAccessor < mCFStaticData_0 > fund_val_b_pv_cf_disc_rate_aig_curve_uel_aig;
- 	ColumnAccessor < mCFStaticData_0 > fund_val_boy_b_aig;
- 	ColumnAccessor < mCFStaticData_0 > fund_val_boy_e_aig;
+ 	ColumnAccessor < mCFStaticData_0 > fund_val_boy_b_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > fund_val_boy_e_crbg;
  	ColumnAccessor < mCFStaticData_0 > fund_val_decrem;
  	ColumnAccessor < mCFStaticData_0 > fund_val_e_bef;
- 	ColumnAccessor < mCFStaticData_0 > fund_val_e_bef_maturity_aig;
  	ColumnAccessor < mCFStaticData_0 > fund_val_fixed;
- 	ColumnAccessor < mCFStaticData_0 > fund_val_fixed_pv_cf_disc_rate_1;
- 	ColumnAccessor < mCFStaticData_0 > fund_val_fixed_pv_cf_disc_rate_aig_curve_ic_uel_aig;
- 	ColumnAccessor < mCFStaticData_0 > fund_val_fixed_pv_cf_disc_rate_aig_curve_no_uel_aig;
- 	ColumnAccessor < mCFStaticData_0 > fund_val_fixed_pv_cf_disc_rate_aig_curve_uel_aig;
- 	ColumnAccessor < mCFStaticData_0 > fund_weighted_cap_spread_fix_rt_aig;
- 	ColumnAccessor < mCFStaticData_0 > fund_weighted_crediting_asset_yld_sprd_aig;
- 	ColumnAccessor < mCFStaticData_0 > fund_weighted_par_rate_aig;
  	ColumnAccessor < mCFStaticData_0 > gaap_acq_exp;
  	ColumnAccessor < mCFStaticData_0 > gaap_ben_res;
  	ColumnAccessor < mCFStaticData_0 > gaap_capzd_acq_exp;
@@ -698,6 +580,8 @@ tax_audit_detail_rpt_id = "";
  	ColumnAccessor < mCFStaticData_0 > gaap_loads_deducted;
  	ColumnAccessor < mCFStaticData_0 > gaap_maint_exp_bom;
  	ColumnAccessor < mCFStaticData_0 > gaap_maint_exp_eom;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_mrb_liab;
+ 	ColumnAccessor < mCFStaticData_0 > gaap_mrb_liab_incr;
  	ColumnAccessor < mCFStaticData_0 > gaap_prem_bonus;
  	ColumnAccessor < mCFStaticData_0 > gaap_prem_tax;
  	ColumnAccessor < mCFStaticData_0 > gaap_prof_aft_tax_for_pv;
@@ -705,209 +589,130 @@ tax_audit_detail_rpt_id = "";
  	ColumnAccessor < mCFStaticData_0 > gaap_req_cap;
  	ColumnAccessor < mCFStaticData_0 > gaap_sfas133_liab;
  	ColumnAccessor < mCFStaticData_0 > gaap_sfas133_liab_incr;
- 	ColumnAccessor < mCFStaticData_0 > gaap_sop031_addl_liab;
- 	ColumnAccessor < mCFStaticData_0 > gaap_sop031_addl_liab_incr;
  	ColumnAccessor < mCFStaticData_0 > gaap_surp_incr;
  	ColumnAccessor < mCFStaticData_0 > gaap_surr_inc;
- 	ColumnAccessor < mCFStaticData_0 > gender_col_e_bef_aig;
- 	ColumnAccessor < mCFStaticData_0 > gmab_chg_partial_e_aig;
- 	ColumnAccessor < mCFStaticData_0 > gmab_chg_partial_e_bef_aig;
+ 	ColumnAccessor < mCFStaticData_0 > gmab_chg_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > gmab_chg_partial_e_bef_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > gmab_chg_partial_e_crbg;
  	ColumnAccessor < mCFStaticData_0 > gmab_global_payoff_crbg;
- 	ColumnAccessor < mCFStaticData_0 > gmab_global_payoff_crbg_pv_cf_disc_rate_aig_curve_uel_aig;
  	ColumnAccessor < mCFStaticData_0 > gmab_payoff_crbg;
- 	ColumnAccessor < mCFStaticData_0 > gmab_payoff_crbg_pv_cf_disc_rate_aig_curve_uel_aig;
  	ColumnAccessor < mCFStaticData_0 > gmwb_chg;
- 	ColumnAccessor < mCFStaticData_0 > gmwb_chg_at_surr_aig;
- 	ColumnAccessor < mCFStaticData_0 > gmwb_chg_at_surr_bef_aig;
- 	ColumnAccessor < mCFStaticData_0 > gmwb_chg_pv_cf_disc_rate_1;
- 	ColumnAccessor < mCFStaticData_0 > gmwb_chg_pv_cf_disc_rate_aig_curve_ic_uel_aig;
- 	ColumnAccessor < mCFStaticData_0 > gmwb_chg_pv_cf_disc_rate_aig_curve_no_uel_aig;
- 	ColumnAccessor < mCFStaticData_0 > gmwb_chg_pv_cf_disc_rate_aig_curve_uel_aig;
- 	ColumnAccessor < mCFStaticData_0 > gmwb_claim_start_duration_aig;
- 	ColumnAccessor < mCFStaticData_0 > gmwb_entitlement_remaining_e_aig;
- 	ColumnAccessor < mCFStaticData_0 > gmwb_entitlement_remaining_e_bef_aig;
- 	ColumnAccessor < mCFStaticData_0 > gmwb_exercise_yrs_aig;
- 	ColumnAccessor < mCFStaticData_0 > gmwb_flex_covered_person_change_expense_aig;
- 	ColumnAccessor < mCFStaticData_0 > gmwb_flex_covered_person_change_expense_aig_pv_cf_disc_rate_1;
- 	ColumnAccessor < mCFStaticData_0 > gmwb_flex_covered_person_change_expense_aig_pv_cf_disc_rate_aig_curve_ic_uel_aig;
- 	ColumnAccessor < mCFStaticData_256 > gmwb_flex_covered_person_change_expense_aig_pv_cf_disc_rate_aig_curve_no_uel_aig;
- 	ColumnAccessor < mCFStaticData_256 > gmwb_flex_covered_person_change_expense_aig_pv_cf_disc_rate_aig_curve_uel_aig;
- 	ColumnAccessor < mCFStaticData_256 > gmwb_flex_exercise_mth_aig;
- 	ColumnAccessor < mCFStaticData_256 > gmwb_income_base_b_aig;
- 	ColumnAccessor < mCFStaticData_256 > gmwb_income_base_cap_b_aig;
- 	ColumnAccessor < mCFStaticData_256 > gmwb_income_base_cap_e_aig;
- 	ColumnAccessor < mCFStaticData_256 > gmwb_income_base_cap_e_bef_aig;
- 	ColumnAccessor < mCFStaticData_256 > gmwb_income_base_cap_prem_base_b_aig;
- 	ColumnAccessor < mCFStaticData_256 > gmwb_income_base_cap_prem_base_e_aig;
- 	ColumnAccessor < mCFStaticData_256 > gmwb_income_base_cap_prem_base_e_bef_aig;
- 	ColumnAccessor < mCFStaticData_256 > gmwb_income_base_e_aig;
- 	ColumnAccessor < mCFStaticData_256 > gmwb_income_base_e_bef_aig;
- 	ColumnAccessor < mCFStaticData_256 > gmwb_income_base_floor_e_aig;
- 	ColumnAccessor < mCFStaticData_256 > gmwb_income_base_floor_e_bef_aig;
- 	ColumnAccessor < mCFStaticData_256 > gmwb_income_base_floor_prem_pct_col_aig;
- 	ColumnAccessor < mCFStaticData_256 > gmwb_income_base_ny_b_aig;
- 	ColumnAccessor < mCFStaticData_256 > gmwb_income_base_ny_b_bef_aig;
- 	ColumnAccessor < mCFStaticData_256 > gmwb_income_base_ny_e_aig;
- 	ColumnAccessor < mCFStaticData_256 > gmwb_income_base_ny_e_bef_aig;
- 	ColumnAccessor < mCFStaticData_256 > gmwb_income_base_reduction_fct_cumul_e_bef_aig;
- 	ColumnAccessor < mCFStaticData_256 > gmwb_income_base_reduction_fct_e_bef_aig;
- 	ColumnAccessor < mCFStaticData_256 > gmwb_income_base_reduction_fct_ny_e_bef_aig;
- 	ColumnAccessor < mCFStaticData_256 > gmwb_income_credit_base_e_aig;
- 	ColumnAccessor < mCFStaticData_256 > gmwb_income_credit_base_e_bef_aig;
- 	ColumnAccessor < mCFStaticData_256 > gmwb_income_credit_e_bef_aig;
- 	ColumnAccessor < mCFStaticData_256 > gmwb_income_start_duration_aig;
- 	ColumnAccessor < mCFStaticData_256 > gmwb_inf;
- 	ColumnAccessor < mCFStaticData_256 > gmwb_inf_bef;
- 	ColumnAccessor < mCFStaticData_256 > gmwb_itm;
- 	ColumnAccessor < mCFStaticData_256 > gmwb_mawa_floor_e_aig;
- 	ColumnAccessor < mCFStaticData_256 > gmwb_mawa_floor_e_bef_aig;
- 	ColumnAccessor < mCFStaticData_256 > gmwb_max_annual_wdl_pct_aig;
- 	ColumnAccessor < mCFStaticData_256 > gmwb_max_wdl_amt_bef_utilization_aig;
- 	ColumnAccessor < mCFStaticData_256 > gmwb_max_wdl_amt_utilized;
- 	ColumnAccessor < mCFStaticData_256 > gmwb_min_income_base_e_bef_aig;
- 	ColumnAccessor < mCFStaticData_256 > gmwb_pipp_stepup_ind_aig;
- 	ColumnAccessor < mCFStaticData_256 > gmwb_wdl_utilization_level_e_bef_aig;
- 	ColumnAccessor < mCFStaticData_256 > gmwb_wdl_utilization_pct_aig;
- 	ColumnAccessor < mCFStaticData_256 > gmwb_withdrl_rate_indexing_addn_b_aig;
- 	ColumnAccessor < mCFStaticData_256 > gmwb_withdrl_rate_indexing_assessment_max_ref_rate_b_aig;
- 	ColumnAccessor < mCFStaticData_256 > gmwb_withdrl_rate_indexing_assessment_max_ref_rate_e_bef_aig;
- 	ColumnAccessor < mCFStaticData_256 > gmwb_withdrl_rate_indexing_assessment_stepup_ind_b_aig;
- 	ColumnAccessor < mCFStaticData_256 > gmwb_withdrl_rate_indexing_policy_issue_ref_rate_aig;
- 	ColumnAccessor < mCFStaticData_256 > gmwb_withdrl_rate_indexing_ref_rate_aig;
- 	ColumnAccessor < mCFStaticData_256 > grop_flag;
- 	ColumnAccessor < mCFStaticData_256 > grop_inf_aig;
- 	ColumnAccessor < mCFStaticData_256 > grop_inf_bef_aig;
- 	ColumnAccessor < mCFStaticData_256 > gross_prem_annualzd;
- 	ColumnAccessor < mCFStaticData_256 > gross_sfc_ben_aig;
- 	ColumnAccessor < mCFStaticData_256 > gwl_acq_exp_allow_aig;
- 	ColumnAccessor < mCFStaticData_256 > gwl_ceding_exp_allow_aig;
- 	ColumnAccessor < mCFStaticData_256 > gwl_maint_exp_allow_aig;
- 	ColumnAccessor < mCFStaticData_256 > gwl_make_whole_settlement_adj_aig;
- 	ColumnAccessor < mCFStaticData_256 > hedge_cash_flow;
- 	ColumnAccessor < mCFStaticData_256 > hedge_cash_flow_pv_cf_disc_rate_1;
- 	ColumnAccessor < mCFStaticData_256 > hedge_cash_flow_pv_cf_disc_rate_aig_curve_ic_uel_aig;
- 	ColumnAccessor < mCFStaticData_256 > hedge_cash_flow_pv_cf_disc_rate_aig_curve_no_uel_aig;
- 	ColumnAccessor < mCFStaticData_256 > hedge_cash_flow_pv_cf_disc_rate_aig_curve_uel_aig;
- 	ColumnAccessor < mCFStaticData_256 > hedge_cost;
- 	ColumnAccessor < mCFStaticData_256 > hedge_cost_per_unit_notional_aig;
- 	ColumnAccessor < mCFStaticData_256 > hedge_cost_pv_cf_disc_rate_1;
- 	ColumnAccessor < mCFStaticData_256 > hedge_cost_pv_cf_disc_rate_aig_curve_ic_uel_aig;
- 	ColumnAccessor < mCFStaticData_256 > hedge_cost_pv_cf_disc_rate_aig_curve_no_uel_aig;
- 	ColumnAccessor < mCFStaticData_256 > hedge_cost_pv_cf_disc_rate_aig_curve_uel_aig;
- 	ColumnAccessor < mCFStaticData_256 > hedge_inv_amt_bom;
- 	ColumnAccessor < mCFStaticData_256 > hedge_mkt_val;
- 	ColumnAccessor < mCFStaticData_256 > hedge_mkt_val_growth;
- 	ColumnAccessor < mCFStaticData_256 > hedge_mkt_val_incr;
- 	ColumnAccessor < mCFStaticData_256 > hedge_sale_amt;
- 	ColumnAccessor < mCFStaticData_256 > hedge_sale_amt_pv_cf_disc_rate_1;
- 	ColumnAccessor < mCFStaticData_256 > hedge_sale_amt_pv_cf_disc_rate_aig_curve_ic_uel_aig;
- 	ColumnAccessor < mCFStaticData_256 > hedge_sale_amt_pv_cf_disc_rate_aig_curve_no_uel_aig;
- 	ColumnAccessor < mCFStaticData_256 > hedge_sale_amt_pv_cf_disc_rate_aig_curve_uel_aig;
- 	ColumnAccessor < mCFStaticData_256 > index_term_index_return_aig;
- 	ColumnAccessor < mCFStaticData_256 > infl_cumul;
- 	ColumnAccessor < mCFStaticData_256 > initialize;
- 	ColumnAccessor < mCFStaticData_256 > inv_asset;
- 	ColumnAccessor < mCFStaticData_256 > inv_inc;
- 	ColumnAccessor < mCFStaticData_256 > inv_inc_bk_prof;
- 	ColumnAccessor < mCFStaticData_256 > inv_inc_earnings_accum;
- 	ColumnAccessor < mCFStaticData_256 > inv_inc_fund;
- 	ColumnAccessor < mCFStaticData_256 > inv_inc_on_invested_assets;
- 	ColumnAccessor < mCFStaticData_256 > inv_inc_res;
- 	ColumnAccessor < mCFStaticData_256 > inv_inc_tgt_cap;
- 	ColumnAccessor < mCFStaticData_256 > inv_inc_undistrib_earnings;
- 	ColumnAccessor < mCFStaticData_256 > irr;
- 	ColumnAccessor < mCFStaticData_256 > irr_wo_tgt_cap;
- 	ColumnAccessor < mCFStaticData_256 > isl_2019_pv_gmwb_benefit_aig;
- 	ColumnAccessor < mCFStaticData_256 > isl_2019_pv_gmwb_benefit_at_issue_aig;
- 	ColumnAccessor < mCFStaticData_256 > issue_age_col_e_bef_aig;
- 	ColumnAccessor < mCFStaticData_256 > issue_age_mp_lookup_gen2;
- 	ColumnAccessor < mCFStaticData_256 > itmness_lookup_aig_gen2;
- 	ColumnAccessor < mCFStaticData_256 > lapse_count_aig;
- 	ColumnAccessor < mCFStaticData_256 > lapse_count_aig_pv_cf_disc_rate_1;
- 	ColumnAccessor < mCFStaticData_256 > lapse_count_aig_pv_cf_disc_rate_aig_curve_ic_uel_aig;
- 	ColumnAccessor < mCFStaticData_256 > lapse_count_aig_pv_cf_disc_rate_aig_curve_no_uel_aig;
- 	ColumnAccessor < mCFStaticData_256 > lapse_count_aig_pv_cf_disc_rate_aig_curve_uel_aig;
- 	ColumnAccessor < mCFStaticData_256 > lapse_dyn_add_myga_aig;
- 	ColumnAccessor < mCFStaticData_256 > lapse_dyn_addn_aig;
- 	ColumnAccessor < mCFStaticData_256 > lapse_dyn_alt_model_mthly_addn_aig;
- 	ColumnAccessor < mCFStaticData_256 > lapse_dyn_alt_model_mult_aig;
- 	ColumnAccessor < mCFStaticData_256 > lapse_dyn_arctan_2019_mult_aig;
- 	ColumnAccessor < mCFStaticData_256 > lapse_dyn_arctan_mult_aig;
- 	ColumnAccessor < mCFStaticData_256 > lapse_dyn_base_prod_aig;
- 	ColumnAccessor < mCFStaticData_256 > lapse_dyn_base_prod_crediting_rt_aig;
- 	ColumnAccessor < mCFStaticData_256 > lapse_dyn_beta_mult_aig;
- 	ColumnAccessor < mCFStaticData_256 > lapse_dyn_fa_mult_aig;
- 	ColumnAccessor < mCFStaticData_256 > lapse_dyn_mthly_addn_aig;
- 	ColumnAccessor < mCFStaticData_256 > lapse_dyn_mult_aig;
- 	ColumnAccessor < mCFStaticData_256 > lapse_dyn_rate_add_isl_2019_aig;
- 	ColumnAccessor < mCFStaticData_256 > lapse_dyn_sfc_mult_aig;
- 	ColumnAccessor < mCFStaticData_256 > lapse_rate;
- 	ColumnAccessor < mCFStaticData_256 > lapse_rate_base;
- 	ColumnAccessor < mCFStaticData_256 > lapse_rate_base_fa_aig;
- 	ColumnAccessor < mCFStaticData_256 > lapse_rate_mthly;
- 	ColumnAccessor < mCFStaticData_256 > lapse_rate_mthly_skew2025_crbg;
- 	ColumnAccessor < mCFStaticData_256 > lapse_rate_planned_numer;
- 	ColumnAccessor < mCFStaticData_256 > lapse_skew_cumul_fct_fa_aig;
- 	ColumnAccessor < mCFStaticData_256 > lapse_skew_fct_fa_aig;
- 	ColumnAccessor < mCFStaticData_256 > last_period_indicator;
- 	ColumnAccessor < mCFStaticData_256 > liab_and_surp;
- 	ColumnAccessor < mCFStaticData_256 > maint_exp_bom;
- 	ColumnAccessor < mCFStaticData_256 > maint_exp_eom;
- 	ColumnAccessor < mCFStaticData_256 > maint_exp_eom_pv_cf_disc_rate_1;
- 	ColumnAccessor < mCFStaticData_256 > maint_exp_eom_pv_cf_disc_rate_aig_curve_ic_uel_aig;
- 	ColumnAccessor < mCFStaticData_256 > maint_exp_eom_pv_cf_disc_rate_aig_curve_no_uel_aig;
- 	ColumnAccessor < mCFStaticData_256 > maint_exp_eom_pv_cf_disc_rate_aig_curve_uel_aig;
- 	ColumnAccessor < mCFStaticData_256 > maturity_benefits;
- 	ColumnAccessor < mCFStaticData_256 > maturity_benefits_pv_cf_disc_rate_1;
- 	ColumnAccessor < mCFStaticData_256 > maturity_benefits_pv_cf_disc_rate_aig_curve_ic_uel_aig;
- 	ColumnAccessor < mCFStaticData_256 > maturity_benefits_pv_cf_disc_rate_aig_curve_no_uel_aig;
- 	ColumnAccessor < mCFStaticData_256 > maturity_benefits_pv_cf_disc_rate_aig_curve_uel_aig;
- 	ColumnAccessor < mCFStaticData_256 > mb_pre_tax_cash_flow_aig;
- 	ColumnAccessor < mCFStaticData_256 > mb_pre_tax_cash_flow_aig_pv_cf_disc_rate_1;
- 	ColumnAccessor < mCFStaticData_256 > mb_pre_tax_cash_flow_aig_pv_cf_disc_rate_aig_curve_ic_uel_aig;
- 	ColumnAccessor < mCFStaticData_256 > mb_pre_tax_cash_flow_aig_pv_cf_disc_rate_aig_curve_no_uel_aig;
- 	ColumnAccessor < mCFStaticData_256 > mb_pre_tax_cash_flow_aig_pv_cf_disc_rate_aig_curve_uel_aig;
- 	ColumnAccessor < mCFStaticData_256 > min_accum_val_b_aig;
- 	ColumnAccessor < mCFStaticData_256 > min_accum_val_b_bef_aig;
- 	ColumnAccessor < mCFStaticData_256 > min_accum_val_e_aig;
- 	ColumnAccessor < mCFStaticData_256 > min_accum_val_e_bef_aig;
- 	ColumnAccessor < mCFStaticData_256 > min_accum_val_e_bef_maturity_aig;
- 	ColumnAccessor < mCFStaticData_256 > min_contract_val;
- 	ColumnAccessor < mCFStaticData_256 > min_contract_val_bef;
- 	ColumnAccessor < mCFStaticData_256 > min_wdl_val_alt_base_b_aig;
- 	ColumnAccessor < mCFStaticData_256 > min_wdl_val_alt_base_e_aig;
- 	ColumnAccessor < mCFStaticData_256 > min_wdl_val_alt_base_e_bef_aig;
- 	ColumnAccessor < mCFStaticData_256 > min_wdl_val_alt_base_e_bef_maturity_aig;
- 	ColumnAccessor < mCFStaticData_256 > min_wdl_val_alt_e_aig;
- 	ColumnAccessor < mCFStaticData_256 > min_wdl_val_alt_e_bef_aig;
- 	ColumnAccessor < mCFStaticData_256 > min_wdl_val_b_aig;
- 	ColumnAccessor < mCFStaticData_256 > min_wdl_val_e_aig;
- 	ColumnAccessor < mCFStaticData_256 > min_wdl_val_e_bef_aig;
- 	ColumnAccessor < mCFStaticData_256 > min_wdl_val_e_bef_maturity_aig;
- 	ColumnAccessor < mCFStaticData_256 > min_wdl_val_final_e_aig;
- 	ColumnAccessor < mCFStaticData_256 > min_wdl_val_final_e_bef_aig;
- 	ColumnAccessor < mCFStaticData_256 > min_wdl_val_final_e_bef_maturity_aig;
- 	ColumnAccessor < mCFStaticData_256 > mths_since_issue;
- 	ColumnAccessor < mCFStaticData_256 > mva_amt_full_surr_cash_val_aig;
- 	ColumnAccessor < mCFStaticData_256 > mva_amt_full_surr_cash_val_aig_pv_cf_disc_rate_1;
- 	ColumnAccessor < mCFStaticData_256 > mva_amt_full_surr_cash_val_aig_pv_cf_disc_rate_aig_curve_ic_uel_aig;
- 	ColumnAccessor < mCFStaticData_256 > mva_amt_full_surr_cash_val_aig_pv_cf_disc_rate_aig_curve_no_uel_aig;
- 	ColumnAccessor < mCFStaticData_256 > mva_amt_full_surr_cash_val_aig_pv_cf_disc_rate_aig_curve_uel_aig;
- 	ColumnAccessor < mCFStaticData_256 > mva_amt_full_surr_cash_val_bef_aig;
- 	ColumnAccessor < mCFStaticData_256 > mva_amt_full_surr_cash_val_bef_aig_pv_cf_disc_rate_1;
- 	ColumnAccessor < mCFStaticData_256 > mva_amt_full_surr_cash_val_bef_aig_pv_cf_disc_rate_aig_curve_ic_uel_aig;
- 	ColumnAccessor < mCFStaticData_256 > mva_amt_full_surr_cash_val_bef_aig_pv_cf_disc_rate_aig_curve_no_uel_aig;
- 	ColumnAccessor < mCFStaticData_256 > mva_amt_full_surr_cash_val_bef_aig_pv_cf_disc_rate_aig_curve_uel_aig;
- 	ColumnAccessor < mCFStaticData_256 > mva_amt_full_surr_cash_val_bef_maturity_aig;
- 	ColumnAccessor < mCFStaticData_256 > mva_amt_partial_wdl_aig;
- 	ColumnAccessor < mCFStaticData_256 > mva_current_term_aig;
- 	ColumnAccessor < mCFStaticData_256 > mva_rate_full_surr_cash_val_aig;
- 	ColumnAccessor < mCFStaticData_256 > mva_rate_full_surr_cash_val_bef_aig;
- 	ColumnAccessor < mCFStaticData_256 > mva_rate_full_surr_cash_val_bef_maturity_aig;
- 	ColumnAccessor < mCFStaticData_256 > myga_current_term_aig;
- 	ColumnAccessor < mCFStaticData_256 > myga_term_mth_elapsed_eom_aig;
- 	ColumnAccessor < mCFStaticData_256 > new_money_rate_aig;
- 	ColumnAccessor < mCFStaticData_256 > nmr_7yr_govt_plus_sprd_aig;
+ 	ColumnAccessor < mCFStaticData_0 > gmwb_chg_partial_bef_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > gmwb_chg_partial_e_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > gmwb_entitlement_remaining_b_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > gmwb_entitlement_remaining_e_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > gmwb_exercise_yrs_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > gmwb_fund_val_inf;
+ 	ColumnAccessor < mCFStaticData_0 > gmwb_fund_val_inf_bef;
+ 	ColumnAccessor < mCFStaticData_0 > gmwb_income_base_b_bef_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > gmwb_income_base_b_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > gmwb_income_base_e_bef_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > gmwb_income_base_e_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > gmwb_income_base_reduction_fct_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > gmwb_income_credit_b_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > gmwb_income_credit_base_e_bef_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > gmwb_income_credit_base_e_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > gmwb_inf;
+ 	ColumnAccessor < mCFStaticData_0 > gmwb_inf_bef;
+ 	ColumnAccessor < mCFStaticData_0 > gmwb_itm;
+ 	ColumnAccessor < mCFStaticData_0 > gmwb_max_ann_wdl_pct_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > gmwb_max_wdl_amt;
+ 	ColumnAccessor < mCFStaticData_0 > gmwb_min_income_base_bef_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > gmwb_pipp_stepup_ind_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > gmwb_rollup_cap_inf;
+ 	ColumnAccessor < mCFStaticData_0 > gmwb_rollup_cap_inf_bef;
+ 	ColumnAccessor < mCFStaticData_0 > gmwb_wdl_amt_e_bef_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > gmwb_wdl_amt_excess_bef_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > gmwb_wdl_excess_ind_e_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > gmwb_wdl_uti_level_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > gmwb_wdl_util_pct_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > gmwb_wdl_util_rand_num_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > gross_prem_annualzd;
+ 	ColumnAccessor < mCFStaticData_0 > gwl_acq_exp_allow_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > gwl_ceding_exp_allow_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > gwl_maint_exp_allow_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > hedge_cash_flow;
+ 	ColumnAccessor < mCFStaticData_0 > hedge_cost;
+ 	ColumnAccessor < mCFStaticData_0 > hedge_inv_amt_bom;
+ 	ColumnAccessor < mCFStaticData_0 > hedge_mkt_val;
+ 	ColumnAccessor < mCFStaticData_0 > hedge_mkt_val_growth;
+ 	ColumnAccessor < mCFStaticData_0 > hedge_mkt_val_incr;
+ 	ColumnAccessor < mCFStaticData_0 > hedge_sale_amt;
+ 	ColumnAccessor < mCFStaticData_0 > income_phase_bef_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > infl_cumul;
+ 	ColumnAccessor < mCFStaticData_0 > initialize;
+ 	ColumnAccessor < mCFStaticData_0 > inv_asset;
+ 	ColumnAccessor < mCFStaticData_0 > inv_inc;
+ 	ColumnAccessor < mCFStaticData_0 > inv_inc_bk_prof;
+ 	ColumnAccessor < mCFStaticData_0 > inv_inc_earnings_accum;
+ 	ColumnAccessor < mCFStaticData_0 > inv_inc_fund;
+ 	ColumnAccessor < mCFStaticData_0 > inv_inc_on_invested_assets;
+ 	ColumnAccessor < mCFStaticData_0 > inv_inc_res;
+ 	ColumnAccessor < mCFStaticData_0 > inv_inc_tgt_cap;
+ 	ColumnAccessor < mCFStaticData_0 > inv_inc_undistrib_earnings;
+ 	ColumnAccessor < mCFStaticData_0 > irr;
+ 	ColumnAccessor < mCFStaticData_0 > irr_wo_tgt_cap;
+ 	ColumnAccessor < mCFStaticData_0 > issue_age_col_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > itm_is_positive_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > lapse_dyn_add_myga_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > lapse_dyn_addn_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > lapse_dyn_arctan_mult_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > lapse_dyn_base_prod_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > lapse_dyn_crediting_rt_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > lapse_dyn_fa_mult_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > lapse_dyn_isl_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > lapse_dyn_mult_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > lapse_dyn_sfc_mult_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > lapse_rate;
+ 	ColumnAccessor < mCFStaticData_0 > lapse_rate_base;
+ 	ColumnAccessor < mCFStaticData_0 > lapse_rate_base_adj_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > lapse_rate_mthly;
+ 	ColumnAccessor < mCFStaticData_0 > lapse_rate_mthly_skew2025_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > lapse_rate_planned_numer;
+ 	ColumnAccessor < mCFStaticData_0 > lapse_skew_cumul_fct_fa_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > lapse_skew_fct_fa_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > last_period_indicator;
+ 	ColumnAccessor < mCFStaticData_0 > liab_and_surp;
+ 	ColumnAccessor < mCFStaticData_0 > maint_exp_bom;
+ 	ColumnAccessor < mCFStaticData_0 > maint_exp_eom;
+ 	ColumnAccessor < mCFStaticData_0 > maturity_benefits;
+ 	ColumnAccessor < mCFStaticData_0 > min_accum_val_b_bef_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > min_accum_val_e_bef_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > min_accum_val_e_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > min_contract_val;
+ 	ColumnAccessor < mCFStaticData_0 > min_contract_val_bef;
+ 	ColumnAccessor < mCFStaticData_0 > min_wdl_val_b_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > min_wdl_val_e_bef_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > min_wdl_val_e_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > mort_rate_exp;
+ 	ColumnAccessor < mCFStaticData_0 > mort_rate_gmwb;
+ 	ColumnAccessor < mCFStaticData_0 > mths_since_issue;
+ 	ColumnAccessor < mCFStaticData_0 > mtt_call_gen2classic_cols;
+ 	ColumnAccessor < mCFStaticData_0 > mtt_call_mbvnb_crbg;
+ 	ColumnAccessor < mCFStaticData_0 > mtt_call_vectorized_cols;
+ 	ColumnAccessor < mCFStaticData_0 > mtt_irr;
+ 	ColumnAccessor < mCFStaticData_0 > mtt_target_all;
+ 	ColumnAccessor < mCFStaticData_0 > mtt_tgt_distrib_earnings;
+ 	ColumnAccessor < mCFStaticData_0 > mtt_tgt_gaap_inc_aft_tax;
+ 	ColumnAccessor < mCFStaticData_0 > mtt_valn_tgt_gaap_mrb;
+ 	ColumnAccessor < mCFStaticData_0 > mtt_valn_tgt_gaap_sfas97rd;
+ 	ColumnAccessor < mCFStaticData_256 > mtt_valn_tgt_pba_scen_amt;
+ 	ColumnAccessor < mCFStaticData_256 > mtt_valn_tgt_stat_tax;
+ 	ColumnAccessor < mCFStaticData_256 > mva_amt_bef_crbg;
+ 	ColumnAccessor < mCFStaticData_256 > mva_amt_crbg;
+ 	ColumnAccessor < mCFStaticData_256 > mva_amt_excess_withdrl_crbg;
+ 	ColumnAccessor < mCFStaticData_256 > mva_comp_num;
+ 	ColumnAccessor < mCFStaticData_256 > mva_comp_rate;
+ 	ColumnAccessor < mCFStaticData_256 > mva_current_term_crbg;
+ 	ColumnAccessor < mCFStaticData_256 > mva_factor_bef_crbg;
+ 	ColumnAccessor < mCFStaticData_256 > mva_factor_crbg;
+ 	ColumnAccessor < mCFStaticData_256 > mva_guar_yrs_remaining;
+ 	ColumnAccessor < mCFStaticData_256 > mva_ratio;
+ 	ColumnAccessor < mCFStaticData_256 > mva_ratio_bef;
+ 	ColumnAccessor < mCFStaticData_256 > myga_current_term_crbg;
+ 	ColumnAccessor < mCFStaticData_256 > myga_term_mth_elapsed_eom_crbg;
+ 	ColumnAccessor < mCFStaticData_256 > new_money_rate_crbg;
+ 	ColumnAccessor < mCFStaticData_256 > nmr_7yr_govt_plus_sprd_crbg;
  	ColumnAccessor < mCFStaticData_256 > notional_to_hedge;
  	ColumnAccessor < mCFStaticData_256 > notional_to_hedge_cap;
  	ColumnAccessor < mCFStaticData_256 > notional_to_hedge_index;
@@ -915,316 +720,213 @@ tax_audit_detail_rpt_id = "";
  	ColumnAccessor < mCFStaticData_256 > notional_to_hedge_net;
  	ColumnAccessor < mCFStaticData_256 > opt_budget;
  	ColumnAccessor < mCFStaticData_256 > opt_budget_amt;
- 	ColumnAccessor < mCFStaticData_256 > opt_budget_amt_pv_cf_disc_rate_1;
- 	ColumnAccessor < mCFStaticData_256 > opt_budget_amt_pv_cf_disc_rate_aig_curve_ic_uel_aig;
- 	ColumnAccessor < mCFStaticData_256 > opt_budget_amt_pv_cf_disc_rate_aig_curve_no_uel_aig;
- 	ColumnAccessor < mCFStaticData_256 > opt_budget_amt_pv_cf_disc_rate_aig_curve_uel_aig;
- 	ColumnAccessor < mCFStaticData_256 > opt_budget_cost_index0_aig;
- 	ColumnAccessor < mCFStaticData_256 > opt_budget_cost_index1_aig;
- 	ColumnAccessor < mCFStaticData_256 > opt_budget_eprs_aig;
- 	ColumnAccessor < mCFStaticData_256 > opt_budget_pv_cf_disc_rate_1;
- 	ColumnAccessor < mCFStaticData_256 > opt_budget_pv_cf_disc_rate_aig_curve_ic_uel_aig;
- 	ColumnAccessor < mCFStaticData_256 > opt_budget_pv_cf_disc_rate_aig_curve_no_uel_aig;
- 	ColumnAccessor < mCFStaticData_256 > opt_budget_pv_cf_disc_rate_aig_curve_uel_aig;
- 	ColumnAccessor < mCFStaticData_256 > opt_cost_atm_aig;
  	ColumnAccessor < mCFStaticData_256 > opt_payoff;
- 	ColumnAccessor < mCFStaticData_256 > opt_payoff_aig;
- 	ColumnAccessor < mCFStaticData_256 > opt_payoff_aig_pv_cf_disc_rate_1;
- 	ColumnAccessor < mCFStaticData_256 > opt_payoff_aig_pv_cf_disc_rate_aig_curve_ic_uel_aig;
- 	ColumnAccessor < mCFStaticData_256 > opt_payoff_aig_pv_cf_disc_rate_aig_curve_no_uel_aig;
- 	ColumnAccessor < mCFStaticData_256 > opt_payoff_aig_pv_cf_disc_rate_aig_curve_uel_aig;
- 	ColumnAccessor < mCFStaticData_256 > opt_payoff_pv_cf_disc_rate_1;
- 	ColumnAccessor < mCFStaticData_256 > opt_payoff_pv_cf_disc_rate_aig_curve_ic_uel_aig;
- 	ColumnAccessor < mCFStaticData_256 > opt_payoff_pv_cf_disc_rate_aig_curve_no_uel_aig;
- 	ColumnAccessor < mCFStaticData_256 > opt_payoff_pv_cf_disc_rate_aig_curve_uel_aig;
  	ColumnAccessor < mCFStaticData_256 > pba_rollforward_base;
  	ColumnAccessor < mCFStaticData_256 > pba_rollforward_base_issued;
  	ColumnAccessor < mCFStaticData_256 > pba_rollforward_factor;
  	ColumnAccessor < mCFStaticData_256 > pfwd_entitlement;
+ 	ColumnAccessor < mCFStaticData_256 > pfwd_entitlement_remaining_bom;
  	ColumnAccessor < mCFStaticData_256 > pfwd_entitlement_remaining_e;
- 	ColumnAccessor < mCFStaticData_256 > pfwd_entitlement_remaining_e_bef;
  	ColumnAccessor < mCFStaticData_256 > pfwd_rate_dynamic;
  	ColumnAccessor < mCFStaticData_256 > pfwd_rate_mthly_fund_val;
- 	ColumnAccessor < mCFStaticData_256 > pfwd_rate_mthly_min_accum_val_aig;
  	ColumnAccessor < mCFStaticData_256 > pfwd_surr_contract_val;
  	ColumnAccessor < mCFStaticData_256 > pfwd_surr_cumul;
  	ColumnAccessor < mCFStaticData_256 > pfwd_surr_cumul_bom;
  	ColumnAccessor < mCFStaticData_256 > pfwd_surr_curr_pol_yr;
  	ColumnAccessor < mCFStaticData_256 > pfwd_surr_fund_val;
- 	ColumnAccessor < mCFStaticData_256 > pfwd_use_aig;
+ 	ColumnAccessor < mCFStaticData_256 > pfwd_use_crbg;
  	ColumnAccessor < mCFStaticData_256 > pol_mth;
  	ColumnAccessor < mCFStaticData_256 > pol_yr;
  	ColumnAccessor < mCFStaticData_256 > policies_b;
- 	ColumnAccessor < mCFStaticData_256 > policies_b_pv_cf_disc_rate_1;
- 	ColumnAccessor < mCFStaticData_256 > policies_b_pv_cf_disc_rate_aig_curve_ic_uel_aig;
- 	ColumnAccessor < mCFStaticData_256 > policies_b_pv_cf_disc_rate_aig_curve_no_uel_aig;
- 	ColumnAccessor < mCFStaticData_256 > policies_b_pv_cf_disc_rate_aig_curve_uel_aig;
- 	ColumnAccessor < mCFStaticData_256 > policies_female_experience_aig;
- 	ColumnAccessor < mCFStaticData_256 > policies_female_gmwb_aig;
+ 	ColumnAccessor < mCFStaticData_256 > policies_female_inf_crbg;
  	ColumnAccessor < mCFStaticData_256 > policies_inf;
  	ColumnAccessor < mCFStaticData_256 > policies_issued;
- 	ColumnAccessor < mCFStaticData_256 > policies_joint_experience_aig;
- 	ColumnAccessor < mCFStaticData_256 > policies_joint_gmwb_aig;
- 	ColumnAccessor < mCFStaticData_256 > policies_last_survivor_experience_aig;
- 	ColumnAccessor < mCFStaticData_256 > policies_last_survivor_gmwb_aig;
- 	ColumnAccessor < mCFStaticData_256 > policies_male_experience_aig;
- 	ColumnAccessor < mCFStaticData_256 > policies_male_gmwb_aig;
+ 	ColumnAccessor < mCFStaticData_256 > policies_joint_inf_crbg;
+ 	ColumnAccessor < mCFStaticData_256 > policies_last_survivor_inf_crbg;
+ 	ColumnAccessor < mCFStaticData_256 > policies_male_inf_crbg;
  	ColumnAccessor < mCFStaticData_256 > port_yld_aft_tax;
- 	ColumnAccessor < mCFStaticData_256 > pre_tax_cash_flow_liab_eom_aig;
- 	ColumnAccessor < mCFStaticData_256 > pre_tax_cash_flow_liab_eom_aig_pv_cf_disc_rate_1;
- 	ColumnAccessor < mCFStaticData_256 > pre_tax_cash_flow_liab_eom_aig_pv_cf_disc_rate_aig_curve_ic_uel_aig;
- 	ColumnAccessor < mCFStaticData_256 > pre_tax_cash_flow_liab_eom_aig_pv_cf_disc_rate_aig_curve_no_uel_aig;
- 	ColumnAccessor < mCFStaticData_256 > pre_tax_cash_flow_liab_eom_aig_pv_cf_disc_rate_aig_curve_uel_aig;
- 	ColumnAccessor < mCFStaticData_256 > pre_tax_cash_flow_liab_weighted_eom_aig;
- 	ColumnAccessor < mCFStaticData_256 > pre_tax_cash_flow_liab_weighted_eom_aig_pv_cf_disc_rate_1;
- 	ColumnAccessor < mCFStaticData_256 > pre_tax_cash_flow_liab_weighted_eom_aig_pv_cf_disc_rate_aig_curve_ic_uel_aig;
- 	ColumnAccessor < mCFStaticData_256 > pre_tax_cash_flow_liab_weighted_eom_aig_pv_cf_disc_rate_aig_curve_no_uel_aig;
- 	ColumnAccessor < mCFStaticData_256 > pre_tax_cash_flow_liab_weighted_eom_aig_pv_cf_disc_rate_aig_curve_uel_aig;
  	ColumnAccessor < mCFStaticData_256 > prem_bonus;
- 	ColumnAccessor < mCFStaticData_256 > prem_bonus_base_e_aig;
- 	ColumnAccessor < mCFStaticData_256 > prem_bonus_base_e_bef_aig;
- 	ColumnAccessor < mCFStaticData_256 > prem_bonus_recapture_base_reduction_fct_aig;
- 	ColumnAccessor < mCFStaticData_256 > prem_bonus_recapture_e_aig;
- 	ColumnAccessor < mCFStaticData_256 > prem_bonus_recapture_e_bef_aig;
- 	ColumnAccessor < mCFStaticData_512 > prem_cumul;
- 	ColumnAccessor < mCFStaticData_512 > prem_cumul_bef;
- 	ColumnAccessor < mCFStaticData_512 > prem_cumul_net_wdl_aig;
- 	ColumnAccessor < mCFStaticData_512 > prem_cumul_net_wdl_bef_aig;
- 	ColumnAccessor < mCFStaticData_512 > prem_cumul_net_wdl_pre_income_aig;
- 	ColumnAccessor < mCFStaticData_512 > prem_cumul_net_wdl_pre_income_bef_aig;
- 	ColumnAccessor < mCFStaticData_512 > prem_cumul_net_wdl_with_int_e_aig;
- 	ColumnAccessor < mCFStaticData_512 > prem_cumul_net_wdl_with_int_e_bef_aig;
- 	ColumnAccessor < mCFStaticData_512 > prem_cumul_proportional_wdl_aig;
- 	ColumnAccessor < mCFStaticData_512 > prem_cumul_proportional_wdl_bef_aig;
- 	ColumnAccessor < mCFStaticData_512 > prem_issued;
- 	ColumnAccessor < mCFStaticData_512 > prem_paid;
- 	ColumnAccessor < mCFStaticData_512 > prem_paid_net;
- 	ColumnAccessor < mCFStaticData_512 > prem_paid_pv_cf_disc_rate_1;
- 	ColumnAccessor < mCFStaticData_512 > prem_paid_pv_cf_disc_rate_aig_curve_ic_uel_aig;
- 	ColumnAccessor < mCFStaticData_512 > prem_paid_pv_cf_disc_rate_aig_curve_no_uel_aig;
- 	ColumnAccessor < mCFStaticData_512 > prem_paid_pv_cf_disc_rate_aig_curve_uel_aig;
- 	ColumnAccessor < mCFStaticData_512 > prem_tax;
- 	ColumnAccessor < mCFStaticData_512 > proj_csv_for_interpolation_aig;
- 	ColumnAccessor < mCFStaticData_512 > pv_benefit_itm_aig;
- 	ColumnAccessor < mCFStaticData_512 > rbc;
- 	ColumnAccessor < mCFStaticData_512 > rbc_c1;
- 	ColumnAccessor < mCFStaticData_512 > rbc_c2;
- 	ColumnAccessor < mCFStaticData_512 > rbc_c2_nar;
- 	ColumnAccessor < mCFStaticData_512 > rbc_c3;
- 	ColumnAccessor < mCFStaticData_512 > rbc_c3_base_ann_high_risk;
- 	ColumnAccessor < mCFStaticData_512 > rbc_c3_base_ann_low_risk;
- 	ColumnAccessor < mCFStaticData_512 > rbc_c3_base_ann_medium_risk;
- 	ColumnAccessor < mCFStaticData_512 > rbc_c3_mp;
- 	ColumnAccessor < mCFStaticData_512 > rbc_c3_stoch_amt;
- 	ColumnAccessor < mCFStaticData_512 > rbc_c3_stoch_amt_unhedged;
- 	ColumnAccessor < mCFStaticData_512 > rbc_c3_unhedged;
- 	ColumnAccessor < mCFStaticData_512 > rbc_c4;
- 	ColumnAccessor < mCFStaticData_512 > reins_ann_benefits_eom;
- 	ColumnAccessor < mCFStaticData_512 > reins_ann_claims_gmwb;
- 	ColumnAccessor < mCFStaticData_512 > reins_cash_flow_bom;
- 	ColumnAccessor < mCFStaticData_512 > reins_cash_flow_eom;
- 	ColumnAccessor < mCFStaticData_512 > reins_cash_flow_int;
- 	ColumnAccessor < mCFStaticData_512 > reins_cash_val;
- 	ColumnAccessor < mCFStaticData_512 > reins_comm_chargeback_reimb;
- 	ColumnAccessor < mCFStaticData_512 > reins_comm_reimb;
- 	ColumnAccessor < mCFStaticData_512 > reins_comm_reimb_bom;
- 	ColumnAccessor < mCFStaticData_512 > reins_comm_reimb_eom;
- 	ColumnAccessor < mCFStaticData_512 > reins_dth_ben_inf;
- 	ColumnAccessor < mCFStaticData_512 > reins_dth_benefits;
- 	ColumnAccessor < mCFStaticData_512 > reins_exp;
- 	ColumnAccessor < mCFStaticData_512 > reins_exp_reimb;
- 	ColumnAccessor < mCFStaticData_512 > reins_exp_reimb_bom;
- 	ColumnAccessor < mCFStaticData_512 > reins_exp_reimb_eom;
- 	ColumnAccessor < mCFStaticData_512 > reins_gaap_ben_res;
- 	ColumnAccessor < mCFStaticData_512 > reins_gaap_capzd_comm_bom;
- 	ColumnAccessor < mCFStaticData_512 > reins_gaap_capzd_comm_eom;
- 	ColumnAccessor < mCFStaticData_512 > reins_gaap_capzd_prem_bonus;
- 	ColumnAccessor < mCFStaticData_512 > reins_gaap_cash_flow_int;
- 	ColumnAccessor < mCFStaticData_512 > reins_gaap_chg_inc;
- 	ColumnAccessor < mCFStaticData_512 > reins_gaap_comm_excess_bom;
- 	ColumnAccessor < mCFStaticData_512 > reins_gaap_comm_excess_eom;
- 	ColumnAccessor < mCFStaticData_512 > reins_gaap_comm_trail_bom;
- 	ColumnAccessor < mCFStaticData_512 > reins_gaap_comm_trail_eom;
- 	ColumnAccessor < mCFStaticData_512 > reins_gaap_cost;
- 	ColumnAccessor < mCFStaticData_512 > reins_gaap_credited_int;
- 	ColumnAccessor < mCFStaticData_512 > reins_gaap_dac;
- 	ColumnAccessor < mCFStaticData_512 > reins_gaap_dac_incr;
- 	ColumnAccessor < mCFStaticData_512 > reins_gaap_inv_inc_res;
- 	ColumnAccessor < mCFStaticData_512 > reins_gaap_liab_net;
- 	ColumnAccessor < mCFStaticData_512 > reins_gaap_loads_deducted;
- 	ColumnAccessor < mCFStaticData_512 > reins_gaap_maint_exp_bom;
- 	ColumnAccessor < mCFStaticData_512 > reins_gaap_maint_exp_eom;
- 	ColumnAccessor < mCFStaticData_512 > reins_gaap_prem_bonus;
- 	ColumnAccessor < mCFStaticData_512 > reins_gaap_prem_tax;
- 	ColumnAccessor < mCFStaticData_512 > reins_gaap_recoveries;
- 	ColumnAccessor < mCFStaticData_512 > reins_gaap_sfas133_liab;
- 	ColumnAccessor < mCFStaticData_512 > reins_gaap_sfas133_liab_incr;
- 	ColumnAccessor < mCFStaticData_512 > reins_gaap_sop031_addl_liab;
- 	ColumnAccessor < mCFStaticData_512 > reins_gaap_sop031_addl_liab_incr;
- 	ColumnAccessor < mCFStaticData_512 > reins_gaap_surr_inc;
- 	ColumnAccessor < mCFStaticData_512 > reins_inv_inc_res;
- 	ColumnAccessor < mCFStaticData_512 > reins_maturity_benefits;
- 	ColumnAccessor < mCFStaticData_512 > reins_prem;
- 	ColumnAccessor < mCFStaticData_512 > reins_prem_base;
- 	ColumnAccessor < mCFStaticData_512 > reins_prem_gmwb;
- 	ColumnAccessor < mCFStaticData_512 > reins_prem_tax;
- 	ColumnAccessor < mCFStaticData_512 > reins_stat_cost;
- 	ColumnAccessor < mCFStaticData_512 > reins_stat_res;
- 	ColumnAccessor < mCFStaticData_512 > reins_stat_res_incr;
- 	ColumnAccessor < mCFStaticData_512 > reins_stat_res_mp;
- 	ColumnAccessor < mCFStaticData_512 > reins_stat_res_npr;
- 	ColumnAccessor < mCFStaticData_512 > reins_stat_res_unhedged;
- 	ColumnAccessor < mCFStaticData_512 > reins_surr_benefits;
- 	ColumnAccessor < mCFStaticData_512 > reins_tax_res;
- 	ColumnAccessor < mCFStaticData_512 > reins_tax_res_incr;
- 	ColumnAccessor < mCFStaticData_512 > reins_tax_res_mp;
- 	ColumnAccessor < mCFStaticData_512 > reins_withdrl_benefits;
- 	ColumnAccessor < mCFStaticData_512 > remaining_preferred_wdl_amt_e_aig;
- 	ColumnAccessor < mCFStaticData_512 > remaining_preferred_wdl_amt_e_bef_aig;
- 	ColumnAccessor < mCFStaticData_512 > risk_free_rate_no_sprd_aig;
- 	ColumnAccessor < mCFStaticData_512 > risk_free_rate_with_ic_uel_sprd_aig;
- 	ColumnAccessor < mCFStaticData_512 > risk_free_rate_with_no_uel_sprd_aig;
- 	ColumnAccessor < mCFStaticData_512 > risk_free_rate_with_uel_sprd_aig;
- 	ColumnAccessor < mCFStaticData_512 > seriatim_run_tgt;
- 	ColumnAccessor < mCFStaticData_512 > sfc_annual_hedge_cost_col_aig;
- 	ColumnAccessor < mCFStaticData_512 > sfc_ben_aig;
- 	ColumnAccessor < mCFStaticData_512 > sfc_itm_aig;
- 	ColumnAccessor < mCFStaticData_512 > shock_lapse_yr_ind_crbg;
- 	ColumnAccessor < mCFStaticData_512 > shock_phase_lookup_aig_gen2;
- 	ColumnAccessor < mCFStaticData_512 > snfl_prospective_e_aig;
- 	ColumnAccessor < mCFStaticData_512 > snfl_prospective_e_bef_aig;
- 	ColumnAccessor < mCFStaticData_512 > startup;
- 	ColumnAccessor < mCFStaticData_512 > stat_res;
- 	ColumnAccessor < mCFStaticData_512 > stat_res_carvm;
- 	ColumnAccessor < mCFStaticData_512 > stat_res_carvm_base_aig;
- 	ColumnAccessor < mCFStaticData_512 > stat_res_carvm_base_full_wd_aig;
- 	ColumnAccessor < mCFStaticData_512 > stat_res_carvm_base_no_wd_aig;
- 	ColumnAccessor < mCFStaticData_512 > stat_res_carvm_net;
- 	ColumnAccessor < mCFStaticData_512 > stat_res_carvm_wb_aig;
- 	ColumnAccessor < mCFStaticData_512 > stat_res_excess;
- 	ColumnAccessor < mCFStaticData_512 > stat_res_excess_unhedged;
- 	ColumnAccessor < mCFStaticData_512 > stat_res_incr;
- 	ColumnAccessor < mCFStaticData_512 > stat_res_mp;
- 	ColumnAccessor < mCFStaticData_512 > stat_res_mp_unhedged;
- 	ColumnAccessor < mCFStaticData_512 > stat_res_net;
- 	ColumnAccessor < mCFStaticData_512 > stat_res_net_excess;
- 	ColumnAccessor < mCFStaticData_512 > stat_res_net_excess_unhedged;
- 	ColumnAccessor < mCFStaticData_512 > stat_res_net_mp;
- 	ColumnAccessor < mCFStaticData_512 > stat_res_net_mp_unhedged;
- 	ColumnAccessor < mCFStaticData_512 > stat_res_net_npr;
- 	ColumnAccessor < mCFStaticData_512 > stat_res_net_npr_unhedged;
- 	ColumnAccessor < mCFStaticData_512 > stat_res_net_stoch_res;
- 	ColumnAccessor < mCFStaticData_512 > stat_res_net_stoch_res_unhedged;
- 	ColumnAccessor < mCFStaticData_512 > stat_res_net_unhedged;
- 	ColumnAccessor < mCFStaticData_512 > stat_res_npr;
- 	ColumnAccessor < mCFStaticData_512 > stat_res_npr_unhedged;
- 	ColumnAccessor < mCFStaticData_512 > stat_res_released_xol_aig;
- 	ColumnAccessor < mCFStaticData_512 > stat_res_stoch_res;
- 	ColumnAccessor < mCFStaticData_512 > stat_res_stoch_res_unhedged;
- 	ColumnAccessor < mCFStaticData_512 > stat_res_unhedged;
- 	ColumnAccessor < mCFStaticData_512 > stat_res_xol_carvm_aig;
- 	ColumnAccessor < mCFStaticData_512 > stat_res_xol_excess_res_aig;
- 	ColumnAccessor < mCFStaticData_512 > stat_res_xol_nb_eco_res_aig;
- 	ColumnAccessor < mCFStaticData_512 > stat_res_xol_pv_nb_ending_amount_aig;
- 	ColumnAccessor < mCFStaticData_512 > surr_benefits;
- 	ColumnAccessor < mCFStaticData_512 > surr_benefits_pv_cf_disc_rate_1;
- 	ColumnAccessor < mCFStaticData_512 > surr_benefits_pv_cf_disc_rate_aig_curve_ic_uel_aig;
- 	ColumnAccessor < mCFStaticData_512 > surr_benefits_pv_cf_disc_rate_aig_curve_no_uel_aig;
- 	ColumnAccessor < mCFStaticData_512 > surr_benefits_pv_cf_disc_rate_aig_curve_uel_aig;
- 	ColumnAccessor < mCFStaticData_512 > surr_chg;
- 	ColumnAccessor < mCFStaticData_512 > surr_chg_inf;
- 	ColumnAccessor < mCFStaticData_512 > surr_chg_inf_bef;
- 	ColumnAccessor < mCFStaticData_512 > surr_chg_inf_bef_maturity_aig;
- 	ColumnAccessor < mCFStaticData_512 > surr_chg_inf_bef_no_gmwb_chg_aig;
- 	ColumnAccessor < mCFStaticData_512 > surr_chg_inf_no_gmwb_chg_aig;
- 	ColumnAccessor < mCFStaticData_512 > surv;
- 	ColumnAccessor < mCFStaticData_512 > surv_period;
- 	ColumnAccessor < mCFStaticData_512 > tax_bk_prof;
- 	ColumnAccessor < mCFStaticData_512 > tax_bk_prof_ytd;
- 	ColumnAccessor < mCFStaticData_512 > tax_capzd_prem;
- 	ColumnAccessor < mCFStaticData_512 > tax_capzd_prem_amortzn;
- 	ColumnAccessor < mCFStaticData_512 > tax_capzd_prem_unamortzd;
- 	ColumnAccessor < mCFStaticData_512 > tax_earnings_accum;
- 	ColumnAccessor < mCFStaticData_512 > tax_earnings_accum_ytd;
- 	ColumnAccessor < mCFStaticData_512 > tax_res;
- 	ColumnAccessor < mCFStaticData_512 > tax_res_carvm;
- 	ColumnAccessor < mCFStaticData_512 > tax_res_carvm_net;
- 	ColumnAccessor < mCFStaticData_512 > tax_res_incr;
- 	ColumnAccessor < mCFStaticData_512 > tax_res_mp;
- 	ColumnAccessor < mCFStaticData_512 > tax_tgt_cap;
- 	ColumnAccessor < mCFStaticData_512 > tax_tgt_cap_ytd;
- 	ColumnAccessor < mCFStaticData_512 > taxable_inc_bk_prof;
- 	ColumnAccessor < mCFStaticData_512 > taxable_inc_bk_prof_ytd;
- 	ColumnAccessor < mCFStaticData_512 > taxable_inc_carryfwd_addn_ytd;
- 	ColumnAccessor < mCFStaticData_512 > taxable_inc_carryfwd_applied_ytd;
- 	ColumnAccessor < mCFStaticData_512 > taxable_inc_carryfwd_avail;
- 	ColumnAccessor < mCFStaticData_512 > taxable_inc_earnings_accum;
- 	ColumnAccessor < mCFStaticData_512 > taxable_inc_earnings_accum_ytd;
- 	ColumnAccessor < mCFStaticData_512 > taxable_inc_tgt_cap;
- 	ColumnAccessor < mCFStaticData_512 > taxable_inc_tgt_cap_ytd;
- 	ColumnAccessor < mCFStaticData_512 > ten_year_treasury_annualized_return_cumul_max_aig;
- 	ColumnAccessor < mCFStaticData_512 > ten_year_treasury_annualized_return_three_mth_avg_aig;
- 	ColumnAccessor < mCFStaticData_512 > tgt_cap;
- 	ColumnAccessor < mCFStaticData_512 > tgt_cap_effect;
- 	ColumnAccessor < mCFStaticData_512 > tgt_cap_incr;
- 	ColumnAccessor < mCFStaticData_512 > tier_number_aig;
- 	ColumnAccessor < mCFStaticData_512 > tier_strat_fee_aig;
- 	ColumnAccessor < mCFStaticData_512 > tier_strat_fee_at_surr_aig;
- 	ColumnAccessor < mCFStaticData_512 > tier_strat_fee_at_surr_bef_aig;
- 	ColumnAccessor < mCFStaticData_512 > undistrib_earnings;
- 	ColumnAccessor < mCFStaticData_512 > uniform_rands_1_aig;
- 	ColumnAccessor < mCFStaticData_512 > uniform_rands_2_aig;
- 	ColumnAccessor < mCFStaticData_512 > uniform_rands_3_aig;
- 	ColumnAccessor < mCFStaticData_512 > valn_tgt_gaap_sfas133;
- 	ColumnAccessor < mCFStaticData_512 > valn_tgt_gaap_sfas97rd;
- 	ColumnAccessor < mCFStaticData_512 > valn_tgt_gaap_sop031;
- 	ColumnAccessor < mCFStaticData_512 > valn_tgt_pba_scen_amt;
- 	ColumnAccessor < mCFStaticData_512 > valn_tgt_stat_tax;
- 	ColumnAccessor < mCFStaticData_512 > weighted_ending_strategy_return_aig;
- 	ColumnAccessor < mCFStaticData_512 > weighted_ending_strategy_return_gmwb_rollup_aig;
- 	ColumnAccessor < mCFStaticData_512 > weighted_eprs_cost_aig;
- 	ColumnAccessor < mCFStaticData_512 > weighted_prorated_strategy_return_aig;
- 	ColumnAccessor < mCFStaticData_512 > weighted_strategy_return_aig;
- 	ColumnAccessor < mCFStaticData_512 > withdrl_benefits;
- 	ColumnAccessor < mCFStaticData_512 > withdrl_benefits_chg_aig;
- 	ColumnAccessor < mCFStaticData_512 > withdrl_benefits_gross_aig;
- 	ColumnAccessor < mCFStaticData_512 > withdrl_benefits_gross_cumul_yr_e_aig;
- 	ColumnAccessor < mCFStaticData_512 > withdrl_benefits_gross_cumul_yr_e_bef_aig;
- 	ColumnAccessor < mCFStaticData_512 > withdrl_benefits_gross_excess_cumul_e_aig;
- 	ColumnAccessor < mCFStaticData_512 > withdrl_benefits_gross_excess_cumul_e_bef_aig;
- 	ColumnAccessor < mCFStaticData_512 > withdrl_benefits_gross_excess_e_bef_aig;
- 	ColumnAccessor < mCFStaticData_512 > withdrl_benefits_gross_excess_ind_e_aig;
- 	ColumnAccessor < mCFStaticData_512 > withdrl_benefits_gross_excess_ind_e_bef_aig;
- 	ColumnAccessor < mCFStaticData_512 > withdrl_benefits_gross_excess_int_credit_e_bef_aig;
- 	ColumnAccessor < mCFStaticData_512 > withdrl_benefits_gross_regular_e_bef_aig;
- 	ColumnAccessor < mCFStaticData_512 > withdrl_benefits_gross_regular_int_credit_e_bef_aig;
- 	ColumnAccessor < mCFStaticData_512 > withdrl_benefits_pv_cf_disc_rate_1;
- 	ColumnAccessor < mCFStaticData_512 > withdrl_benefits_pv_cf_disc_rate_aig_curve_ic_uel_aig;
- 	ColumnAccessor < mCFStaticData_512 > withdrl_benefits_pv_cf_disc_rate_aig_curve_no_uel_aig;
- 	ColumnAccessor < mCFStaticData_512 > withdrl_benefits_pv_cf_disc_rate_aig_curve_uel_aig;
- 	ColumnAccessor < mCFStaticData_512 > xol_amount_aig;
- 	ColumnAccessor < mCFStaticData_512 > xol_gmwb_claim_crbg;
- 	ColumnAccessor < mCFStaticData_512 > xol_prem_aig;
+ 	ColumnAccessor < mCFStaticData_256 > prem_bonus_base_e_bef_crbg;
+ 	ColumnAccessor < mCFStaticData_256 > prem_bonus_base_e_crbg;
+ 	ColumnAccessor < mCFStaticData_256 > prem_bonus_base_reduction_fct_crbg;
+ 	ColumnAccessor < mCFStaticData_256 > prem_bonus_recap_e_bef_crbg;
+ 	ColumnAccessor < mCFStaticData_256 > prem_bonus_recap_e_crbg;
+ 	ColumnAccessor < mCFStaticData_256 > prem_cumul;
+ 	ColumnAccessor < mCFStaticData_256 > prem_cumul_bef;
+ 	ColumnAccessor < mCFStaticData_256 > prem_cumul_net_wdl_bef_crbg;
+ 	ColumnAccessor < mCFStaticData_256 > prem_cumul_net_wdl_crbg;
+ 	ColumnAccessor < mCFStaticData_256 > prem_cumul_prop_wdl_bef_crbg;
+ 	ColumnAccessor < mCFStaticData_256 > prem_cumul_prop_wdl_crbg;
+ 	ColumnAccessor < mCFStaticData_256 > prem_issued;
+ 	ColumnAccessor < mCFStaticData_256 > prem_paid;
+ 	ColumnAccessor < mCFStaticData_256 > prem_paid_net;
+ 	ColumnAccessor < mCFStaticData_256 > prem_tax;
+ 	ColumnAccessor < mCFStaticData_256 > pv_ann_ben_disc_uel_crbg;
+ 	ColumnAccessor < mCFStaticData_256 > pv_bom_cf_disc_uel_crbg;
+ 	ColumnAccessor < mCFStaticData_256 > pv_eom_cf_disc_uel_crbg;
+ 	ColumnAccessor < mCFStaticData_256 > pv_gmwb_ben_itm_current_crbg;
+ 	ColumnAccessor < mCFStaticData_256 > pv_gmwb_ben_itm_init_rate_crbg;
+ 	ColumnAccessor < mCFStaticData_256 > pv_gmwb_benefit_itm;
+ 	ColumnAccessor < mCFStaticData_256 > pv_gmwb_mawp_crbg;
+ 	ColumnAccessor < mCFStaticData_256 > pv_gmwb_pip_pct_crbg;
+ 	ColumnAccessor < mCFStaticData_256 > pv_sfc_ben_itm_crbg;
+ 	ColumnAccessor < mCFStaticData_256 > rand_num_non_us_return_crbg;
+ 	ColumnAccessor < mCFStaticData_256 > rbc;
+ 	ColumnAccessor < mCFStaticData_256 > rbc_c1;
+ 	ColumnAccessor < mCFStaticData_256 > rbc_c2;
+ 	ColumnAccessor < mCFStaticData_256 > rbc_c2_nar;
+ 	ColumnAccessor < mCFStaticData_256 > rbc_c3;
+ 	ColumnAccessor < mCFStaticData_256 > rbc_c3_base_ann_high_risk;
+ 	ColumnAccessor < mCFStaticData_256 > rbc_c3_base_ann_low_risk;
+ 	ColumnAccessor < mCFStaticData_256 > rbc_c3_base_ann_medium_risk;
+ 	ColumnAccessor < mCFStaticData_256 > rbc_c3_mp;
+ 	ColumnAccessor < mCFStaticData_256 > rbc_c3_stoch_amt;
+ 	ColumnAccessor < mCFStaticData_256 > rbc_c3_stoch_amt_unhedged;
+ 	ColumnAccessor < mCFStaticData_256 > rbc_c3_unhedged;
+ 	ColumnAccessor < mCFStaticData_256 > rbc_c4;
+ 	ColumnAccessor < mCFStaticData_256 > reins_ann_benefits_eom;
+ 	ColumnAccessor < mCFStaticData_256 > reins_ann_claims_gmwb;
+ 	ColumnAccessor < mCFStaticData_256 > reins_cash_flow_bom;
+ 	ColumnAccessor < mCFStaticData_256 > reins_cash_flow_eom;
+ 	ColumnAccessor < mCFStaticData_256 > reins_cash_flow_int;
+ 	ColumnAccessor < mCFStaticData_256 > reins_cash_val;
+ 	ColumnAccessor < mCFStaticData_256 > reins_comm_chargeback_reimb;
+ 	ColumnAccessor < mCFStaticData_256 > reins_comm_reimb;
+ 	ColumnAccessor < mCFStaticData_256 > reins_comm_reimb_bom;
+ 	ColumnAccessor < mCFStaticData_256 > reins_comm_reimb_eom;
+ 	ColumnAccessor < mCFStaticData_256 > reins_dth_ben_inf;
+ 	ColumnAccessor < mCFStaticData_256 > reins_dth_benefits;
+ 	ColumnAccessor < mCFStaticData_256 > reins_exp;
+ 	ColumnAccessor < mCFStaticData_256 > reins_exp_reimb;
+ 	ColumnAccessor < mCFStaticData_256 > reins_exp_reimb_bom;
+ 	ColumnAccessor < mCFStaticData_256 > reins_exp_reimb_eom;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_ben_res;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_capzd_comm_bom;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_capzd_comm_eom;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_capzd_prem_bonus;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_cash_flow_int;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_chg_inc;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_comm_excess_bom;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_comm_excess_eom;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_comm_trail_bom;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_comm_trail_eom;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_cost;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_credited_int;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_dac;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_dac_incr;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_inv_inc_res;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_liab_net;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_loads_deducted;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_maint_exp_bom;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_maint_exp_eom;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_mrb_liab;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_mrb_liab_incr;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_prem_bonus;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_prem_tax;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_recoveries;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_sfas133_liab;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_sfas133_liab_incr;
+ 	ColumnAccessor < mCFStaticData_256 > reins_gaap_surr_inc;
+ 	ColumnAccessor < mCFStaticData_256 > reins_inv_inc_res;
+ 	ColumnAccessor < mCFStaticData_256 > reins_maturity_benefits;
+ 	ColumnAccessor < mCFStaticData_256 > reins_prem;
+ 	ColumnAccessor < mCFStaticData_256 > reins_prem_base;
+ 	ColumnAccessor < mCFStaticData_256 > reins_prem_gmwb;
+ 	ColumnAccessor < mCFStaticData_256 > reins_prem_tax;
+ 	ColumnAccessor < mCFStaticData_256 > reins_stat_cost;
+ 	ColumnAccessor < mCFStaticData_256 > reins_stat_res;
+ 	ColumnAccessor < mCFStaticData_256 > reins_stat_res_incr;
+ 	ColumnAccessor < mCFStaticData_256 > reins_stat_res_mp;
+ 	ColumnAccessor < mCFStaticData_256 > reins_stat_res_npr;
+ 	ColumnAccessor < mCFStaticData_256 > reins_stat_res_unhedged;
+ 	ColumnAccessor < mCFStaticData_256 > reins_surr_benefits;
+ 	ColumnAccessor < mCFStaticData_256 > reins_tax_res;
+ 	ColumnAccessor < mCFStaticData_256 > reins_tax_res_incr;
+ 	ColumnAccessor < mCFStaticData_256 > reins_tax_res_mp;
+ 	ColumnAccessor < mCFStaticData_256 > reins_withdrl_benefits;
+ 	ColumnAccessor < mCFStaticData_256 > shock_lapse_phase_crbg;
+ 	ColumnAccessor < mCFStaticData_256 > shock_lapse_yr_ind_crbg;
+ 	ColumnAccessor < mCFStaticData_256 > startup;
+ 	ColumnAccessor < mCFStaticData_256 > stat_res;
+ 	ColumnAccessor < mCFStaticData_256 > stat_res_carvm;
+ 	ColumnAccessor < mCFStaticData_256 > stat_res_carvm_net;
+ 	ColumnAccessor < mCFStaticData_256 > stat_res_excess;
+ 	ColumnAccessor < mCFStaticData_256 > stat_res_excess_unhedged;
+ 	ColumnAccessor < mCFStaticData_256 > stat_res_incr;
+ 	ColumnAccessor < mCFStaticData_256 > stat_res_mp;
+ 	ColumnAccessor < mCFStaticData_256 > stat_res_mp_unhedged;
+ 	ColumnAccessor < mCFStaticData_256 > stat_res_net;
+ 	ColumnAccessor < mCFStaticData_256 > stat_res_net_excess;
+ 	ColumnAccessor < mCFStaticData_256 > stat_res_net_excess_unhedged;
+ 	ColumnAccessor < mCFStaticData_256 > stat_res_net_mp;
+ 	ColumnAccessor < mCFStaticData_256 > stat_res_net_mp_unhedged;
+ 	ColumnAccessor < mCFStaticData_256 > stat_res_net_npr;
+ 	ColumnAccessor < mCFStaticData_256 > stat_res_net_npr_unhedged;
+ 	ColumnAccessor < mCFStaticData_256 > stat_res_net_stoch_res;
+ 	ColumnAccessor < mCFStaticData_256 > stat_res_net_stoch_res_unhedged;
+ 	ColumnAccessor < mCFStaticData_256 > stat_res_net_unhedged;
+ 	ColumnAccessor < mCFStaticData_256 > stat_res_npr;
+ 	ColumnAccessor < mCFStaticData_256 > stat_res_npr_unhedged;
+ 	ColumnAccessor < mCFStaticData_256 > stat_res_stoch_res;
+ 	ColumnAccessor < mCFStaticData_256 > stat_res_stoch_res_unhedged;
+ 	ColumnAccessor < mCFStaticData_256 > stat_res_unhedged;
+ 	ColumnAccessor < mCFStaticData_256 > surr_benefits;
+ 	ColumnAccessor < mCFStaticData_256 > surr_chg;
+ 	ColumnAccessor < mCFStaticData_256 > surr_chg_excess_withdrl_crbg;
+ 	ColumnAccessor < mCFStaticData_256 > surr_chg_inf;
+ 	ColumnAccessor < mCFStaticData_256 > surr_chg_inf_bef;
+ 	ColumnAccessor < mCFStaticData_256 > surr_chg_inf_wo_mva;
+ 	ColumnAccessor < mCFStaticData_256 > surr_chg_inf_wo_mva_bef;
+ 	ColumnAccessor < mCFStaticData_256 > surr_chg_pct_crbg;
+ 	ColumnAccessor < mCFStaticData_256 > surv;
+ 	ColumnAccessor < mCFStaticData_256 > surv_period;
+ 	ColumnAccessor < mCFStaticData_256 > tax_bk_prof;
+ 	ColumnAccessor < mCFStaticData_256 > tax_bk_prof_ytd;
+ 	ColumnAccessor < mCFStaticData_256 > tax_capzd_prem;
+ 	ColumnAccessor < mCFStaticData_256 > tax_capzd_prem_amortzn;
+ 	ColumnAccessor < mCFStaticData_256 > tax_capzd_prem_unamortzd;
+ 	ColumnAccessor < mCFStaticData_256 > tax_earnings_accum;
+ 	ColumnAccessor < mCFStaticData_256 > tax_earnings_accum_ytd;
+ 	ColumnAccessor < mCFStaticData_256 > tax_res;
+ 	ColumnAccessor < mCFStaticData_256 > tax_res_carvm;
+ 	ColumnAccessor < mCFStaticData_256 > tax_res_carvm_net;
+ 	ColumnAccessor < mCFStaticData_256 > tax_res_incr;
+ 	ColumnAccessor < mCFStaticData_256 > tax_res_mp;
+ 	ColumnAccessor < mCFStaticData_256 > tax_tgt_cap;
+ 	ColumnAccessor < mCFStaticData_256 > tax_tgt_cap_ytd;
+ 	ColumnAccessor < mCFStaticData_256 > taxable_inc_bk_prof;
+ 	ColumnAccessor < mCFStaticData_256 > taxable_inc_bk_prof_ytd;
+ 	ColumnAccessor < mCFStaticData_256 > taxable_inc_carryfwd_addn_ytd;
+ 	ColumnAccessor < mCFStaticData_256 > taxable_inc_carryfwd_applied_ytd;
+ 	ColumnAccessor < mCFStaticData_256 > taxable_inc_carryfwd_avail;
+ 	ColumnAccessor < mCFStaticData_256 > taxable_inc_earnings_accum;
+ 	ColumnAccessor < mCFStaticData_256 > taxable_inc_earnings_accum_ytd;
+ 	ColumnAccessor < mCFStaticData_256 > taxable_inc_tgt_cap;
+ 	ColumnAccessor < mCFStaticData_256 > taxable_inc_tgt_cap_ytd;
+ 	ColumnAccessor < mCFStaticData_256 > tgt_cap;
+ 	ColumnAccessor < mCFStaticData_256 > tgt_cap_effect;
+ 	ColumnAccessor < mCFStaticData_256 > tgt_cap_incr;
+ 	ColumnAccessor < mCFStaticData_256 > undistrib_earnings;
+ 	ColumnAccessor < mCFStaticData_256 > valn_tgt_gaap_mrb;
+ 	ColumnAccessor < mCFStaticData_256 > valn_tgt_gaap_sfas97rd;
+ 	ColumnAccessor < mCFStaticData_256 > valn_tgt_pba_scen_amt;
+ 	ColumnAccessor < mCFStaticData_256 > valn_tgt_stat_tax;
+ 	ColumnAccessor < mCFStaticData_256 > withdrl_benefits;
+ 	ColumnAccessor < mCFStaticData_256 > withdrl_benefits_gross_crbg;
+ 	ColumnAccessor < mCFStaticData_256 > zz_cash_val_wo_mva_bef;
 //Column Definition END@2
 
  // Temporary Table...
 	MonTable* ptr_tt_tax_capzd_prem_amortzn_sched;
 	TempTableAccessor tax_capzd_prem_amortzn_sched;
 
-_1D_FIACARVM_LIAB sm_carvm_stat;
-_1D_FIACARVM_LIAB sm_carvm_tax;
+_2D_FIACARVM_LIAB sm_carvm_stat;
+_2D_FIACARVM_LIAB sm_carvm_tax;
 _1D_FIAAFUND_LIAB sm_fia_account;
 _1D_ANN_PBA_PBA sm_fia_ann_pba;
-AUTOMATION *sm_fia_automation;
+_1D_MRB_GAAP sm_fia_mrb;
 RATES_ECONOMY *sm_fia_rates;
-_1D_SFAS133_GAAP sm_fia_sfas133;
 _1D_SFAS97RD_GAAP sm_fia_sfas97rd;
-FIA_LIAB *sm_bond_is;
-FIA_LIAB *sm_bond_pv;
-FIA_LIAB *sm_bond_ym;
-FIA_LIAB *sm_mtg_is;
-FIA_LIAB *sm_mtg_pv;
-FIA_LIAB *sm_mtg_ym;
 int main_rebase_model; //1
 
 public :
@@ -1243,44 +945,42 @@ public :
 #ifdef MICROSOFT
 #pragma warning(pop)
 #endif	MICROSOFT
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > acq_exp_allow_level_aig;
-  inline double	Get_acq_exp_allow_level_aig() {
-		return acq_exp_allow_level_aig; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > acq_exp_pct_prem;
   inline double	Get_acq_exp_pct_prem() {
 		return acq_exp_pct_prem; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > acq_exp_per_pol;
   inline double	Get_acq_exp_per_pol() {
 		return acq_exp_per_pol; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > activate_index1_aig;
-  inline xstring	Get_activate_index1_aig() {
-		return activate_index1_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > addl_sc_shock_pfwd_use_aig;
-  inline double	Get_addl_sc_shock_pfwd_use_aig() {
-		return addl_sc_shock_pfwd_use_aig; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > admin_fee_per_pol;
   inline double	Get_admin_fee_per_pol() {
 		return admin_fee_per_pol; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > allowable_threshold_deviation_aig;
-  inline double	Get_allowable_threshold_deviation_aig() {
-		return allowable_threshold_deviation_aig; }
-	Attribute::Proxy <int, DESCRIPTOR_TABLE > ann_ben_yr;
-  inline int	Get_ann_ben_yr() {
-		return ann_ben_yr; }
-  inline void Set_ann_ben_yr(const int &v) {
-		ann_ben_yr.setValue(v); }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > ann_benefits_min_wdl_val_defn_aig;
-  inline xstring	Get_ann_benefits_min_wdl_val_defn_aig() {
-		return ann_benefits_min_wdl_val_defn_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > ann_benefits_partial_interest_credited_defn_aig;
-  inline xstring	Get_ann_benefits_partial_interest_credited_defn_aig() {
-		return ann_benefits_partial_interest_credited_defn_aig; }
-	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > ann_rate_table_aig;
-  inline xstring	Get_ann_rate_table_aig() {
-		return ann_rate_table_aig; }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > ann_ben_partial_credit_ind_crbg;
+  inline xstring	Get_ann_ben_partial_credit_ind_crbg() {
+		return ann_ben_partial_credit_ind_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > ann_gmwb_claim_yr;
+  inline double	Get_ann_gmwb_claim_yr() {
+		return ann_gmwb_claim_yr; }
+	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > annuity_type_crbg;
+  inline xstring	Get_annuity_type_crbg() {
+		return annuity_type_crbg; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > annuitzn_base;
   inline double	Get_annuitzn_base() {
 		return annuitzn_base; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > arctan_base_aft_shock_mult_crbg;
+  inline double	Get_arctan_base_aft_shock_mult_crbg() {
+		return arctan_base_aft_shock_mult_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > arctan_base_inc_mult_crbg;
+  inline double	Get_arctan_base_inc_mult_crbg() {
+		return arctan_base_inc_mult_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > arctan_base_shock_mult_crbg;
+  inline double	Get_arctan_base_shock_mult_crbg() {
+		return arctan_base_shock_mult_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > arctan_param1_crbg;
+  inline double	Get_arctan_param1_crbg() {
+		return arctan_param1_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > arctan_param2_crbg;
+  inline double	Get_arctan_param2_crbg() {
+		return arctan_param2_crbg; }
 	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > asset_yld_comp_rate_id;
   inline xstring	Get_asset_yld_comp_rate_id() {
 		return asset_yld_comp_rate_id; }
@@ -1290,6 +990,9 @@ public :
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > asset_yld_deterministic;
   inline double	Get_asset_yld_deterministic() {
 		return asset_yld_deterministic; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > asset_yld_for_rate_setting;
+  inline double	Get_asset_yld_for_rate_setting() {
+		return asset_yld_for_rate_setting; }
 	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > audit_rpt_defn;
   inline xstring	Get_audit_rpt_defn() {
 		return audit_rpt_defn; }
@@ -1298,23 +1001,18 @@ public :
 		return av_size_crbg; }
   inline void Set_av_size_crbg(const double &v) {
 		av_size_crbg.setValue(v); }
-	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > broker_aig;
-  inline xstring	Get_broker_aig() {
-		return broker_aig; }
-	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > broker_category_aig;
-  inline xstring	Get_broker_category_aig() {
-		return broker_category_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > ca_mva_cv_floor_aig;
-  inline xstring	Get_ca_mva_cv_floor_aig() {
-		return ca_mva_cv_floor_aig; }
-	Attribute::Proxy <StringEnum, DESCRIPTOR_TABLE > calc_base_res_only_aig;
-  inline xstring	Get_calc_base_res_only_aig() {
-		return calc_base_res_only_aig; }
-  inline void Set_calc_base_res_only_aig(const xstring &v) {
-		calc_base_res_only_aig.setValue(v); }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > calc_carvm_defn;
-  inline xstring	Get_calc_carvm_defn() {
-		return calc_carvm_defn; }
+	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > broker_crbg;
+  inline xstring	Get_broker_crbg() {
+		return broker_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > bs_dividend_crbg;
+  inline double	Get_bs_dividend_crbg() {
+		return bs_dividend_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > bs_fwd_vol_crbg;
+  inline double	Get_bs_fwd_vol_crbg() {
+		return bs_fwd_vol_crbg; }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > calc_pv_gmwb_av_exhaustion_crbg;
+  inline xstring	Get_calc_pv_gmwb_av_exhaustion_crbg() {
+		return calc_pv_gmwb_av_exhaustion_crbg; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > capzd_acq_exp_pct_pct_prem;
   inline double	Get_capzd_acq_exp_pct_pct_prem() {
 		return capzd_acq_exp_pct_pct_prem; }
@@ -1324,62 +1022,67 @@ public :
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > capzd_prem_bonus_pct;
   inline double	Get_capzd_prem_bonus_pct() {
 		return capzd_prem_bonus_pct; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > carvm_res_floor_pct_aig;
-  inline double	Get_carvm_res_floor_pct_aig() {
-		return carvm_res_floor_pct_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > carvm_res_floor_switch_aig;
-  inline xstring	Get_carvm_res_floor_switch_aig() {
-		return carvm_res_floor_switch_aig; }
+	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > carvm_stat_annuitzn_tests;
+  inline xstring	Get_carvm_stat_annuitzn_tests() {
+		return carvm_stat_annuitzn_tests; }
+	Attribute::Proxy <int, DESCRIPTOR_TABLE > carvm_stat_annuitzn_tests_cnt;
+  inline int	Get_carvm_stat_annuitzn_tests_cnt() {
+		return carvm_stat_annuitzn_tests_cnt; }
+  inline void Set_carvm_stat_annuitzn_tests_cnt(const int &v) {
+		carvm_stat_annuitzn_tests_cnt.setValue(v); }
 	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > carvm_stat_detail_rpt_defn;
   inline xstring	Get_carvm_stat_detail_rpt_defn() {
 		return carvm_stat_detail_rpt_defn; }
+	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > carvm_stat_gmwb_exercise_points_attained_age;
+  inline xstring	Get_carvm_stat_gmwb_exercise_points_attained_age() {
+		return carvm_stat_gmwb_exercise_points_attained_age; }
+	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > carvm_stat_gmwb_exercise_points_issue;
+  inline xstring	Get_carvm_stat_gmwb_exercise_points_issue() {
+		return carvm_stat_gmwb_exercise_points_issue; }
+	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > carvm_stat_gmwb_exercise_points_valn_prd;
+  inline xstring	Get_carvm_stat_gmwb_exercise_points_valn_prd() {
+		return carvm_stat_gmwb_exercise_points_valn_prd; }
+	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > carvm_tax_annuitzn_tests;
+  inline xstring	Get_carvm_tax_annuitzn_tests() {
+		return carvm_tax_annuitzn_tests; }
+	Attribute::Proxy <int, DESCRIPTOR_TABLE > carvm_tax_annuitzn_tests_cnt;
+  inline int	Get_carvm_tax_annuitzn_tests_cnt() {
+		return carvm_tax_annuitzn_tests_cnt; }
+  inline void Set_carvm_tax_annuitzn_tests_cnt(const int &v) {
+		carvm_tax_annuitzn_tests_cnt.setValue(v); }
 	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > carvm_tax_detail_rpt_defn;
   inline xstring	Get_carvm_tax_detail_rpt_defn() {
 		return carvm_tax_detail_rpt_defn; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > cash_flow_pct_by_prod_aig;
-  inline double	Get_cash_flow_pct_by_prod_aig() {
-		return cash_flow_pct_by_prod_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > cash_flow_pct_input_vector_aig;
-  inline double	Get_cash_flow_pct_input_vector_aig() {
-		return cash_flow_pct_input_vector_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > cash_surrender_value_defn_aig;
-  inline xstring	Get_cash_surrender_value_defn_aig() {
-		return cash_surrender_value_defn_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > comm_chargeback_pct_aig;
-  inline double	Get_comm_chargeback_pct_aig() {
-		return comm_chargeback_pct_aig; }
-	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > comm_chargeback_period_mths_aig;
-  inline int	Get_comm_chargeback_period_mths_aig() {
-		return comm_chargeback_period_mths_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > comm_chgback_pct_dth_aig;
-  inline double	Get_comm_chgback_pct_dth_aig() {
-		return comm_chgback_pct_dth_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > comm_chgback_pct_surr_aig;
-  inline double	Get_comm_chgback_pct_surr_aig() {
-		return comm_chgback_pct_surr_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > comm_fund_payment_freq_aig;
-  inline double	Get_comm_fund_payment_freq_aig() {
-		return comm_fund_payment_freq_aig; }
+	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > carvm_tax_gmwb_exercise_points_attained_age;
+  inline xstring	Get_carvm_tax_gmwb_exercise_points_attained_age() {
+		return carvm_tax_gmwb_exercise_points_attained_age; }
+	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > carvm_tax_gmwb_exercise_points_issue;
+  inline xstring	Get_carvm_tax_gmwb_exercise_points_issue() {
+		return carvm_tax_gmwb_exercise_points_issue; }
+	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > carvm_tax_gmwb_exercise_points_valn_prd;
+  inline xstring	Get_carvm_tax_gmwb_exercise_points_valn_prd() {
+		return carvm_tax_gmwb_exercise_points_valn_prd; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > cash_flow_pct_by_prod_crbg;
+  inline double	Get_cash_flow_pct_by_prod_crbg() {
+		return cash_flow_pct_by_prod_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > cash_flow_pct_vector_crbg;
+  inline double	Get_cash_flow_pct_vector_crbg() {
+		return cash_flow_pct_vector_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > comm_chargeback_pct;
+  inline double	Get_comm_chargeback_pct() {
+		return comm_chargeback_pct; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > comm_chgback_pct_dth_crbg;
+  inline double	Get_comm_chgback_pct_dth_crbg() {
+		return comm_chgback_pct_dth_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > comm_chgback_pct_surr_crbg;
+  inline double	Get_comm_chgback_pct_surr_crbg() {
+		return comm_chgback_pct_surr_crbg; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > comm_pct_fund;
   inline double	Get_comm_pct_fund() {
 		return comm_pct_fund; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > comm_pct_prem;
   inline double	Get_comm_pct_prem() {
 		return comm_pct_prem; }
-	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > comm_trail_table_aig;
-  inline xstring	Get_comm_trail_table_aig() {
-		return comm_trail_table_aig; }
-	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > comm_upfront_table_aig;
-  inline xstring	Get_comm_upfront_table_aig() {
-		return comm_upfront_table_aig; }
-	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > commission_set_aig;
-  inline xstring	Get_commission_set_aig() {
-		return commission_set_aig; }
-	Attribute::Proxy <StringEnum, DESCRIPTOR_TABLE > comp_lookup_aig;
-  inline xstring	Get_comp_lookup_aig() {
-		return comp_lookup_aig; }
-  inline void Set_comp_lookup_aig(const xstring &v) {
-		comp_lookup_aig.setValue(v); }
 	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > comp_rate_compared_defn;
   inline xstring	Get_comp_rate_compared_defn() {
 		return comp_rate_compared_defn; }
@@ -1430,124 +1133,69 @@ public :
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > comp_rate_weighted_rate3_weight;
   inline double	Get_comp_rate_weighted_rate3_weight() {
 		return comp_rate_weighted_rate3_weight; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > competitor_rate_govt_tenor_aig;
-  inline double	Get_competitor_rate_govt_tenor_aig() {
-		return competitor_rate_govt_tenor_aig; }
-	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > confinement_assumption_set_aig;
-  inline xstring	Get_confinement_assumption_set_aig() {
-		return confinement_assumption_set_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > confinement_nolapse_switch_aig;
-  inline xstring	Get_confinement_nolapse_switch_aig() {
-		return confinement_nolapse_switch_aig; }
-	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > confinement_set_aig;
-  inline xstring	Get_confinement_set_aig() {
-		return confinement_set_aig; }
+	Attribute::Proxy <int, DESCRIPTOR_TABLE > confinement_age_crbg;
+  inline int	Get_confinement_age_crbg() {
+		return confinement_age_crbg; }
+  inline void Set_confinement_age_crbg(const int &v) {
+		confinement_age_crbg.setValue(v); }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > confinement_incidence_crbg;
+  inline double	Get_confinement_incidence_crbg() {
+		return confinement_incidence_crbg; }
+	Attribute::Proxy <int, DESCRIPTOR_TABLE > confinement_mth_crbg;
+  inline int	Get_confinement_mth_crbg() {
+		return confinement_mth_crbg; }
+  inline void Set_confinement_mth_crbg(const int &v) {
+		confinement_mth_crbg.setValue(v); }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > confinement_recovery_crbg;
+  inline double	Get_confinement_recovery_crbg() {
+		return confinement_recovery_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > confinement_recovery_mult_aig;
+  inline double	Get_confinement_recovery_mult_aig() {
+		return confinement_recovery_mult_aig; }
+	Attribute::Proxy <int, DESCRIPTOR_TABLE > confinement_yrs_crbg;
+  inline int	Get_confinement_yrs_crbg() {
+		return confinement_yrs_crbg; }
+  inline void Set_confinement_yrs_crbg(const int &v) {
+		confinement_yrs_crbg.setValue(v); }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > contract_val_net_consideration_pct;
   inline double	Get_contract_val_net_consideration_pct() {
 		return contract_val_net_consideration_pct; }
 	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > contract_val_sc_defn;
   inline xstring	Get_contract_val_sc_defn() {
 		return contract_val_sc_defn; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > coupon_freq_defn_aig;
-  inline xstring	Get_coupon_freq_defn_aig() {
-		return coupon_freq_defn_aig; }
-	Attribute::Proxy <StringEnum, DESCRIPTOR_TABLE > covered_person_status_aig;
-  inline xstring	Get_covered_person_status_aig() {
-		return covered_person_status_aig; }
-  inline void Set_covered_person_status_aig(const xstring &v) {
-		covered_person_status_aig.setValue(v); }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > crediting_asset_yld_sprd;
   inline double	Get_crediting_asset_yld_sprd() {
 		return crediting_asset_yld_sprd; }
-	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > crediting_eqt_index_aig;
-  inline xstring	Get_crediting_eqt_index_aig() {
-		return crediting_eqt_index_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > crediting_fixed_defn_aig;
-  inline xstring	Get_crediting_fixed_defn_aig() {
-		return crediting_fixed_defn_aig; }
 	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > crediting_nb_defn;
   inline xstring	Get_crediting_nb_defn() {
 		return crediting_nb_defn; }
-	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > crediting_nb_rate_id_aig;
-  inline xstring	Get_crediting_nb_rate_id_aig() {
-		return crediting_nb_rate_id_aig; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > crediting_nb_yld_maturity;
   inline double	Get_crediting_nb_yld_maturity() {
 		return crediting_nb_yld_maturity; }
 	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > crediting_nb_yld_rating;
   inline xstring	Get_crediting_nb_yld_rating() {
 		return crediting_nb_yld_rating; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > crediting_ner_aig;
-  inline double	Get_crediting_ner_aig() {
-		return crediting_ner_aig; }
-	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > crediting_ner_set_aig;
-  inline xstring	Get_crediting_ner_set_aig() {
-		return crediting_ner_set_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > crediting_pri_sprd_tgt_aig;
-  inline double	Get_crediting_pri_sprd_tgt_aig() {
-		return crediting_pri_sprd_tgt_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > crediting_pri_sprd_tgt_idx1_aig;
-  inline double	Get_crediting_pri_sprd_tgt_idx1_aig() {
-		return crediting_pri_sprd_tgt_idx1_aig; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > crediting_ner_crbg;
+  inline double	Get_crediting_ner_crbg() {
+		return crediting_ner_crbg; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > crediting_rate_fixed;
   inline double	Get_crediting_rate_fixed() {
 		return crediting_rate_fixed; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > crediting_rate_gtd;
   inline double	Get_crediting_rate_gtd() {
 		return crediting_rate_gtd; }
-	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > crediting_rate_guar_mths_fixed;
-  inline int	Get_crediting_rate_guar_mths_fixed() {
-		return crediting_rate_guar_mths_fixed; }
-	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > crediting_rate_guar_mths_idx1_aig;
-  inline int	Get_crediting_rate_guar_mths_idx1_aig() {
-		return crediting_rate_guar_mths_idx1_aig; }
-	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > crediting_rate_guar_mths_index0;
-  inline int	Get_crediting_rate_guar_mths_index0() {
-		return crediting_rate_guar_mths_index0; }
-	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > crediting_rate_guar_mths_index2;
-  inline int	Get_crediting_rate_guar_mths_index2() {
-		return crediting_rate_guar_mths_index2; }
-	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > crediting_rate_guar_mths_index3;
-  inline int	Get_crediting_rate_guar_mths_index3() {
-		return crediting_rate_guar_mths_index3; }
-	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > crediting_rate_guar_mths_index4;
-  inline int	Get_crediting_rate_guar_mths_index4() {
-		return crediting_rate_guar_mths_index4; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > crediting_rate_min;
   inline double	Get_crediting_rate_min() {
 		return crediting_rate_min; }
-	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > crediting_rate_min_table_aig;
-  inline xstring	Get_crediting_rate_min_table_aig() {
-		return crediting_rate_min_table_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > crediting_rate_partial_sprd_defn_aig;
-  inline xstring	Get_crediting_rate_partial_sprd_defn_aig() {
-		return crediting_rate_partial_sprd_defn_aig; }
-	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > crediting_rate_type_aig;
-  inline xstring	Get_crediting_rate_type_aig() {
-		return crediting_rate_type_aig; }
-	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > crediting_type_aig;
-  inline xstring	Get_crediting_type_aig() {
-		return crediting_type_aig; }
-	Attribute::Proxy <xstring, DESCRIPTOR_TABLE > crediting_type_dyn_aig;
-  inline xstring	Get_crediting_type_dyn_aig() {
-		return crediting_type_dyn_aig; }
-  inline void Set_crediting_type_dyn_aig(const xstring &v) {
-		crediting_type_dyn_aig.setValue(v); }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > crediting_type_dyn_defn_aig;
-  inline xstring	Get_crediting_type_dyn_defn_aig() {
-		return crediting_type_dyn_defn_aig; }
-	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > crediting_type_dyn_interm_aig;
-  inline xstring	Get_crediting_type_dyn_interm_aig() {
-		return crediting_type_dyn_interm_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > cubic_spline_enhancement_dev_team_switch_aig;
-  inline xstring	Get_cubic_spline_enhancement_dev_team_switch_aig() {
-		return cubic_spline_enhancement_dev_team_switch_aig; }
+	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > crediting_strategy_crbg;
+  inline xstring	Get_crediting_strategy_crbg() {
+		return crediting_strategy_crbg; }
+	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > data_file_name_input;
+  inline xstring	Get_data_file_name_input() {
+		return data_file_name_input; }
 	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > data_validation_defn;
   inline xstring	Get_data_validation_defn() {
 		return data_validation_defn; }
-	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > decrement_set_aig;
-  inline xstring	Get_decrement_set_aig() {
-		return decrement_set_aig; }
 	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > decrements_defn;
   inline xstring	Get_decrements_defn() {
 		return decrements_defn; }
@@ -1568,185 +1216,101 @@ public :
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > disc_rate_scen_yr;
   inline double	Get_disc_rate_scen_yr() {
 		return disc_rate_scen_yr; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > disc_rate_sprd_ic_uel_aig;
-  inline double	Get_disc_rate_sprd_ic_uel_aig() {
-		return disc_rate_sprd_ic_uel_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > disc_rate_sprd_no_uel_aig;
-  inline double	Get_disc_rate_sprd_no_uel_aig() {
-		return disc_rate_sprd_no_uel_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > disc_rate_sprd_uel_aig;
-  inline double	Get_disc_rate_sprd_uel_aig() {
-		return disc_rate_sprd_uel_aig; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > disc_rate_sprd_ic_uel_crbg;
+  inline double	Get_disc_rate_sprd_ic_uel_crbg() {
+		return disc_rate_sprd_ic_uel_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > disc_rate_sprd_no_uel_crbg;
+  inline double	Get_disc_rate_sprd_no_uel_crbg() {
+		return disc_rate_sprd_no_uel_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > disc_rate_sprd_uel_crbg;
+  inline double	Get_disc_rate_sprd_uel_crbg() {
+		return disc_rate_sprd_uel_crbg; }
 	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > disc_rates_selected;
   inline xstring	Get_disc_rates_selected() {
 		return disc_rates_selected; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > dth_ben_cap_aig;
-  inline double	Get_dth_ben_cap_aig() {
-		return dth_ben_cap_aig; }
 	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > dth_ben_defn;
   inline xstring	Get_dth_ben_defn() {
 		return dth_ben_defn; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > dth_ben_partial_interest_credited_defn_aig;
-  inline xstring	Get_dth_ben_partial_interest_credited_defn_aig() {
-		return dth_ben_partial_interest_credited_defn_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > dth_ben_primary_tail_defn_aig;
-  inline xstring	Get_dth_ben_primary_tail_defn_aig() {
-		return dth_ben_primary_tail_defn_aig; }
-	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > dyn_lapse_table_aig;
-  inline xstring	Get_dyn_lapse_table_aig() {
-		return dyn_lapse_table_aig; }
 	Attribute::Proxy <double, DESCRIPTOR_TABLE > dyn_sprd_crbg;
   inline double	Get_dyn_sprd_crbg() {
 		return dyn_sprd_crbg; }
   inline void Set_dyn_sprd_crbg(const double &v) {
 		dyn_sprd_crbg.setValue(v); }
-	Attribute::Proxy <StringEnum, DESCRIPTOR_TABLE > enhanced_income_benefit_exercise_aig;
-  inline xstring	Get_enhanced_income_benefit_exercise_aig() {
-		return enhanced_income_benefit_exercise_aig; }
-  inline void Set_enhanced_income_benefit_exercise_aig(const xstring &v) {
-		enhanced_income_benefit_exercise_aig.setValue(v); }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > enhanced_income_benefit_utilization_pct_aig;
-  inline double	Get_enhanced_income_benefit_utilization_pct_aig() {
-		return enhanced_income_benefit_utilization_pct_aig; }
-	Attribute::Proxy <int, DESCRIPTOR_TABLE > enhanced_income_confinement_age_aig;
-  inline int	Get_enhanced_income_confinement_age_aig() {
-		return enhanced_income_confinement_age_aig; }
-  inline void Set_enhanced_income_confinement_age_aig(const int &v) {
-		enhanced_income_confinement_age_aig.setValue(v); }
-	Attribute::Proxy <int, DESCRIPTOR_TABLE > enhanced_income_confinement_mth_aig;
-  inline int	Get_enhanced_income_confinement_mth_aig() {
-		return enhanced_income_confinement_mth_aig; }
-  inline void Set_enhanced_income_confinement_mth_aig(const int &v) {
-		enhanced_income_confinement_mth_aig.setValue(v); }
-	Attribute::Proxy <StringEnum, DESCRIPTOR_TABLE > enhanced_income_confinement_state_aig;
-  inline xstring	Get_enhanced_income_confinement_state_aig() {
-		return enhanced_income_confinement_state_aig; }
-  inline void Set_enhanced_income_confinement_state_aig(const xstring &v) {
-		enhanced_income_confinement_state_aig.setValue(v); }
-	Attribute::Proxy <int, DESCRIPTOR_TABLE > enhanced_income_confinement_yr_aig;
-  inline int	Get_enhanced_income_confinement_yr_aig() {
-		return enhanced_income_confinement_yr_aig; }
-  inline void Set_enhanced_income_confinement_yr_aig(const int &v) {
-		enhanced_income_confinement_yr_aig.setValue(v); }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > enhanced_income_defn_aig;
-  inline xstring	Get_enhanced_income_defn_aig() {
-		return enhanced_income_defn_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > enhanced_income_gmwb_exercise_defn_aig;
-  inline xstring	Get_enhanced_income_gmwb_exercise_defn_aig() {
-		return enhanced_income_gmwb_exercise_defn_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > enhanced_income_incidence_base_aig;
-  inline double	Get_enhanced_income_incidence_base_aig() {
-		return enhanced_income_incidence_base_aig; }
-	Attribute::Proxy <StringEnum, DESCRIPTOR_TABLE > enhanced_income_incidence_gender_aig;
-  inline xstring	Get_enhanced_income_incidence_gender_aig() {
-		return enhanced_income_incidence_gender_aig; }
-  inline void Set_enhanced_income_incidence_gender_aig(const xstring &v) {
-		enhanced_income_incidence_gender_aig.setValue(v); }
-	Attribute::Proxy <int, DESCRIPTOR_TABLE > enhanced_income_incidence_issue_age_aig;
-  inline int	Get_enhanced_income_incidence_issue_age_aig() {
-		return enhanced_income_incidence_issue_age_aig; }
-  inline void Set_enhanced_income_incidence_issue_age_aig(const int &v) {
-		enhanced_income_incidence_issue_age_aig.setValue(v); }
-	Attribute::Proxy <int, DESCRIPTOR_TABLE > enhanced_income_incidence_pol_yr_aig;
-  inline int	Get_enhanced_income_incidence_pol_yr_aig() {
-		return enhanced_income_incidence_pol_yr_aig; }
-  inline void Set_enhanced_income_incidence_pol_yr_aig(const int &v) {
-		enhanced_income_incidence_pol_yr_aig.setValue(v); }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > enhanced_income_mawp_mult_aig;
-  inline double	Get_enhanced_income_mawp_mult_aig() {
-		return enhanced_income_mawp_mult_aig; }
-	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > enhanced_income_max_cumul_benefit_yrs_aig;
-  inline int	Get_enhanced_income_max_cumul_benefit_yrs_aig() {
-		return enhanced_income_max_cumul_benefit_yrs_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > enhanced_income_mort_base_confined_aig;
-  inline double	Get_enhanced_income_mort_base_confined_aig() {
-		return enhanced_income_mort_base_confined_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > enhanced_income_mort_base_non_confined_aig;
-  inline double	Get_enhanced_income_mort_base_non_confined_aig() {
-		return enhanced_income_mort_base_non_confined_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > enhanced_income_mort_mult_confined_aig;
-  inline double	Get_enhanced_income_mort_mult_confined_aig() {
-		return enhanced_income_mort_mult_confined_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > enhanced_income_recovery_base_aig;
-  inline double	Get_enhanced_income_recovery_base_aig() {
-		return enhanced_income_recovery_base_aig; }
-	Attribute::Proxy <StringEnum, DESCRIPTOR_TABLE > enhanced_income_recovery_gender_aig;
-  inline xstring	Get_enhanced_income_recovery_gender_aig() {
-		return enhanced_income_recovery_gender_aig; }
-  inline void Set_enhanced_income_recovery_gender_aig(const xstring &v) {
-		enhanced_income_recovery_gender_aig.setValue(v); }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > enhanced_income_recovery_mult_aig;
-  inline double	Get_enhanced_income_recovery_mult_aig() {
-		return enhanced_income_recovery_mult_aig; }
-	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > enhanced_income_wait_period_aig;
-  inline int	Get_enhanced_income_wait_period_aig() {
-		return enhanced_income_wait_period_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > eprs_sfc_aig;
-  inline xstring	Get_eprs_sfc_aig() {
-		return eprs_sfc_aig; }
-	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > excess_wdl_set_aig;
-  inline xstring	Get_excess_wdl_set_aig() {
-		return excess_wdl_set_aig; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > dynamic_lapse_gmwb_itm_threshold;
+  inline double	Get_dynamic_lapse_gmwb_itm_threshold() {
+		return dynamic_lapse_gmwb_itm_threshold; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > enh_inc_mawp_mult;
+  inline double	Get_enh_inc_mawp_mult() {
+		return enh_inc_mawp_mult; }
+	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > enh_inc_max_cumul_yrs;
+  inline int	Get_enh_inc_max_cumul_yrs() {
+		return enh_inc_max_cumul_yrs; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > enh_inc_utilization_pct;
+  inline double	Get_enh_inc_utilization_pct() {
+		return enh_inc_utilization_pct; }
+	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > enh_inc_wait_period;
+  inline int	Get_enh_inc_wait_period() {
+		return enh_inc_wait_period; }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > enhanced_income_ind_crbg;
+  inline xstring	Get_enhanced_income_ind_crbg() {
+		return enhanced_income_ind_crbg; }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > eprs_sfc_defn;
+  inline xstring	Get_eprs_sfc_defn() {
+		return eprs_sfc_defn; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > exp_adj_mult;
   inline double	Get_exp_adj_mult() {
 		return exp_adj_mult; }
-	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > expense_set_aig;
-  inline xstring	Get_expense_set_aig() {
-		return expense_set_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > fa_base_lapse_rate;
-  inline double	Get_fa_base_lapse_rate() {
-		return fa_base_lapse_rate; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > fa_crediting_dyn_beta_a;
-  inline double	Get_fa_crediting_dyn_beta_a() {
-		return fa_crediting_dyn_beta_a; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > fa_crediting_dyn_beta_b;
-  inline double	Get_fa_crediting_dyn_beta_b() {
-		return fa_crediting_dyn_beta_b; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > fa_crediting_dyn_beta_c;
-  inline double	Get_fa_crediting_dyn_beta_c() {
-		return fa_crediting_dyn_beta_c; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > fa_base_lapse_crbg;
+  inline double	Get_fa_base_lapse_crbg() {
+		return fa_base_lapse_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > fa_credit_dyn_beta_a_crbg;
+  inline double	Get_fa_credit_dyn_beta_a_crbg() {
+		return fa_credit_dyn_beta_a_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > fa_credit_dyn_beta_b_crbg;
+  inline double	Get_fa_credit_dyn_beta_b_crbg() {
+		return fa_credit_dyn_beta_b_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > fa_credit_dyn_beta_c_crbg;
+  inline double	Get_fa_credit_dyn_beta_c_crbg() {
+		return fa_credit_dyn_beta_c_crbg; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > fa_dyn_lapse_av_size_mult_crbg;
   inline double	Get_fa_dyn_lapse_av_size_mult_crbg() {
 		return fa_dyn_lapse_av_size_mult_crbg; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > fa_dyn_lapse_dyn_sprd_mult_crbg;
   inline double	Get_fa_dyn_lapse_dyn_sprd_mult_crbg() {
 		return fa_dyn_lapse_dyn_sprd_mult_crbg; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > fa_dyn_lapse_mult_alpha_aig;
-  inline double	Get_fa_dyn_lapse_mult_alpha_aig() {
-		return fa_dyn_lapse_mult_alpha_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > fa_dyn_lapse_mult_beta_aig;
-  inline double	Get_fa_dyn_lapse_mult_beta_aig() {
-		return fa_dyn_lapse_mult_beta_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > fa_guarantee_rate;
-  inline double	Get_fa_guarantee_rate() {
-		return fa_guarantee_rate; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > fa_init_bonus_rate_aig;
-  inline double	Get_fa_init_bonus_rate_aig() {
-		return fa_init_bonus_rate_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > fa_init_pricing_sprd_aig;
-  inline double	Get_fa_init_pricing_sprd_aig() {
-		return fa_init_pricing_sprd_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > fa_lapse_factor;
-  inline double	Get_fa_lapse_factor() {
-		return fa_lapse_factor; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > fa_ner_cap_sprd_aig;
-  inline double	Get_fa_ner_cap_sprd_aig() {
-		return fa_ner_cap_sprd_aig; }
-	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > fa_rate_migration_yr_aig;
-  inline int	Get_fa_rate_migration_yr_aig() {
-		return fa_rate_migration_yr_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > fa_rate_ren_max_aig;
-  inline double	Get_fa_rate_ren_max_aig() {
-		return fa_rate_ren_max_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > fixed_annuity_ind_aig;
-  inline xstring	Get_fixed_annuity_ind_aig() {
-		return fixed_annuity_ind_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > force_initial_cover_ownership_gender_same_aig;
-  inline xstring	Get_force_initial_cover_ownership_gender_same_aig() {
-		return force_initial_cover_ownership_gender_same_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > fund_val_defn_aig;
-  inline xstring	Get_fund_val_defn_aig() {
-		return fund_val_defn_aig; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > fa_dyn_lapse_mult_alpha_crbg;
+  inline double	Get_fa_dyn_lapse_mult_alpha_crbg() {
+		return fa_dyn_lapse_mult_alpha_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > fa_dyn_lapse_mult_beta_crbg;
+  inline double	Get_fa_dyn_lapse_mult_beta_crbg() {
+		return fa_dyn_lapse_mult_beta_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > fa_guar_rate_crbg;
+  inline double	Get_fa_guar_rate_crbg() {
+		return fa_guar_rate_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > fa_init_bonus_crbg;
+  inline double	Get_fa_init_bonus_crbg() {
+		return fa_init_bonus_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > fa_init_pri_sprd_crbg;
+  inline double	Get_fa_init_pri_sprd_crbg() {
+		return fa_init_pri_sprd_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > fa_lapse_factor_crbg;
+  inline double	Get_fa_lapse_factor_crbg() {
+		return fa_lapse_factor_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > fa_ner_cap_sprd_crbg;
+  inline double	Get_fa_ner_cap_sprd_crbg() {
+		return fa_ner_cap_sprd_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > fa_pricing_rate;
+  inline double	Get_fa_pricing_rate() {
+		return fa_pricing_rate; }
+	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > fa_rate_migration_yr_crbg;
+  inline int	Get_fa_rate_migration_yr_crbg() {
+		return fa_rate_migration_yr_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > fa_renew_rate_max_crbg;
+  inline double	Get_fa_renew_rate_max_crbg() {
+		return fa_renew_rate_max_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > fund_val_beg_term;
+  inline double	Get_fund_val_beg_term() {
+		return fund_val_beg_term; }
 	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > fund_val_rebal_defn;
   inline xstring	Get_fund_val_rebal_defn() {
 		return fund_val_rebal_defn; }
@@ -1775,68 +1339,51 @@ public :
 		return gen2_declarations; }
   inline void Set_gen2_declarations(const xstring &v) {
 		gen2_declarations.setValue(v); }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gen2_defn;
-  inline xstring	Get_gen2_defn() {
-		return gen2_defn; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gender_aft_act_aig;
-  inline xstring	Get_gender_aft_act_aig() {
-		return gender_aft_act_aig; }
-	Attribute::Proxy <StringEnum, DESCRIPTOR_TABLE > gender_mp;
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gender_aft_inc;
+  inline xstring	Get_gender_aft_inc() {
+		return gender_aft_inc; }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gender_mp;
   inline xstring	Get_gender_mp() {
 		return gender_mp; }
-  inline void Set_gender_mp(const xstring &v) {
-		gender_mp.setValue(v); }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gender_mp_aig;
-  inline xstring	Get_gender_mp_aig() {
-		return gender_mp_aig; }
-	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > glb_flex_cost_set_aig;
-  inline xstring	Get_glb_flex_cost_set_aig() {
-		return glb_flex_cost_set_aig; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > glb_itm_disc_rate;
   inline double	Get_glb_itm_disc_rate() {
 		return glb_itm_disc_rate; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmab_av_cap_rt_aig;
-  inline double	Get_gmab_av_cap_rt_aig() {
-		return gmab_av_cap_rt_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmab_chg_pct_aig;
-  inline double	Get_gmab_chg_pct_aig() {
-		return gmab_chg_pct_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmab_credit_rt_mult_aig;
-  inline double	Get_gmab_credit_rt_mult_aig() {
-		return gmab_credit_rt_mult_aig; }
-	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > gmab_csv_grop_yr_aig;
-  inline int	Get_gmab_csv_grop_yr_aig() {
-		return gmab_csv_grop_yr_aig; }
-	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > gmab_ind_aig;
-  inline int	Get_gmab_ind_aig() {
-		return gmab_ind_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmwb_base_mav_aig;
-  inline xstring	Get_gmwb_base_mav_aig() {
-		return gmwb_base_mav_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmwb_chg_at_surr_timing_defn_aig;
-  inline xstring	Get_gmwb_chg_at_surr_timing_defn_aig() {
-		return gmwb_chg_at_surr_timing_defn_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmwb_chg_at_surr_yn_aig;
-  inline xstring	Get_gmwb_chg_at_surr_yn_aig() {
-		return gmwb_chg_at_surr_yn_aig; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmab_av_cap_rt_crbg;
+  inline double	Get_gmab_av_cap_rt_crbg() {
+		return gmab_av_cap_rt_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmab_chg_pct_crbg;
+  inline double	Get_gmab_chg_pct_crbg() {
+		return gmab_chg_pct_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmab_credit_rt_mult_crbg;
+  inline double	Get_gmab_credit_rt_mult_crbg() {
+		return gmab_credit_rt_mult_crbg; }
+	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > gmab_csv_grop_yr_crbg;
+  inline int	Get_gmab_csv_grop_yr_crbg() {
+		return gmab_csv_grop_yr_crbg; }
+	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > gmab_ind_crbg;
+  inline int	Get_gmab_ind_crbg() {
+		return gmab_ind_crbg; }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmwb_chg_at_surr_crbg;
+  inline xstring	Get_gmwb_chg_at_surr_crbg() {
+		return gmwb_chg_at_surr_crbg; }
 	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmwb_chg_base;
   inline xstring	Get_gmwb_chg_base() {
 		return gmwb_chg_base; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmwb_chg_freq_aig;
-  inline xstring	Get_gmwb_chg_freq_aig() {
-		return gmwb_chg_freq_aig; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmwb_chg_pct;
   inline double	Get_gmwb_chg_pct() {
 		return gmwb_chg_pct; }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmwb_chg_surr_timing_crbg;
+  inline xstring	Get_gmwb_chg_surr_timing_crbg() {
+		return gmwb_chg_surr_timing_crbg; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmwb_claim_disc_rate;
   inline double	Get_gmwb_claim_disc_rate() {
 		return gmwb_claim_disc_rate; }
 	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmwb_claim_disc_rate_defn;
   inline xstring	Get_gmwb_claim_disc_rate_defn() {
 		return gmwb_claim_disc_rate_defn; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmwb_claim_print_debug_output_defn_aig;
-  inline xstring	Get_gmwb_claim_print_debug_output_defn_aig() {
-		return gmwb_claim_print_debug_output_defn_aig; }
+	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > gmwb_code;
+  inline xstring	Get_gmwb_code() {
+		return gmwb_code; }
 	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > gmwb_cohort_id;
   inline int	Get_gmwb_cohort_id() {
 		return gmwb_cohort_id; }
@@ -1846,97 +1393,45 @@ public :
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmwb_cohort_utilz_rate;
   inline double	Get_gmwb_cohort_utilz_rate() {
 		return gmwb_cohort_utilz_rate; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmwb_credit_mult_aig;
-  inline double	Get_gmwb_credit_mult_aig() {
-		return gmwb_credit_mult_aig; }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmwb_credit_aft_income_crbg;
+  inline xstring	Get_gmwb_credit_aft_income_crbg() {
+		return gmwb_credit_aft_income_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmwb_credit_mult_aft_inc_crbg;
+  inline double	Get_gmwb_credit_mult_aft_inc_crbg() {
+		return gmwb_credit_mult_aft_inc_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmwb_credit_mult_bef_inc_crbg;
+  inline double	Get_gmwb_credit_mult_bef_inc_crbg() {
+		return gmwb_credit_mult_bef_inc_crbg; }
 	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmwb_defn;
   inline xstring	Get_gmwb_defn() {
 		return gmwb_defn; }
-	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > gmwb_doubling_year_aig;
-  inline int	Get_gmwb_doubling_year_aig() {
-		return gmwb_doubling_year_aig; }
+	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > gmwb_doubling_year_crbg;
+  inline int	Get_gmwb_doubling_year_crbg() {
+		return gmwb_doubling_year_crbg; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmwb_exercise_yrs;
   inline double	Get_gmwb_exercise_yrs() {
 		return gmwb_exercise_yrs; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmwb_flex_base_lapse_multiplier_aig;
-  inline double	Get_gmwb_flex_base_lapse_multiplier_aig() {
-		return gmwb_flex_base_lapse_multiplier_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmwb_flex_defn_aig;
-  inline xstring	Get_gmwb_flex_defn_aig() {
-		return gmwb_flex_defn_aig; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmwb_flex_base_lapse_mult_crbg;
+  inline double	Get_gmwb_flex_base_lapse_mult_crbg() {
+		return gmwb_flex_base_lapse_mult_crbg; }
 	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmwb_fund_val_defn;
   inline xstring	Get_gmwb_fund_val_defn() {
 		return gmwb_fund_val_defn; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmwb_fund_val_period;
   inline double	Get_gmwb_fund_val_period() {
 		return gmwb_fund_val_period; }
-	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > gmwb_generation_aig;
-  inline xstring	Get_gmwb_generation_aig() {
-		return gmwb_generation_aig; }
-	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > gmwb_generation_set_aig;
-  inline xstring	Get_gmwb_generation_set_aig() {
-		return gmwb_generation_set_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmwb_income_base_cap_defn_aig;
-  inline xstring	Get_gmwb_income_base_cap_defn_aig() {
-		return gmwb_income_base_cap_defn_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmwb_income_base_cap_prem_base_reduction_method_aig;
-  inline xstring	Get_gmwb_income_base_cap_prem_base_reduction_method_aig() {
-		return gmwb_income_base_cap_prem_base_reduction_method_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmwb_income_base_cap_prem_pct_aig;
-  inline double	Get_gmwb_income_base_cap_prem_pct_aig() {
-		return gmwb_income_base_cap_prem_pct_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmwb_income_base_defn;
-  inline xstring	Get_gmwb_income_base_defn() {
-		return gmwb_income_base_defn; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmwb_income_base_floor_prem_pct_aig;
-  inline double	Get_gmwb_income_base_floor_prem_pct_aig() {
-		return gmwb_income_base_floor_prem_pct_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmwb_income_fund_val_base_reduction_method_aig;
-  inline xstring	Get_gmwb_income_fund_val_base_reduction_method_aig() {
-		return gmwb_income_fund_val_base_reduction_method_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmwb_income_prem_base_reduction_method_aig;
-  inline xstring	Get_gmwb_income_prem_base_reduction_method_aig() {
-		return gmwb_income_prem_base_reduction_method_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmwb_income_rollup_cap_base_reduction_method_aig;
-  inline xstring	Get_gmwb_income_rollup_cap_base_reduction_method_aig() {
-		return gmwb_income_rollup_cap_base_reduction_method_aig; }
 	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > gmwb_ind;
   inline int	Get_gmwb_ind() {
 		return gmwb_ind; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmwb_mawp_pipp_split_aig;
-  inline xstring	Get_gmwb_mawp_pipp_split_aig() {
-		return gmwb_mawp_pipp_split_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmwb_mawp_reg_47_aig;
-  inline xstring	Get_gmwb_mawp_reg_47_aig() {
-		return gmwb_mawp_reg_47_aig; }
-	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > gmwb_mawp_reg_47_min_attained_age_aig;
-  inline int	Get_gmwb_mawp_reg_47_min_attained_age_aig() {
-		return gmwb_mawp_reg_47_min_attained_age_aig; }
-	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > gmwb_mawp_reg_47_min_issue_age_aig;
-  inline int	Get_gmwb_mawp_reg_47_min_issue_age_aig() {
-		return gmwb_mawp_reg_47_min_issue_age_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmwb_mawp_reg_47_slope_aig;
-  inline double	Get_gmwb_mawp_reg_47_slope_aig() {
-		return gmwb_mawp_reg_47_slope_aig; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmwb_mawp_addn_crbg;
+  inline double	Get_gmwb_mawp_addn_crbg() {
+		return gmwb_mawp_addn_crbg; }
 	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > gmwb_max_age;
   inline int	Get_gmwb_max_age() {
 		return gmwb_max_age; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmwb_max_annual_wdl_addn_pct_aig;
-  inline double	Get_gmwb_max_annual_wdl_addn_pct_aig() {
-		return gmwb_max_annual_wdl_addn_pct_aig; }
-	Attribute::Proxy <int, DESCRIPTOR_TABLE > gmwb_max_annual_wdl_attained_age_aig;
-  inline int	Get_gmwb_max_annual_wdl_attained_age_aig() {
-		return gmwb_max_annual_wdl_attained_age_aig; }
-  inline void Set_gmwb_max_annual_wdl_attained_age_aig(const int &v) {
-		gmwb_max_annual_wdl_attained_age_aig.setValue(v); }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmwb_max_annual_wdl_pct;
   inline double	Get_gmwb_max_annual_wdl_pct() {
 		return gmwb_max_annual_wdl_pct; }
-	Attribute::Proxy <int, DESCRIPTOR_TABLE > gmwb_max_annual_wdl_pol_yr_aig;
-  inline int	Get_gmwb_max_annual_wdl_pol_yr_aig() {
-		return gmwb_max_annual_wdl_pol_yr_aig; }
-  inline void Set_gmwb_max_annual_wdl_pol_yr_aig(const int &v) {
-		gmwb_max_annual_wdl_pol_yr_aig.setValue(v); }
 	Attribute::Proxy <int, DESCRIPTOR_TABLE > gmwb_max_exec_point;
   inline int	Get_gmwb_max_exec_point() {
 		return gmwb_max_exec_point; }
@@ -1948,11 +1443,6 @@ public :
 	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmwb_max_wdl_amt_base_defn;
   inline xstring	Get_gmwb_max_wdl_amt_base_defn() {
 		return gmwb_max_wdl_amt_base_defn; }
-	Attribute::Proxy <StringEnum, DESCRIPTOR_TABLE > gmwb_mib_rollup_phase_lookup_aig;
-  inline xstring	Get_gmwb_mib_rollup_phase_lookup_aig() {
-		return gmwb_mib_rollup_phase_lookup_aig; }
-  inline void Set_gmwb_mib_rollup_phase_lookup_aig(const xstring &v) {
-		gmwb_mib_rollup_phase_lookup_aig.setValue(v); }
 	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > gmwb_min_age;
   inline int	Get_gmwb_min_age() {
 		return gmwb_min_age; }
@@ -1965,214 +1455,148 @@ public :
 	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > gmwb_mort_base_tbl_style;
   inline xstring	Get_gmwb_mort_base_tbl_style() {
 		return gmwb_mort_base_tbl_style; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmwb_net_credit_aig;
-  inline xstring	Get_gmwb_net_credit_aig() {
-		return gmwb_net_credit_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmwb_nyia_itm_denominator_aig;
-  inline xstring	Get_gmwb_nyia_itm_denominator_aig() {
-		return gmwb_nyia_itm_denominator_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmwb_option_aig;
-  inline xstring	Get_gmwb_option_aig() {
-		return gmwb_option_aig; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmwb_mrb_req_prof_chg;
+  inline double	Get_gmwb_mrb_req_prof_chg() {
+		return gmwb_mrb_req_prof_chg; }
 	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmwb_pfwd_dyn_defn;
   inline xstring	Get_gmwb_pfwd_dyn_defn() {
 		return gmwb_pfwd_dyn_defn; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmwb_pfwd_dyn_mult;
   inline double	Get_gmwb_pfwd_dyn_mult() {
 		return gmwb_pfwd_dyn_mult; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmwb_pipp_pct_aig;
-  inline double	Get_gmwb_pipp_pct_aig() {
-		return gmwb_pipp_pct_aig; }
-	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > gmwb_pipp_stepup_age_aig;
-  inline int	Get_gmwb_pipp_stepup_age_aig() {
-		return gmwb_pipp_stepup_age_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmwb_pipp_stepup_pct_aig;
-  inline double	Get_gmwb_pipp_stepup_pct_aig() {
-		return gmwb_pipp_stepup_pct_aig; }
-	Attribute::Proxy <double, DESCRIPTOR_TABLE > gmwb_pipp_stepup_period_aig;
-  inline double	Get_gmwb_pipp_stepup_period_aig() {
-		return gmwb_pipp_stepup_period_aig; }
-  inline void Set_gmwb_pipp_stepup_period_aig(const double &v) {
-		gmwb_pipp_stepup_period_aig.setValue(v); }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmwb_prem_credit_aig;
-  inline double	Get_gmwb_prem_credit_aig() {
-		return gmwb_prem_credit_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmwb_prem_credit_pct_defn_aig;
-  inline xstring	Get_gmwb_prem_credit_pct_defn_aig() {
-		return gmwb_prem_credit_pct_defn_aig; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmwb_pipp_crbg;
+  inline double	Get_gmwb_pipp_crbg() {
+		return gmwb_pipp_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmwb_pipp_stepup_crbg;
+  inline double	Get_gmwb_pipp_stepup_crbg() {
+		return gmwb_pipp_stepup_crbg; }
 	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmwb_prem_defn;
   inline xstring	Get_gmwb_prem_defn() {
 		return gmwb_prem_defn; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmwb_prem_rollup_credit_type_aig;
-  inline xstring	Get_gmwb_prem_rollup_credit_type_aig() {
-		return gmwb_prem_rollup_credit_type_aig; }
-	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > gmwb_prem_rollup_performance_based_aig;
-  inline int	Get_gmwb_prem_rollup_performance_based_aig() {
-		return gmwb_prem_rollup_performance_based_aig; }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmwb_reg47_crbg;
+  inline xstring	Get_gmwb_reg47_crbg() {
+		return gmwb_reg47_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmwb_reg47_slope_crbg;
+  inline double	Get_gmwb_reg47_slope_crbg() {
+		return gmwb_reg47_slope_crbg; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmwb_rollup_cap;
   inline double	Get_gmwb_rollup_cap() {
 		return gmwb_rollup_cap; }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmwb_rollup_credit_type_crbg;
+  inline xstring	Get_gmwb_rollup_credit_type_crbg() {
+		return gmwb_rollup_credit_type_crbg; }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmwb_rollup_freq_defn;
+  inline xstring	Get_gmwb_rollup_freq_defn() {
+		return gmwb_rollup_freq_defn; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmwb_rollup_rate;
   inline double	Get_gmwb_rollup_rate() {
 		return gmwb_rollup_rate; }
 	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmwb_rollup_rate_type;
   inline xstring	Get_gmwb_rollup_rate_type() {
 		return gmwb_rollup_rate_type; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmwb_rollup_rate_type_aig;
-  inline xstring	Get_gmwb_rollup_rate_type_aig() {
-		return gmwb_rollup_rate_type_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmwb_sfas133_req_prof_chg;
-  inline double	Get_gmwb_sfas133_req_prof_chg() {
-		return gmwb_sfas133_req_prof_chg; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmwb_step_up_rate;
   inline double	Get_gmwb_step_up_rate() {
 		return gmwb_step_up_rate; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmwb_type_aig;
-  inline xstring	Get_gmwb_type_aig() {
-		return gmwb_type_aig; }
+	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > gmwb_type_crbg;
+  inline xstring	Get_gmwb_type_crbg() {
+		return gmwb_type_crbg; }
+	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > gmwb_util_broker_type_crbg;
+  inline xstring	Get_gmwb_util_broker_type_crbg() {
+		return gmwb_util_broker_type_crbg; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmwb_wait_period;
   inline double	Get_gmwb_wait_period() {
 		return gmwb_wait_period; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmwb_wdl_fixed_utilization_rate_aig;
-  inline double	Get_gmwb_wdl_fixed_utilization_rate_aig() {
-		return gmwb_wdl_fixed_utilization_rate_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmwb_wdl_pct_tbl_style_aig;
-  inline xstring	Get_gmwb_wdl_pct_tbl_style_aig() {
-		return gmwb_wdl_pct_tbl_style_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmwb_wdl_random_utilization_rate_aig;
-  inline double	Get_gmwb_wdl_random_utilization_rate_aig() {
-		return gmwb_wdl_random_utilization_rate_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmwb_wdl_utilization_calc_defn_aig;
-  inline xstring	Get_gmwb_wdl_utilization_calc_defn_aig() {
-		return gmwb_wdl_utilization_calc_defn_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmwb_wdl_utilization_init_population_aig;
-  inline double	Get_gmwb_wdl_utilization_init_population_aig() {
-		return gmwb_wdl_utilization_init_population_aig; }
-	Attribute::Proxy <StringEnum, DESCRIPTOR_TABLE > gmwb_wdl_utilization_level_aig;
-  inline xstring	Get_gmwb_wdl_utilization_level_aig() {
-		return gmwb_wdl_utilization_level_aig; }
-  inline void Set_gmwb_wdl_utilization_level_aig(const xstring &v) {
-		gmwb_wdl_utilization_level_aig.setValue(v); }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmwb_wdl_utilization_primary_transition_prob_aig;
-  inline double	Get_gmwb_wdl_utilization_primary_transition_prob_aig() {
-		return gmwb_wdl_utilization_primary_transition_prob_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmwb_wdl_utilization_random_number_src_aig;
-  inline xstring	Get_gmwb_wdl_utilization_random_number_src_aig() {
-		return gmwb_wdl_utilization_random_number_src_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmwb_wdl_utilization_secondary_transition_prob_aig;
-  inline double	Get_gmwb_wdl_utilization_secondary_transition_prob_aig() {
-		return gmwb_wdl_utilization_secondary_transition_prob_aig; }
-	Attribute::Proxy <StringEnum, DESCRIPTOR_TABLE > gmwb_wdl_utilization_tgt_level_aig;
-  inline xstring	Get_gmwb_wdl_utilization_tgt_level_aig() {
-		return gmwb_wdl_utilization_tgt_level_aig; }
-  inline void Set_gmwb_wdl_utilization_tgt_level_aig(const xstring &v) {
-		gmwb_wdl_utilization_tgt_level_aig.setValue(v); }
-	static Attribute::Descriptor descriptor_256[];
-#ifdef MICROSOFT
-#pragma warning(push)
-#pragma warning(disable : 4005)
-// Disable the warning C4005: 'DESCRIPTOR_TABLE' : macro redefinition
-#endif	MICROSOFT
-	#define DESCRIPTOR_TABLE FIA_LIAB::descriptor_256
-#ifdef MICROSOFT
-#pragma warning(pop)
-#endif	MICROSOFT
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmwb_wdl_utilization_transition_matrix_threshold_aig;
-  inline double	Get_gmwb_wdl_utilization_transition_matrix_threshold_aig() {
-		return gmwb_wdl_utilization_transition_matrix_threshold_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmwb_wdl_utilization_transition_prob_tbl_aig;
-  inline xstring	Get_gmwb_wdl_utilization_transition_prob_tbl_aig() {
-		return gmwb_wdl_utilization_transition_prob_tbl_aig; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmwb_wdl_avg_util_pct_crbg;
+  inline double	Get_gmwb_wdl_avg_util_pct_crbg() {
+		return gmwb_wdl_avg_util_pct_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmwb_wdl_next_util_prob_1_crbg;
+  inline double	Get_gmwb_wdl_next_util_prob_1_crbg() {
+		return gmwb_wdl_next_util_prob_1_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmwb_wdl_next_util_prob_2_crbg;
+  inline double	Get_gmwb_wdl_next_util_prob_2_crbg() {
+		return gmwb_wdl_next_util_prob_2_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmwb_wdl_random_util_rate_crbg;
+  inline double	Get_gmwb_wdl_random_util_rate_crbg() {
+		return gmwb_wdl_random_util_rate_crbg; }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmwb_wdl_reduce_ben_base;
+  inline xstring	Get_gmwb_wdl_reduce_ben_base() {
+		return gmwb_wdl_reduce_ben_base; }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmwb_wdl_trig_by_confinement;
+  inline xstring	Get_gmwb_wdl_trig_by_confinement() {
+		return gmwb_wdl_trig_by_confinement; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmwb_wdl_util_init_crbg;
+  inline double	Get_gmwb_wdl_util_init_crbg() {
+		return gmwb_wdl_util_init_crbg; }
+	Attribute::Proxy <int, DESCRIPTOR_TABLE > gmwb_wdl_util_level_crbg;
+  inline int	Get_gmwb_wdl_util_level_crbg() {
+		return gmwb_wdl_util_level_crbg; }
+  inline void Set_gmwb_wdl_util_level_crbg(const int &v) {
+		gmwb_wdl_util_level_crbg.setValue(v); }
+	Attribute::Proxy <int, DESCRIPTOR_TABLE > gmwb_wdl_util_tgt_level_crbg;
+  inline int	Get_gmwb_wdl_util_tgt_level_crbg() {
+		return gmwb_wdl_util_tgt_level_crbg; }
+  inline void Set_gmwb_wdl_util_tgt_level_crbg(const int &v) {
+		gmwb_wdl_util_tgt_level_crbg.setValue(v); }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmwb_wdl_util_type_crbg;
+  inline xstring	Get_gmwb_wdl_util_type_crbg() {
+		return gmwb_wdl_util_type_crbg; }
 	Attribute::Proxy <int, DESCRIPTOR_TABLE > gmwb_withdrl_age;
   inline int	Get_gmwb_withdrl_age() {
 		return gmwb_withdrl_age; }
   inline void Set_gmwb_withdrl_age(const int &v) {
 		gmwb_withdrl_age.setValue(v); }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmwb_withdrl_rate_indexing_assessment_chg_addn_aig;
-  inline double	Get_gmwb_withdrl_rate_indexing_assessment_chg_addn_aig() {
-		return gmwb_withdrl_rate_indexing_assessment_chg_addn_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmwb_withdrl_rate_indexing_assessment_defn_aig;
-  inline xstring	Get_gmwb_withdrl_rate_indexing_assessment_defn_aig() {
-		return gmwb_withdrl_rate_indexing_assessment_defn_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmwb_withdrl_rate_indexing_assessment_ind_aig;
-  inline xstring	Get_gmwb_withdrl_rate_indexing_assessment_ind_aig() {
-		return gmwb_withdrl_rate_indexing_assessment_ind_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmwb_withdrl_rate_indexing_cap_rate_aig;
-  inline double	Get_gmwb_withdrl_rate_indexing_cap_rate_aig() {
-		return gmwb_withdrl_rate_indexing_cap_rate_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gmwb_withdrl_rate_indexing_defn_aig;
-  inline xstring	Get_gmwb_withdrl_rate_indexing_defn_aig() {
-		return gmwb_withdrl_rate_indexing_defn_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gmwb_withdrl_rate_indexing_part_rate_aig;
-  inline double	Get_gmwb_withdrl_rate_indexing_part_rate_aig() {
-		return gmwb_withdrl_rate_indexing_part_rate_aig; }
-	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > grop_ind_aig;
-  inline int	Get_grop_ind_aig() {
-		return grop_ind_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gsia_reins_defn_aig;
-  inline xstring	Get_gsia_reins_defn_aig() {
-		return gsia_reins_defn_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gwl_acq_exp_allow_level_aig;
-  inline double	Get_gwl_acq_exp_allow_level_aig() {
-		return gwl_acq_exp_allow_level_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gwl_ceding_exp_allow_level_aig;
-  inline double	Get_gwl_ceding_exp_allow_level_aig() {
-		return gwl_ceding_exp_allow_level_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gwl_infl_addn_aig;
-  inline double	Get_gwl_infl_addn_aig() {
-		return gwl_infl_addn_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gwl_infl_mult1_aig;
-  inline double	Get_gwl_infl_mult1_aig() {
-		return gwl_infl_mult1_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gwl_infl_mult2_aig;
-  inline double	Get_gwl_infl_mult2_aig() {
-		return gwl_infl_mult2_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gwl_maint_exp_allow_level_aig;
-  inline double	Get_gwl_maint_exp_allow_level_aig() {
-		return gwl_maint_exp_allow_level_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > hiloband_aig;
-  inline xstring	Get_hiloband_aig() {
-		return hiloband_aig; }
+	Attribute::Proxy <int, DESCRIPTOR_TABLE > gmwb_withdrl_yr_lookup;
+  inline int	Get_gmwb_withdrl_yr_lookup() {
+		return gmwb_withdrl_yr_lookup; }
+  inline void Set_gmwb_withdrl_yr_lookup(const int &v) {
+		gmwb_withdrl_yr_lookup.setValue(v); }
+	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > grop_ind_crbg;
+  inline int	Get_grop_ind_crbg() {
+		return grop_ind_crbg; }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gsia_reins_defn_crbg;
+  inline xstring	Get_gsia_reins_defn_crbg() {
+		return gsia_reins_defn_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gwl_acq_exp_allow_level_crbg;
+  inline double	Get_gwl_acq_exp_allow_level_crbg() {
+		return gwl_acq_exp_allow_level_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gwl_infl_addn_crbg;
+  inline double	Get_gwl_infl_addn_crbg() {
+		return gwl_infl_addn_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gwl_infl_mult1_crbg;
+  inline double	Get_gwl_infl_mult1_crbg() {
+		return gwl_infl_mult1_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gwl_infl_mult2_crbg;
+  inline double	Get_gwl_infl_mult2_crbg() {
+		return gwl_infl_mult2_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > gwl_maint_exp_allow_level_crbg;
+  inline double	Get_gwl_maint_exp_allow_level_crbg() {
+		return gwl_maint_exp_allow_level_crbg; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > host_accrual_rate;
   inline double	Get_host_accrual_rate() {
 		return host_accrual_rate; }
-	Attribute::Proxy <StringEnum, DESCRIPTOR_TABLE > income_phase_lookup_aig;
-  inline xstring	Get_income_phase_lookup_aig() {
-		return income_phase_lookup_aig; }
-  inline void Set_income_phase_lookup_aig(const xstring &v) {
-		income_phase_lookup_aig.setValue(v); }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > independent_mp_defn;
-  inline xstring	Get_independent_mp_defn() {
-		return independent_mp_defn; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > infl_deduction_aig;
-  inline double	Get_infl_deduction_aig() {
-		return infl_deduction_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > infl_mult_aig;
-  inline double	Get_infl_mult_aig() {
-		return infl_mult_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > infl_rate_const_aig;
-  inline double	Get_infl_rate_const_aig() {
-		return infl_rate_const_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > infl_rate_defn_aig;
-  inline xstring	Get_infl_rate_defn_aig() {
-		return infl_rate_defn_aig; }
-	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > infl_rate_table_aig;
-  inline xstring	Get_infl_rate_table_aig() {
-		return infl_rate_table_aig; }
-	Attribute::Proxy <xstring, DESCRIPTOR_TABLE > infl_start_date;
+	Attribute::Proxy <xstring, DESCRIPTOR_TABLE > index_id_lookup;
+  inline xstring	Get_index_id_lookup() {
+		return index_id_lookup; }
+  inline void Set_index_id_lookup(const xstring &v) {
+		index_id_lookup.setValue(v); }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > index_val_beg_term;
+  inline double	Get_index_val_beg_term() {
+		return index_val_beg_term; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > infl_deduction_crbg;
+  inline double	Get_infl_deduction_crbg() {
+		return infl_deduction_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > infl_mult_crbg;
+  inline double	Get_infl_mult_crbg() {
+		return infl_mult_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > infl_rate_const_crbg;
+  inline double	Get_infl_rate_const_crbg() {
+		return infl_rate_const_crbg; }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > infl_rate_defn_crbg;
+  inline xstring	Get_infl_rate_defn_crbg() {
+		return infl_rate_defn_crbg; }
+	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > infl_start_date;
   inline xstring	Get_infl_start_date() {
 		return infl_start_date; }
-  inline void Set_infl_start_date(const xstring &v) {
-		infl_start_date.setValue(v); }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > infl_start_date_defn_aig;
-  inline xstring	Get_infl_start_date_defn_aig() {
-		return infl_start_date_defn_aig; }
-	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > infl_start_date_input_aig;
-  inline xstring	Get_infl_start_date_input_aig() {
-		return infl_start_date_input_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > infl_treasury_yr_aig;
-  inline double	Get_infl_treasury_yr_aig() {
-		return infl_treasury_yr_aig; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_cap_rate_index0;
   inline double	Get_init_cap_rate_index0() {
 		return init_cap_rate_index0; }
@@ -2188,15 +1612,27 @@ public :
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_cap_rate_index4;
   inline double	Get_init_cap_rate_index4() {
 		return init_cap_rate_index4; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_cash_val;
+  inline double	Get_init_cash_val() {
+		return init_cash_val; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_cash_val_no_mva;
+  inline double	Get_init_cash_val_no_mva() {
+		return init_cash_val_no_mva; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_comm_subject_to_chargeback;
   inline double	Get_init_comm_subject_to_chargeback() {
 		return init_comm_subject_to_chargeback; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_contract_val;
   inline double	Get_init_contract_val() {
 		return init_contract_val; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_crediting_rate_fixed_aig;
-  inline double	Get_init_crediting_rate_fixed_aig() {
-		return init_crediting_rate_fixed_aig; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_crediting_rate_cumul;
+  inline double	Get_init_crediting_rate_cumul() {
+		return init_crediting_rate_cumul; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_eprs_part_rate;
+  inline double	Get_init_eprs_part_rate() {
+		return init_eprs_part_rate; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_fund_val_boy;
+  inline double	Get_init_fund_val_boy() {
+		return init_fund_val_boy; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_fund_val_fixed;
   inline double	Get_init_fund_val_fixed() {
 		return init_fund_val_fixed; }
@@ -2218,21 +1654,54 @@ public :
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_gmab_av;
   inline double	Get_init_gmab_av() {
 		return init_gmab_av; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_gmwb_entitlement_remaining;
+  inline double	Get_init_gmwb_entitlement_remaining() {
+		return init_gmwb_entitlement_remaining; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_gmwb_fund_val;
   inline double	Get_init_gmwb_fund_val() {
 		return init_gmwb_fund_val; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_gmwb_income_credit_base;
+  inline double	Get_init_gmwb_income_credit_base() {
+		return init_gmwb_income_credit_base; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_gmwb_max_ann_wdl_pct;
+  inline double	Get_init_gmwb_max_ann_wdl_pct() {
+		return init_gmwb_max_ann_wdl_pct; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_gmwb_max_wdl_amt;
   inline double	Get_init_gmwb_max_wdl_amt() {
 		return init_gmwb_max_wdl_amt; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_gmwb_prem;
   inline double	Get_init_gmwb_prem() {
 		return init_gmwb_prem; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_gmwb_wdl_excess_ind;
+  inline double	Get_init_gmwb_wdl_excess_ind() {
+		return init_gmwb_wdl_excess_ind; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_gmwb_wdl_util_level;
+  inline double	Get_init_gmwb_wdl_util_level() {
+		return init_gmwb_wdl_util_level; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_gmwb_wdl_util_pct;
+  inline double	Get_init_gmwb_wdl_util_pct() {
+		return init_gmwb_wdl_util_pct; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_hedge_budget;
   inline double	Get_init_hedge_budget() {
 		return init_hedge_budget; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_hedge_mkt_val_per_unit;
+  inline double	Get_init_hedge_mkt_val_per_unit() {
+		return init_hedge_mkt_val_per_unit; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_host_val;
   inline double	Get_init_host_val() {
 		return init_host_val; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_index_val;
+  inline double	Get_init_index_val() {
+		return init_index_val; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_min_accum_val;
+  inline double	Get_init_min_accum_val() {
+		return init_min_accum_val; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_min_wdl_val;
+  inline double	Get_init_min_wdl_val() {
+		return init_min_wdl_val; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_opt_cost_beg_term;
+  inline double	Get_init_opt_cost_beg_term() {
+		return init_opt_cost_beg_term; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_part_rate_index0;
   inline double	Get_init_part_rate_index0() {
 		return init_part_rate_index0; }
@@ -2257,18 +1726,37 @@ public :
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_policies;
   inline double	Get_init_policies() {
 		return init_policies; }
-	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > init_policies_female_aig;
-  inline int	Get_init_policies_female_aig() {
-		return init_policies_female_aig; }
-	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > init_policies_joint_aig;
-  inline int	Get_init_policies_joint_aig() {
-		return init_policies_joint_aig; }
-	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > init_policies_male_aig;
-  inline int	Get_init_policies_male_aig() {
-		return init_policies_male_aig; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_policies_female_crbg;
+  inline double	Get_init_policies_female_crbg() {
+		return init_policies_female_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_policies_joint_crbg;
+  inline double	Get_init_policies_joint_crbg() {
+		return init_policies_joint_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_policies_male_crbg;
+  inline double	Get_init_policies_male_crbg() {
+		return init_policies_male_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_prem_bonus_base;
+  inline double	Get_init_prem_bonus_base() {
+		return init_prem_bonus_base; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_prem_net_wdl;
+  inline double	Get_init_prem_net_wdl() {
+		return init_prem_net_wdl; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_prem_prop_wdl;
+  inline double	Get_init_prem_prop_wdl() {
+		return init_prem_prop_wdl; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_rebal_pct_fixed;
   inline double	Get_init_rebal_pct_fixed() {
 		return init_rebal_pct_fixed; }
+	static Attribute::Descriptor descriptor_256[];
+#ifdef MICROSOFT
+#pragma warning(push)
+#pragma warning(disable : 4005)
+// Disable the warning C4005: 'DESCRIPTOR_TABLE' : macro redefinition
+#endif	MICROSOFT
+	#define DESCRIPTOR_TABLE FIA_LIAB::descriptor_256
+#ifdef MICROSOFT
+#pragma warning(pop)
+#endif	MICROSOFT
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_rebal_pct_index0;
   inline double	Get_init_rebal_pct_index0() {
 		return init_rebal_pct_index0; }
@@ -2284,69 +1772,42 @@ public :
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_rebal_pct_index4;
   inline double	Get_init_rebal_pct_index4() {
 		return init_rebal_pct_index4; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_spread_rate_index0_aig;
-  inline double	Get_init_spread_rate_index0_aig() {
-		return init_spread_rate_index0_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_spread_rate_index1_aig;
-  inline double	Get_init_spread_rate_index1_aig() {
-		return init_spread_rate_index1_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_spread_rate_index2_aig;
-  inline double	Get_init_spread_rate_index2_aig() {
-		return init_spread_rate_index2_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_spread_rate_index3_aig;
-  inline double	Get_init_spread_rate_index3_aig() {
-		return init_spread_rate_index3_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_spread_rate_index4_aig;
-  inline double	Get_init_spread_rate_index4_aig() {
-		return init_spread_rate_index4_aig; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_sprd_rate_index0;
+  inline double	Get_init_sprd_rate_index0() {
+		return init_sprd_rate_index0; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_stat_res_carvm;
   inline double	Get_init_stat_res_carvm() {
 		return init_stat_res_carvm; }
-	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > init_strategy_term_aig;
-  inline int	Get_init_strategy_term_aig() {
-		return init_strategy_term_aig; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_tax_res_carvm;
   inline double	Get_init_tax_res_carvm() {
 		return init_tax_res_carvm; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_trigger_rate_index0_aig;
-  inline double	Get_init_trigger_rate_index0_aig() {
-		return init_trigger_rate_index0_aig; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_trigger_rate_index0;
+  inline double	Get_init_trigger_rate_index0() {
+		return init_trigger_rate_index0; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_withdrl_cumul;
   inline double	Get_init_withdrl_cumul() {
 		return init_withdrl_cumul; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > inner_fund_val_bef_boy;
-  inline double	Get_inner_fund_val_bef_boy() {
-		return inner_fund_val_bef_boy; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > inner_fund_val_boy;
-  inline double	Get_inner_fund_val_boy() {
-		return inner_fund_val_boy; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > isl_2019_alpha_aig;
-  inline double	Get_isl_2019_alpha_aig() {
-		return isl_2019_alpha_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > isl_2019_beta_aig;
-  inline double	Get_isl_2019_beta_aig() {
-		return isl_2019_beta_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > isl_2019_coefficient_aig;
-  inline double	Get_isl_2019_coefficient_aig() {
-		return isl_2019_coefficient_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > isl_2019_divisor_aig;
-  inline double	Get_isl_2019_divisor_aig() {
-		return isl_2019_divisor_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > isl_2019_lapse_dyn_rate_defn_aig;
-  inline xstring	Get_isl_2019_lapse_dyn_rate_defn_aig() {
-		return isl_2019_lapse_dyn_rate_defn_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > isl_2019_lapse_dyn_rate_defn_at_issue_aig;
-  inline xstring	Get_isl_2019_lapse_dyn_rate_defn_at_issue_aig() {
-		return isl_2019_lapse_dyn_rate_defn_at_issue_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > isl_2019_surr_chg_pct_threshold_aig;
-  inline double	Get_isl_2019_surr_chg_pct_threshold_aig() {
-		return isl_2019_surr_chg_pct_threshold_aig; }
-	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > issue_age_female_aig;
-  inline int	Get_issue_age_female_aig() {
-		return issue_age_female_aig; }
-	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > issue_age_male_aig;
-  inline int	Get_issue_age_male_aig() {
-		return issue_age_male_aig; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > isl_alpha_crbg;
+  inline double	Get_isl_alpha_crbg() {
+		return isl_alpha_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > isl_beta_crbg;
+  inline double	Get_isl_beta_crbg() {
+		return isl_beta_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > isl_coefficient_crbg;
+  inline double	Get_isl_coefficient_crbg() {
+		return isl_coefficient_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > isl_divisor_crbg;
+  inline double	Get_isl_divisor_crbg() {
+		return isl_divisor_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > isl_surr_chg_threshold;
+  inline double	Get_isl_surr_chg_threshold() {
+		return isl_surr_chg_threshold; }
+	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > issue_age_female_crbg;
+  inline int	Get_issue_age_female_crbg() {
+		return issue_age_female_crbg; }
+	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > issue_age_male_crbg;
+  inline int	Get_issue_age_male_crbg() {
+		return issue_age_male_crbg; }
 	Attribute::Proxy <int, DESCRIPTOR_TABLE > issue_age_mp;
   inline int	Get_issue_age_mp() {
 		return issue_age_mp; }
@@ -2358,107 +1819,66 @@ public :
 	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > itm_defn;
   inline xstring	Get_itm_defn() {
 		return itm_defn; }
-	Attribute::Proxy <StringEnum, DESCRIPTOR_TABLE > itmness_lookup_aig;
-  inline xstring	Get_itmness_lookup_aig() {
-		return itmness_lookup_aig; }
-  inline void Set_itmness_lookup_aig(const xstring &v) {
-		itmness_lookup_aig.setValue(v); }
-	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > lad_type_aig;
-  inline xstring	Get_lad_type_aig() {
-		return lad_type_aig; }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > itm_denom_defn_crbg;
+  inline xstring	Get_itm_denom_defn_crbg() {
+		return itm_denom_defn_crbg; }
+	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > itm_disc_curve_crbg;
+  inline xstring	Get_itm_disc_curve_crbg() {
+		return itm_disc_curve_crbg; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_adj_mult;
   inline double	Get_lapse_adj_mult() {
 		return lapse_adj_mult; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > lapse_dyn_addl_preshock_sprd_crbg;
-  inline xstring	Get_lapse_dyn_addl_preshock_sprd_crbg() {
-		return lapse_dyn_addl_preshock_sprd_crbg; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_dyn_arctan_2019_aft_mib_rollup_shock_mult_aig;
-  inline double	Get_lapse_dyn_arctan_2019_aft_mib_rollup_shock_mult_aig() {
-		return lapse_dyn_arctan_2019_aft_mib_rollup_shock_mult_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_dyn_arctan_2019_income_phase_mult_aig;
-  inline double	Get_lapse_dyn_arctan_2019_income_phase_mult_aig() {
-		return lapse_dyn_arctan_2019_income_phase_mult_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_dyn_arctan_2019_mib_rollup_shock_mult_aig;
-  inline double	Get_lapse_dyn_arctan_2019_mib_rollup_shock_mult_aig() {
-		return lapse_dyn_arctan_2019_mib_rollup_shock_mult_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_dyn_arctan_2019_param_01_aig;
-  inline double	Get_lapse_dyn_arctan_2019_param_01_aig() {
-		return lapse_dyn_arctan_2019_param_01_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_dyn_arctan_2019_param_02_aig;
-  inline double	Get_lapse_dyn_arctan_2019_param_02_aig() {
-		return lapse_dyn_arctan_2019_param_02_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_dyn_arctan_param_01_aig;
-  inline double	Get_lapse_dyn_arctan_param_01_aig() {
-		return lapse_dyn_arctan_param_01_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_dyn_arctan_param_02_aig;
-  inline double	Get_lapse_dyn_arctan_param_02_aig() {
-		return lapse_dyn_arctan_param_02_aig; }
-	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > lapse_dyn_arctan_param_defn_aig;
-  inline xstring	Get_lapse_dyn_arctan_param_defn_aig() {
-		return lapse_dyn_arctan_param_defn_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > lapse_dyn_base_prod_defn_aig;
-  inline xstring	Get_lapse_dyn_base_prod_defn_aig() {
-		return lapse_dyn_base_prod_defn_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_dyn_base_prod_mult_floor_aig;
-  inline double	Get_lapse_dyn_base_prod_mult_floor_aig() {
-		return lapse_dyn_base_prod_mult_floor_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_dyn_base_prod_tgt_pri_sprd_reduction_aig;
-  inline double	Get_lapse_dyn_base_prod_tgt_pri_sprd_reduction_aig() {
-		return lapse_dyn_base_prod_tgt_pri_sprd_reduction_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_dyn_base_prod_threshold_aig;
-  inline double	Get_lapse_dyn_base_prod_threshold_aig() {
-		return lapse_dyn_base_prod_threshold_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > lapse_dyn_beta_defn_aig;
-  inline xstring	Get_lapse_dyn_beta_defn_aig() {
-		return lapse_dyn_beta_defn_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > lapse_dyn_defn_aig;
-  inline xstring	Get_lapse_dyn_defn_aig() {
-		return lapse_dyn_defn_aig; }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > lapse_dyn_base_prod_defn_crbg;
+  inline xstring	Get_lapse_dyn_base_prod_defn_crbg() {
+		return lapse_dyn_base_prod_defn_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_dyn_base_prod_max_crbg;
+  inline double	Get_lapse_dyn_base_prod_max_crbg() {
+		return lapse_dyn_base_prod_max_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_dyn_base_prod_min_crbg;
+  inline double	Get_lapse_dyn_base_prod_min_crbg() {
+		return lapse_dyn_base_prod_min_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_dyn_base_prod_mult1_crbg;
+  inline double	Get_lapse_dyn_base_prod_mult1_crbg() {
+		return lapse_dyn_base_prod_mult1_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_dyn_base_prod_mult2_crbg;
+  inline double	Get_lapse_dyn_base_prod_mult2_crbg() {
+		return lapse_dyn_base_prod_mult2_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_dyn_base_prod_threshold_crbg;
+  inline double	Get_lapse_dyn_base_prod_threshold_crbg() {
+		return lapse_dyn_base_prod_threshold_crbg; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_dyn_exp;
   inline double	Get_lapse_dyn_exp() {
 		return lapse_dyn_exp; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_dyn_exp_param_aig;
-  inline double	Get_lapse_dyn_exp_param_aig() {
-		return lapse_dyn_exp_param_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > lapse_dyn_isl_method_aig;
-  inline xstring	Get_lapse_dyn_isl_method_aig() {
-		return lapse_dyn_isl_method_aig; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_dyn_exp_param_crbg;
+  inline double	Get_lapse_dyn_exp_param_crbg() {
+		return lapse_dyn_exp_param_crbg; }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > lapse_dyn_isl_defn_crbg;
+  inline xstring	Get_lapse_dyn_isl_defn_crbg() {
+		return lapse_dyn_isl_defn_crbg; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_dyn_mult;
   inline double	Get_lapse_dyn_mult() {
 		return lapse_dyn_mult; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_dyn_mult_floor_aig;
-  inline double	Get_lapse_dyn_mult_floor_aig() {
-		return lapse_dyn_mult_floor_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_dyn_mva_mult_aig;
-  inline double	Get_lapse_dyn_mva_mult_aig() {
-		return lapse_dyn_mva_mult_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > lapse_dyn_print_debug_output_defn_aig;
-  inline xstring	Get_lapse_dyn_print_debug_output_defn_aig() {
-		return lapse_dyn_print_debug_output_defn_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > lapse_dyn_rate_defn_aig;
-  inline xstring	Get_lapse_dyn_rate_defn_aig() {
-		return lapse_dyn_rate_defn_aig; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_dyn_mult_floor_crbg;
+  inline double	Get_lapse_dyn_mult_floor_crbg() {
+		return lapse_dyn_mult_floor_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_dyn_mva_mult_crbg;
+  inline double	Get_lapse_dyn_mva_mult_crbg() {
+		return lapse_dyn_mva_mult_crbg; }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > lapse_dyn_preshock_sprd_crbg;
+  inline xstring	Get_lapse_dyn_preshock_sprd_crbg() {
+		return lapse_dyn_preshock_sprd_crbg; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_dyn_scmult;
   inline double	Get_lapse_dyn_scmult() {
 		return lapse_dyn_scmult; }
 	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > lapse_dyn_shock_yr_defn_crbg;
   inline xstring	Get_lapse_dyn_shock_yr_defn_crbg() {
 		return lapse_dyn_shock_yr_defn_crbg; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > lapse_dyn_surr_chg_period_defn_aig;
-  inline xstring	Get_lapse_dyn_surr_chg_period_defn_aig() {
-		return lapse_dyn_surr_chg_period_defn_aig; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_dyn_thresh;
   inline double	Get_lapse_dyn_thresh() {
 		return lapse_dyn_thresh; }
 	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > lapse_is_dynamic;
   inline xstring	Get_lapse_is_dynamic() {
 		return lapse_is_dynamic; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_rate_base_prod_max_aig;
-  inline double	Get_lapse_rate_base_prod_max_aig() {
-		return lapse_rate_base_prod_max_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_rate_base_prod_min_aig;
-  inline double	Get_lapse_rate_base_prod_min_aig() {
-		return lapse_rate_base_prod_min_aig; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_rate_input;
   inline double	Get_lapse_rate_input() {
 		return lapse_rate_input; }
@@ -2468,137 +1888,48 @@ public :
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_rate_min;
   inline double	Get_lapse_rate_min() {
 		return lapse_rate_min; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_rate_shock_yr_max;
-  inline double	Get_lapse_rate_shock_yr_max() {
-		return lapse_rate_shock_yr_max; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_rate_shock_yr_min;
-  inline double	Get_lapse_rate_shock_yr_min() {
-		return lapse_rate_shock_yr_min; }
-	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > lapse_rate_table_aig;
-  inline xstring	Get_lapse_rate_table_aig() {
-		return lapse_rate_table_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_sens_test_deep_itm_mult_aig;
-  inline double	Get_lapse_sens_test_deep_itm_mult_aig() {
-		return lapse_sens_test_deep_itm_mult_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_sens_test_deep_itm_threshold_aig;
-  inline double	Get_lapse_sens_test_deep_itm_threshold_aig() {
-		return lapse_sens_test_deep_itm_threshold_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_sens_test_deep_otm_mult_aig;
-  inline double	Get_lapse_sens_test_deep_otm_mult_aig() {
-		return lapse_sens_test_deep_otm_mult_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_sens_test_deep_otm_threshold_aig;
-  inline double	Get_lapse_sens_test_deep_otm_threshold_aig() {
-		return lapse_sens_test_deep_otm_threshold_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_sens_test_dyn_lapse_add_mult_aig;
-  inline double	Get_lapse_sens_test_dyn_lapse_add_mult_aig() {
-		return lapse_sens_test_dyn_lapse_add_mult_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_sens_test_itm_add_aig;
-  inline double	Get_lapse_sens_test_itm_add_aig() {
-		return lapse_sens_test_itm_add_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_sens_test_itm_mult_aig;
-  inline double	Get_lapse_sens_test_itm_mult_aig() {
-		return lapse_sens_test_itm_mult_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_sens_test_itm_threshold_aig;
-  inline double	Get_lapse_sens_test_itm_threshold_aig() {
-		return lapse_sens_test_itm_threshold_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_sens_test_otm_add_aig;
-  inline double	Get_lapse_sens_test_otm_add_aig() {
-		return lapse_sens_test_otm_add_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_sens_test_otm_mult_aig;
-  inline double	Get_lapse_sens_test_otm_mult_aig() {
-		return lapse_sens_test_otm_mult_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_sens_test_otm_threshold_aig;
-  inline double	Get_lapse_sens_test_otm_threshold_aig() {
-		return lapse_sens_test_otm_threshold_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_skew_fct1_aig;
-  inline double	Get_lapse_skew_fct1_aig() {
-		return lapse_skew_fct1_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_skew_fct2_aig;
-  inline double	Get_lapse_skew_fct2_aig() {
-		return lapse_skew_fct2_aig; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_shock_yr_max_crbg;
+  inline double	Get_lapse_shock_yr_max_crbg() {
+		return lapse_shock_yr_max_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_shock_yr_min_crbg;
+  inline double	Get_lapse_shock_yr_min_crbg() {
+		return lapse_shock_yr_min_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_skew_fct1_crbg;
+  inline double	Get_lapse_skew_fct1_crbg() {
+		return lapse_skew_fct1_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_skew_fct2_crbg;
+  inline double	Get_lapse_skew_fct2_crbg() {
+		return lapse_skew_fct2_crbg; }
 	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > lapse_skew_method_crbg;
   inline xstring	Get_lapse_skew_method_crbg() {
 		return lapse_skew_method_crbg; }
-	Attribute::Proxy <int, DESCRIPTOR_TABLE > lapse_skew_pol_mth;
-  inline int	Get_lapse_skew_pol_mth() {
-		return lapse_skew_pol_mth; }
-  inline void Set_lapse_skew_pol_mth(const int &v) {
-		lapse_skew_pol_mth.setValue(v); }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_skew_split;
-  inline double	Get_lapse_skew_split() {
-		return lapse_skew_split; }
-	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > licensing_fee_table_aig;
-  inline xstring	Get_licensing_fee_table_aig() {
-		return licensing_fee_table_aig; }
-	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > liquidity_spread_set_aig;
-  inline xstring	Get_liquidity_spread_set_aig() {
-		return liquidity_spread_set_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > maint_exp_allow_level_aig;
-  inline double	Get_maint_exp_allow_level_aig() {
-		return maint_exp_allow_level_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > maint_exp_fund_value_type;
-  inline xstring	Get_maint_exp_fund_value_type() {
-		return maint_exp_fund_value_type; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > lapse_skew_split_crbg;
+  inline double	Get_lapse_skew_split_crbg() {
+		return lapse_skew_split_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > licensing_fee_pct_crbg;
+  inline double	Get_licensing_fee_pct_crbg() {
+		return licensing_fee_pct_crbg; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > maint_exp_pct_fund;
   inline double	Get_maint_exp_pct_fund() {
 		return maint_exp_pct_fund; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > maint_exp_pct_fund_2_aig;
-  inline double	Get_maint_exp_pct_fund_2_aig() {
-		return maint_exp_pct_fund_2_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > maint_exp_pct_fund_aig;
-  inline double	Get_maint_exp_pct_fund_aig() {
-		return maint_exp_pct_fund_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > maint_exp_pct_strategy_value_aig;
-  inline double	Get_maint_exp_pct_strategy_value_aig() {
-		return maint_exp_pct_strategy_value_aig; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > maint_exp_per_pol;
   inline double	Get_maint_exp_per_pol() {
 		return maint_exp_per_pol; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > maint_exp_per_pol_payout;
-  inline double	Get_maint_exp_per_pol_payout() {
-		return maint_exp_per_pol_payout; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > make_whole_settlement_adj_coef_greater_aig;
-  inline double	Get_make_whole_settlement_adj_coef_greater_aig() {
-		return make_whole_settlement_adj_coef_greater_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > make_whole_settlement_adj_coef_lower_aig;
-  inline double	Get_make_whole_settlement_adj_coef_lower_aig() {
-		return make_whole_settlement_adj_coef_lower_aig; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > male_sex_pct;
   inline double	Get_male_sex_pct() {
 		return male_sex_pct; }
 	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > maturity_age_input;
   inline int	Get_maturity_age_input() {
 		return maturity_age_input; }
-	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > maturity_benefits_min_yrs_aig;
-  inline int	Get_maturity_benefits_min_yrs_aig() {
-		return maturity_benefits_min_yrs_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > max_downward_deviation_aig;
-  inline double	Get_max_downward_deviation_aig() {
-		return max_downward_deviation_aig; }
-	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > min_accum_val_activation_period_yrs_ny_aig;
-  inline int	Get_min_accum_val_activation_period_yrs_ny_aig() {
-		return min_accum_val_activation_period_yrs_ny_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > min_accum_val_annualized_growth_rate_ny_aig;
-  inline double	Get_min_accum_val_annualized_growth_rate_ny_aig() {
-		return min_accum_val_annualized_growth_rate_ny_aig; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > mav_growth_rate_crbg;
+  inline double	Get_mav_growth_rate_crbg() {
+		return mav_growth_rate_crbg; }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > mawp_lookup_type_crbg;
+  inline xstring	Get_mawp_lookup_type_crbg() {
+		return mawp_lookup_type_crbg; }
 	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > min_cash_val_mths;
   inline int	Get_min_cash_val_mths() {
 		return min_cash_val_mths; }
-	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > min_rate_set_aig;
-  inline xstring	Get_min_rate_set_aig() {
-		return min_rate_set_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > min_wdl_val_growth_pct_aig;
-  inline double	Get_min_wdl_val_growth_pct_aig() {
-		return min_wdl_val_growth_pct_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > min_wdl_val_method_aig;
-  inline xstring	Get_min_wdl_val_method_aig() {
-		return min_wdl_val_method_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > min_wdl_val_prem_pct_aig;
-  inline double	Get_min_wdl_val_prem_pct_aig() {
-		return min_wdl_val_prem_pct_aig; }
-	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > model_version_set_aig;
-  inline xstring	Get_model_version_set_aig() {
-		return model_version_set_aig; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > mort_addn;
   inline double	Get_mort_addn() {
 		return mort_addn; }
@@ -2613,62 +1944,60 @@ public :
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > mort_base;
   inline double	Get_mort_base() {
 		return mort_base; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > mort_base_curr;
-  inline double	Get_mort_base_curr() {
-		return mort_base_curr; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > mort_base_confined_crbg;
+  inline double	Get_mort_base_confined_crbg() {
+		return mort_base_confined_crbg; }
 	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > mort_base_curr_tbl_id;
   inline xstring	Get_mort_base_curr_tbl_id() {
 		return mort_base_curr_tbl_id; }
 	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > mort_base_curr_tbl_style;
   inline xstring	Get_mort_base_curr_tbl_style() {
 		return mort_base_curr_tbl_style; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > mort_base_guar;
-  inline double	Get_mort_base_guar() {
-		return mort_base_guar; }
 	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > mort_base_guar_tbl_id;
   inline xstring	Get_mort_base_guar_tbl_id() {
 		return mort_base_guar_tbl_id; }
 	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > mort_base_guar_tbl_style;
   inline xstring	Get_mort_base_guar_tbl_style() {
 		return mort_base_guar_tbl_style; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > mort_base_non_confined_crbg;
+  inline double	Get_mort_base_non_confined_crbg() {
+		return mort_base_non_confined_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > mort_base_omega;
+  inline double	Get_mort_base_omega() {
+		return mort_base_omega; }
 	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > mort_base_tbl_id;
   inline xstring	Get_mort_base_tbl_id() {
 		return mort_base_tbl_id; }
 	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > mort_base_tbl_style;
   inline xstring	Get_mort_base_tbl_style() {
 		return mort_base_tbl_style; }
+	Attribute::Proxy <int, DESCRIPTOR_TABLE > mort_cal_yr;
+  inline int	Get_mort_cal_yr() {
+		return mort_cal_yr; }
+  inline void Set_mort_cal_yr(const int &v) {
+		mort_cal_yr.setValue(v); }
 	Attribute::Proxy <StringEnum, DESCRIPTOR_TABLE > mort_calc_basis;
   inline xstring	Get_mort_calc_basis() {
 		return mort_calc_basis; }
   inline void Set_mort_calc_basis(const xstring &v) {
 		mort_calc_basis.setValue(v); }
-	Attribute::Proxy <StringEnum, DESCRIPTOR_TABLE > mort_calc_basis_joint_aig;
-  inline xstring	Get_mort_calc_basis_joint_aig() {
-		return mort_calc_basis_joint_aig; }
-  inline void Set_mort_calc_basis_joint_aig(const xstring &v) {
-		mort_calc_basis_joint_aig.setValue(v); }
-	Attribute::Proxy <int, DESCRIPTOR_TABLE > mort_date;
-  inline int	Get_mort_date() {
-		return mort_date; }
-  inline void Set_mort_date(const int &v) {
-		mort_date.setValue(v); }
 	Attribute::Proxy <StringEnum, DESCRIPTOR_TABLE > mort_gender;
   inline xstring	Get_mort_gender() {
 		return mort_gender; }
   inline void Set_mort_gender(const xstring &v) {
 		mort_gender.setValue(v); }
-	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > mort_improve_base_date_aig;
-  inline xstring	Get_mort_improve_base_date_aig() {
-		return mort_improve_base_date_aig; }
+	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > mort_impr_base_date_crbg;
+  inline xstring	Get_mort_impr_base_date_crbg() {
+		return mort_impr_base_date_crbg; }
+	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > mort_impr_tbl_id;
+  inline xstring	Get_mort_impr_tbl_id() {
+		return mort_impr_tbl_id; }
 	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > mort_improve_base_yr;
   inline int	Get_mort_improve_base_yr() {
 		return mort_improve_base_yr; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > mort_improve_pct;
   inline double	Get_mort_improve_pct() {
 		return mort_improve_pct; }
-	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > mort_improve_tbl_id_aig;
-  inline xstring	Get_mort_improve_tbl_id_aig() {
-		return mort_improve_tbl_id_aig; }
 	Attribute::Proxy <int, DESCRIPTOR_TABLE > mort_issue_age;
   inline int	Get_mort_issue_age() {
 		return mort_issue_age; }
@@ -2677,12 +2006,9 @@ public :
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > mort_mult;
   inline double	Get_mort_mult() {
 		return mort_mult; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > mort_mult_curr;
-  inline double	Get_mort_mult_curr() {
-		return mort_mult_curr; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > mort_mult_guar;
-  inline double	Get_mort_mult_guar() {
-		return mort_mult_guar; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > mort_mult_confined_crbg;
+  inline double	Get_mort_mult_confined_crbg() {
+		return mort_mult_confined_crbg; }
 	Attribute::Proxy <int, DESCRIPTOR_TABLE > mort_pol_yr;
   inline int	Get_mort_pol_yr() {
 		return mort_pol_yr; }
@@ -2691,155 +2017,194 @@ public :
 	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > mp_id;
   inline xstring	Get_mp_id() {
 		return mp_id; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > mva_cap_change_2025_crbg;
-  inline xstring	Get_mva_cap_change_2025_crbg() {
-		return mva_cap_change_2025_crbg; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > mva_defn_aig;
-  inline xstring	Get_mva_defn_aig() {
-		return mva_defn_aig; }
-	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > mva_period_aig;
-  inline int	Get_mva_period_aig() {
-		return mva_period_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > mva_period_renewal_aig;
-  inline double	Get_mva_period_renewal_aig() {
-		return mva_period_renewal_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > myga_init_term;
-  inline double	Get_myga_init_term() {
-		return myga_init_term; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > myga_renew_term;
-  inline double	Get_myga_renew_term() {
-		return myga_renew_term; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > myga_renewable_ind;
-  inline xstring	Get_myga_renewable_ind() {
-		return myga_renewable_ind; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > new_money_rate_sprd;
-  inline double	Get_new_money_rate_sprd() {
-		return new_money_rate_sprd; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > no_wdl_cohort_lapse_is_dynamic_aig;
-  inline xstring	Get_no_wdl_cohort_lapse_is_dynamic_aig() {
-		return no_wdl_cohort_lapse_is_dynamic_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > non_gmwb_qualified_cal_fct1_aig;
-  inline double	Get_non_gmwb_qualified_cal_fct1_aig() {
-		return non_gmwb_qualified_cal_fct1_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > non_gmwb_qualified_cal_fct2_aig;
-  inline double	Get_non_gmwb_qualified_cal_fct2_aig() {
-		return non_gmwb_qualified_cal_fct2_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > non_gmwb_qualified_pct_aig;
-  inline double	Get_non_gmwb_qualified_pct_aig() {
-		return non_gmwb_qualified_pct_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > opt_bgt_gr_sc_yrs_offset_aig;
-  inline double	Get_opt_bgt_gr_sc_yrs_offset_aig() {
-		return opt_bgt_gr_sc_yrs_offset_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > opt_bgt_gr_sc_yrs_offset_idx1_aig;
-  inline double	Get_opt_bgt_gr_sc_yrs_offset_idx1_aig() {
-		return opt_bgt_gr_sc_yrs_offset_idx1_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > opt_budget_annuity_factor_disc_aig;
-  inline xstring	Get_opt_budget_annuity_factor_disc_aig() {
-		return opt_budget_annuity_factor_disc_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > opt_budget_defn_aig;
-  inline xstring	Get_opt_budget_defn_aig() {
-		return opt_budget_defn_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > opt_budget_tgt_alpha_aig;
-  inline double	Get_opt_budget_tgt_alpha_aig() {
-		return opt_budget_tgt_alpha_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > opt_budget_tgt_alpha_idx1_aig;
-  inline double	Get_opt_budget_tgt_alpha_idx1_aig() {
-		return opt_budget_tgt_alpha_idx1_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > opt_budget_tgt_reduction_aig;
-  inline double	Get_opt_budget_tgt_reduction_aig() {
-		return opt_budget_tgt_reduction_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > opt_budget_tgt_reduction_idx1_aig;
-  inline double	Get_opt_budget_tgt_reduction_idx1_aig() {
-		return opt_budget_tgt_reduction_idx1_aig; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > mva_adj_ratio_mult;
+  inline double	Get_mva_adj_ratio_mult() {
+		return mva_adj_ratio_mult; }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > mva_cap_defn_crbg;
+  inline xstring	Get_mva_cap_defn_crbg() {
+		return mva_cap_defn_crbg; }
+	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > mva_comp_rate_id;
+  inline xstring	Get_mva_comp_rate_id() {
+		return mva_comp_rate_id; }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > mva_constraint_defn;
+  inline xstring	Get_mva_constraint_defn() {
+		return mva_constraint_defn; }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > mva_defn;
+  inline xstring	Get_mva_defn() {
+		return mva_defn; }
+	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > mva_guar_yrs_renewal;
+  inline int	Get_mva_guar_yrs_renewal() {
+		return mva_guar_yrs_renewal; }
+	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > mva_init_term;
+  inline int	Get_mva_init_term() {
+		return mva_init_term; }
+	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > mva_renewal_term_crbg;
+  inline int	Get_mva_renewal_term_crbg() {
+		return mva_renewal_term_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > mwv_growth_pct_crbg;
+  inline double	Get_mwv_growth_pct_crbg() {
+		return mwv_growth_pct_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > mwv_prem_pct_crbg;
+  inline double	Get_mwv_prem_pct_crbg() {
+		return mwv_prem_pct_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > myga_current_term;
+  inline double	Get_myga_current_term() {
+		return myga_current_term; }
+	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > myga_init_term_crbg;
+  inline int	Get_myga_init_term_crbg() {
+		return myga_init_term_crbg; }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > myga_renew_ind_crbg;
+  inline xstring	Get_myga_renew_ind_crbg() {
+		return myga_renew_ind_crbg; }
+	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > myga_renew_term_crbg;
+  inline int	Get_myga_renew_term_crbg() {
+		return myga_renew_term_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > myga_term_mth_elapsed_eom;
+  inline double	Get_myga_term_mth_elapsed_eom() {
+		return myga_term_mth_elapsed_eom; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > nb_cap_rate_crbg;
+  inline double	Get_nb_cap_rate_crbg() {
+		return nb_cap_rate_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > nb_eprs_add_par_crbg;
+  inline double	Get_nb_eprs_add_par_crbg() {
+		return nb_eprs_add_par_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > nb_fixed_rate_crbg;
+  inline double	Get_nb_fixed_rate_crbg() {
+		return nb_fixed_rate_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > nb_opt_budget_input_crbg;
+  inline double	Get_nb_opt_budget_input_crbg() {
+		return nb_opt_budget_input_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > nb_part_rate_crbg;
+  inline double	Get_nb_part_rate_crbg() {
+		return nb_part_rate_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > nb_sprd_rate_crbg;
+  inline double	Get_nb_sprd_rate_crbg() {
+		return nb_sprd_rate_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > nb_trigger_rate_crbg;
+  inline double	Get_nb_trigger_rate_crbg() {
+		return nb_trigger_rate_crbg; }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > ner_correction_crbg;
+  inline xstring	Get_ner_correction_crbg() {
+		return ner_correction_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > nmr_spread_crbg;
+  inline double	Get_nmr_spread_crbg() {
+		return nmr_spread_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > non_us_return_beta_crbg;
+  inline double	Get_non_us_return_beta_crbg() {
+		return non_us_return_beta_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > non_us_return_sigma_crbg;
+  inline double	Get_non_us_return_sigma_crbg() {
+		return non_us_return_sigma_crbg; }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > ny_glb_ind_crbg;
+  inline xstring	Get_ny_glb_ind_crbg() {
+		return ny_glb_ind_crbg; }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > nyia_ind_crbg;
+  inline xstring	Get_nyia_ind_crbg() {
+		return nyia_ind_crbg; }
+	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > opt_budget_const_yr_crbg;
+  inline int	Get_opt_budget_const_yr_crbg() {
+		return opt_budget_const_yr_crbg; }
 	Attribute::Proxy <StringEnum, DESCRIPTOR_TABLE > opt_defn;
   inline xstring	Get_opt_defn() {
 		return opt_defn; }
   inline void Set_opt_defn(const xstring &v) {
 		opt_defn.setValue(v); }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > option_strike_annualization_aig;
-  inline xstring	Get_option_strike_annualization_aig() {
-		return option_strike_annualization_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > part_enhancement_method_aig;
-  inline xstring	Get_part_enhancement_method_aig() {
-		return part_enhancement_method_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > payoff_hedge_cost_pct_crbg;
-  inline double	Get_payoff_hedge_cost_pct_crbg() {
-		return payoff_hedge_cost_pct_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > pba_base_lapse_mult_crbg;
+  inline double	Get_pba_base_lapse_mult_crbg() {
+		return pba_base_lapse_mult_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > pba_infl_intercept_crbg;
+  inline double	Get_pba_infl_intercept_crbg() {
+		return pba_infl_intercept_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > pba_infl_slope_crbg;
+  inline double	Get_pba_infl_slope_crbg() {
+		return pba_infl_slope_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > pba_maint_exp_mult_crbg;
+  inline double	Get_pba_maint_exp_mult_crbg() {
+		return pba_maint_exp_mult_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > pba_mort_mult_no_gmwb_crbg;
+  inline double	Get_pba_mort_mult_no_gmwb_crbg() {
+		return pba_mort_mult_no_gmwb_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > pba_pfwd_pct_mult_crbg;
+  inline double	Get_pba_pfwd_pct_mult_crbg() {
+		return pba_pfwd_pct_mult_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > pba_trail_comm_mult_crbg;
+  inline double	Get_pba_trail_comm_mult_crbg() {
+		return pba_trail_comm_mult_crbg; }
 	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > pfwd_amt_avail_defn;
   inline xstring	Get_pfwd_amt_avail_defn() {
 		return pfwd_amt_avail_defn; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > pfwd_amt_avail_defn_aig;
-  inline xstring	Get_pfwd_amt_avail_defn_aig() {
-		return pfwd_amt_avail_defn_aig; }
 	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > pfwd_freq;
   inline xstring	Get_pfwd_freq() {
 		return pfwd_freq; }
-	Attribute::Proxy <StringEnum, DESCRIPTOR_TABLE > pfwd_model_carvm_aig;
-  inline xstring	Get_pfwd_model_carvm_aig() {
-		return pfwd_model_carvm_aig; }
-  inline void Set_pfwd_model_carvm_aig(const xstring &v) {
-		pfwd_model_carvm_aig.setValue(v); }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > pfwd_partial_interest_credited_aig;
-  inline xstring	Get_pfwd_partial_interest_credited_aig() {
-		return pfwd_partial_interest_credited_aig; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > pfwd_pct;
   inline double	Get_pfwd_pct() {
 		return pfwd_pct; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > pfwd_use_nq_aig;
-  inline double	Get_pfwd_use_nq_aig() {
-		return pfwd_use_nq_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > pfwd_use_q_aig;
-  inline double	Get_pfwd_use_q_aig() {
-		return pfwd_use_q_aig; }
-	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > pfwd_util_table_aig;
-  inline xstring	Get_pfwd_util_table_aig() {
-		return pfwd_util_table_aig; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > pfwd_rate_calc_fct1_crbg;
+  inline double	Get_pfwd_rate_calc_fct1_crbg() {
+		return pfwd_rate_calc_fct1_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > pfwd_rate_calc_fct2_crbg;
+  inline double	Get_pfwd_rate_calc_fct2_crbg() {
+		return pfwd_rate_calc_fct2_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > pfwd_use;
+  inline double	Get_pfwd_use() {
+		return pfwd_use; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > pfwd_use_addl_shock_yr_crbg;
+  inline double	Get_pfwd_use_addl_shock_yr_crbg() {
+		return pfwd_use_addl_shock_yr_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > pfwd_use_nq_crbg;
+  inline double	Get_pfwd_use_nq_crbg() {
+		return pfwd_use_nq_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > pfwd_use_q_crbg;
+  inline double	Get_pfwd_use_q_crbg() {
+		return pfwd_use_q_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > pfwd_use_qual_pct_crbg;
+  inline double	Get_pfwd_use_qual_pct_crbg() {
+		return pfwd_use_qual_pct_crbg; }
+	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > pipp_stepup_age_crbg;
+  inline int	Get_pipp_stepup_age_crbg() {
+		return pipp_stepup_age_crbg; }
 	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > plan_code;
   inline xstring	Get_plan_code() {
 		return plan_code; }
-	Attribute::Proxy <int, DESCRIPTOR_TABLE > pol_yr_lookup_gen2;
-  inline int	Get_pol_yr_lookup_gen2() {
-		return pol_yr_lookup_gen2; }
-  inline void Set_pol_yr_lookup_gen2(const int &v) {
-		pol_yr_lookup_gen2.setValue(v); }
-	Attribute::Proxy <xstring, DESCRIPTOR_TABLE > pos_sprd_ind_dyn_lapse_aig;
-  inline xstring	Get_pos_sprd_ind_dyn_lapse_aig() {
-		return pos_sprd_ind_dyn_lapse_aig; }
-  inline void Set_pos_sprd_ind_dyn_lapse_aig(const xstring &v) {
-		pos_sprd_ind_dyn_lapse_aig.setValue(v); }
-	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > preincome_exercise_yrs_aig;
-  inline int	Get_preincome_exercise_yrs_aig() {
-		return preincome_exercise_yrs_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > prem_bonus_recapture_pct_aig;
-  inline double	Get_prem_bonus_recapture_pct_aig() {
-		return prem_bonus_recapture_pct_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > prem_credit_pct_aig;
-  inline double	Get_prem_credit_pct_aig() {
-		return prem_credit_pct_aig; }
+	Attribute::Proxy <int, DESCRIPTOR_TABLE > pol_mth_lookup;
+  inline int	Get_pol_mth_lookup() {
+		return pol_mth_lookup; }
+  inline void Set_pol_mth_lookup(const int &v) {
+		pol_mth_lookup.setValue(v); }
+	Attribute::Proxy <int, DESCRIPTOR_TABLE > pol_yr_lookup;
+  inline int	Get_pol_yr_lookup() {
+		return pol_yr_lookup; }
+  inline void Set_pol_yr_lookup(const int &v) {
+		pol_yr_lookup.setValue(v); }
+	Attribute::Proxy <xstring, DESCRIPTOR_TABLE > pos_sprd_ind_crbg;
+  inline xstring	Get_pos_sprd_ind_crbg() {
+		return pos_sprd_ind_crbg; }
+  inline void Set_pos_sprd_ind_crbg(const xstring &v) {
+		pos_sprd_ind_crbg.setValue(v); }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > prem_band;
+  inline xstring	Get_prem_band() {
+		return prem_band; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > prem_bonus_recap_pct_crbg;
+  inline double	Get_prem_bonus_recap_pct_crbg() {
+		return prem_bonus_recap_pct_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > prem_credit;
+  inline double	Get_prem_credit() {
+		return prem_credit; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > prem_tax_pct;
   inline double	Get_prem_tax_pct() {
 		return prem_tax_pct; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > pri_sprd_tgt_crbg;
+  inline double	Get_pri_sprd_tgt_crbg() {
+		return pri_sprd_tgt_crbg; }
 	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > pricing_defn;
   inline xstring	Get_pricing_defn() {
 		return pricing_defn; }
-	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > product_feature_set_aig;
-  inline xstring	Get_product_feature_set_aig() {
-		return product_feature_set_aig; }
 	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > prof_distribn_mode;
   inline xstring	Get_prof_distribn_mode() {
 		return prof_distribn_mode; }
 	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > proj_date;
   inline xstring	Get_proj_date() {
 		return proj_date; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > prop_female_owned_aig;
-  inline double	Get_prop_female_owned_aig() {
-		return prop_female_owned_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > prop_joint_owned_aig;
-  inline double	Get_prop_joint_owned_aig() {
-		return prop_joint_owned_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > prop_male_owned_aig;
-  inline double	Get_prop_male_owned_aig() {
-		return prop_male_owned_aig; }
 	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > purch_rate_curr_comp_rate_id;
   inline xstring	Get_purch_rate_curr_comp_rate_id() {
 		return purch_rate_curr_comp_rate_id; }
@@ -2861,15 +2226,9 @@ public :
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > purch_rate_guar_fixed;
   inline double	Get_purch_rate_guar_fixed() {
 		return purch_rate_guar_fixed; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > pv_benefits_defn_aig;
-  inline xstring	Get_pv_benefits_defn_aig() {
-		return pv_benefits_defn_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > quota_share_reinsured_aig;
-  inline double	Get_quota_share_reinsured_aig() {
-		return quota_share_reinsured_aig; }
-	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > rate_setting_cycle_aig;
-  inline xstring	Get_rate_setting_cycle_aig() {
-		return rate_setting_cycle_aig; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > quota_share_reinsured_crbg;
+  inline double	Get_quota_share_reinsured_crbg() {
+		return quota_share_reinsured_crbg; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > rbc_c1_liab_only_stat_res_pct;
   inline double	Get_rbc_c1_liab_only_stat_res_pct() {
 		return rbc_c1_liab_only_stat_res_pct; }
@@ -2879,24 +2238,14 @@ public :
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > rbc_c3_ann_high_risk_pct;
   inline double	Get_rbc_c3_ann_high_risk_pct() {
 		return rbc_c3_ann_high_risk_pct; }
-	static Attribute::Descriptor descriptor_512[];
-#ifdef MICROSOFT
-#pragma warning(push)
-#pragma warning(disable : 4005)
-// Disable the warning C4005: 'DESCRIPTOR_TABLE' : macro redefinition
-#endif	MICROSOFT
-	#define DESCRIPTOR_TABLE FIA_LIAB::descriptor_512
-#ifdef MICROSOFT
-#pragma warning(pop)
-#endif	MICROSOFT
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > rbc_c3_ann_low_risk_pct;
   inline double	Get_rbc_c3_ann_low_risk_pct() {
 		return rbc_c3_ann_low_risk_pct; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > rbc_c3_ann_medium_risk_pct;
   inline double	Get_rbc_c3_ann_medium_risk_pct() {
 		return rbc_c3_ann_medium_risk_pct; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > rbc_c3_ann_risk_defn;
-  inline xstring	Get_rbc_c3_ann_risk_defn() {
+	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > rbc_c3_ann_risk_defn;
+  inline int	Get_rbc_c3_ann_risk_defn() {
 		return rbc_c3_ann_risk_defn; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > rbc_c4_prem_pct;
   inline double	Get_rbc_c4_prem_pct() {
@@ -2916,50 +2265,18 @@ public :
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > reins_pct;
   inline double	Get_reins_pct() {
 		return reins_pct; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > renewal_2020_beta_down_aig;
-  inline double	Get_renewal_2020_beta_down_aig() {
-		return renewal_2020_beta_down_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > renewal_2020_beta_down_idx1_aig;
-  inline double	Get_renewal_2020_beta_down_idx1_aig() {
-		return renewal_2020_beta_down_idx1_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > renewal_2020_beta_up_aig;
-  inline double	Get_renewal_2020_beta_up_aig() {
-		return renewal_2020_beta_up_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > renewal_2020_beta_up_idx1_aig;
-  inline double	Get_renewal_2020_beta_up_idx1_aig() {
-		return renewal_2020_beta_up_idx1_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > renewal_2020_glb_beta_down_adj_aig;
-  inline double	Get_renewal_2020_glb_beta_down_adj_aig() {
-		return renewal_2020_glb_beta_down_adj_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > renewal_2020_glb_beta_down_adj_idx1_aig;
-  inline double	Get_renewal_2020_glb_beta_down_adj_idx1_aig() {
-		return renewal_2020_glb_beta_down_adj_idx1_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > renewal_2020_glb_beta_up_adj_aig;
-  inline double	Get_renewal_2020_glb_beta_up_adj_aig() {
-		return renewal_2020_glb_beta_up_adj_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > renewal_2020_glb_beta_up_adj_idx1_aig;
-  inline double	Get_renewal_2020_glb_beta_up_adj_idx1_aig() {
-		return renewal_2020_glb_beta_up_adj_idx1_aig; }
-	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > renewal_2020_mig_st_yr_aig;
-  inline int	Get_renewal_2020_mig_st_yr_aig() {
-		return renewal_2020_mig_st_yr_aig; }
-	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > renewal_2020_mig_st_yr_idx1_aig;
-  inline int	Get_renewal_2020_mig_st_yr_idx1_aig() {
-		return renewal_2020_mig_st_yr_idx1_aig; }
-	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > renewal_set_aig;
-  inline xstring	Get_renewal_set_aig() {
-		return renewal_set_aig; }
-	Attribute::Proxy <int, DESCRIPTOR_TABLE > res_period;
-  inline int	Get_res_period() {
-		return res_period; }
-  inline void Set_res_period(const int &v) {
-		res_period.setValue(v); }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > rmd_attained_age_aig;
-  inline double	Get_rmd_attained_age_aig() {
-		return rmd_attained_age_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > rng_engine_aig;
-  inline xstring	Get_rng_engine_aig() {
-		return rng_engine_aig; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > renewal_beta_down_crbg;
+  inline double	Get_renewal_beta_down_crbg() {
+		return renewal_beta_down_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > renewal_beta_up_crbg;
+  inline double	Get_renewal_beta_up_crbg() {
+		return renewal_beta_up_crbg; }
+	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > renewal_sc_yr_offest_crbg;
+  inline int	Get_renewal_sc_yr_offest_crbg() {
+		return renewal_sc_yr_offest_crbg; }
+	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > rmd_age_crbg;
+  inline int	Get_rmd_age_crbg() {
+		return rmd_age_crbg; }
 	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > seg_id;
   inline xstring	Get_seg_id() {
 		return seg_id; }
@@ -2973,127 +2290,72 @@ public :
 		return sfas97rd_cohort_id_gross; }
   inline void Set_sfas97rd_cohort_id_gross(const xstring &v) {
 		sfas97rd_cohort_id_gross.setValue(v); }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > sfc_annual_hedge_cost_aig;
-  inline double	Get_sfc_annual_hedge_cost_aig() {
-		return sfc_annual_hedge_cost_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > sfc_atan_alpha_aig;
-  inline double	Get_sfc_atan_alpha_aig() {
-		return sfc_atan_alpha_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > sfc_atan_beta_aig;
-  inline double	Get_sfc_atan_beta_aig() {
-		return sfc_atan_beta_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > sfc_atan_gamma_aig;
-  inline double	Get_sfc_atan_gamma_aig() {
-		return sfc_atan_gamma_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > sfc_atan_mult_floor_aig;
-  inline double	Get_sfc_atan_mult_floor_aig() {
-		return sfc_atan_mult_floor_aig; }
-	Attribute::Proxy <StringEnum, DESCRIPTOR_TABLE > shock_phase_lookup_aig;
-  inline xstring	Get_shock_phase_lookup_aig() {
-		return shock_phase_lookup_aig; }
-  inline void Set_shock_phase_lookup_aig(const xstring &v) {
-		shock_phase_lookup_aig.setValue(v); }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > shock_skew_mth_aig;
-  inline double	Get_shock_skew_mth_aig() {
-		return shock_skew_mth_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > shock_skew_pct_aig;
-  inline double	Get_shock_skew_pct_aig() {
-		return shock_skew_pct_aig; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > sfc_atan_alpha_crbg;
+  inline double	Get_sfc_atan_alpha_crbg() {
+		return sfc_atan_alpha_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > sfc_atan_beta_crbg;
+  inline double	Get_sfc_atan_beta_crbg() {
+		return sfc_atan_beta_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > sfc_atan_gamma_crbg;
+  inline double	Get_sfc_atan_gamma_crbg() {
+		return sfc_atan_gamma_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > sfc_atan_mult_floor_crbg;
+  inline double	Get_sfc_atan_mult_floor_crbg() {
+		return sfc_atan_mult_floor_crbg; }
+	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > shock_skew_mth_crbg;
+  inline int	Get_shock_skew_mth_crbg() {
+		return shock_skew_mth_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > shock_skew_pct_crbg;
+  inline double	Get_shock_skew_pct_crbg() {
+		return shock_skew_pct_crbg; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > single_prem;
   inline double	Get_single_prem() {
 		return single_prem; }
-	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > snfl_add_age_aig;
-  inline int	Get_snfl_add_age_aig() {
-		return snfl_add_age_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > snfl_add_interest_rate_aig;
-  inline double	Get_snfl_add_interest_rate_aig() {
-		return snfl_add_interest_rate_aig; }
-	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > snfl_maturity_age_aig;
-  inline int	Get_snfl_maturity_age_aig() {
-		return snfl_maturity_age_aig; }
-	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > snfl_set_aig;
-  inline xstring	Get_snfl_set_aig() {
-		return snfl_set_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > spousal_continuation_defn_aig;
-  inline xstring	Get_spousal_continuation_defn_aig() {
-		return spousal_continuation_defn_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > spousal_continuation_election_rate_aig;
-  inline double	Get_spousal_continuation_election_rate_aig() {
-		return spousal_continuation_election_rate_aig; }
-	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > stat_carvm_annuitzn_tests;
-  inline xstring	Get_stat_carvm_annuitzn_tests() {
-		return stat_carvm_annuitzn_tests; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > spousal_cont_elect_rate_crbg;
+  inline double	Get_spousal_cont_elect_rate_crbg() {
+		return spousal_cont_elect_rate_crbg; }
 	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > stat_carvm_calc_annuitzn_defn;
   inline xstring	Get_stat_carvm_calc_annuitzn_defn() {
 		return stat_carvm_calc_annuitzn_defn; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > stat_carvm_cont_defn;
-  inline xstring	Get_stat_carvm_cont_defn() {
-		return stat_carvm_cont_defn; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > stat_carvm_defn;
-  inline xstring	Get_stat_carvm_defn() {
-		return stat_carvm_defn; }
-	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > stat_carvm_gmwb_exercise_points;
-  inline xstring	Get_stat_carvm_gmwb_exercise_points() {
-		return stat_carvm_gmwb_exercise_points; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > stat_carvm_int_rate;
-  inline double	Get_stat_carvm_int_rate() {
-		return stat_carvm_int_rate; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > stat_carvm_life_int_rate;
-  inline double	Get_stat_carvm_life_int_rate() {
-		return stat_carvm_life_int_rate; }
 	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > stat_res_defn;
   inline xstring	Get_stat_res_defn() {
 		return stat_res_defn; }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > stat_res_mva_defn;
+  inline xstring	Get_stat_res_mva_defn() {
+		return stat_res_mva_defn; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > stat_res_pct;
   inline double	Get_stat_res_pct() {
 		return stat_res_pct; }
 	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > stat_valn_code;
   inline xstring	Get_stat_valn_code() {
 		return stat_valn_code; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > state_var_dth_bene_cap_aig;
-  inline xstring	Get_state_var_dth_bene_cap_aig() {
-		return state_var_dth_bene_cap_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > state_var_rider_fee_chg_aig;
-  inline xstring	Get_state_var_rider_fee_chg_aig() {
-		return state_var_rider_fee_chg_aig; }
-	Attribute::Proxy <double, DESCRIPTOR_TABLE > strategy_term_dyn_aig;
-  inline double	Get_strategy_term_dyn_aig() {
-		return strategy_term_dyn_aig; }
-  inline void Set_strategy_term_dyn_aig(const double &v) {
-		strategy_term_dyn_aig.setValue(v); }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > surr_ben_primary_tail_defn_aig;
-  inline xstring	Get_surr_ben_primary_tail_defn_aig() {
-		return surr_ben_primary_tail_defn_aig; }
 	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > surr_chg_defn;
   inline xstring	Get_surr_chg_defn() {
 		return surr_chg_defn; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > surr_chg_pct;
   inline double	Get_surr_chg_pct() {
 		return surr_chg_pct; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > surr_chg_pct_renewal_aig;
-  inline double	Get_surr_chg_pct_renewal_aig() {
-		return surr_chg_pct_renewal_aig; }
-	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > surr_chg_period_aig;
-  inline int	Get_surr_chg_period_aig() {
-		return surr_chg_period_aig; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > surr_chg_pct_renewal_crbg;
+  inline double	Get_surr_chg_pct_renewal_crbg() {
+		return surr_chg_pct_renewal_crbg; }
+	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > surr_chg_period_crbg;
+  inline int	Get_surr_chg_period_crbg() {
+		return surr_chg_period_crbg; }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > surr_chg_timing_defn;
+  inline xstring	Get_surr_chg_timing_defn() {
+		return surr_chg_timing_defn; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > tax_capzd_prem_pct;
   inline double	Get_tax_capzd_prem_pct() {
 		return tax_capzd_prem_pct; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > tax_capzd_prem_pct_qualify;
   inline double	Get_tax_capzd_prem_pct_qualify() {
 		return tax_capzd_prem_pct_qualify; }
-	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > tax_carvm_annuitzn_tests;
-  inline xstring	Get_tax_carvm_annuitzn_tests() {
-		return tax_carvm_annuitzn_tests; }
 	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > tax_carvm_calc_annuitzn_defn;
   inline xstring	Get_tax_carvm_calc_annuitzn_defn() {
 		return tax_carvm_calc_annuitzn_defn; }
 	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > tax_carvm_defn;
   inline xstring	Get_tax_carvm_defn() {
 		return tax_carvm_defn; }
-	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > tax_carvm_gmwb_exercise_points;
-  inline xstring	Get_tax_carvm_gmwb_exercise_points() {
-		return tax_carvm_gmwb_exercise_points; }
 	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > tax_loss_treatment;
   inline xstring	Get_tax_loss_treatment() {
 		return tax_loss_treatment; }
@@ -3103,157 +2365,41 @@ public :
 	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > tax_res_defn;
   inline xstring	Get_tax_res_defn() {
 		return tax_res_defn; }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > tax_res_mva_defn;
+  inline xstring	Get_tax_res_mva_defn() {
+		return tax_res_mva_defn; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > tax_res_pct;
   inline double	Get_tax_res_pct() {
 		return tax_res_pct; }
+	Attribute::Proxy <double, DESCRIPTOR_TABLE > tax_res_pct_stat;
+  inline double	Get_tax_res_pct_stat() {
+		return tax_res_pct_stat; }
+  inline void Set_tax_res_pct_stat(const double &v) {
+		tax_res_pct_stat.setValue(v); }
 	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > tax_valn_code;
   inline xstring	Get_tax_valn_code() {
 		return tax_valn_code; }
-	Attribute::Proxy <StringEnum, DESCRIPTOR_TABLE > temp_key_comp_lookup_aig;
-  inline xstring	Get_temp_key_comp_lookup_aig() {
-		return temp_key_comp_lookup_aig; }
-  inline void Set_temp_key_comp_lookup_aig(const xstring &v) {
-		temp_key_comp_lookup_aig.setValue(v); }
-	Attribute::Proxy <StringEnum, DESCRIPTOR_TABLE > temp_key_cov_person_status;
-  inline xstring	Get_temp_key_cov_person_status() {
-		return temp_key_cov_person_status; }
-  inline void Set_temp_key_cov_person_status(const xstring &v) {
-		temp_key_cov_person_status.setValue(v); }
-	Attribute::Proxy <StringEnum, DESCRIPTOR_TABLE > temp_key_cred_dyn_lever_aig;
-  inline xstring	Get_temp_key_cred_dyn_lever_aig() {
-		return temp_key_cred_dyn_lever_aig; }
-  inline void Set_temp_key_cred_dyn_lever_aig(const xstring &v) {
-		temp_key_cred_dyn_lever_aig.setValue(v); }
-	Attribute::Proxy <xstring, DESCRIPTOR_TABLE > temp_key_cred_type_dyn_aig;
-  inline xstring	Get_temp_key_cred_type_dyn_aig() {
-		return temp_key_cred_type_dyn_aig; }
-  inline void Set_temp_key_cred_type_dyn_aig(const xstring &v) {
-		temp_key_cred_type_dyn_aig.setValue(v); }
-	Attribute::Proxy <StringEnum, DESCRIPTOR_TABLE > temp_key_inc_phase_aig;
-  inline xstring	Get_temp_key_inc_phase_aig() {
-		return temp_key_inc_phase_aig; }
-  inline void Set_temp_key_inc_phase_aig(const xstring &v) {
-		temp_key_inc_phase_aig.setValue(v); }
-	Attribute::Proxy <int, DESCRIPTOR_TABLE > temp_key_iss_age;
-  inline int	Get_temp_key_iss_age() {
-		return temp_key_iss_age; }
-  inline void Set_temp_key_iss_age(const int &v) {
-		temp_key_iss_age.setValue(v); }
-	Attribute::Proxy <StringEnum, DESCRIPTOR_TABLE > temp_key_itmness_lookup_aig;
-  inline xstring	Get_temp_key_itmness_lookup_aig() {
-		return temp_key_itmness_lookup_aig; }
-  inline void Set_temp_key_itmness_lookup_aig(const xstring &v) {
-		temp_key_itmness_lookup_aig.setValue(v); }
-	Attribute::Proxy <StringEnum, DESCRIPTOR_TABLE > temp_key_shock_phase_lookup_aig;
-  inline xstring	Get_temp_key_shock_phase_lookup_aig() {
-		return temp_key_shock_phase_lookup_aig; }
-  inline void Set_temp_key_shock_phase_lookup_aig(const xstring &v) {
-		temp_key_shock_phase_lookup_aig.setValue(v); }
-	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > testing_rate_set_aig;
-  inline xstring	Get_testing_rate_set_aig() {
-		return testing_rate_set_aig; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > tgt_budget_alpha_crbg;
+  inline double	Get_tgt_budget_alpha_crbg() {
+		return tgt_budget_alpha_crbg; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > tgt_budget_reduction_crbg;
+  inline double	Get_tgt_budget_reduction_crbg() {
+		return tgt_budget_reduction_crbg; }
 	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > tgt_cap_defn;
   inline xstring	Get_tgt_cap_defn() {
 		return tgt_cap_defn; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > tgt_cap_rbc_mult;
   inline double	Get_tgt_cap_rbc_mult() {
 		return tgt_cap_rbc_mult; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > time_step_defn;
-  inline xstring	Get_time_step_defn() {
-		return time_step_defn; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > total_lapse_based_on_tier_aig;
-  inline xstring	Get_total_lapse_based_on_tier_aig() {
-		return total_lapse_based_on_tier_aig; }
 	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > use_mp;
   inline xstring	Get_use_mp() {
 		return use_mp; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > use_option_cost_tables_defn_aig;
-  inline xstring	Get_use_option_cost_tables_defn_aig() {
-		return use_option_cost_tables_defn_aig; }
-	Attribute::Proxy <StringEnum, DESCRIPTOR_TABLE > valn_carvm_defn;
-  inline xstring	Get_valn_carvm_defn() {
-		return valn_carvm_defn; }
-  inline void Set_valn_carvm_defn(const xstring &v) {
-		valn_carvm_defn.setValue(v); }
-	Attribute::Proxy <StringEnum, DESCRIPTOR_TABLE > valn_cash_settle_defn;
-  inline xstring	Get_valn_cash_settle_defn() {
-		return valn_cash_settle_defn; }
-  inline void Set_valn_cash_settle_defn(const xstring &v) {
-		valn_cash_settle_defn.setValue(v); }
-	Attribute::Proxy <int, DESCRIPTOR_TABLE > valn_guar_dur;
-  inline int	Get_valn_guar_dur() {
-		return valn_guar_dur; }
-  inline void Set_valn_guar_dur(const int &v) {
-		valn_guar_dur.setValue(v); }
-	Attribute::Proxy <StringEnum, DESCRIPTOR_TABLE > valn_int_guar_defn;
-  inline xstring	Get_valn_int_guar_defn() {
-		return valn_int_guar_defn; }
-  inline void Set_valn_int_guar_defn(const xstring &v) {
-		valn_int_guar_defn.setValue(v); }
-	Attribute::Proxy <int, DESCRIPTOR_TABLE > valn_issue_yr;
-  inline int	Get_valn_issue_yr() {
-		return valn_issue_yr; }
-  inline void Set_valn_issue_yr(const int &v) {
-		valn_issue_yr.setValue(v); }
 	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > valn_periods_selected;
   inline xstring	Get_valn_periods_selected() {
 		return valn_periods_selected; }
-	Attribute::Proxy <StringEnum, DESCRIPTOR_TABLE > valn_plan_type;
-  inline xstring	Get_valn_plan_type() {
-		return valn_plan_type; }
-  inline void Set_valn_plan_type(const xstring &v) {
-		valn_plan_type.setValue(v); }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > valn_rate_cash_settle_defn;
-  inline xstring	Get_valn_rate_cash_settle_defn() {
-		return valn_rate_cash_settle_defn; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > valn_rate_int_guar_defn;
-  inline xstring	Get_valn_rate_int_guar_defn() {
-		return valn_rate_int_guar_defn; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > valn_rate_plan_type_elective_annuitzn;
-  inline xstring	Get_valn_rate_plan_type_elective_annuitzn() {
-		return valn_rate_plan_type_elective_annuitzn; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > valn_rate_plan_type_elective_cash_val;
-  inline xstring	Get_valn_rate_plan_type_elective_cash_val() {
-		return valn_rate_plan_type_elective_cash_val; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > valn_rate_plan_type_non_elective;
-  inline xstring	Get_valn_rate_plan_type_non_elective() {
-		return valn_rate_plan_type_non_elective; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > valn_rate_plan_type_non_elective_gmwb_after_exhaust_aig;
-  inline xstring	Get_valn_rate_plan_type_non_elective_gmwb_after_exhaust_aig() {
-		return valn_rate_plan_type_non_elective_gmwb_after_exhaust_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > valn_rate_plan_type_non_elective_gmwb_before_exhaust_aig;
-  inline xstring	Get_valn_rate_plan_type_non_elective_gmwb_before_exhaust_aig() {
-		return valn_rate_plan_type_non_elective_gmwb_before_exhaust_aig; }
 	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > valn_yrs;
   inline int	Get_valn_yrs() {
 		return valn_yrs; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > xol_admitted_ratio_aig;
-  inline double	Get_xol_admitted_ratio_aig() {
-		return xol_admitted_ratio_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > xol_chg_freq_aig;
-  inline xstring	Get_xol_chg_freq_aig() {
-		return xol_chg_freq_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > xol_chg_pct_aig;
-  inline double	Get_xol_chg_pct_aig() {
-		return xol_chg_pct_aig; }
-	Attribute::ProxyReadOnly <int, DESCRIPTOR_TABLE > xol_deal_end_date_aig;
-  inline int	Get_xol_deal_end_date_aig() {
-		return xol_deal_end_date_aig; }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > xol_deal_switch_aig;
-  inline xstring	Get_xol_deal_switch_aig() {
-		return xol_deal_switch_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > xol_discount_rate_aig;
-  inline double	Get_xol_discount_rate_aig() {
-		return xol_discount_rate_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > xol_nb_eco_res_ratio_aig;
-  inline double	Get_xol_nb_eco_res_ratio_aig() {
-		return xol_nb_eco_res_ratio_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > xol_nb_initial_factor_aig;
-  inline double	Get_xol_nb_initial_factor_aig() {
-		return xol_nb_initial_factor_aig; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > xol_quota_share_aig;
-  inline double	Get_xol_quota_share_aig() {
-		return xol_quota_share_aig; }
 	Attribute::Proxy <int, DESCRIPTOR_TABLE > msnumelement;
   inline int	Get_msnumelement() {
 		return msnumelement; }
@@ -3261,35 +2407,27 @@ public :
 		msnumelement.setValue(v); }
 	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > audit_detail_flag;
 	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > commencement_period;
-	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > coupon_freq_aig;
+	Attribute::Proxy<Scalar<xstring>, DESCRIPTOR_TABLE > data_file_name;
 	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > elapsed_mths;
-	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > enhanced_income_flag_aig;
 	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > final_period;
-	Attribute::Proxy<Scalar<double>, DESCRIPTOR_TABLE > gmwb_chg_freq_per_yr_aig;
 	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > gmwb_flag;
-	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > gmwb_mib_rollup_max_yrs_aig;
 	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > gmwb_req_yrs_wait;
-	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > independent_flag;
 	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > infl_start_mth;
 	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > infl_start_period;
 	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > infl_start_yr;
-	Attribute::Proxy<Scalar<double>, DESCRIPTOR_TABLE > init_policies_female_spousal_2019_calc_aig;
-	Attribute::Proxy<Scalar<double>, DESCRIPTOR_TABLE > init_policies_joint_experience_calc_aig;
-	Attribute::Proxy<Scalar<double>, DESCRIPTOR_TABLE > init_policies_joint_spousal_2019_calc_aig;
-	Attribute::Proxy<Scalar<double>, DESCRIPTOR_TABLE > init_policies_male_spousal_2019_calc_aig;
-	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > int_guar_dur;
+	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > issue_age;
 	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > issue_date;
 	Attribute::Proxy<Scalar<double>, DESCRIPTOR_TABLE > issue_day;
 	Attribute::Proxy<Scalar<double>, DESCRIPTOR_TABLE > issue_mth;
 	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > issue_yr;
 	Attribute::Proxy<Scalar<double>, DESCRIPTOR_TABLE > itm_period_disc_rate;
-	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > lapse_shock_year_aig;
+	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > lapse_shock_year_crbg;
+	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > lipm_ind_crbg;
 	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > maturity_age;
-	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > maturity_benefits_period_aig;
 	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > maturity_period;
-	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > max_mva_surr_chg_period_aig;
-	Attribute::Proxy<Scalar<xstring>, DESCRIPTOR_TABLE > mva_defn_lookup_aig;
-	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > primary_tail_period_aig;
+	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > max_mva_sc_period_crbg;
+	Attribute::Proxy<Scalar<double>, DESCRIPTOR_TABLE > mort_impr_time_elapsed;
+	Attribute::Proxy<Scalar<double>, DESCRIPTOR_TABLE > mva_comp_rate_issue;
 	Attribute::Proxy<Scalar<xstring>, DESCRIPTOR_TABLE > proj_date_adj;
 	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > proj_start_date;
 	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > proj_start_mth;
@@ -3298,9 +2436,9 @@ public :
 	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > start_period;
 	Attribute::Proxy<Scalar<xstring>, DESCRIPTOR_TABLE > state_of_world_financial_file_path;
 	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > tax_capzd_prem_amortzn_yrs;
-	Attribute::Proxy<Scalar<double>, DESCRIPTOR_TABLE > tax_res_equals_stat_flag;
 	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > term_to_omega_age;
-	Attribute::Proxy<Scalar<double>, DESCRIPTOR_TABLE > wdl_period_mths_aig;
+	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > term_to_omega_age_f_crbg;
+	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > term_to_omega_age_m_crbg;
 
 void setPtr_col(int cf_no, CashFlowBase* cf);
 void start_of_projection();
@@ -3316,338 +2454,80 @@ void after_startup(int decrement = 0);
 
  // External function prototypes
 
-// Calculate the base MAWP (before interest rate indexing):
-#line 1 "calc_base_mawp_pct_aig.fia_liab.for"
-double calc_base_mawp_pct_aig(
-	int gmwb_withdrl_mth, StrEnum::EnumValue enhanced_income_benefit, StrEnum::EnumValue gender_cv);
+// Calc Gmwb Wdl Util Level Crbg
+#line 1 "calc_gmwb_wdl_util_level_crbg.fia_liab.for"
+double calc_gmwb_wdl_util_level_crbg(
+	int t, double unif_rv_cv, double util_level_cv, double fund_val_e_bef_cv = 0.0, double gmwb_inf_e_bef_cv = 0.0);
 
-// GMWB FLEX
-#line 1 "calc_gmwb_flex_aig.fia_liab.for"
-void calc_gmwb_flex_aig(void);
+// Dth Rate Calc Crbg
+#line 1 "dth_rate_calc_crbg.fia_liab.for"
+double dth_rate_calc_crbg(int t, int pol_yr, StrEnum::EnumValue mort_gender_cv);
 
-// Calculates the MAWP rate for a given arbitrary policy year
-#line 1 "calc_mawp_pct_aig.fia_liab.for"
-double calc_mawp_pct_aig(int t, int gmwb_withdrl_mth, StrEnum::EnumValue gender_cv, StrEnum::EnumValue enhanced_income_benefit, StrEnum::EnumValue income_phase, bool hypothetical_assessment = false);
+// Dth Rate Confinement Calc Crbg
+#line 1 "dth_rate_confinement_calc_crbg.fia_liab.for"
+double dth_rate_confinement_calc_crbg(int t, int pol_yr, StrEnum::EnumValue mort_gender_cv,
+		int confinement_status, int confinement_age = 0, int confinement_mths = 0);
 
-// MVA Amount Calculation for Lapses
-#line 1 "calc_mva_amt_full_surr_aig.fia_liab.for"
-double calc_mva_amt_full_surr_aig(double mva_final_factor, 
-								  double mva_base,
-								  double free_withdrawal_amount,
-								  double premium_enhancement_recapture);
-
-// MVA Rate Calculation for Lapses, Current Products
-#line 1 "calc_mva_rate_full_surr_default_aig.fia_liab.for"
-double calc_mva_rate_full_surr_default_aig(double I, 
-										   double J,
-										   int N,
-										   double contract_value,
-										   double minimum_withdrawal_value,
-										   double withdrawal_charge,
-										   double remaining_pfwd,
-										   double premium_enhancement_recapture);
-
-// Calc Pipp Pct Aig
-#line 1 "calc_pipp_pct_aig.fia_liab.for"
-double calc_pipp_pct_aig(int t, int gmwb_withdrl_mth, StrEnum::EnumValue gender_cv);
-
-// Calc Reg 47 Mawp Pct Aig
-#line 1 "calc_reg_47_mawp_pct_aig.fia_liab.for"
-double calc_reg_47_mawp_pct_aig(int issue_age, StrEnum::EnumValue covered_person_status, int gmwb_withdrl_yr);
-
-// Get `covered person status` from `gender`:
-#line 1 "covered_person_status_calc_aig.fia_liab.for"
-StrEnum::EnumValue covered_person_status_calc_aig(StrEnum::EnumValue gender_cv);
-
-// Covered person status enum value:
-#line 1 "covered_person_status_get_enum_value_aig.fia_liab.for"
-StrEnum::EnumValue covered_person_status_get_enum_value_aig(double covered_person_status);
-
-// Covered person status code:
-#line 1 "covered_person_status_get_integer_value_aig.fia_liab.for"
-double covered_person_status_get_integer_value_aig(StrEnum::EnumValue covered_person_status);
-
-// Sets the covered person status used for MAWP/PIPP rate lookups
-#line 1 "covered_person_status_set_aig.fia_liab.for"
-void covered_person_status_set_aig(void);
-
-// Death Claim Rate Monthly Calculation
-#line 1 "dth_claim_rate_mthly_calc.fia_liab.for"
-double dth_claim_rate_mthly_calc(
-	int t, int pol_yr, StrEnum::EnumValue mort_basis, StrEnum::EnumValue mort_gender_cv,
-	StrEnum::EnumValue confinement_status, int confinement_age = 0, int confinement_mths = 0);
-
-// Enhanced Income Benefit Eligibility Check Aig
-#line 1 "enhanced_income_benefit_eligibility_check_aig.fia_liab.for"
-bool enhanced_income_benefit_eligibility_check_aig(int policy_year, int enhanced_income_benefit_yrs, double fund_val);
-
-// Enhanced Income Benefit Exercise Check
-#line 1 "enhanced_income_benefit_exercise_check_aig.fia_liab.for"
-StrEnum::EnumValue enhanced_income_benefit_exercise_check_aig(int policy_year, int enhanced_income_benefit_yrs, double fund_val, 
-	StrEnum::EnumValue confinement_status, StrEnum::EnumValue projection_type );
-
-// Enhanced Income Benefit Exercise Column/Enum Translation
-#line 1 "enhanced_income_benefit_exercise_get_enum_aig.fia_liab.for"
-StrEnum::EnumValue enhanced_income_benefit_exercise_get_enum_aig(int benefit_flag);
-
-// Enhanced Income Confinement State Column/Enum Translation
-#line 1 "enhanced_income_confinement_state_get_enum_aig.fia_liab.for"
-StrEnum::EnumValue enhanced_income_confinement_state_get_enum_aig(int confinement_flag);
-
-// Fund Val Exhaust Aig
-#line 1 "fund_val_exhaust_aig.fia_liab.for"
-int fund_val_exhaust_aig(int t, double account_value, double gmwb_max_wthdrl_amt, bool calc_to_cal_yr_exhaust = true);
-
-// Uniform Rands Default Random Engine:
-#line 1 "gen_uniform_rands_default_random_engine_aig.fia_liab.for"
-void gen_uniform_rands_default_random_engine_aig(vector<vector<double>>& uniform_rands_arr);
-
-// Gen Uniform Rands Rafm Random Engine Aig
-#line 1 "gen_uniform_rands_rafm_random_engine_aig.fia_liab.for"
-void gen_uniform_rands_rafm_random_engine_aig(vector< vector <double>>& uniform_rands_arr);
-
-// Use model projection values to generate an RNG seed:
-#line 1 "gen_uniform_rands_seed_aig.fia_liab.for"
-int gen_uniform_rands_seed_aig(int scen_num, xstring mp_id);
-
-// Gender:
-#line 1 "gender_get_enum_value_aig.fia_liab.for"
-StrEnum::EnumValue gender_get_enum_value_aig(double gender_code);
-
-// Gender code:
-#line 1 "gender_get_integer_value_aig.fia_liab.for"
-double gender_get_integer_value_aig(StrEnum::EnumValue gender_cv);
-
-// Gender Set Aig
-#line 1 "gender_set_aig.fia_liab.for"
-void gender_set_aig(void);
+// Gen Uniform Rands Crbg
+#line 1 "gen_uniform_rands_crbg.fia_liab.for"
+void gen_uniform_rands_crbg(vector< vector <double>>& uniform_rands_arr);
 
 // Get Competitor Rate
 #line 1 "get_comp_rate.fia_liab.for"
 double get_comp_rate(xstring cr_id, int t);
 
-// Get Gmwb Withdrawal Fixed Utilization Rate:
-#line 1 "get_gmwb_wdl_fixed_utilization_rate_aig.fia_liab.for"
-double get_gmwb_wdl_fixed_utilization_rate_aig(int t);
+// Get Gmwb Wdl Init Util Level Crbg
+#line 1 "get_gmwb_wdl_init_util_level_crbg.fia_liab.for"
+double get_gmwb_wdl_init_util_level_crbg(double random_uniform_draw);
 
-// Get Gmwb Withdrawal Random Initial Utilization Level:
-#line 1 "get_gmwb_wdl_random_init_utilization_level_aig.fia_liab.for"
-StrEnum::EnumValue get_gmwb_wdl_random_init_utilization_level_aig(double random_uniform_draw);
+// Get Gmwb Wdl Util Level Crbg
+#line 1 "get_gmwb_wdl_util_level_crbg.fia_liab.for"
+double get_gmwb_wdl_util_level_crbg(double current_level, int transition_tbl_id,	double random_uniform_draw);
 
-// Get Gmwb Withdrawal Random Utilization Level:
-#line 1 "get_gmwb_wdl_random_utilization_level_aig.fia_liab.for"
-StrEnum::EnumValue get_gmwb_wdl_random_utilization_level_aig(
-	StrEnum::EnumValue current_level,
-	StrEnum::EnumValue transition_tbl_id,
-	double random_uniform_draw);
+// get_gmwb_wdl_util_prob_crbg
+#line 1 "get_gmwb_wdl_util_prob_crbg.fia_liab.for"
+double get_gmwb_wdl_util_prob_crbg(
+	double current_level, double tgt_level, int transition_tbl_id);
 
-// Get Gmwb Withdrawal Random Utilization Rate:
-#line 1 "get_gmwb_wdl_random_utilization_rate_aig.fia_liab.for"
-double get_gmwb_wdl_random_utilization_rate_aig(StrEnum::EnumValue util_level);
-
-// Get Gmwb Withdrawal Random Utilization Transition Probability:
-#line 1 "get_gmwb_wdl_random_utilization_transition_prob_aig.fia_liab.for"
-double get_gmwb_wdl_random_utilization_transition_prob_aig(
-	StrEnum::EnumValue current_level, 
-	StrEnum::EnumValue tgt_level,
-	StrEnum::EnumValue gmwb_wdl_utilization_transition_prob_tbl);
-
-// Randomly return a new utilization level:
-#line 1 "get_gmwb_wdl_utilization_level_aig.fia_liab.for"
-StrEnum::EnumValue get_gmwb_wdl_utilization_level_aig(
-	int t, double unif_rv_cv, StrEnum::EnumValue util_level_cv, double fund_val_e_bef_cv = 0.0, double gmwb_inf_e_bef_cv = 0.0);
-
-// Prints Claim Tail inner loop values
-#line 1 "gmwb_claim_print_debug_output_aig.fia_liab.for"
-void gmwb_claim_print_debug_output_aig(vector< vector <xstring> > debug_output);
-
-// Return the utilization level enum value:
-#line 1 "gmwb_wdl_utilization_level_get_enum_aig.fia_liab.for"
-StrEnum::EnumValue gmwb_wdl_utilization_level_get_enum_aig(double util_code);
-
-// Return number which corresponds to utilization level enum value:
-#line 1 "gmwb_wdl_utilization_level_get_integer_aig.fia_liab.for"
-double gmwb_wdl_utilization_level_get_integer_aig(StrEnum::EnumValue util_cv);
-
-// Index Rate Referencing --addition to base withdrawal rate:
-#line 1 "gmwb_withdrl_rate_indexing_addn_calc_aig.fia_liab.for"
-double gmwb_withdrl_rate_indexing_addn_calc_aig(int t, StrEnum::EnumValue income_phase, bool hypothetical_assessment);
-
-// Gmwb Withdrawal Rate Indexing Particpation Rate Calculation
-#line 1 "gmwb_withdrl_rate_indexing_part_rate_calc_aig.fia_liab.for"
-double gmwb_withdrl_rate_indexing_part_rate_calc_aig(int t, StrEnum::EnumValue income_phase);
+// Get Rate
+#line 1 "get_rate.fia_liab.for"
+double get_rate(StrEnum::EnumValue rate_defn, int t, const xstring &id_input, int rate_type, double rate_term_input, double fwd_or_moneyness, int return_rate_basis, int shift_type);
 
 // Internal Rate of Return Calculation
 #line 1 "irr_calc.fia_liab.for"
 double irr_calc(int t, const xstring &roi_type);
 
-// Issue Age Calc Aig
-#line 1 "issue_age_calc_aig.fia_liab.for"
-int issue_age_calc_aig(StrEnum::EnumValue gender_cv);
-
-// Calculate ISL 2019 Additional Lapse:
-#line 1 "lapse_dyn_rate_add_isl_2019_calc_aig.fia_liab.for"
-double lapse_dyn_rate_add_isl_2019_calc_aig(
-	int t, double cash_val_e_bef_cv, double gmwb_inf_e_bef_cv, double glb_apv_cv, double glb_apv_at_issue_cv, double mva_pct = 0.0);
+// Issue Age Calc Crbg
+#line 1 "issue_age_calc_crbg.fia_liab.for"
+int issue_age_calc_crbg(StrEnum::EnumValue gender_cv);
 
 // Dynamic Lapse Rate
 #line 1 "lapse_rate_dyn.fia_liab.for"
 double lapse_rate_dyn(int t);
 
-// Scale G2 mortality improvement
-#line 1 "mort_improve_mult_aig.fia_liab.for"
-double mort_improve_mult_aig(int att_age, StrEnum::EnumValue gender_local, int t);
+// Mort Improve Mult Crbg
+#line 1 "mort_improve_mult_crbg.fia_liab.for"
+double mort_improve_mult_crbg(int att_age, StrEnum::EnumValue gender_local, int t);
 
-// Calculate survivorship for inner loop projections:
-#line 1 "pv_benefit_projection_mort_rates_calc_aig.fia_liab.for"
-void pv_benefit_projection_mort_rates_calc_aig(const int& projection_month, const int& current_month, double& lxy, double& lx, double& ly, double& lxy_bar, double& dx, double& dy, double& dxy_bar);
-
-// Get withdrawal discount factor for ITM inner loops:
-#line 1 "pv_gmwb_benefit_disc_factor_calc_aig.fia_liab.for"
-double pv_gmwb_benefit_disc_factor_calc_aig(int t, int i, StrEnum::EnumValue discount_rate_override);
-
-// Current forward rate discounting:
-#line 1 "pv_gmwb_benefit_disc_factor_curr_forward_calc_aig.fia_liab.for"
-double pv_gmwb_benefit_disc_factor_curr_forward_calc_aig(int t, int i);
-
-// Current spot rate discounting:
-#line 1 "pv_gmwb_benefit_disc_factor_curr_spot_calc_aig.fia_liab.for"
-double pv_gmwb_benefit_disc_factor_curr_spot_calc_aig(int t, int i);
-
-// Future forwards discounting:
-#line 1 "pv_gmwb_benefit_disc_factor_future_forward_calc_aig.fia_liab.for"
-double pv_gmwb_benefit_disc_factor_future_forward_calc_aig(int t, int i);
-
-// Calculate at-issue ten-year swap discount factor:
-#line 1 "pv_gmwb_benefit_disc_factor_ten_year_swap_at_issue_calc_aig.fia_liab.for"
-double pv_gmwb_benefit_disc_factor_ten_year_swap_at_issue_calc_aig(int t, int i);
-
-// Calculate ten-year swap discount factor:
-#line 1 "pv_gmwb_benefit_disc_factor_ten_year_swap_calc_aig.fia_liab.for"
-double pv_gmwb_benefit_disc_factor_ten_year_swap_calc_aig(int t, int i);
-
-// AIG's PV of GMWB benefit calculation
-#line 1 "pv_gmwb_benefit_itm_calc_aig.fia_liab.for"
-double pv_gmwb_benefit_itm_calc_aig(int t, double gmwb_income_base, StrEnum::EnumValue discount_rate_override);
-
-// Prints ITM inner loop values
-#line 1 "pv_gmwb_benefit_itm_debug_print_aig.fia_liab.for"
-void pv_gmwb_benefit_itm_debug_print_aig(int t, vector< vector <xstring> > debug_output);
-
-// Debug output helper function:
-#line 1 "pv_gmwb_benefit_itm_debug_store_i_vals_aig.fia_liab.for"
-void pv_gmwb_benefit_itm_debug_store_i_vals_aig(
-	vector< vector <xstring> >& debug_output, int i, double period_wdl, double male_surv, double female_surv, double last_surv,
-	double disc_factor, double disc_male_wdls, double disc_female_wdls, double disc_joint_wdls, double fund_val);
-
-// Mortality Rate Used for ann_benefits_gmwb_calc_aig, Spousal 2019
-#line 1 "pv_gmwb_benefit_mort_rate_calc_spousal_2019_aig.fia_liab.for"
-double pv_gmwb_benefit_mort_rate_calc_spousal_2019_aig(int start_period, int i, int max_period, double spousal_continuation_election_rate);
-
-// Pv SFC Benefit Forward Rate Calc Aig
-#line 1 "pv_sfc_benefit_forward_rate_calc_aig.fia_liab.for"
-double pv_sfc_benefit_forward_rate_calc_aig(int t, int i);
-
-// Pv SFC Benefit Itm Calc Aig
-#line 1 "pv_sfc_benefit_itm_calc_aig.fia_liab.for"
-double pv_sfc_benefit_itm_calc_aig(int t);
+// PV GMWB Benefit for ITM
+#line 1 "pv_gmwb_benefit_itm_calc.fia_liab.for"
+double pv_gmwb_benefit_itm_calc(int t, int pol_yr, int pol_mth, double disc_rate, double gmwb_if_bef_eom, double gmwb_max_wthdrl_amt_bef, double pfwd_cumul);
 
 // Read State Of World Financial
 #line 1 "read_state_of_world_financial.fia_liab.for"
 void read_state_of_world_financial(void);
 
-// Sets Competitive Indicator End of the Month, Before Claims
-#line 1 "set_comp_lookup_e_bef_aig.fia_liab.for"
-void set_comp_lookup_e_bef_aig(int t);
-
 // Setup FIA Account Variables
 #line 1 "set_fia_account_vars.fia_liab.for"
 void set_fia_account_vars(void);
 
-// Set Minimum Income Base/Rollup Phase At the End of the Month, Before Claims
-#line 1 "set_gmwb_mib_rollup_phase_lookup_e_bef_aig.fia_liab.for"
-void set_gmwb_mib_rollup_phase_lookup_e_bef_aig(int t);
-
-// Set Income Phase Lookup at the Beginning of Month:
-#line 1 "set_income_phase_lookup_b_bef_aig.fia_liab.for"
-void set_income_phase_lookup_b_bef_aig(int t);
-
-// Set Income Phase At the End of the Month
-#line 1 "set_income_phase_lookup_e_aig.fia_liab.for"
-void set_income_phase_lookup_e_aig(int t);
-
-// Set Income Phase At the End of the Month, Before Claims
-#line 1 "set_income_phase_lookup_e_bef_aig.fia_liab.for"
-void set_income_phase_lookup_e_bef_aig(int t);
-
-// Sets In The Moneyness Lookup, end of the month, before claims
-#line 1 "set_itmness_lookup_e_bef_aig.fia_liab.for"
-void set_itmness_lookup_e_bef_aig(int t);
-
-// Spousal Continuation 2019 Death Claim Rate Calculation
-#line 1 "spousal_2019_dth_claim_rate_calc_aig.fia_liab.for"
-double spousal_2019_dth_claim_rate_calc_aig(double policies_last_to_die_bom, double policies_last_to_die_eom);
-
-// Spousal Continuation 2019 Female Policies Projection
-#line 1 "spousal_2019_proj_policies_female_aig.fia_liab.for"
-double spousal_2019_proj_policies_female_aig(int t, double policies_joint_cv, double policies_female_cv, double spousal_continuation_election_rate_cv);
-
-// Spousal Continuation 2019 Joint Policies Projection
-#line 1 "spousal_2019_proj_policies_joint_aig.fia_liab.for"
-double spousal_2019_proj_policies_joint_aig(int t, double policies_joint_cv);
-
-// Spousal Continuation 2019 Last Survivor Policies Projection
-#line 1 "spousal_2019_proj_policies_last_survivor_aig.fia_liab.for"
-double spousal_2019_proj_policies_last_survivor_aig(double policies_joint_cv, double policies_male_cv, double policies_female_cv);
-
-// Spousal Continuation 2019 Male Policies Projection
-#line 1 "spousal_2019_proj_policies_male_aig.fia_liab.for"
-double spousal_2019_proj_policies_male_aig(int t, double policies_joint_cv, double policies_male_cv, double spousal_continuation_election_rate_cv);
-
-// Statutory CARVM Reserve Interim Calc
-#line 1 "stat_res_calc_interim.fia_liab.for"
-double stat_res_calc_interim(const xstring &col_name, int time);
-
-// Sum Over Funds
-#line 1 "sum_over_funds.fia_liab.for"
-double sum_over_funds(const xstring &colname, int t, int type);
-
-// Surrender Charge Inforce Calculation (Fund Value)
-#line 1 "surr_chg_inf_fund_val_calc_aig.fia_liab.for"
-double surr_chg_inf_fund_val_calc_aig(
-    double fund_value,
-    double prem_bonus_recapture,
-    double pfwd_entitlement,
-    double prorata_gmwb_chg,
-    int t);
-
-// Tax CARVM Reserve Interim Calc
-#line 1 "tax_res_calc_interim.fia_liab.for"
-double tax_res_calc_interim(const xstring &col_name, int time);
-
-// Term To Omega Age Calculation
-#line 1 "term_to_omega_age_calc_aig.fia_liab.for"
-int term_to_omega_age_calc_aig(StrEnum::EnumValue gender, StrEnum::EnumValue mort_basis);
-
-// Number of days Between two Dates in years
-#line 1 "time_between_dates_calc_aig.fia_liab.for"
-double time_between_dates_calc_aig(xstring start_date, xstring end_date);
+// Time Between Dates Calc Crbg
+#line 1 "time_between_dates_calc_crbg.fia_liab.for"
+double time_between_dates_calc_crbg(xstring start_date, xstring end_date);
 
 // Validate Data
 #line 1 "validate_data.fia_liab.for"
 void validate_data(void);
-
-// Fund Value - Weighted Sum Over Funds, Beginning of Month After Charges
-#line 1 "weighted_sum_over_funds_b_aig.fia_liab.for"
-double weighted_sum_over_funds_b_aig(const xstring &colname, int t);
-
-// Fund Value - Weighted Sum Over Funds, Beginning of Month
-#line 1 "weighted_sum_over_funds_b_bef_aig.fia_liab.for"
-double weighted_sum_over_funds_b_bef_aig(const xstring &colname, int t);
-
-// Fund Value - Weighted Sum Over Funds, End of Month Before Claims
-#line 1 "weighted_sum_over_funds_e_bef_aig.fia_liab.for"
-double weighted_sum_over_funds_e_bef_aig(const xstring &colname, int t);
 
 // Write intermediate reserve calculations
 #line 1 "write_reserves.fia_liab.for"
@@ -3736,20 +2616,13 @@ public :
 	void write(const xstring& key, long include_submodels = write_submodels);
 
 	ModelClass *Save_main;
-	_1D_FIACARVM_LIAB &sm_carvm_stat; //
-	_1D_FIACARVM_LIAB &sm_carvm_tax; //
+	_2D_FIACARVM_LIAB &sm_carvm_stat; //
+	_2D_FIACARVM_LIAB &sm_carvm_tax; //
 	_1D_FIAAFUND_LIAB &sm_fia_account; //
 	_1D_ANN_PBA_PBA &sm_fia_ann_pba; //
-	AUTOMATION *&sm_fia_automation; //
+	_1D_MRB_GAAP &sm_fia_mrb; //
 	RATES_ECONOMY *&sm_fia_rates; //
-	_1D_SFAS133_GAAP &sm_fia_sfas133; //
 	_1D_SFAS97RD_GAAP &sm_fia_sfas97rd; //
-	FIA_LIAB *&sm_bond_is; //
-	FIA_LIAB *&sm_bond_pv; //
-	FIA_LIAB *&sm_bond_ym; //
-	FIA_LIAB *&sm_mtg_is; //
-	FIA_LIAB *&sm_mtg_pv; //
-	FIA_LIAB *&sm_mtg_ym; //
 
 	ProductFeatureList* pfl;
 

@@ -21,67 +21,46 @@ ADCO_ASSET_UDF(int columnCount, Descriptor* mocd[], Product* persObj)
 
 // Calendar Month 
 double adco_asset_cal_mth(int t);
-
 // Calendar Year 
 double adco_asset_cal_yr(int t);
-
 // Calendar Year Relative 
 double adco_asset_cal_yr_relative(int t);
-
 // Date 
 double adco_asset_date(int t);
-
 // Finalize 
 double adco_asset_finalize(int t);
-
 // Get Prepayment Rate 
 double adco_asset_get_prepmt_rate(int t);
-
 // Initialize 
 double adco_asset_initialize(int t);
-
 // Process ADCo detail 
 double adco_asset_process_adco_detail(int t);
-
 // Startup 
 virtual double virtual_startup(int t);
-
 // Detail Report Flag 
 int  adco_asset_asset_detail_rpt_flag();
-
 // Underlying  index 
 int  adco_asset_index();
-
 // Loan issuer 
 int  adco_asset_issuer();
-
 // Loan Type 
 int  adco_asset_loan_type();
-
 // Original Projection Start Mth 
 int  adco_asset_orig_proj_start_mth();
-
 // Original Projection Start Yr 
 int  adco_asset_orig_proj_start_yr();
-
 // Output File 
 xstring  adco_asset_output_file();
-
 // Output Path 
 xstring  adco_asset_output_path();
-
 // Projection Date Adjusted 
 xstring  adco_asset_proj_date_adj();
-
 // Projection Start Mth 
 int  adco_asset_proj_start_mth();
-
 // Projection Start Yr 
 int  adco_asset_proj_start_yr();
-
 // Start Period 
 int  adco_asset_start_period();
-
 
 };
 #endif

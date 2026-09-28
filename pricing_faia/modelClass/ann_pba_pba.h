@@ -2,6 +2,8 @@
 #define __ANN_PBA_PBA_H_
 #pragma warning ( disable : 4819 )
 
+	#define __ANN_PBA_PBA_H_
+
 #include <math.h>
 #include "xstring.h"
 #include "Locator.h"
@@ -60,7 +62,6 @@ extern MY_DLL ofstream log_strm;
 #include "StringProxy.h"			// ... contains String Proxies
 #include "StringEnumProxy.h"		// ... contains StringEnum Proxies
 #include "NumProxyNonMembers.h"		// ... min, max
-#include "StringedProxyNonMembers.h"		// ... concatenation for StringEnum
 #include "ArrayProxy.h"			// ... contains Array Proxies
 #include "ScalarProxy.h"			// ... contains Scalar Proxies
 #include "ModelGroupProxy.h"
@@ -70,6 +71,11 @@ extern MY_DLL ofstream log_strm;
 
 
 using namespace StrEnum;
+
+#ifdef __CREATE_AA_COMP_COMP_CLASS_
+class AA_COMP_COMP;
+class AA_COMP_COMP_persistent_object;
+#endif
 
 #ifdef __CREATE_ADCO_ASSET_CLASS_
 class ADCO_ASSET;
@@ -87,11 +93,6 @@ class ASSET_ASSET;
 class ASSET_ASSET_persistent_object;
 #endif
 
-#ifdef __CREATE_AUTOMATION_CLASS_
-class AUTOMATION;
-class AUTOMATION_persistent_object;
-#endif
-
 #ifdef __CREATE_A_SUBPORT_ASSET_CLASS_
 class A_SUBPORT_ASSET;
 class A_SUBPORT_ASSET_persistent_object;
@@ -104,22 +105,21 @@ typedef TMultiDComp<_2D_A_SUBPORT_ASSET, A_SUBPORT_ASSET_persistent_object> _3D_
 class BOND_ASSET;
 class BOND_ASSET_persistent_object;
 typedef TComp<BOND_ASSET, BOND_ASSET_persistent_object> _1D_BOND_ASSET;
+typedef TMultiDComp<_1D_BOND_ASSET, BOND_ASSET_persistent_object> _2D_BOND_ASSET;
 #endif
 
 #ifdef __CREATE_BOND_CF_ASSET_CLASS_
 class BOND_CF_ASSET;
 class BOND_CF_ASSET_persistent_object;
-#endif
-
-#ifdef __CREATE_COMP_COMP_CLASS_
-class COMP_COMP;
-class COMP_COMP_persistent_object;
+typedef TComp<BOND_CF_ASSET, BOND_CF_ASSET_persistent_object> _1D_BOND_CF_ASSET;
+typedef TMultiDComp<_1D_BOND_CF_ASSET, BOND_CF_ASSET_persistent_object> _2D_BOND_CF_ASSET;
 #endif
 
 #ifdef __CREATE_EIO_ASSET_CLASS_
 class EIO_ASSET;
 class EIO_ASSET_persistent_object;
 typedef TComp<EIO_ASSET, EIO_ASSET_persistent_object> _1D_EIO_ASSET;
+typedef TMultiDComp<_1D_EIO_ASSET, EIO_ASSET_persistent_object> _2D_EIO_ASSET;
 #endif
 
 #ifdef __CREATE_EPA_ASSET_CLASS_
@@ -144,6 +144,7 @@ typedef TComp<FIAAFUND_LIAB, FIAAFUND_LIAB_persistent_object> _1D_FIAAFUND_LIAB;
 class FIACARVM_LIAB;
 class FIACARVM_LIAB_persistent_object;
 typedef TComp<FIACARVM_LIAB, FIACARVM_LIAB_persistent_object> _1D_FIACARVM_LIAB;
+typedef TMultiDComp<_1D_FIACARVM_LIAB, FIACARVM_LIAB_persistent_object> _2D_FIACARVM_LIAB;
 #endif
 
 #ifdef __CREATE_FIA_LIAB_CLASS_
@@ -159,11 +160,6 @@ typedef TComp<HDG_GRP_COMP, HDG_GRP_COMP_persistent_object> _1D_HDG_GRP_COMP;
 typedef TMultiDComp<_1D_HDG_GRP_COMP, HDG_GRP_COMP_persistent_object> _2D_HDG_GRP_COMP;
 #endif
 
-#ifdef __CREATE_INTEX_ASSET_CLASS_
-class INTEX_ASSET;
-class INTEX_ASSET_persistent_object;
-#endif
-
 #ifdef __CREATE_INVSTRAT_ASSET_CLASS_
 class INVSTRAT_ASSET;
 class INVSTRAT_ASSET_persistent_object;
@@ -175,15 +171,24 @@ class LIAB_LIAB;
 class LIAB_LIAB_persistent_object;
 #endif
 
+#ifdef __CREATE_MRB_GAAP_CLASS_
+class MRB_GAAP;
+class MRB_GAAP_persistent_object;
+typedef TComp<MRB_GAAP, MRB_GAAP_persistent_object> _1D_MRB_GAAP;
+#endif
+
 #ifdef __CREATE_MTG_ASSET_CLASS_
 class MTG_ASSET;
 class MTG_ASSET_persistent_object;
 typedef TComp<MTG_ASSET, MTG_ASSET_persistent_object> _1D_MTG_ASSET;
+typedef TMultiDComp<_1D_MTG_ASSET, MTG_ASSET_persistent_object> _2D_MTG_ASSET;
 #endif
 
 #ifdef __CREATE_MTG_CF_ASSET_CLASS_
 class MTG_CF_ASSET;
 class MTG_CF_ASSET_persistent_object;
+typedef TComp<MTG_CF_ASSET, MTG_CF_ASSET_persistent_object> _1D_MTG_CF_ASSET;
+typedef TMultiDComp<_1D_MTG_CF_ASSET, MTG_CF_ASSET_persistent_object> _2D_MTG_CF_ASSET;
 #endif
 
 #ifdef __CREATE_RATES_ECONOMY_CLASS_
@@ -197,22 +202,11 @@ class SEG_COMP_persistent_object;
 typedef TComp<SEG_COMP, SEG_COMP_persistent_object> _1D_SEG_COMP;
 #endif
 
-#ifdef __CREATE_SFAS133_GAAP_CLASS_
-class SFAS133_GAAP;
-class SFAS133_GAAP_persistent_object;
-typedef TComp<SFAS133_GAAP, SFAS133_GAAP_persistent_object> _1D_SFAS133_GAAP;
-#endif
-
 #ifdef __CREATE_SFAS97RD_GAAP_CLASS_
 class SFAS97RD_GAAP;
 class SFAS97RD_GAAP_persistent_object;
 typedef TComp<SFAS97RD_GAAP, SFAS97RD_GAAP_persistent_object> _1D_SFAS97RD_GAAP;
 typedef TMultiDComp<_1D_SFAS97RD_GAAP, SFAS97RD_GAAP_persistent_object> _2D_SFAS97RD_GAAP;
-#endif
-
-#ifdef __CREATE_UTIL_RAFM_CLASS_
-class UTIL_RAFM;
-class UTIL_RAFM_persistent_object;
 #endif
 
 
@@ -254,13 +248,23 @@ public :
 	static HVector<ModelClass::ddfStruct> ddfVector; 
 	static BitArray dataVariables; 
 	static bool hasBeenWritten;
-
-//typedef map <int, long, less <int> > mpmap; //Gen2 - 9/6/2024 - comment out typedef
+	static void Terminator();
+	static FunctionPtr RegisterTerminatorOnce;
+	
 int scen_greatest_pv_period;
 double init_assets;
 double init_asset_pct;
 SmartArray <double> hedge_cash_flow_array;
 SmartArray <double> hedge_mkt_val_array;
+
+#if defined(__AA_COMP_COMP_H_)
+RATES_ECONOMY /*modelobject_name: RATES*/ *rates_ptr;
+#else
+RATES_ECONOMY /*modelobject_name: FIA_RATES*/ *rates_ptr;
+#endif
+
+SEG_COMP * seg_element;
+
 
 	void init_(){
 		
@@ -275,6 +279,10 @@ scen_greatest_pv_period = -1;
 
 	}
 
+#ifdef __CREATE_ADCO_ASSET_CLASS_
+	ADCO_ASSET	*company_asset_adco;
+	ADCO_ASSET	*&adco;
+#endif
 #ifdef __CREATE_ANN_PBA_PBA_CLASS_
 	ANN_PBA_PBA	*company_seg_ann_pba;
 	ANN_PBA_PBA	*&ann_pba;
@@ -283,8 +291,8 @@ scen_greatest_pv_period = -1;
 	ASSET_ASSET	*company_asset;
 	ASSET_ASSET	*&asset;
 #endif
-#ifdef __CREATE_COMP_COMP_CLASS_
-	COMP_COMP	*company;
+#ifdef __CREATE_AA_COMP_COMP_CLASS_
+	AA_COMP_COMP	*company;
 #endif
 #ifdef __CREATE_FIA_LIAB_CLASS_
 	FIA_LIAB	*company_liab_fia;
@@ -293,10 +301,6 @@ scen_greatest_pv_period = -1;
 #ifdef __CREATE_ANN_PBA_PBA_CLASS_
 	ANN_PBA_PBA	*company_liab_fia_fia_ann_pba;
 	ANN_PBA_PBA	*&fia_ann_pba;
-#endif
-#ifdef __CREATE_AUTOMATION_CLASS_
-	AUTOMATION	*company_liab_fia_fia_automation;
-	AUTOMATION	*&fia_automation;
 #endif
 #ifdef __CREATE_RATES_ECONOMY_CLASS_
 	RATES_ECONOMY	*company_liab_fia_fia_rates;
@@ -317,6 +321,7 @@ scen_greatest_pv_period = -1;
  // Column Definition Begins
  	ColumnAccessor < mCFStaticData_0 > asset_yld_mthly;
  	ColumnAccessor < mCFStaticData_0 > assets_accum;
+ 	ColumnAccessor < mCFStaticData_0 > assets_accum_inv;
  	ColumnAccessor < mCFStaticData_0 > cal_mth;
  	ColumnAccessor < mCFStaticData_0 > cal_yr;
  	ColumnAccessor < mCFStaticData_0 > cal_yr_relative;
@@ -324,6 +329,9 @@ scen_greatest_pv_period = -1;
  	ColumnAccessor < mCFStaticData_0 > cash_flow;
  	ColumnAccessor < mCFStaticData_0 > cash_flow_int;
  	ColumnAccessor < mCFStaticData_0 > cash_flow_rate_mthly;
+ 	ColumnAccessor < mCFStaticData_0 > cash_from_hedge;
+ 	ColumnAccessor < mCFStaticData_0 > cash_from_hedge_int;
+ 	ColumnAccessor < mCFStaticData_0 > cash_val;
  	ColumnAccessor < mCFStaticData_0 > date;
  	ColumnAccessor < mCFStaticData_0 > def_accum;
  	ColumnAccessor < mCFStaticData_0 > direct_cap_gain;
@@ -382,12 +390,6 @@ scen_greatest_pv_period = -1;
 //Column Definition END@2
 
  // Temporary Table...
-ANN_PBA_PBA *sm_bond_is;
-ANN_PBA_PBA *sm_bond_pv;
-ANN_PBA_PBA *sm_bond_ym;
-ANN_PBA_PBA *sm_mtg_is;
-ANN_PBA_PBA *sm_mtg_pv;
-ANN_PBA_PBA *sm_mtg_ym;
 int main_rebase_model; //1
 
 public :
@@ -406,9 +408,31 @@ public :
 #ifdef MICROSOFT
 #pragma warning(pop)
 #endif	MICROSOFT
+	Attribute::Proxy <xstring, DESCRIPTOR_TABLE > category_id;
+  inline xstring	Get_category_id() {
+		return category_id; }
+  inline void Set_category_id(const xstring &v) {
+		category_id.setValue(v); }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > cte_pct_stoch_cap;
   inline double	Get_cte_pct_stoch_cap() {
 		return cte_pct_stoch_cap; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > dflt_max_net_sprd_adj_factor;
+  inline double	Get_dflt_max_net_sprd_adj_factor() {
+		return dflt_max_net_sprd_adj_factor; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > dflt_sprd_related_factor;
+  inline double	Get_dflt_sprd_related_factor() {
+		return dflt_sprd_related_factor; }
+	Attribute::Proxy <xstring, DESCRIPTOR_TABLE > existing_asset_lookup;
+  inline xstring	Get_existing_asset_lookup() {
+		return existing_asset_lookup; }
+  inline void Set_existing_asset_lookup(const xstring &v) {
+		existing_asset_lookup.setValue(v); }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > gen2_declarations;
+  inline xstring	Get_gen2_declarations() {
+		return gen2_declarations; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > hedge_payoff_margin;
+  inline double	Get_hedge_payoff_margin() {
+		return hedge_payoff_margin; }
 	Attribute::Proxy <StringEnum, DESCRIPTOR_TABLE > hedging_cash_flow_defn;
   inline xstring	Get_hedging_cash_flow_defn() {
 		return hedging_cash_flow_defn; }
@@ -428,30 +452,27 @@ public :
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > hedging_e_factor_stoch_res;
   inline double	Get_hedging_e_factor_stoch_res() {
 		return hedging_e_factor_stoch_res; }
-	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > hedging_output_file_best_estimate_stoch_cap;
-  inline xstring	Get_hedging_output_file_best_estimate_stoch_cap() {
-		return hedging_output_file_best_estimate_stoch_cap; }
-	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > hedging_output_file_best_estimate_stoch_res;
-  inline xstring	Get_hedging_output_file_best_estimate_stoch_res() {
-		return hedging_output_file_best_estimate_stoch_res; }
-	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > hedging_output_file_existing_hedges_stoch_cap;
-  inline xstring	Get_hedging_output_file_existing_hedges_stoch_cap() {
-		return hedging_output_file_existing_hedges_stoch_cap; }
-	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > hedging_output_file_existing_hedges_stoch_res;
-  inline xstring	Get_hedging_output_file_existing_hedges_stoch_res() {
-		return hedging_output_file_existing_hedges_stoch_res; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > hedging_stat_scale_factor_max_stoch_cap;
-  inline double	Get_hedging_stat_scale_factor_max_stoch_cap() {
-		return hedging_stat_scale_factor_max_stoch_cap; }
-	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > hedging_stat_scale_factor_max_stoch_res;
-  inline double	Get_hedging_stat_scale_factor_max_stoch_res() {
-		return hedging_stat_scale_factor_max_stoch_res; }
+	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > hedging_output_file_best_estimate_stoch;
+  inline xstring	Get_hedging_output_file_best_estimate_stoch() {
+		return hedging_output_file_best_estimate_stoch; }
+	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > hedging_output_file_existing_hedges_stoch;
+  inline xstring	Get_hedging_output_file_existing_hedges_stoch() {
+		return hedging_output_file_existing_hedges_stoch; }
+	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > hedging_stat_scale_factor_max_stoch;
+  inline double	Get_hedging_stat_scale_factor_max_stoch() {
+		return hedging_stat_scale_factor_max_stoch; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_asset_pct_input;
   inline double	Get_init_asset_pct_input() {
 		return init_asset_pct_input; }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > init_assets_defn;
+  inline xstring	Get_init_assets_defn() {
+		return init_assets_defn; }
 	Attribute::ProxyReadOnly <double, DESCRIPTOR_TABLE > init_assets_input;
   inline double	Get_init_assets_input() {
 		return init_assets_input; }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > model_name;
+  inline xstring	Get_model_name() {
+		return model_name; }
 	Attribute::Proxy <StringEnum, DESCRIPTOR_TABLE > pba_code;
   inline xstring	Get_pba_code() {
 		return pba_code; }
@@ -484,15 +505,27 @@ public :
 		return seg_id; }
   inline void Set_seg_id(const xstring &v) {
 		seg_id.setValue(v); }
-	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > tax_defn_stoch_cap;
+	Attribute::Proxy <xstring, DESCRIPTOR_TABLE > seg_id_lookup;
+  inline xstring	Get_seg_id_lookup() {
+		return seg_id_lookup; }
+  inline void Set_seg_id_lookup(const xstring &v) {
+		seg_id_lookup.setValue(v); }
+	Attribute::Proxy <StringEnum, DESCRIPTOR_TABLE > tax_defn_stoch_cap;
   inline xstring	Get_tax_defn_stoch_cap() {
 		return tax_defn_stoch_cap; }
-	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > valn_results_stoch_cap;
-  inline xstring	Get_valn_results_stoch_cap() {
-		return valn_results_stoch_cap; }
-	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > valn_results_stoch_res;
-  inline xstring	Get_valn_results_stoch_res() {
-		return valn_results_stoch_res; }
+  inline void Set_tax_defn_stoch_cap(const xstring &v) {
+		tax_defn_stoch_cap.setValue(v); }
+	Attribute::ProxyReadOnly <StringEnum, DESCRIPTOR_TABLE > tax_defn_stoch_cap_input;
+  inline xstring	Get_tax_defn_stoch_cap_input() {
+		return tax_defn_stoch_cap_input; }
+	Attribute::ProxyReadOnly <xstring, DESCRIPTOR_TABLE > valn_results_scen_amt;
+  inline xstring	Get_valn_results_scen_amt() {
+		return valn_results_scen_amt; }
+	Attribute::Proxy <double, DESCRIPTOR_TABLE > wal_lookup;
+  inline double	Get_wal_lookup() {
+		return wal_lookup; }
+  inline void Set_wal_lookup(const double &v) {
+		wal_lookup.setValue(v); }
 	Attribute::Proxy <StringEnum, DESCRIPTOR_TABLE > working_res_defn_input;
   inline xstring	Get_working_res_defn_input() {
 		return working_res_defn_input; }
@@ -520,7 +553,6 @@ public :
 	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > start_period;
 	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > tax_capzd_prem_amortzn_yrs;
 	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > tax_flag;
-	Attribute::Proxy<Scalar<xstring>, DESCRIPTOR_TABLE > valn_results_scen_amt;
 	Attribute::Proxy<Scalar<int>, DESCRIPTOR_TABLE > working_res_defn;
 
 void setPtr_col(int cf_no, CashFlowBase* cf);
@@ -543,7 +575,15 @@ void get_hedge_items(void);
 
 // Sum Over PBA
 #line 1 "sum_over_pba.ann_pba_pba.for"
-double sum_over_pba(const xstring &colname, int t);
+double sum_over_pba(const xstring &/* CiProxyFormula */colname, const int /* CiProxyTime */ t);
+
+// Sum Over PBA EPL
+#line 1 "sum_over_pba_epl.ann_pba_pba.for"
+double sum_over_pba_epl(const xstring & colname, const int t);
+
+// Write Valuation Output
+#line 1 "write_valuation_output.ann_pba_pba.for"
+void write_valuation_output(xstring group_name);
 
 
 //factory
@@ -620,12 +660,6 @@ public :
 	void write(const xstring& key, long include_submodels = write_submodels);
 
 	ModelClass *Save_main;
-	ANN_PBA_PBA *&sm_bond_is; //
-	ANN_PBA_PBA *&sm_bond_pv; //
-	ANN_PBA_PBA *&sm_bond_ym; //
-	ANN_PBA_PBA *&sm_mtg_is; //
-	ANN_PBA_PBA *&sm_mtg_pv; //
-	ANN_PBA_PBA *&sm_mtg_ym; //
 
 	ProductFeatureList* pfl;
 
